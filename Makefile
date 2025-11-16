@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Werror -std=c99 -D_POSIX_C_SOURCE=200809L -O2
+CFLAGS = -Wall -Wextra -Werror -std=c99 -D_POSIX_C_SOURCE=200809L -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -O2
 LDFLAGS =
 
 # Directories
@@ -29,10 +29,12 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/http_client.c \
           $(SRCDIR)/registry.c \
           $(SRCDIR)/install_env.c \
+          $(SRCDIR)/fileutil.c \
           $(SRCDIR)/pgsolver/pg_core.c \
           $(SRCDIR)/pgsolver/pg_elm.c \
           $(SRCDIR)/vendor/sha1.c \
-          $(SRCDIR)/vendor/sha256.c
+          $(SRCDIR)/vendor/sha256.c \
+          $(SRCDIR)/vendor/miniz.c
 BUILDINFO_SRC = $(BUILDDIR)/buildinfo.c
 OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/alloc.o \
@@ -54,10 +56,12 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/http_client.o \
           $(BUILDDIR)/registry.o \
           $(BUILDDIR)/install_env.o \
+          $(BUILDDIR)/fileutil.o \
           $(BUILDDIR)/pg_core.o \
           $(BUILDDIR)/pg_elm.o \
           $(BUILDDIR)/sha1.o \
           $(BUILDDIR)/sha256.o \
+          $(BUILDDIR)/miniz.o \
           $(BUILDDIR)/buildinfo.o
 TARGET = $(BINDIR)/$(TARGET_FILE)
 PG_CORE_TEST = $(BINDIR)/pg_core_test
@@ -130,7 +134,7 @@ $(BUILDDIR)/publish.o: $(SRCDIR)/publish.c $(SRCDIR)/publish.h $(SRCDIR)/elm_jso
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build install object
-$(BUILDDIR)/install.o: $(SRCDIR)/install.c $(SRCDIR)/install.h $(SRCDIR)/install_check.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h | $(BUILDDIR)
+$(BUILDDIR)/install.o: $(SRCDIR)/install.c $(SRCDIR)/install.h $(SRCDIR)/install_check.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build install_check object
@@ -178,7 +182,11 @@ $(BUILDDIR)/registry.o: $(SRCDIR)/registry.c $(SRCDIR)/registry.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build install_env object
-$(BUILDDIR)/install_env.o: $(SRCDIR)/install_env.c $(SRCDIR)/install_env.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/http_client.h $(SRCDIR)/cJSON.h $(SRCDIR)/vendor/sha1.h | $(BUILDDIR)
+$(BUILDDIR)/install_env.o: $(SRCDIR)/install_env.c $(SRCDIR)/install_env.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/http_client.h $(SRCDIR)/cJSON.h $(SRCDIR)/vendor/sha1.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build fileutil object
+$(BUILDDIR)/fileutil.o: $(SRCDIR)/fileutil.c $(SRCDIR)/fileutil.h $(SRCDIR)/vendor/miniz.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build sha1 object
@@ -187,6 +195,10 @@ $(BUILDDIR)/sha1.o: $(SRCDIR)/vendor/sha1.c $(SRCDIR)/vendor/sha1.h | $(BUILDDIR
 
 # Build sha256 object
 $(BUILDDIR)/sha256.o: $(SRCDIR)/vendor/sha256.c $(SRCDIR)/vendor/sha256.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build miniz object
+$(BUILDDIR)/miniz.o: $(SRCDIR)/vendor/miniz.c $(SRCDIR)/vendor/miniz.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Link final binary

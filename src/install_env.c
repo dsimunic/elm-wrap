@@ -3,6 +3,7 @@
 #include "cJSON.h"
 #include "vendor/sha1.h"
 #include "log.h"
+#include "fileutil.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -575,16 +576,11 @@ bool install_env_download_package(InstallEnv *env, const char *author, const cha
         return false;
     }
 
-    /* Extract the archive using unzip command */
-    char unzip_cmd[1024];
-    snprintf(unzip_cmd, sizeof(unzip_cmd), "unzip -q -o \"%s\" -d \"%s\"", temp_file, pkg_dir);
-
+    /* Extract the archive */
     log_progress("  Extracting to: %s", pkg_dir);
 
-    int unzip_result = system(unzip_cmd);
-    if (unzip_result != 0) {
-        fprintf(stderr, "Error: Failed to extract package archive (exit code: %d)\n", unzip_result);
-        fprintf(stderr, "  Command: %s\n", unzip_cmd);
+    if (!extract_zip(temp_file, pkg_dir)) {
+        fprintf(stderr, "Error: Failed to extract package archive\n");
         arena_free(pkg_dir);
         remove(temp_file);
         cJSON_Delete(endpoint);
@@ -593,23 +589,16 @@ bool install_env_download_package(InstallEnv *env, const char *author, const cha
 
     /* GitHub zipballs extract to a subdirectory named author-package-commithash
      * We need to move the contents up one level.
-     * Use a shell command to find the subdirectory and move its contents up.
      */
-    char move_cmd[2048];
-    snprintf(move_cmd, sizeof(move_cmd),
-             "cd \"%s\" && "
-             "subdir=$(ls -1 | head -n 1) && "
-             "if [ -d \"$subdir\" ]; then "
-             "  mv \"$subdir\"/* . 2>/dev/null || true && "
-             "  mv \"$subdir\"/.[!.]* . 2>/dev/null || true && "
-             "  rmdir \"$subdir\" 2>/dev/null || true; "
-             "fi",
-             pkg_dir);
-
-    int move_result = system(move_cmd);
-    if (move_result != 0) {
-        fprintf(stderr, "Warning: Failed to reorganize package directory (exit code: %d)\n", move_result);
-        /* Don't fail the entire operation, the files might still be usable */
+    char *subdir = find_first_subdirectory(pkg_dir);
+    if (subdir) {
+        if (!move_directory_contents(subdir, pkg_dir)) {
+            fprintf(stderr, "Warning: Failed to reorganize package directory\n");
+            /* Don't fail the entire operation, the files might still be usable */
+        }
+        /* Try to remove the now-empty subdirectory */
+        rmdir(subdir);
+        arena_free(subdir);
     }
 
     /* Clean up */

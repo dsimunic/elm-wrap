@@ -9,6 +9,7 @@
 #include "alloc.h"
 #include "log.h"
 #include "progname.h"
+#include "fileutil.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -242,35 +243,6 @@ static bool ensure_path_exists(const char *path) {
 }
 
 // Helper function to find first subdirectory in a directory
-static char* find_first_subdirectory(const char *dir_path) {
-    DIR *dir = opendir(dir_path);
-    if (!dir) return NULL;
-
-    struct dirent *entry;
-    char *found_dir = NULL;
-
-    while ((entry = readdir(dir)) != NULL) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-
-        size_t subdir_len = strlen(dir_path) + strlen(entry->d_name) + 2;
-        char *subdir_path = arena_malloc(subdir_len);
-        if (!subdir_path) continue;
-        snprintf(subdir_path, subdir_len, "%s/%s", dir_path, entry->d_name);
-
-        struct stat st;
-        if (stat(subdir_path, &st) == 0 && S_ISDIR(st.st_mode)) {
-            found_dir = subdir_path;
-            break;
-        }
-        arena_free(subdir_path);
-    }
-
-    closedir(dir);
-    return found_dir;
-}
-
 // Helper function to install package from local file/directory
 static bool install_from_file(const char *source_path, InstallEnv *env, const char *author, const char *name, const char *version) {
     struct stat st;
@@ -311,9 +283,9 @@ static bool install_from_file(const char *source_path, InstallEnv *env, const ch
 
     // Delete existing version directory if it exists
     if (stat(dest_path, &st) == 0) {
-        char rm_cmd[4096];
-        snprintf(rm_cmd, sizeof(rm_cmd), "rm -rf \"%s\"", dest_path);
-        system(rm_cmd);
+        if (!remove_directory_recursive(dest_path)) {
+            fprintf(stderr, "Warning: Failed to remove existing directory: %s\n", dest_path);
+        }
     }
 
     // Check if source_path has elm.json at root (direct package dir) or has a subdirectory (extracted zip)
@@ -321,12 +293,10 @@ static bool install_from_file(const char *source_path, InstallEnv *env, const ch
     snprintf(elm_json_check, sizeof(elm_json_check), "%s/elm.json", source_path);
     bool has_elm_json_at_root = (stat(elm_json_check, &st) == 0);
 
-    int result = 0;
+    bool result = true;
     if (has_elm_json_at_root) {
         // Direct package directory - copy contents
-        char cp_cmd[4096];
-        snprintf(cp_cmd, sizeof(cp_cmd), "cp -r \"%s\" \"%s\"", source_path, dest_path);
-        result = system(cp_cmd);
+        result = copy_directory_recursive(source_path, dest_path);
     } else {
         // Extracted zip - find the subdirectory and move it
         char *extracted_dir = find_first_subdirectory(source_path);
@@ -338,13 +308,17 @@ static bool install_from_file(const char *source_path, InstallEnv *env, const ch
         }
 
         // Move the extracted directory to the final destination
-        char mv_cmd[4096];
-        snprintf(mv_cmd, sizeof(mv_cmd), "mv \"%s\" \"%s\"", extracted_dir, dest_path);
-        result = system(mv_cmd);
+        if (rename(extracted_dir, dest_path) != 0) {
+            /* rename() failed, possibly cross-device, fall back to copy+delete */
+            result = copy_directory_recursive(extracted_dir, dest_path);
+            if (result) {
+                remove_directory_recursive(extracted_dir);
+            }
+        }
         arena_free(extracted_dir);
     }
 
-    if (result != 0) {
+    if (!result) {
         fprintf(stderr, "Error: Failed to install package to destination\n");
         arena_free(pkg_base_dir);
         arena_free(dest_path);
@@ -815,9 +789,7 @@ int cmd_install(int argc, char *argv[]) {
             }
 
             // Extract to temp location
-            char extract_cmd[4096];
-            snprintf(extract_cmd, sizeof(extract_cmd), "unzip -q -o \"%s\" -d \"%s\"", temp_file, temp_dir_buf);
-            if (system(extract_cmd) != 0) {
+            if (!extract_zip(temp_file, temp_dir_buf)) {
                 fprintf(stderr, "Error: Failed to extract archive\n");
                 arena_free(author);
                 arena_free(name);

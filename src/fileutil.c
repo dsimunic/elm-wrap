@@ -1,0 +1,342 @@
+#include "fileutil.h"
+#include "vendor/miniz.h"
+#include "alloc.h"
+#include "log.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <unistd.h>
+#include <errno.h>
+#include <libgen.h>
+#include <limits.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
+/* Ensure a directory exists, creating it and parent directories if necessary */
+static bool ensure_directory(const char *path) {
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        return S_ISDIR(st.st_mode);
+    }
+
+    /* Create parent directory first */
+    char *path_copy = arena_strdup(path);
+    if (!path_copy) return false;
+
+    char *parent = dirname(path_copy);
+    if (strcmp(parent, ".") != 0 && strcmp(parent, "/") != 0) {
+        if (!ensure_directory(parent)) {
+            arena_free(path_copy);
+            return false;
+        }
+    }
+    arena_free(path_copy);
+
+    /* Create this directory */
+    if (mkdir(path, 0755) != 0 && errno != EEXIST) {
+        return false;
+    }
+
+    return true;
+}
+
+/* Extract a ZIP file to a destination directory */
+bool extract_zip(const char *zip_path, const char *dest_dir) {
+    mz_zip_archive zip;
+    memset(&zip, 0, sizeof(zip));
+
+    if (!mz_zip_reader_init_file(&zip, zip_path, 0)) {
+        fprintf(stderr, "Error: Failed to open ZIP file: %s\n", zip_path);
+        return false;
+    }
+
+    int num_files = mz_zip_reader_get_num_files(&zip);
+    bool success = true;
+
+    for (int i = 0; i < num_files; i++) {
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(&zip, i, &file_stat)) {
+            fprintf(stderr, "Error: Failed to get file stat for index %d\n", i);
+            success = false;
+            break;
+        }
+
+        /* Build output path */
+        char output_path[4096];
+        snprintf(output_path, sizeof(output_path), "%s/%s", dest_dir, file_stat.m_filename);
+
+        if (mz_zip_reader_is_file_a_directory(&zip, i)) {
+            /* Create directory */
+            if (!ensure_directory(output_path)) {
+                fprintf(stderr, "Error: Failed to create directory: %s\n", output_path);
+                success = false;
+                break;
+            }
+        } else {
+            /* Extract file */
+            /* Ensure parent directory exists */
+            char *output_copy = arena_strdup(output_path);
+            if (!output_copy) {
+                success = false;
+                break;
+            }
+            char *parent = dirname(output_copy);
+            if (!ensure_directory(parent)) {
+                fprintf(stderr, "Error: Failed to create parent directory: %s\n", parent);
+                arena_free(output_copy);
+                success = false;
+                break;
+            }
+            arena_free(output_copy);
+
+            /* Extract the file */
+            if (!mz_zip_reader_extract_to_file(&zip, i, output_path, 0)) {
+                fprintf(stderr, "Error: Failed to extract file: %s\n", file_stat.m_filename);
+                success = false;
+                break;
+            }
+        }
+    }
+
+    mz_zip_reader_end(&zip);
+    return success;
+}
+
+/* Find the first subdirectory in a directory */
+char* find_first_subdirectory(const char *dir_path) {
+    DIR *dir = opendir(dir_path);
+    if (!dir) {
+        return NULL;
+    }
+
+    struct dirent *entry;
+    char *result = NULL;
+
+    while ((entry = readdir(dir)) != NULL) {
+        /* Skip . and .. */
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        /* Build full path */
+        char full_path[4096];
+        snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, entry->d_name);
+
+        struct stat st;
+        if (stat(full_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+            result = arena_strdup(full_path);
+            break;
+        }
+    }
+
+    closedir(dir);
+    return result;
+}
+
+/* Move a single file or directory */
+static bool move_item(const char *src, const char *dest) {
+    /* Try rename first (fast, atomic) */
+    if (rename(src, dest) == 0) {
+        return true;
+    }
+
+    /* If rename failed (possibly cross-device), fall back to copy+delete */
+    struct stat st;
+    if (stat(src, &st) != 0) {
+        return false;
+    }
+
+    if (S_ISDIR(st.st_mode)) {
+        /* For directories, use recursive copy then delete */
+        if (!copy_directory_recursive(src, dest)) {
+            return false;
+        }
+        return remove_directory_recursive(src);
+    } else {
+        /* For files, copy then delete */
+        FILE *src_file = fopen(src, "rb");
+        if (!src_file) return false;
+
+        FILE *dest_file = fopen(dest, "wb");
+        if (!dest_file) {
+            fclose(src_file);
+            return false;
+        }
+
+        char buffer[8192];
+        size_t n;
+        bool success = true;
+        while ((n = fread(buffer, 1, sizeof(buffer), src_file)) > 0) {
+            if (fwrite(buffer, 1, n, dest_file) != n) {
+                success = false;
+                break;
+            }
+        }
+
+        fclose(src_file);
+        fclose(dest_file);
+
+        if (success) {
+            unlink(src);
+        }
+        return success;
+    }
+}
+
+/* Move contents of source directory to destination directory */
+bool move_directory_contents(const char *src_dir, const char *dest_dir) {
+    DIR *dir = opendir(src_dir);
+    if (!dir) {
+        fprintf(stderr, "Error: Failed to open directory: %s\n", src_dir);
+        return false;
+    }
+
+    struct dirent *entry;
+    bool success = true;
+
+    while ((entry = readdir(dir)) != NULL) {
+        /* Skip . and .. */
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        char src_path[4096];
+        char dest_path[4096];
+        snprintf(src_path, sizeof(src_path), "%s/%s", src_dir, entry->d_name);
+        snprintf(dest_path, sizeof(dest_path), "%s/%s", dest_dir, entry->d_name);
+
+        if (!move_item(src_path, dest_path)) {
+            fprintf(stderr, "Warning: Failed to move %s to %s\n", src_path, dest_path);
+            /* Continue with other files even if one fails */
+        }
+    }
+
+    closedir(dir);
+    return success;
+}
+
+/* Recursively delete a directory and all its contents */
+bool remove_directory_recursive(const char *path) {
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        /* Path doesn't exist, consider it success */
+        return true;
+    }
+
+    if (!S_ISDIR(st.st_mode)) {
+        /* It's a file, just delete it */
+        return unlink(path) == 0;
+    }
+
+    /* It's a directory, delete contents first */
+    DIR *dir = opendir(path);
+    if (!dir) {
+        return false;
+    }
+
+    struct dirent *entry;
+    bool success = true;
+
+    while ((entry = readdir(dir)) != NULL) {
+        /* Skip . and .. */
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        char entry_path[4096];
+        snprintf(entry_path, sizeof(entry_path), "%s/%s", path, entry->d_name);
+
+        if (!remove_directory_recursive(entry_path)) {
+            success = false;
+            /* Continue trying to delete other entries */
+        }
+    }
+
+    closedir(dir);
+
+    /* Remove the now-empty directory */
+    if (success) {
+        success = (rmdir(path) == 0);
+    }
+
+    return success;
+}
+
+/* Recursively copy a directory and all its contents */
+bool copy_directory_recursive(const char *src_path, const char *dest_path) {
+    struct stat st;
+    if (stat(src_path, &st) != 0) {
+        return false;
+    }
+
+    if (!S_ISDIR(st.st_mode)) {
+        /* It's a file, copy it */
+        FILE *src_file = fopen(src_path, "rb");
+        if (!src_file) return false;
+
+        FILE *dest_file = fopen(dest_path, "wb");
+        if (!dest_file) {
+            fclose(src_file);
+            return false;
+        }
+
+        char buffer[8192];
+        size_t n;
+        bool success = true;
+        while ((n = fread(buffer, 1, sizeof(buffer), src_file)) > 0) {
+            if (fwrite(buffer, 1, n, dest_file) != n) {
+                success = false;
+                break;
+            }
+        }
+
+        fclose(src_file);
+        fclose(dest_file);
+
+        /* Preserve permissions */
+        chmod(dest_path, st.st_mode);
+
+        return success;
+    }
+
+    /* It's a directory, create it and copy contents */
+    if (!ensure_directory(dest_path)) {
+        return false;
+    }
+
+    DIR *dir = opendir(src_path);
+    if (!dir) {
+        return false;
+    }
+
+    struct dirent *entry;
+    bool success = true;
+
+    while ((entry = readdir(dir)) != NULL) {
+        /* Skip . and .. */
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        char src_entry[4096];
+        char dest_entry[4096];
+        snprintf(src_entry, sizeof(src_entry), "%s/%s", src_path, entry->d_name);
+        snprintf(dest_entry, sizeof(dest_entry), "%s/%s", dest_path, entry->d_name);
+
+        if (!copy_directory_recursive(src_entry, dest_entry)) {
+            success = false;
+            /* Continue trying to copy other entries */
+        }
+    }
+
+    closedir(dir);
+
+    /* Preserve directory permissions */
+    chmod(dest_path, st.st_mode);
+
+    return success;
+}
