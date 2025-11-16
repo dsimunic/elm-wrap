@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#include <sys/stat.h>
 
 #include "../../src/pgsolver/pg_core.h"
 #include "../../src/alloc.h"
@@ -129,8 +130,12 @@ static PgPackageId ctx_get_or_create_package_id(TestProviderCtx *ctx, const char
     }
 
     PgPackageId id = ctx->mapping_count;
-    strncpy(ctx->mappings[ctx->mapping_count].name, name, MAX_PACKAGE_NAME - 1);
-    ctx->mappings[ctx->mapping_count].name[MAX_PACKAGE_NAME - 1] = '\0';
+    size_t len = strlen(name);
+    if (len >= MAX_PACKAGE_NAME) {
+        len = MAX_PACKAGE_NAME - 1;
+    }
+    memcpy(ctx->mappings[ctx->mapping_count].name, name, len);
+    ctx->mappings[ctx->mapping_count].name[len] = '\0';
     ctx->mappings[ctx->mapping_count].id = id;
     ctx->mapping_count++;
 
@@ -143,8 +148,12 @@ static TestPackageEntry *ctx_add_package(TestProviderCtx *ctx, const char *name,
     }
     TestPackageEntry *entry = &ctx->packages[ctx->package_count++];
     entry->pkg = id;
-    strncpy(entry->name, name, MAX_PACKAGE_NAME - 1);
-    entry->name[MAX_PACKAGE_NAME - 1] = '\0';
+    size_t len = strlen(name);
+    if (len >= MAX_PACKAGE_NAME) {
+        len = MAX_PACKAGE_NAME - 1;
+    }
+    memcpy(entry->name, name, len);
+    entry->name[len] = '\0';
     entry->version_count = 0;
     return entry;
 }
@@ -550,13 +559,24 @@ int main(int argc, char **argv) {
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_type != DT_REG) {
+        /* Skip . and .. */
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
         /* Check if file ends with .json */
         size_t name_len = strlen(entry->d_name);
         if (name_len < 5 || strcmp(entry->d_name + name_len - 5, ".json") != 0) {
+            continue;
+        }
+
+        /* Build full path for stat check */
+        char filepath[512];
+        snprintf(filepath, sizeof(filepath), "%s/%s", test_dir, entry->d_name);
+
+        /* Use stat to check if it's a regular file (portable) */
+        struct stat st;
+        if (stat(filepath, &st) != 0 || !S_ISREG(st.st_mode)) {
             continue;
         }
 
@@ -573,9 +593,6 @@ int main(int argc, char **argv) {
             skipped++;
             continue;
         }
-
-        char filepath[512];
-        snprintf(filepath, sizeof(filepath), "%s/%s", test_dir, entry->d_name);
 
         total++;
         if (run_test(filepath)) {

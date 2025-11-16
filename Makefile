@@ -74,7 +74,13 @@ include buildinfo.mk
 # Ensure 'all' is the default target (must be set after include)
 .DEFAULT_GOAL := all
 
-.PHONY: all clean pg_core_test pg_file_test test check dist distcheck
+# Installation directories
+PREFIX ?= /usr/local
+BINDIR_INSTALL = $(PREFIX)/bin
+USER_PREFIX = $(HOME)/.local
+USER_BINDIR = $(USER_PREFIX)/bin
+
+.PHONY: all clean pg_core_test pg_file_test test check dist distcheck install install-user uninstall uninstall-user
 
 all: $(TARGET)
 
@@ -278,3 +284,30 @@ distcheck: dist
 		rm -rf $$DISTCHECK_DIR; \
 		exit 1; \
 	fi
+
+# Install to system directories (requires root/sudo on most systems)
+install: $(TARGET)
+	@echo "Installing $(TARGET_FILE) to $(BINDIR_INSTALL)..."
+	@install -d $(BINDIR_INSTALL)
+	@install -m 755 $(TARGET) $(BINDIR_INSTALL)/$(TARGET_FILE)
+	@echo "Installation complete. $(TARGET_FILE) installed to $(BINDIR_INSTALL)/$(TARGET_FILE)"
+
+# Install to user's local directory
+install-user: $(TARGET)
+	@echo "Installing $(TARGET_FILE) to $(USER_BINDIR)..."
+	@install -d $(USER_BINDIR)
+	@install -m 755 $(TARGET) $(USER_BINDIR)/$(TARGET_FILE)
+	@echo "Installation complete. $(TARGET_FILE) installed to $(USER_BINDIR)/$(TARGET_FILE)"
+	@echo "Make sure $(USER_BINDIR) is in your PATH"
+
+# Uninstall from system directories
+uninstall:
+	@echo "Uninstalling $(TARGET_FILE) from $(BINDIR_INSTALL)..."
+	@rm -f $(BINDIR_INSTALL)/$(TARGET_FILE)
+	@echo "Uninstall complete."
+
+# Uninstall from user's local directory
+uninstall-user:
+	@echo "Uninstalling $(TARGET_FILE) from $(USER_BINDIR)..."
+	@rm -f $(USER_BINDIR)/$(TARGET_FILE)
+	@echo "Uninstall complete."
