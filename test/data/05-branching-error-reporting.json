@@ -1,0 +1,53 @@
+{
+  "name": "Branching Error Reporting",
+  "description": "Complex failure with non-linear derivation graph",
+  "packages": {
+    "foo": {
+      "versions": ["1.0.0", "1.1.0"],
+      "dependencies": {
+        "1.0.0": {
+          "a": "^1.0.0",
+          "b": "^1.0.0"
+        },
+        "1.1.0": {
+          "x": "^1.0.0",
+          "y": "^1.0.0"
+        }
+      }
+    },
+    "a": {
+      "versions": ["1.0.0"],
+      "dependencies": {
+        "1.0.0": {
+          "b": "^2.0.0"
+        }
+      }
+    },
+    "b": {
+      "versions": ["1.0.0", "2.0.0"],
+      "dependencies": {
+        "1.0.0": {},
+        "2.0.0": {}
+      }
+    },
+    "x": {
+      "versions": ["1.0.0"],
+      "dependencies": {
+        "1.0.0": {
+          "y": "^2.0.0"
+        }
+      }
+    },
+    "y": {
+      "versions": ["1.0.0", "2.0.0"],
+      "dependencies": {
+        "1.0.0": {},
+        "2.0.0": {}
+      }
+    }
+  },
+  "root_dependencies": {
+    "foo": "^1.0.0"
+  },
+  "expected": "conflict"
+}

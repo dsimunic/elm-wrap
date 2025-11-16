@@ -1,0 +1,60 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-amd64
+          - os: macos-latest
+            platform: macos-arm64
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install dependencies (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libcurl4-openssl-dev libssl-dev zlib1g-dev
+    
+    - name: Install dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        # curl is already available on macOS
+        echo "curl is pre-installed on macOS"
+    
+    - name: Build project (Linux - static)
+      if: runner.os == 'Linux'
+      run: make all LDFLAGS="-static"
+    
+    - name: Build project (macOS - dynamic)
+      if: runner.os == 'macOS'
+      run: make all
+    
+    - name: Run tests
+      run: make check
+    
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: elm-wrap-${{ matrix.platform }}
+        path: bin/elm-wrap
+        if-no-files-found: error
+    
+    - name: Display version
+      run: |
+        ./bin/elm-wrap --version || echo "Version command not available"

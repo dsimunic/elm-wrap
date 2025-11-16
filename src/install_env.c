@@ -1,0 +1,635 @@
+#include "install_env.h"
+#include "alloc.h"
+#include "cJSON.h"
+#include "vendor/sha1.h"
+#include "log.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <ctype.h>
+
+#define DEFAULT_REGISTRY_URL "https://package.elm-lang.org"
+
+/* Parse all-packages JSON response into Registry */
+static bool parse_all_packages_json(const char *json_str, Registry *registry) {
+    if (!json_str || !registry) return false;
+
+    cJSON *json = cJSON_Parse(json_str);
+    if (!json) {
+        fprintf(stderr, "Error: Failed to parse all-packages JSON\n");
+        const char *error_ptr = cJSON_GetErrorPtr();
+        if (error_ptr) {
+            /* Show context around error */
+            const char *start = (error_ptr > json_str + 40) ? error_ptr - 40 : json_str;
+            const char *end = error_ptr + 40;
+            fprintf(stderr, "Error near: ...%.*s...\n", (int)(end - start), start);
+        }
+        return false;
+    }
+
+    /* Reset registry counters */
+    registry->total_versions = 0;
+
+    /* Iterate over package entries */
+    cJSON *package = NULL;
+    cJSON_ArrayForEach(package, json) {
+        if (!cJSON_IsArray(package)) continue;
+
+        const char *package_name = package->string;
+        if (!package_name) continue;
+
+        /* Parse author/name */
+        const char *slash = strchr(package_name, '/');
+        if (!slash) continue;
+
+        size_t author_len = slash - package_name;
+        char *author = arena_malloc(author_len + 1);
+        if (!author) {
+            cJSON_Delete(json);
+            return false;
+        }
+
+        strncpy(author, package_name, author_len);
+        author[author_len] = '\0';
+        const char *name = slash + 1;
+
+        /* Add entry */
+        registry_add_entry(registry, author, name);
+
+        /* Parse versions */
+        cJSON *version_item = NULL;
+        cJSON_ArrayForEach(version_item, package) {
+            if (!cJSON_IsString(version_item)) continue;
+
+            const char *version_str = version_item->valuestring;
+            Version version = version_parse(version_str);
+
+            /* Add version (maintains descending order) */
+            registry_add_version(registry, author, name, version);
+        }
+
+        arena_free(author);
+    }
+
+    cJSON_Delete(json);
+    return true;
+}
+
+/* Parse incremental update response (array of "author/package@version" strings) */
+static bool parse_since_response(const char *json_str, Registry *registry) {
+    if (!json_str || !registry) return false;
+
+    cJSON *json = cJSON_Parse(json_str);
+    if (!json || !cJSON_IsArray(json)) {
+        fprintf(stderr, "Error: Failed to parse /since response JSON\n");
+        if (json) cJSON_Delete(json);
+        return false;
+    }
+
+    int count = cJSON_GetArraySize(json);
+    if (count == 0) {
+        /* No new packages */
+        cJSON_Delete(json);
+        return true;
+    }
+
+    printf("Received %d new package version(s)\n", count);
+
+    /* Parse each entry */
+    cJSON *item = NULL;
+    cJSON_ArrayForEach(item, json) {
+        if (!cJSON_IsString(item)) continue;
+
+        const char *entry_str = item->valuestring;
+
+        /* Parse "author/package@version" */
+        const char *at = strchr(entry_str, '@');
+        if (!at) continue;
+
+        /* Extract package name */
+        size_t package_name_len = at - entry_str;
+        char *package_name = arena_malloc(package_name_len + 1);
+        if (!package_name) {
+            cJSON_Delete(json);
+            return false;
+        }
+
+        strncpy(package_name, entry_str, package_name_len);
+        package_name[package_name_len] = '\0';
+
+        /* Parse author/name */
+        const char *slash = strchr(package_name, '/');
+        if (!slash) {
+            arena_free(package_name);
+            continue;
+        }
+
+        size_t author_len = slash - package_name;
+        char *author = arena_malloc(author_len + 1);
+        if (!author) {
+            arena_free(package_name);
+            cJSON_Delete(json);
+            return false;
+        }
+
+        strncpy(author, package_name, author_len);
+        author[author_len] = '\0';
+        const char *name = slash + 1;
+
+        /* Parse version */
+        const char *version_str = at + 1;
+        Version version = version_parse(version_str);
+
+        /* Add to registry */
+        registry_add_version(registry, author, name, version);
+
+        arena_free(author);
+        arena_free(package_name);
+    }
+
+    cJSON_Delete(json);
+    return true;
+}
+
+/* Create environment */
+InstallEnv* install_env_create(void) {
+    InstallEnv *env = arena_calloc(1, sizeof(InstallEnv));
+    return env;
+}
+
+/* Initialize environment */
+bool install_env_init(InstallEnv *env) {
+    if (!env) return false;
+
+    /* Initialize cache config */
+    env->cache = cache_config_init();
+    if (!env->cache) {
+        fprintf(stderr, "Error: Failed to initialize cache configuration\n");
+        return false;
+    }
+
+    /* Ensure cache directories exist */
+    if (!cache_ensure_directories(env->cache)) {
+        fprintf(stderr, "Error: Failed to create cache directories\n");
+        return false;
+    }
+
+    /* Initialize curl session */
+    env->curl_session = curl_session_create();
+    if (!env->curl_session) {
+        fprintf(stderr, "Error: Failed to initialize HTTP client\n");
+        return false;
+    }
+
+    /* Get registry URL from environment or use default */
+    const char *registry_url_env = getenv("ELM_PACKAGE_REGISTRY_URL");
+    if (registry_url_env && registry_url_env[0] != '\0') {
+        env->registry_url = arena_strdup(registry_url_env);
+    } else {
+        env->registry_url = arena_strdup(DEFAULT_REGISTRY_URL);
+    }
+
+    if (!env->registry_url) {
+        fprintf(stderr, "Error: Failed to allocate registry URL\n");
+        return false;
+    }
+
+    /* Try to load cached registry */
+    env->registry = registry_load_from_dat(env->cache->registry_path, &env->known_version_count);
+
+    if (env->registry) {
+        log_progress("Loaded cached registry: %zu packages, %zu versions",
+               env->registry->entry_count, env->registry->total_versions);
+    } else {
+        log_progress("No cached registry found, will fetch from network");
+        env->registry = registry_create();
+        if (!env->registry) {
+            fprintf(stderr, "Error: Failed to create registry\n");
+            return false;
+        }
+        env->known_version_count = 0;
+    }
+
+    /* Test connectivity */
+    char health_check_url[512];
+    snprintf(health_check_url, sizeof(health_check_url), "%s/all-packages", env->registry_url);
+
+    log_progress("Testing connectivity to %s...", env->registry_url);
+    env->offline = !curl_session_can_connect(env->curl_session, health_check_url);
+
+    if (env->offline) {
+        log_progress("Warning: Cannot connect to package registry (offline mode)");
+
+        if (env->known_version_count == 0) {
+            fprintf(stderr, "Error: No cached registry and cannot connect to network\n");
+            fprintf(stderr, "Please run again when online to download package registry\n");
+            return false;
+        }
+
+        log_progress("Using cached registry data");
+    } else {
+        log_progress("Connected to package registry");
+
+        /* Fetch or update registry */
+        if (env->known_version_count == 0) {
+            if (!install_env_fetch_registry(env)) {
+                fprintf(stderr, "Error: Failed to fetch registry from network\n");
+                return false;
+            }
+        } else {
+            if (!install_env_update_registry(env)) {
+                fprintf(stderr, "Warning: Failed to update registry (using cached data)\n");
+            }
+        }
+    }
+
+    return true;
+}
+
+/* Fetch full registry */
+bool install_env_fetch_registry(InstallEnv *env) {
+    if (!env || !env->curl_session || !env->registry_url) return false;
+
+    char url[512];
+    snprintf(url, sizeof(url), "%s/all-packages", env->registry_url);
+
+    printf("Fetching package registry from %s...\n", url);
+
+    MemoryBuffer *buffer = memory_buffer_create();
+    if (!buffer) {
+        fprintf(stderr, "Error: Failed to allocate memory buffer\n");
+        return false;
+    }
+
+    HttpResult result = http_get_json(env->curl_session, url, buffer);
+
+    if (result != HTTP_OK) {
+        fprintf(stderr, "Error: Failed to fetch registry\n");
+        fprintf(stderr, "  URL: %s\n", url);
+        fprintf(stderr, "  Error: %s\n", http_result_to_string(result));
+        fprintf(stderr, "  Details: %s\n", curl_session_get_error(env->curl_session));
+
+        memory_buffer_free(buffer);
+        env->offline = true;
+        return false;
+    }
+
+    printf("Downloaded %zu bytes\n", buffer->len);
+
+    /* Parse JSON */
+    if (!parse_all_packages_json(buffer->data, env->registry)) {
+        fprintf(stderr, "Error: Failed to parse registry JSON\n");
+        memory_buffer_free(buffer);
+        return false;
+    }
+
+    memory_buffer_free(buffer);
+
+    printf("Registry loaded: %zu packages, %zu versions\n",
+           env->registry->entry_count, env->registry->total_versions);
+
+    /* Save to cache (binary format) */
+    if (!registry_dat_write(env->registry, env->cache->registry_path)) {
+        fprintf(stderr, "Warning: Failed to cache registry to %s\n", env->cache->registry_path);
+    } else {
+        printf("Registry cached to %s\n", env->cache->registry_path);
+        env->known_version_count = env->registry->total_versions;
+    }
+
+    return true;
+}
+
+/* Update registry incrementally */
+bool install_env_update_registry(InstallEnv *env) {
+    if (!env || !env->curl_session || !env->registry_url) return false;
+
+    char url[512];
+    snprintf(url, sizeof(url), "%s/all-packages/since/%zu",
+             env->registry_url, env->known_version_count);
+
+    log_progress("Checking for registry updates (known: %zu versions)...", env->known_version_count);
+
+    MemoryBuffer *buffer = memory_buffer_create();
+    if (!buffer) {
+        fprintf(stderr, "Error: Failed to allocate memory buffer\n");
+        return false;
+    }
+
+    HttpResult result = http_get_json(env->curl_session, url, buffer);
+
+    if (result != HTTP_OK) {
+        fprintf(stderr, "Warning: Failed to fetch registry updates\n");
+        fprintf(stderr, "  URL: %s\n", url);
+        fprintf(stderr, "  Error: %s\n", http_result_to_string(result));
+
+        memory_buffer_free(buffer);
+        return false;
+    }
+
+    /* Parse incremental update */
+    if (!parse_since_response(buffer->data, env->registry)) {
+        fprintf(stderr, "Warning: Failed to parse registry update\n");
+        memory_buffer_free(buffer);
+        return false;
+    }
+
+    memory_buffer_free(buffer);
+
+    /* Save updated registry if we got new versions */
+    size_t new_total = env->registry->total_versions;
+    if (new_total > env->known_version_count) {
+        log_progress("Registry updated: %zu new version(s)", new_total - env->known_version_count);
+
+        if (!registry_dat_write(env->registry, env->cache->registry_path)) {
+            fprintf(stderr, "Warning: Failed to cache updated registry\n");
+        } else {
+            env->known_version_count = new_total;
+        }
+    } else {
+        log_progress("Registry is up to date");
+    }
+
+    return true;
+}
+
+/* Convert hex character to value (0-15) */
+static int hex_char_to_int(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+/* Convert hex string to bytes */
+static bool hex_string_to_bytes(const char *hex, BYTE *bytes, size_t byte_len) {
+    if (!hex || !bytes) return false;
+
+    size_t hex_len = strlen(hex);
+    if (hex_len != byte_len * 2) return false;
+
+    for (size_t i = 0; i < byte_len; i++) {
+        int high = hex_char_to_int(hex[i * 2]);
+        int low = hex_char_to_int(hex[i * 2 + 1]);
+
+        if (high < 0 || low < 0) return false;
+
+        bytes[i] = (BYTE)((high << 4) | low);
+    }
+
+    return true;
+}
+
+/* Compute SHA-1 hash of a file */
+static bool compute_file_sha1(const char *filepath, BYTE hash[SHA1_BLOCK_SIZE]) {
+    if (!filepath || !hash) return false;
+
+    FILE *file = fopen(filepath, "rb");
+    if (!file) {
+        fprintf(stderr, "Error: Cannot open file for SHA-1 computation: %s\n", filepath);
+        return false;
+    }
+
+    SHA1_CTX ctx;
+    sha1_init(&ctx);
+
+    BYTE buffer[4096];
+    size_t bytes_read;
+
+    while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+        sha1_update(&ctx, buffer, bytes_read);
+    }
+
+    fclose(file);
+    sha1_final(&ctx, hash);
+
+    return true;
+}
+
+/* Verify SHA-1 hash of a file against expected hex string */
+static bool verify_file_sha1(const char *filepath, const char *expected_hex) {
+    if (!filepath || !expected_hex) return false;
+
+    /* Compute actual hash */
+    BYTE actual_hash[SHA1_BLOCK_SIZE];
+    if (!compute_file_sha1(filepath, actual_hash)) {
+        return false;
+    }
+
+    /* Convert expected hex string to bytes */
+    BYTE expected_hash[SHA1_BLOCK_SIZE];
+    if (!hex_string_to_bytes(expected_hex, expected_hash, SHA1_BLOCK_SIZE)) {
+        fprintf(stderr, "Error: Invalid SHA-1 hex string: %s\n", expected_hex);
+        return false;
+    }
+
+    /* Compare hashes */
+    if (memcmp(actual_hash, expected_hash, SHA1_BLOCK_SIZE) != 0) {
+        fprintf(stderr, "Error: SHA-1 hash mismatch\n");
+        fprintf(stderr, "  Expected: %s\n", expected_hex);
+        fprintf(stderr, "  Actual:   ");
+        for (int i = 0; i < SHA1_BLOCK_SIZE; i++) {
+            fprintf(stderr, "%02x", actual_hash[i]);
+        }
+        fprintf(stderr, "\n");
+        return false;
+    }
+
+    return true;
+}
+
+/* Ensure directory exists (recursively create parent directories) */
+static bool ensure_directory_exists(const char *path) {
+    if (!path || path[0] == '\0') return false;
+
+    /* Check if directory already exists */
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        return S_ISDIR(st.st_mode);
+    }
+
+    /* Create parent directory first */
+    char *path_copy = arena_strdup(path);
+    if (!path_copy) return false;
+
+    char *last_slash = strrchr(path_copy, '/');
+    if (last_slash && last_slash != path_copy) {
+        *last_slash = '\0';
+        if (!ensure_directory_exists(path_copy)) {
+            arena_free(path_copy);
+            return false;
+        }
+        *last_slash = '/';
+    }
+
+    arena_free(path_copy);
+
+    /* Create this directory */
+    return mkdir(path, 0755) == 0;
+}
+
+/* Download and extract a package */
+bool install_env_download_package(InstallEnv *env, const char *author, const char *name, const char *version) {
+    if (!env || !author || !name || !version) return false;
+
+    /* Check if offline */
+    if (env->offline) {
+        fprintf(stderr, "Error: Cannot download package in offline mode\n");
+        return false;
+    }
+
+    log_progress("Downloading %s/%s@%s...", author, name, version);
+
+    /* Construct endpoint.json URL */
+    char endpoint_url[512];
+    snprintf(endpoint_url, sizeof(endpoint_url),
+             "%s/packages/%s/%s/%s/endpoint.json",
+             env->registry_url, author, name, version);
+
+    /* Fetch endpoint.json */
+    MemoryBuffer *endpoint_buf = memory_buffer_create();
+    if (!endpoint_buf) {
+        fprintf(stderr, "Error: Failed to allocate memory buffer\n");
+        return false;
+    }
+
+    HttpResult result = http_get_json(env->curl_session, endpoint_url, endpoint_buf);
+    if (result != HTTP_OK) {
+        fprintf(stderr, "Error: Failed to fetch package endpoint\n");
+        fprintf(stderr, "  URL: %s\n", endpoint_url);
+        fprintf(stderr, "  Error: %s\n", http_result_to_string(result));
+        memory_buffer_free(endpoint_buf);
+        return false;
+    }
+
+    /* Parse endpoint.json to get archive URL and hash */
+    cJSON *endpoint = cJSON_Parse(endpoint_buf->data);
+    memory_buffer_free(endpoint_buf);
+
+    if (!endpoint) {
+        fprintf(stderr, "Error: Failed to parse endpoint.json\n");
+        return false;
+    }
+
+    cJSON *url_obj = cJSON_GetObjectItem(endpoint, "url");
+    cJSON *hash_obj = cJSON_GetObjectItem(endpoint, "hash");
+
+    if (!url_obj || !cJSON_IsString(url_obj) || !hash_obj || !cJSON_IsString(hash_obj)) {
+        fprintf(stderr, "Error: Invalid endpoint.json format\n");
+        cJSON_Delete(endpoint);
+        return false;
+    }
+
+    const char *archive_url = url_obj->valuestring;
+    const char *expected_hash = hash_obj->valuestring;
+
+    log_progress("  Archive URL: %s", archive_url);
+    log_progress("  Expected SHA-1: %s", expected_hash);
+
+    /* Create temporary file for download */
+    char temp_file[256];
+    snprintf(temp_file, sizeof(temp_file), "/tmp/elm-package-%s-%s-%s.zip", author, name, version);
+
+    /* Download the archive */
+    result = http_download_file(env->curl_session, archive_url, temp_file);
+    if (result != HTTP_OK) {
+        fprintf(stderr, "Error: Failed to download package archive\n");
+        fprintf(stderr, "  URL: %s\n", archive_url);
+        fprintf(stderr, "  Error: %s\n", http_result_to_string(result));
+        cJSON_Delete(endpoint);
+        return false;
+    }
+
+    log_progress("  Downloaded to: %s", temp_file);
+
+    /* Verify SHA-1 hash */
+    log_progress("  Verifying SHA-1 hash...");
+    if (!verify_file_sha1(temp_file, expected_hash)) {
+        fprintf(stderr, "Error: SHA-1 verification failed\n");
+        remove(temp_file);
+        cJSON_Delete(endpoint);
+        return false;
+    }
+
+    log_progress("  SHA-1 verification passed");
+
+    /* Get package directory path */
+    size_t pkg_dir_len = strlen(env->cache->packages_dir) + strlen(author) + strlen(name) + strlen(version) + 4;
+    char *pkg_dir = arena_malloc(pkg_dir_len);
+    if (!pkg_dir) {
+        fprintf(stderr, "Error: Failed to allocate package directory path\n");
+        remove(temp_file);
+        cJSON_Delete(endpoint);
+        return false;
+    }
+
+    snprintf(pkg_dir, pkg_dir_len, "%s/%s/%s/%s", env->cache->packages_dir, author, name, version);
+
+    /* Ensure package directory exists */
+    if (!ensure_directory_exists(pkg_dir)) {
+        fprintf(stderr, "Error: Failed to create package directory: %s\n", pkg_dir);
+        arena_free(pkg_dir);
+        remove(temp_file);
+        cJSON_Delete(endpoint);
+        return false;
+    }
+
+    /* Extract the archive using unzip command */
+    char unzip_cmd[1024];
+    snprintf(unzip_cmd, sizeof(unzip_cmd), "unzip -q -o \"%s\" -d \"%s\"", temp_file, pkg_dir);
+
+    log_progress("  Extracting to: %s", pkg_dir);
+
+    int unzip_result = system(unzip_cmd);
+    if (unzip_result != 0) {
+        fprintf(stderr, "Error: Failed to extract package archive (exit code: %d)\n", unzip_result);
+        fprintf(stderr, "  Command: %s\n", unzip_cmd);
+        arena_free(pkg_dir);
+        remove(temp_file);
+        cJSON_Delete(endpoint);
+        return false;
+    }
+
+    /* GitHub zipballs extract to a subdirectory named author-package-commithash
+     * We need to move the contents up one level.
+     * Use a shell command to find the subdirectory and move its contents up.
+     */
+    char move_cmd[2048];
+    snprintf(move_cmd, sizeof(move_cmd),
+             "cd \"%s\" && "
+             "subdir=$(ls -1 | head -n 1) && "
+             "if [ -d \"$subdir\" ]; then "
+             "  mv \"$subdir\"/* . 2>/dev/null || true && "
+             "  mv \"$subdir\"/.[!.]* . 2>/dev/null || true && "
+             "  rmdir \"$subdir\" 2>/dev/null || true; "
+             "fi",
+             pkg_dir);
+
+    int move_result = system(move_cmd);
+    if (move_result != 0) {
+        fprintf(stderr, "Warning: Failed to reorganize package directory (exit code: %d)\n", move_result);
+        /* Don't fail the entire operation, the files might still be usable */
+    }
+
+    /* Clean up */
+    remove(temp_file);
+    arena_free(pkg_dir);
+    cJSON_Delete(endpoint);
+
+    log_progress("  Successfully installed %s/%s@%s", author, name, version);
+
+    return true;
+}
+
+/* Free environment */
+void install_env_free(InstallEnv *env) {
+    if (!env) return;
+
+    cache_config_free(env->cache);
+    registry_free(env->registry);
+    curl_session_free(env->curl_session);
+    arena_free(env->registry_url);
+    arena_free(env->registry_etag);
+    arena_free(env);
+}

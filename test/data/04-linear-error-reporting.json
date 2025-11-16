@@ -1,0 +1,34 @@
+{
+  "name": "Linear Error Reporting",
+  "description": "Dependency graph with no valid solution - straightforwardly linear derivation",
+  "packages": {
+    "foo": {
+      "versions": ["1.0.0"],
+      "dependencies": {
+        "1.0.0": {
+          "bar": "^2.0.0"
+        }
+      }
+    },
+    "bar": {
+      "versions": ["2.0.0"],
+      "dependencies": {
+        "2.0.0": {
+          "baz": "^3.0.0"
+        }
+      }
+    },
+    "baz": {
+      "versions": ["1.0.0", "3.0.0"],
+      "dependencies": {
+        "1.0.0": {},
+        "3.0.0": {}
+      }
+    }
+  },
+  "root_dependencies": {
+    "foo": "^1.0.0",
+    "baz": "^1.0.0"
+  },
+  "expected": "conflict"
+}

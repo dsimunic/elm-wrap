@@ -1,0 +1,288 @@
+#include "cache.h"
+#include "install_env.h"
+#include "alloc.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#define DEFAULT_ELM_VERSION "0.19.1"
+
+/* Platform-specific home directory detection */
+static char* get_default_elm_home(const char *elm_version) {
+#ifdef _WIN32
+    const char *profile = getenv("USERPROFILE");
+    if (profile && elm_version) {
+        size_t len = strlen(profile) + strlen("\\.elm\\") + strlen(elm_version) + 1;
+        char *path = arena_malloc(len);
+        if (!path) return NULL;
+        snprintf(path, len, "%s\\.elm\\%s", profile, elm_version);
+        return path;
+    }
+#endif
+
+    const char *home = getenv("HOME");
+    if (home && elm_version) {
+        size_t len = strlen(home) + strlen("/.elm/") + strlen(elm_version) + 1;
+        char *path = arena_malloc(len);
+        if (!path) return NULL;
+        snprintf(path, len, "%s/.elm/%s", home, elm_version);
+        return path;
+    }
+
+    const char *user = getenv("USER");
+    if (user && elm_version) {
+#ifdef _WIN32
+        size_t len = strlen("C:\\Users\\") + strlen(user) + strlen("\\.elm\\") + strlen(elm_version) + 1;
+        char *path = arena_malloc(len);
+        if (!path) return NULL;
+        snprintf(path, len, "C:\\Users\\%s\\.elm\\%s", user, elm_version);
+        return path;
+#else
+        size_t len = strlen("/home/") + strlen(user) + strlen("/.elm/") + strlen(elm_version) + 1;
+        char *path = arena_malloc(len);
+        if (!path) return NULL;
+        snprintf(path, len, "/home/%s/.elm/%s", user, elm_version);
+        return path;
+#endif
+    }
+
+    /* Fallback to relative path */
+    size_t len = strlen("./.elm/") + (elm_version ? strlen(elm_version) : 0) + 1;
+    char *path = arena_malloc(len);
+    if (!path) return NULL;
+    snprintf(path, len, "./.elm/%s", elm_version ? elm_version : DEFAULT_ELM_VERSION);
+    return path;
+}
+
+static bool ensure_path_exists(const char *path) {
+    if (!path || path[0] == '\0') {
+        return false;
+    }
+
+    char *mutable_path = arena_strdup(path);
+    if (!mutable_path) {
+        return false;
+    }
+
+    bool ok = true;
+    size_t len = strlen(mutable_path);
+    /* Ensure intermediate directories exist when path contains '/' */
+    for (size_t i = 1; i < len && ok; i++) {
+        if (mutable_path[i] == '/' || mutable_path[i] == '\\') {
+            char saved = mutable_path[i];
+            mutable_path[i] = '\0';
+            struct stat st;
+            if (mutable_path[0] != '\0' &&
+                stat(mutable_path, &st) != 0) {
+                if (mkdir(mutable_path, 0755) != 0) {
+                    perror("Failed to create directory");
+                    ok = false;
+                }
+            }
+            mutable_path[i] = saved;
+        }
+    }
+
+    if (ok) {
+        struct stat st;
+        if (stat(mutable_path, &st) != 0) {
+            if (mkdir(mutable_path, 0755) != 0) {
+                perror("Failed to create directory");
+                ok = false;
+            }
+        }
+    }
+
+    arena_free(mutable_path);
+    return ok;
+}
+
+CacheConfig* cache_config_init(void) {
+    CacheConfig *config = arena_calloc(1, sizeof(CacheConfig));
+    if (!config) return NULL;
+    
+    const char *env_version = getenv("ELM_VERSION");
+    if (env_version && env_version[0] != '\0') {
+        config->elm_version = arena_strdup(env_version);
+    } else {
+        config->elm_version = arena_strdup(DEFAULT_ELM_VERSION);
+    }
+
+    if (!config->elm_version) {
+        cache_config_free(config);
+        return NULL;
+    }
+
+    // Get ELM_HOME from environment or use default
+    char *env_elm_home = getenv("ELM_HOME");
+    if (env_elm_home && env_elm_home[0] != '\0') {
+        config->elm_home = arena_strdup(env_elm_home);
+    } else {
+        config->elm_home = get_default_elm_home(config->elm_version);
+    }
+    
+    if (!config->elm_home) {
+        cache_config_free(config);
+        return NULL;
+    }
+    
+    // Build paths
+    size_t packages_len = strlen(config->elm_home) + strlen("/packages") + 1;
+    config->packages_dir = arena_malloc(packages_len);
+    if (!config->packages_dir) {
+        cache_config_free(config);
+        return NULL;
+    }
+    snprintf(config->packages_dir, packages_len, "%s/packages", config->elm_home);
+    
+    size_t registry_len = strlen(config->packages_dir) + strlen("/registry.dat") + 1;
+    config->registry_path = arena_malloc(registry_len);
+    if (!config->registry_path) {
+        cache_config_free(config);
+        return NULL;
+    }
+    snprintf(config->registry_path, registry_len, "%s/registry.dat", config->packages_dir);
+    
+    return config;
+}
+
+void cache_config_free(CacheConfig *config) {
+    if (!config) return;
+    
+    arena_free(config->elm_version);
+    arena_free(config->elm_home);
+    arena_free(config->packages_dir);
+    arena_free(config->registry_path);
+    arena_free(config);
+}
+
+char* cache_get_package_path(CacheConfig *config, const char *author, const char *name, const char *version) {
+    if (!config || !author || !name || !version) return NULL;
+    
+    size_t len = strlen(config->packages_dir) + strlen(author) + strlen(name) + strlen(version) + 4;
+    char *path = arena_malloc(len);
+    if (!path) return NULL;
+    
+    snprintf(path, len, "%s/%s/%s/%s", config->packages_dir, author, name, version);
+    return path;
+}
+
+bool cache_package_exists(CacheConfig *config, const char *author, const char *name, const char *version) {
+    char *path = cache_get_package_path(config, author, name, version);
+    if (!path) return false;
+    
+    struct stat st;
+    bool exists = (stat(path, &st) == 0 && S_ISDIR(st.st_mode));
+    
+    arena_free(path);
+    return exists;
+}
+
+bool cache_registry_exists(CacheConfig *config) {
+    if (!config) return false;
+    
+    struct stat st;
+    return (stat(config->registry_path, &st) == 0 && S_ISREG(st.st_mode));
+}
+
+bool cache_ensure_directories(CacheConfig *config) {
+    if (!config) return false;
+    
+    if (!ensure_path_exists(config->elm_home)) {
+        return false;
+    }
+    if (!ensure_path_exists(config->packages_dir)) {
+        return false;
+    }
+    return true;
+}
+
+/* Download package from registry */
+bool cache_download_package(CacheConfig *config, const char *author, const char *name, const char *version) {
+    /* Note: This function is called from multiple places:
+     * 1. install.c - when downloading packages not in cache
+     * 2. solver.c - when the solver needs a package for dependency resolution
+     * 3. pgsolver/pg_elm.c - when PubGrub solver needs package metadata
+     *
+     * It should be safe to call even if the package already exists, as we
+     * check for existence first. However, callers typically check via
+     * cache_package_exists() before calling this function.
+     */
+
+    if (!config || !author || !name || !version) return false;
+
+    /* For now, we rely on external curl_session being passed in.
+     * This is a stub that will be replaced with actual implementation
+     * using the InstallEnv curl session.
+     *
+     * The proper implementation requires:
+     * 1. Access to CurlSession (from InstallEnv)
+     * 2. Download endpoint.json to get archive URL and hash
+     * 3. Download the ZIP archive
+     * 4. Verify hash
+     * 5. Extract to package directory
+     *
+     * This requires refactoring to pass InstallEnv or CurlSession through
+     * the call chain, which affects multiple files.
+     */
+
+    fprintf(stderr, "[STUB] cache_download_package: Would download %s/%s@%s\n", author, name, version);
+    fprintf(stderr, "  URL: https://package.elm-lang.org/packages/%s/%s/%s/endpoint.json\n", author, name, version);
+
+    char *path = cache_get_package_path(config, author, name, version);
+    if (path) {
+        fprintf(stderr, "  Local path: %s\n", path);
+        arena_free(path);
+    }
+
+    fprintf(stderr, "  Note: cache_download_package needs CurlSession from InstallEnv\n");
+    fprintf(stderr, "        Current architecture doesn't pass session through solver\n");
+
+    return true;  // Stub returns success for now
+}
+
+/* Download package using InstallEnv (actual implementation) */
+bool cache_download_package_with_env(struct InstallEnv *env, const char *author, const char *name, const char *version) {
+    if (!env) {
+        fprintf(stderr, "Error: InstallEnv is NULL in cache_download_package_with_env\n");
+        return false;
+    }
+
+    /* Delegate to install_env_download_package which has the real implementation */
+    return install_env_download_package(env, author, name, version);
+}
+
+bool cache_download_registry(CacheConfig *config) {
+    if (!config) return false;
+    
+    fprintf(stderr, "[STUB] cache_download_registry: Would download registry\n");
+    fprintf(stderr, "  URL: https://package.elm-lang.org/all-packages\n");
+    fprintf(stderr, "  Local path: %s\n", config->registry_path);
+    
+    // TODO: Implement with libcurl
+    // 1. Fetch all-packages endpoint
+    // 2. Parse JSON to binary format
+    // 3. Save to registry.dat
+    
+    return true;  // Stub returns success
+}
+
+bool cache_package_any_version_exists(CacheConfig *config, const char *author, const char *name) {
+    if (!config || !author || !name) {
+        return false;
+    }
+
+    size_t len = strlen(config->packages_dir) + strlen(author) + strlen(name) + 3;
+    char *path = arena_malloc(len);
+    if (!path) return false;
+
+    snprintf(path, len, "%s/%s/%s", config->packages_dir, author, name);
+
+    struct stat st;
+    bool exists = (stat(path, &st) == 0 && S_ISDIR(st.st_mode));
+
+    arena_free(path);
+    return exists;
+}

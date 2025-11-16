@@ -1,0 +1,29 @@
+{
+  "name": "No Conflicts",
+  "description": "Simple case where no actual conflicts occur",
+  "packages": {
+    "foo": {
+      "versions": ["1.0.0"],
+      "dependencies": {
+        "1.0.0": {
+          "bar": "^1.0.0"
+        }
+      }
+    },
+    "bar": {
+      "versions": ["1.0.0", "2.0.0"],
+      "dependencies": {
+        "1.0.0": {},
+        "2.0.0": {}
+      }
+    }
+  },
+  "root_dependencies": {
+    "foo": "^1.0.0"
+  },
+  "expected": "success",
+  "solution": {
+    "foo": "1.0.0",
+    "bar": "1.0.0"
+  }
+}

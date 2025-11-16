@@ -1,0 +1,32 @@
+{
+  "name": "Avoiding Conflict During Decision Making",
+  "description": "Decision making examines a package version that would cause a conflict and chooses not to select it",
+  "packages": {
+    "foo": {
+      "versions": ["1.0.0", "1.1.0"],
+      "dependencies": {
+        "1.0.0": {},
+        "1.1.0": {
+          "bar": "^2.0.0"
+        }
+      }
+    },
+    "bar": {
+      "versions": ["1.0.0", "1.1.0", "2.0.0"],
+      "dependencies": {
+        "1.0.0": {},
+        "1.1.0": {},
+        "2.0.0": {}
+      }
+    }
+  },
+  "root_dependencies": {
+    "foo": "^1.0.0",
+    "bar": "^1.0.0"
+  },
+  "expected": "success",
+  "solution": {
+    "foo": "1.0.0",
+    "bar": "1.1.0"
+  }
+}
