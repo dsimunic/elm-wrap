@@ -13,6 +13,10 @@
 #include <sys/stat.h>
 #include <limits.h>
 
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
 #define ELM_JSON_PATH "elm.json"
 
 static void print_make_usage(void) {

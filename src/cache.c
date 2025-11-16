@@ -49,10 +49,11 @@ static char* get_default_elm_home(const char *elm_version) {
     }
 
     /* Fallback to relative path */
-    size_t len = strlen("./.elm/") + (elm_version ? strlen(elm_version) : 0) + 1;
+    const char *version = elm_version ? elm_version : DEFAULT_ELM_VERSION;
+    size_t len = strlen("./.elm/") + strlen(version) + 1;
     char *path = arena_malloc(len);
     if (!path) return NULL;
-    snprintf(path, len, "./.elm/%s", elm_version ? elm_version : DEFAULT_ELM_VERSION);
+    snprintf(path, len, "./.elm/%s", version);
     return path;
 }
 

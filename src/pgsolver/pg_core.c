@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#ifndef SIZE_MAX
+#define SIZE_MAX ((size_t)-1)
+#endif
+
 /* Internal core types (kept private to this file) */
 
 typedef struct {

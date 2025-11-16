@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdint.h>
 
 static larena global_arena;
 static bool alloc_initialized = false;
