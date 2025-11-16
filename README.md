@@ -250,22 +250,27 @@ Once you are happy with it, rename to `elm` to keep using it without re-training
 
 ### Download Pre-built Binaries
 
-Download the latest release for your platform:
 
-- **Linux (x86_64)**: [elm-wrap-linux-amd64](https://github.com/OWNER/REPO/releases/latest/download/elm-wrap-linux-amd64)
-- **macOS (Apple Silicon / ARM64)**: [elm-wrap-macos-arm64](https://github.com/OWNER/REPO/releases/latest/download/elm-wrap-macos-arm64)
+**macOS (Apple Silicon / ARM64)**: [elm-wrap-macos-arm64](https://github.com/OWNER/REPO/releases/latest/download/elm-wrap-macos-arm64)
+```
+curl -L https://github.com/OWNER/REPO/releases/latest/download/elm-wrap-macos-arm64 -o elm-wrap
+chmod +x elm-wrap
+mv elm-wrap ~/.local/bin 
+or
+sudo mv elm-wrap /usr/local/bin/
+```
+
+**Linux (x86_64)**: [elm-wrap-linux-amd64](https://github.com/OWNER/REPO/releases/latest/download/elm-wrap-linux-amd64)
+
+For whatever reason, Linux build turned out to be a major pain. I don't know how others do it. I had GitHub build a statically linked binary on Alpine; that works correctly, however it is freakin' huge at 25mb! (Compared to 290K on macOS build, thanks to libcurl shipping in the base system).
+
+I've also instructed it to build a dynamically linked binary on Ubuntu, after a major painful back-and forth with everything working locally and failing in GH actions. Presumably if you are on Linux and benefit from `elm-watch` then likely know how to get that working on your machine.
+
 
 ```bash
 # Linux (x86_64)
 curl -L https://github.com/OWNER/REPO/releases/latest/download/elm-wrap-linux-amd64 -o elm-wrap
 chmod +x elm-wrap
-sudo mv elm-wrap /usr/local/bin/
-
-# macOS (Apple Silicon / ARM64)
-curl -L https://github.com/OWNER/REPO/releases/latest/download/elm-wrap-macos-arm64 -o elm-wrap
-chmod +x elm-wrap
-mv elm-wrap ~/.local/bin 
-or
 sudo mv elm-wrap /usr/local/bin/
 ```
 

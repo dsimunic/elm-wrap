@@ -81,6 +81,25 @@ CurlSession* curl_session_create(void) {
     }
     if (ca_bundle) {
         curl_easy_setopt(session->handle, CURLOPT_CAINFO, ca_bundle);
+    } else {
+        /* Try common CA bundle locations for portability across distros */
+        const char *ca_paths[] = {
+            "/etc/ssl/certs/ca-certificates.crt",  /* Debian/Ubuntu/Gentoo */
+            "/etc/pki/tls/certs/ca-bundle.crt",    /* Fedora/RHEL */
+            "/etc/ssl/ca-bundle.pem",              /* OpenSUSE */
+            "/etc/ssl/cert.pem",                   /* Alpine/OpenBSD */
+            "/usr/local/share/certs/ca-root-nss.crt", /* FreeBSD */
+            NULL
+        };
+        
+        for (int i = 0; ca_paths[i] != NULL; i++) {
+            FILE *test = fopen(ca_paths[i], "r");
+            if (test) {
+                fclose(test);
+                curl_easy_setopt(session->handle, CURLOPT_CAINFO, ca_paths[i]);
+                break;
+            }
+        }
     }
 
     return session;
@@ -119,6 +138,14 @@ bool curl_session_can_connect(CurlSession *session, const char *test_url) {
 
     /* Perform request */
     CURLcode res = curl_easy_perform(handle);
+
+    /* Log error for debugging */
+    if (res != CURLE_OK) {
+        const char *error_msg = strlen(session->error_buffer) > 0 
+            ? session->error_buffer 
+            : curl_easy_strerror(res);
+        fprintf(stderr, "DEBUG: Connection test failed: %s (code %d)\n", error_msg, res);
+    }
 
     /* Restore timeout */
     curl_easy_setopt(handle, CURLOPT_TIMEOUT_MS, saved_timeout);

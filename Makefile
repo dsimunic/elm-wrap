@@ -1,6 +1,39 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror -std=c99 -D_POSIX_C_SOURCE=200809L -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -O2
-LDFLAGS =
+
+# Detect operating system
+UNAME_S := $(shell uname -s)
+
+# Set LDFLAGS based on OS
+ifeq ($(UNAME_S),Linux)
+    # Check if STATIC=1 is set (for Alpine static builds)
+    ifdef STATIC
+        CFLAGS += -static
+        PKG_CONFIG_CURL := $(shell pkg-config --libs --static libcurl 2>/dev/null)
+        ifneq ($(PKG_CONFIG_CURL),)
+            LDFLAGS = -static $(PKG_CONFIG_CURL)
+        else
+            LDFLAGS = -static -lcurl
+        endif
+    else
+        # On Linux, use dynamic linking by default
+        # Static linking is complex due to Kerberos dependencies in libcurl
+        # For static builds, use Alpine Linux with STATIC=1 or build curl without GSSAPI
+        PKG_CONFIG_CURL := $(shell pkg-config --libs --static libcurl 2>/dev/null)
+        ifneq ($(PKG_CONFIG_CURL),)
+            LDFLAGS = $(PKG_CONFIG_CURL)
+        else
+            # Fallback to basic curl linking
+            LDFLAGS = -lcurl
+        endif
+    endif
+else ifeq ($(UNAME_S),Darwin)
+    # On macOS, use dynamic linking
+    LDFLAGS = -lcurl
+else
+    # Default fallback
+    LDFLAGS = -lcurl
+endif
 
 # Directories
 SRCDIR = src
@@ -209,7 +242,7 @@ $(BUILDDIR)/miniz.o: $(SRCDIR)/vendor/miniz.c $(SRCDIR)/vendor/miniz.h | $(BUILD
 
 # Link final binary
 $(TARGET): $(OBJECTS) | $(BINDIR)
-	$(CC) $(OBJECTS) $(LDFLAGS) -lcurl -o $@
+	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
 
 # Create directories
 $(BUILDDIR):

@@ -309,7 +309,11 @@ static bool parse_test_file(const char *filepath, TestCase *test) {
         return false;
     }
 
-    fread(json, 1, fsize, f);
+    if (fread(json, 1, fsize, f) != (size_t)fsize) {
+        fclose(f);
+        arena_free(json);
+        return false;
+    }
     fclose(f);
     json[fsize] = '\0';
 
