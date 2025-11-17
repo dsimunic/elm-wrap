@@ -46,7 +46,7 @@ jobs:
             platform: macos-arm64
             artifact_name: elm-wrap
             asset_name: elm-wrap-macos-arm64
-          - os: macos-12
+          - os: macos-15-intel
             platform: macos-amd64
             artifact_name: elm-wrap
             asset_name: elm-wrap-macos-amd64
