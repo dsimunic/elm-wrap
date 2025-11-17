@@ -1,0 +1,30 @@
+name: Trigger Tap Update
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  trigger-tap-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Trigger homebrew-elm-wrap update
+        env:
+          TAP_DISPATCH_TOKEN: ${{ secrets.TAP_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$TAP_DISPATCH_TOKEN" ]; then
+            echo "TAP_DISPATCH_TOKEN is not set" >&2
+            exit 1
+          fi
+
+          curl -X POST https://api.github.com/repos/dsimunic/homebrew-elm-wrap/dispatches \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: token $TAP_DISPATCH_TOKEN" \
+            -d "{\"event_type\": \"elm-wrap-release\", \"client_payload\": {\"version\": \"${{ steps.version.outputs.version }}\"}}"
