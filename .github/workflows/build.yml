@@ -16,28 +16,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            platform: linux-amd64
-          - os: macos-latest
+          - os: macos-14
             platform: macos-arm64
+          - os: macos-12
+            platform: macos-amd64
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
-    - name: Install dependencies (Ubuntu)
-      if: runner.os == 'Linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential pkg-config libcurl4-openssl-dev libldap2-dev libbrotli-dev \
-          libssh-dev libpsl-dev libkrb5-dev \
-          libnghttp2-dev libidn2-0-dev librtmp-dev libzstd-dev
-    
-    - name: Install dependencies (macOS)
-      if: runner.os == 'macOS'
-      run: |
-        # curl is already available on macOS
-        echo "curl is pre-installed on macOS"
     
     - name: Build project
       run: make clean all
@@ -49,45 +35,6 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: elm-wrap-${{ matrix.platform }}
-        path: bin/elm-wrap
-        if-no-files-found: error
-    
-    - name: Display version
-      run: |
-        ./bin/elm-wrap --version || echo "Version command not available"
-
-  build-alpine-static:
-    name: Build static binary on Alpine Linux
-    runs-on: ubuntu-latest
-    container:
-      image: alpine:latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Install dependencies
-      run: |
-        apk add --no-cache build-base curl-dev curl-static pkgconfig \
-          openssl-libs-static zlib-static nghttp2-static \
-          brotli-static libidn2-static \
-          libunistring-static libpsl-static zstd-static
-    
-    - name: Build static binary
-      run: make clean all STATIC=1
-    
-    - name: Verify static binary
-      run: |
-        file bin/elm-wrap
-        ldd bin/elm-wrap 2>&1 || echo "✓ Static binary (no dynamic dependencies)"
-    
-    - name: Run tests
-      run: make check
-    
-    - name: Upload static binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: elm-wrap-linux-amd64-static
         path: bin/elm-wrap
         if-no-files-found: error
     
