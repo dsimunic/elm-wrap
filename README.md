@@ -274,6 +274,31 @@ chmod +x elm-wrap
 sudo mv elm-wrap /usr/local/bin/
 ```
 
+### Docker development environment.
+
+Follow the advice here on installing Docker,
+[install docker](https://docs.docker.com/engine/install/debian/)
+as well as setting up non-root users to be able to use it,
+[non-root users](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
+
+To confirm it is working correctly run these commands (`newgrp docker` only
+needs to be run if you are not logging out and back in again):
+
+    newgrp docker
+    docker run hello-world
+
+To build the docker image:
+
+    docker build -t wrap-dev:bookworm .
+
+To run an interactive session as your user inside the docker container:
+
+    docker run -it --rm -v "$PWD":/work wrap-dev:bookworm bash
+
+Build the code with make:
+
+    make
+
 ## Prior art and similar utilities
 
 `elm-wrap` is independently thought of and created. 
