@@ -5,3 +5,5 @@ bin/
 *.so
 *.dylib
 elm-stuff/
+repository_cache/
+package_repository/
