@@ -14,7 +14,7 @@
 
 #define DEFAULT_REGISTRY_URL "https://package.elm-lang.org"
 
-/* Parse all-packages JSON response into Registry */
+/* Compile all-packages.json into Registry.dat */
 static bool parse_all_packages_json(const char *json_str, Registry *registry) {
     if (!json_str || !registry) return false;
 
@@ -55,10 +55,8 @@ static bool parse_all_packages_json(const char *json_str, Registry *registry) {
         author[author_len] = '\0';
         const char *name = slash + 1;
 
-        /* Add entry */
         registry_add_entry(registry, author, name);
 
-        /* Parse versions */
         cJSON *version_item = NULL;
         cJSON_ArrayForEach(version_item, package) {
             if (!cJSON_IsString(version_item)) continue;
@@ -66,7 +64,7 @@ static bool parse_all_packages_json(const char *json_str, Registry *registry) {
             const char *version_str = version_item->valuestring;
             Version version = version_parse(version_str);
 
-            /* Add version (maintains descending order) */
+            /* Add version maintains descending order */
             registry_add_version(registry, author, name, version);
         }
 
@@ -90,25 +88,21 @@ static bool parse_since_response(const char *json_str, Registry *registry) {
 
     int count = cJSON_GetArraySize(json);
     if (count == 0) {
-        /* No new packages */
         cJSON_Delete(json);
         return true;
     }
 
     printf("Received %d new package version(s)\n", count);
 
-    /* Parse each entry */
     cJSON *item = NULL;
     cJSON_ArrayForEach(item, json) {
         if (!cJSON_IsString(item)) continue;
 
         const char *entry_str = item->valuestring;
 
-        /* Parse "author/package@version" */
         const char *at = strchr(entry_str, '@');
         if (!at) continue;
 
-        /* Extract package name */
         size_t package_name_len = at - entry_str;
         char *package_name = arena_malloc(package_name_len + 1);
         if (!package_name) {
@@ -119,7 +113,6 @@ static bool parse_since_response(const char *json_str, Registry *registry) {
         strncpy(package_name, entry_str, package_name_len);
         package_name[package_name_len] = '\0';
 
-        /* Parse author/name */
         const char *slash = strchr(package_name, '/');
         if (!slash) {
             arena_free(package_name);
@@ -138,11 +131,9 @@ static bool parse_since_response(const char *json_str, Registry *registry) {
         author[author_len] = '\0';
         const char *name = slash + 1;
 
-        /* Parse version */
         const char *version_str = at + 1;
         Version version = version_parse(version_str);
 
-        /* Add to registry */
         registry_add_version(registry, author, name, version);
 
         arena_free(author);
@@ -153,37 +144,31 @@ static bool parse_since_response(const char *json_str, Registry *registry) {
     return true;
 }
 
-/* Create environment */
 InstallEnv* install_env_create(void) {
     InstallEnv *env = arena_calloc(1, sizeof(InstallEnv));
     return env;
 }
 
-/* Initialize environment */
 bool install_env_init(InstallEnv *env) {
     if (!env) return false;
 
-    /* Initialize cache config */
     env->cache = cache_config_init();
     if (!env->cache) {
         fprintf(stderr, "Error: Failed to initialize cache configuration\n");
         return false;
     }
 
-    /* Ensure cache directories exist */
     if (!cache_ensure_directories(env->cache)) {
         fprintf(stderr, "Error: Failed to create cache directories\n");
         return false;
     }
 
-    /* Initialize curl session */
     env->curl_session = curl_session_create();
     if (!env->curl_session) {
         fprintf(stderr, "Error: Failed to initialize HTTP client\n");
         return false;
     }
 
-    /* Get registry URL from environment or use default */
     const char *registry_url_env = getenv("ELM_PACKAGE_REGISTRY_URL");
     if (registry_url_env && registry_url_env[0] != '\0') {
         env->registry_url = arena_strdup(registry_url_env);
@@ -196,7 +181,6 @@ bool install_env_init(InstallEnv *env) {
         return false;
     }
 
-    /* Try to load cached registry */
     env->registry = registry_load_from_dat(env->cache->registry_path, &env->known_version_count);
 
     if (env->registry) {
@@ -212,7 +196,7 @@ bool install_env_init(InstallEnv *env) {
         env->known_version_count = 0;
     }
 
-    /* Test connectivity */
+    //REVIEW: magic number.
     char health_check_url[512];
     snprintf(health_check_url, sizeof(health_check_url), "%s/all-packages", env->registry_url);
 
@@ -232,7 +216,6 @@ bool install_env_init(InstallEnv *env) {
     } else {
         log_progress("Connected to package registry");
 
-        /* Fetch or update registry */
         if (env->known_version_count == 0) {
             if (!install_env_fetch_registry(env)) {
                 fprintf(stderr, "Error: Failed to fetch registry from network\n");
@@ -248,10 +231,10 @@ bool install_env_init(InstallEnv *env) {
     return true;
 }
 
-/* Fetch full registry */
 bool install_env_fetch_registry(InstallEnv *env) {
     if (!env || !env->curl_session || !env->registry_url) return false;
 
+    //REVIEW: magic number.
     char url[512];
     snprintf(url, sizeof(url), "%s/all-packages", env->registry_url);
 
@@ -278,7 +261,6 @@ bool install_env_fetch_registry(InstallEnv *env) {
 
     printf("Downloaded %zu bytes\n", buffer->len);
 
-    /* Parse JSON */
     if (!parse_all_packages_json(buffer->data, env->registry)) {
         fprintf(stderr, "Error: Failed to parse registry JSON\n");
         memory_buffer_free(buffer);
@@ -290,7 +272,6 @@ bool install_env_fetch_registry(InstallEnv *env) {
     printf("Registry loaded: %zu packages, %zu versions\n",
            env->registry->entry_count, env->registry->total_versions);
 
-    /* Save to cache (binary format) */
     if (!registry_dat_write(env->registry, env->cache->registry_path)) {
         fprintf(stderr, "Warning: Failed to cache registry to %s\n", env->cache->registry_path);
     } else {
@@ -301,10 +282,10 @@ bool install_env_fetch_registry(InstallEnv *env) {
     return true;
 }
 
-/* Update registry incrementally */
 bool install_env_update_registry(InstallEnv *env) {
     if (!env || !env->curl_session || !env->registry_url) return false;
 
+    //REVIEW: magic number.
     char url[512];
     snprintf(url, sizeof(url), "%s/all-packages/since/%zu",
              env->registry_url, env->known_version_count);
@@ -328,7 +309,6 @@ bool install_env_update_registry(InstallEnv *env) {
         return false;
     }
 
-    /* Parse incremental update */
     if (!parse_since_response(buffer->data, env->registry)) {
         fprintf(stderr, "Warning: Failed to parse registry update\n");
         memory_buffer_free(buffer);
@@ -337,7 +317,6 @@ bool install_env_update_registry(InstallEnv *env) {
 
     memory_buffer_free(buffer);
 
-    /* Save updated registry if we got new versions */
     size_t new_total = env->registry->total_versions;
     if (new_total > env->known_version_count) {
         log_progress("Registry updated: %zu new version(s)", new_total - env->known_version_count);
@@ -388,26 +367,16 @@ bool install_env_download_package(InstallEnv *env, const char *author, const cha
 
     log_progress("  Extracting to: %s", pkg_dir);
 
-    if (!extract_zip(archive_path, pkg_dir)) {
+    /* Only extracts elm.json, docs.json, LICENSE, README.md, and src/
+     * Automatically handles GitHub zipball structure (skips leading directory component)
+     * Won't overwrite existing elm.json or docs.json
+     */
+    if (!extract_zip_selective(archive_path, pkg_dir)) {
         fprintf(stderr, "Error: Failed to extract package archive\n");
         arena_free(pkg_dir);
         remove(archive_path);
         arena_free(archive_path);
         return false;
-    }
-
-    /* GitHub zipballs extract to a subdirectory named author-package-commithash
-     * We need to move the contents up one level.
-     */
-    char *subdir = find_first_subdirectory(pkg_dir);
-    if (subdir) {
-        if (!move_directory_contents(subdir, pkg_dir)) {
-            fprintf(stderr, "Warning: Failed to reorganize package directory\n");
-            /* Don't fail the entire operation, the files might still be usable */
-        }
-        /* Try to remove the now-empty subdirectory */
-        rmdir(subdir);
-        arena_free(subdir);
     }
 
     remove(archive_path);
@@ -419,7 +388,6 @@ bool install_env_download_package(InstallEnv *env, const char *author, const cha
     return true;
 }
 
-/* Free environment */
 void install_env_free(InstallEnv *env) {
     if (!env) return;
 

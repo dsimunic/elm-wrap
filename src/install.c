@@ -20,12 +20,10 @@
 
 #define ELM_JSON_PATH "elm.json"
 
-// ANSI color codes
 #define ANSI_DULL_CYAN "\033[36m"
 #define ANSI_DULL_YELLOW "\033[33m"
 #define ANSI_RESET "\033[0m"
 
-// Forward declarations
 static char* find_package_elm_json(const char *pkg_path);
 
 static void print_install_what(const char *elm_home) {
@@ -75,21 +73,18 @@ static void print_install_usage(void) {
 static bool parse_package_name(const char *package, char **author, char **name) {
     if (!package) return false;
 
-    // Find the slash separator
     const char *slash = strchr(package, '/');
     if (!slash) {
         fprintf(stderr, "Error: Package name must be in format 'author/package'\n");
         return false;
     }
 
-    // Extract author
     size_t author_len = slash - package;
     *author = arena_malloc(author_len + 1);
     if (!*author) return false;
     strncpy(*author, package, author_len);
     (*author)[author_len] = '\0';
 
-    // Extract name
     *name = arena_strdup(slash + 1);
     if (!*name) {
         arena_free(*author);
@@ -139,21 +134,18 @@ static Package* find_existing_package(ElmJson *elm_json, const char *author, con
     return NULL;
 }
 
-// Helper function to extract package name and version from elm.json at a given path
 static bool read_package_info_from_elm_json(const char *elm_json_path, char **out_author, char **out_name, char **out_version) {
     ElmJson *pkg_elm_json = elm_json_read(elm_json_path);
     if (!pkg_elm_json) {
         return false;
     }
 
-    // Check if it's a package project (not application)
     if (pkg_elm_json->type != ELM_PROJECT_PACKAGE) {
         fprintf(stderr, "Error: The elm.json at %s is not a package project\n", elm_json_path);
         elm_json_free(pkg_elm_json);
         return false;
     }
 
-    // Extract author and name from package name
     if (pkg_elm_json->package_name) {
         if (!parse_package_name(pkg_elm_json->package_name, out_author, out_name)) {
             elm_json_free(pkg_elm_json);
@@ -165,7 +157,6 @@ static bool read_package_info_from_elm_json(const char *elm_json_path, char **ou
         return false;
     }
 
-    // Extract version
     if (pkg_elm_json->package_version) {
         *out_version = arena_strdup(pkg_elm_json->package_version);
     } else {
@@ -178,7 +169,6 @@ static bool read_package_info_from_elm_json(const char *elm_json_path, char **ou
     return true;
 }
 
-// Helper function to create PIN file
 static bool create_pin_file(const char *pkg_path, const char *version) {
     size_t pin_path_len = strlen(pkg_path) + strlen("/PIN") + 1;
     char *pin_path = arena_malloc(pin_path_len);
@@ -200,9 +190,6 @@ static bool create_pin_file(const char *pkg_path, const char *version) {
     return true;
 }
 
-
-
-// Helper function to ensure directory path exists
 static bool ensure_path_exists(const char *path) {
     if (!path || path[0] == '\0') {
         return false;
@@ -242,8 +229,6 @@ static bool ensure_path_exists(const char *path) {
     return ok;
 }
 
-// Helper function to find first subdirectory in a directory
-// Helper function to install package from local file/directory
 static bool install_from_file(const char *source_path, InstallEnv *env, const char *author, const char *name, const char *version) {
     struct stat st;
     if (stat(source_path, &st) != 0) {
@@ -256,7 +241,6 @@ static bool install_from_file(const char *source_path, InstallEnv *env, const ch
         return false;
     }
 
-    // Get package base directory (author/name, not version)
     size_t pkg_base_len = strlen(env->cache->packages_dir) + strlen(author) + strlen(name) + 3;
     char *pkg_base_dir = arena_malloc(pkg_base_len);
     if (!pkg_base_dir) {
@@ -265,7 +249,6 @@ static bool install_from_file(const char *source_path, InstallEnv *env, const ch
     }
     snprintf(pkg_base_dir, pkg_base_len, "%s/%s/%s", env->cache->packages_dir, author, name);
 
-    // Get destination path (author/name/version)
     char *dest_path = cache_get_package_path(env->cache, author, name, version);
     if (!dest_path) {
         fprintf(stderr, "Error: Failed to get package path\n");
@@ -273,7 +256,6 @@ static bool install_from_file(const char *source_path, InstallEnv *env, const ch
         return false;
     }
 
-    // Ensure package base directory exists
     if (!ensure_path_exists(pkg_base_dir)) {
         fprintf(stderr, "Error: Failed to create package base directory: %s\n", pkg_base_dir);
         arena_free(pkg_base_dir);
@@ -281,40 +263,36 @@ static bool install_from_file(const char *source_path, InstallEnv *env, const ch
         return false;
     }
 
-    // Delete existing version directory if it exists
     if (stat(dest_path, &st) == 0) {
         if (!remove_directory_recursive(dest_path)) {
             fprintf(stderr, "Warning: Failed to remove existing directory: %s\n", dest_path);
         }
     }
 
-    // Check if source_path has elm.json at root (direct package dir) or has a subdirectory (extracted zip)
+    // Copy from source to destination
+    // Note: source_path could be either:
+    //   1. A direct package directory (elm.json at root)
+    //   2. An extracted zip with package in subdirectory
+    // We handle both cases by checking for elm.json location
+    //REVIEW: magic number.
     char elm_json_check[4096];
     snprintf(elm_json_check, sizeof(elm_json_check), "%s/elm.json", source_path);
-    bool has_elm_json_at_root = (stat(elm_json_check, &st) == 0);
-
-    bool result = true;
-    if (has_elm_json_at_root) {
-        // Direct package directory - copy contents
+    
+    bool result;
+    if (stat(elm_json_check, &st) == 0) {
+        // elm.json at root - direct package directory
         result = copy_directory_recursive(source_path, dest_path);
     } else {
-        // Extracted zip - find the subdirectory and move it
+        // elm.json not at root - likely extracted zip with subdirectory
         char *extracted_dir = find_first_subdirectory(source_path);
         if (!extracted_dir) {
-            fprintf(stderr, "Error: Could not find extracted package directory in %s\n", source_path);
+            fprintf(stderr, "Error: Could not find package directory in %s\n", source_path);
             arena_free(pkg_base_dir);
             arena_free(dest_path);
             return false;
         }
 
-        // Move the extracted directory to the final destination
-        if (rename(extracted_dir, dest_path) != 0) {
-            /* rename() failed, possibly cross-device, fall back to copy+delete */
-            result = copy_directory_recursive(extracted_dir, dest_path);
-            if (result) {
-                remove_directory_recursive(extracted_dir);
-            }
-        }
+        result = copy_directory_recursive(extracted_dir, dest_path);
         arena_free(extracted_dir);
     }
 
@@ -325,7 +303,7 @@ static bool install_from_file(const char *source_path, InstallEnv *env, const ch
         return false;
     }
 
-    // Verify that src directory exists
+    //REVIEW: magic number.
     char src_path[4096];
     snprintf(src_path, sizeof(src_path), "%s/src", dest_path);
     if (stat(src_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
@@ -340,7 +318,6 @@ static bool install_from_file(const char *source_path, InstallEnv *env, const ch
     return true;
 }
 
-// Comparison function for sorting package changes alphabetically
 static int compare_package_changes(const void *a, const void *b) {
     const PackageChange *pkg_a = (const PackageChange *)a;
     const PackageChange *pkg_b = (const PackageChange *)b;
@@ -363,12 +340,10 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
               is_test ? " (test dependency)" : "",
               major_upgrade ? " (major upgrade allowed)" : "");
 
-    // Step 3.1/3.2: Check if package already exists anywhere in elm.json
     Package *existing_pkg = find_existing_package(elm_json, author, name);
     PromotionType promotion = elm_json_find_package(elm_json, author, name);
 
     if (existing_pkg && !major_upgrade) {
-        // Package exists and we're not doing a major upgrade - just ensure it's downloaded
         log_debug("Package %s/%s is already in your dependencies", author, name);
         if (existing_pkg->version &&
             cache_package_exists(env->cache, author, name, existing_pkg->version)) {
@@ -378,7 +353,6 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
         }
 
         if (promotion != PROMOTION_NONE) {
-            // Promote if needed
             if (elm_json_promote_package(elm_json, author, name)) {
                 log_debug("Saving updated elm.json");
                 if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
@@ -390,7 +364,6 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
                 log_debug("Done");
             }
         } else {
-            // Package is already installed and no promotion needed
             printf("It is already installed!\n");
         }
 
@@ -398,15 +371,14 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
         arena_free(name);
         return 0;
     } else if (existing_pkg && major_upgrade) {
-        // Package exists but we want to upgrade it - continue to solver
         log_debug("Package %s/%s exists at %s, checking for major upgrade", 
                   author, name, existing_pkg->version);
     }
 
-    // Step 3.3: Check if package exists in registry
     RegistryEntry *registry_entry = registry_find(env->registry, author, name);
 
     if (!registry_entry) {
+        //TODO: Suggest similar package names, check for misspellings
         log_error("I cannot find package '%s/%s'", author, name);
         log_error("Make sure the package name is correct");
 
@@ -463,7 +435,6 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
         return 1;
     }
 
-    // Count adds and changes, calculate max width
     int add_count = 0;
     int change_count = 0;
     int max_width = 0;  // Use same width for both sections
@@ -481,7 +452,6 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
         if (pkg_len > max_width) max_width = pkg_len;
     }
 
-    // Create temporary arrays for adds and changes
     PackageChange *adds = arena_malloc(sizeof(PackageChange) * add_count);
     PackageChange *changes = arena_malloc(sizeof(PackageChange) * change_count);
 
@@ -497,15 +467,12 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
         }
     }
 
-    // Sort both arrays
     qsort(adds, add_count, sizeof(PackageChange), compare_package_changes);
     qsort(changes, change_count, sizeof(PackageChange), compare_package_changes);
 
-    // Print the plan
     printf("Here is my plan:\n");
     printf("  \n");
 
-    // Print adds
     if (add_count > 0) {
         printf("  Add:\n");
         for (int i = 0; i < add_count; i++) {
@@ -517,7 +484,6 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
         printf("  \n");
     }
 
-    // Print changes
     if (change_count > 0) {
         printf("  Change:\n");
         for (int i = 0; i < change_count; i++) {
@@ -536,7 +502,6 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
         printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
         fflush(stdout);
         
-        // Read user input
         char response[10];
         if (!fgets(response, sizeof(response), stdin)) {
             fprintf(stderr, "Error reading input\n");
@@ -546,7 +511,6 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
             return 1;
         }
         
-        // Check response
         if (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n') {
             printf("Aborted.\n");
             install_plan_free(out_plan);
@@ -556,17 +520,14 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
         }
     }
     
-    // Apply the changes to elm_json
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
         PackageMap *target_map = NULL;
         
         if (elm_json->type == ELM_PROJECT_APPLICATION) {
             if (strcmp(change->author, author) == 0 && strcmp(change->name, name) == 0) {
-                // Requested package goes to direct
                 target_map = is_test ? elm_json->dependencies_test_direct : elm_json->dependencies_direct;
             } else {
-                // Others to indirect
                 target_map = is_test ? elm_json->dependencies_test_indirect : elm_json->dependencies_indirect;
             }
         } else {
@@ -582,7 +543,6 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
         }
     }
     
-    // Save updated elm.json
     printf("Saving elm.json...\n");
     if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
         fprintf(stderr, "Error: Failed to write elm.json\n");
@@ -612,7 +572,6 @@ int cmd_install(int argc, char *argv[]) {
     const char *from_file_path = NULL;
     const char *from_url = NULL;
 
-    // Parse arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_install_usage();
@@ -676,14 +635,12 @@ int cmd_install(int argc, char *argv[]) {
         }
     }
 
-    // Validate --major flag
     if (major_upgrade) {
         if (!major_package_name) {
             fprintf(stderr, "Error: --major requires a package name\n");
             print_install_usage();
             return 1;
         }
-        // Use major_package_name as the package_name
         if (package_name && strcmp(package_name, major_package_name) != 0) {
             fprintf(stderr, "Error: Conflicting package names with --major\n");
             return 1;
@@ -711,7 +668,6 @@ int cmd_install(int argc, char *argv[]) {
         log_set_level(LOG_LEVEL_PROGRESS);
     }
     
-    // Step 1: Initialize environment, registry, and HTTP session
     InstallEnv *env = install_env_create();
     if (!env) {
         log_error("Failed to create install environment");
@@ -726,7 +682,6 @@ int cmd_install(int argc, char *argv[]) {
 
     log_debug("ELM_HOME: %s", env->cache->elm_home);
 
-    // Step 2: Read elm.json
     log_debug("Reading elm.json");
     ElmJson *elm_json = elm_json_read(ELM_JSON_PATH);
     if (!elm_json) {
@@ -757,7 +712,6 @@ int cmd_install(int argc, char *argv[]) {
         char temp_dir_buf[1024];
         temp_dir_buf[0] = '\0';
 
-        // Parse the package name provided by user
         if (!parse_package_name(package_name, &author, &name)) {
             elm_json_free(elm_json);
             install_env_free(env);
@@ -768,11 +722,9 @@ int cmd_install(int argc, char *argv[]) {
         // For --from-url, download to temp first
         if (from_url) {
             snprintf(temp_dir_buf, sizeof(temp_dir_buf), "/tmp/wrap_temp_%s_%s", author, name);
-
-            // Create temp directory
             mkdir(temp_dir_buf, 0755);
 
-            // Download to temp location
+            //REVIEV: magic number.
             char temp_file[1024];
             snprintf(temp_file, sizeof(temp_file), "%s/package.zip", temp_dir_buf);
 
@@ -788,8 +740,7 @@ int cmd_install(int argc, char *argv[]) {
                 return 1;
             }
 
-            // Extract to temp location
-            if (!extract_zip(temp_file, temp_dir_buf)) {
+            if (!extract_zip_selective(temp_file, temp_dir_buf)) {
                 fprintf(stderr, "Error: Failed to extract archive\n");
                 arena_free(author);
                 arena_free(name);
@@ -799,7 +750,6 @@ int cmd_install(int argc, char *argv[]) {
                 return 1;
             }
 
-            // Delete the zip file after extraction
             unlink(temp_file);
 
             from_file_path = temp_dir_buf;
@@ -849,7 +799,6 @@ int cmd_install(int argc, char *argv[]) {
         }
 
         if (read_package_info_from_elm_json(elm_json_path, &actual_author, &actual_name, &actual_version)) {
-            // Check if actual package name matches user-provided name
             if (strcmp(author, actual_author) != 0 || strcmp(name, actual_name) != 0) {
                 printf("Warning: Package name in elm.json (%s/%s) differs from specified name (%s/%s)\n",
                        actual_author, actual_name, author, name);
@@ -875,7 +824,6 @@ int cmd_install(int argc, char *argv[]) {
                 }
             }
 
-            // Use actual package info for installation
             arena_free(author);
             arena_free(name);
             author = actual_author;
@@ -891,11 +839,9 @@ int cmd_install(int argc, char *argv[]) {
             return 1;
         }
 
-        // Check if package already exists in elm.json and update in-place
         Package *existing_pkg = find_existing_package(elm_json, author, name);
         bool is_update = (existing_pkg != NULL);
 
-        // Present installation plan
         printf("Here is my plan:\n");
         printf("  \n");
         if (is_update) {
@@ -925,7 +871,6 @@ int cmd_install(int argc, char *argv[]) {
             }
         }
 
-        // Install from file
         if (!install_from_file(from_file_path, env, author, name, version)) {
             fprintf(stderr, "Error: Failed to install package from file\n");
             if (version) arena_free(version);
@@ -937,7 +882,6 @@ int cmd_install(int argc, char *argv[]) {
             return 1;
         }
 
-        // Create PIN file if requested - in package dir, not version dir
         if (pin_flag) {
             // Get package directory (one level up from version dir)
             size_t pkg_dir_len = strlen(env->cache->packages_dir) + strlen(author) + strlen(name) + 3;
@@ -949,13 +893,10 @@ int cmd_install(int argc, char *argv[]) {
             }
         }
 
-        // Update elm.json (update in-place if exists, add if new)
         if (is_update) {
-            // Update existing package version
             arena_free(existing_pkg->version);
             existing_pkg->version = arena_strdup(version);
         } else {
-            // Add new package
             PackageMap *target_map = NULL;
             if (elm_json->type == ELM_PROJECT_APPLICATION) {
                 target_map = is_test ? elm_json->dependencies_test_direct : elm_json->dependencies_direct;
@@ -968,7 +909,6 @@ int cmd_install(int argc, char *argv[]) {
             }
         }
 
-        // Save elm.json
         printf("Saving elm.json...\n");
         if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
             fprintf(stderr, "Error: Failed to write elm.json\n");
@@ -988,11 +928,8 @@ int cmd_install(int argc, char *argv[]) {
         arena_free(name);
         result = 0;
     } else if (package_name) {
-        // Install specific package (Step 3+)
         result = install_package(package_name, is_test, major_upgrade, auto_yes, elm_json, env);
     } else {
-        // No package specified - show "INSTALL WHAT?" message
-        // Copy elm_home before freeing env
         char *elm_home = arena_strdup(env->cache->elm_home);
         elm_json_free(elm_json);
         install_env_free(env);
@@ -1003,11 +940,9 @@ int cmd_install(int argc, char *argv[]) {
         return 1;
     }
 
-    // Cleanup
     elm_json_free(elm_json);
     install_env_free(env);
 
-    // Restore original log level
     log_set_level(original_level);
 
     return result;
@@ -1033,7 +968,6 @@ int cmd_remove(int argc, char *argv[]) {
     const char *package_name = NULL;
     bool auto_yes = false;
 
-    // Parse arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_remove_usage();
@@ -1068,7 +1002,6 @@ int cmd_remove(int argc, char *argv[]) {
 
     log_debug("Removing %s/%s", author, name);
 
-    // Initialize environment
     InstallEnv *env = install_env_create();
     if (!env) {
         log_error("Failed to create install environment");
@@ -1087,7 +1020,6 @@ int cmd_remove(int argc, char *argv[]) {
 
     log_debug("ELM_HOME: %s", env->cache->elm_home);
 
-    // Read elm.json
     log_debug("Reading elm.json");
     ElmJson *elm_json = elm_json_read(ELM_JSON_PATH);
     if (!elm_json) {
@@ -1099,7 +1031,6 @@ int cmd_remove(int argc, char *argv[]) {
         return 1;
     }
 
-    // Initialize solver
     SolverState *solver = solver_init(env, false);  // Offline mode - we don't need to download anything
     if (!solver) {
         log_error("Failed to initialize solver");
@@ -1110,7 +1041,6 @@ int cmd_remove(int argc, char *argv[]) {
         return 1;
     }
 
-    // Call solver to compute removal plan
     InstallPlan *out_plan = NULL;
     SolverResult result = solver_remove_package(solver, elm_json, author, name, &out_plan);
 
@@ -1134,7 +1064,6 @@ int cmd_remove(int argc, char *argv[]) {
         return 1;
     }
 
-    // Sort changes alphabetically
     qsort(out_plan->changes, out_plan->count, sizeof(PackageChange), compare_package_changes);
 
     // Calculate max width for formatting
@@ -1145,7 +1074,6 @@ int cmd_remove(int argc, char *argv[]) {
         if (pkg_len > max_width) max_width = pkg_len;
     }
 
-    // Print the plan
     printf("Here is my plan:\n");
     printf("  \n");
     printf("  Remove:\n");
@@ -1162,7 +1090,6 @@ int cmd_remove(int argc, char *argv[]) {
         printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
         fflush(stdout);
         
-        // Read user input
         char response[10];
         if (!fgets(response, sizeof(response), stdin)) {
             fprintf(stderr, "Error reading input\n");
@@ -1174,7 +1101,6 @@ int cmd_remove(int argc, char *argv[]) {
             return 1;
         }
         
-        // Check response
         if (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n') {
             printf("Aborted.\n");
             install_plan_free(out_plan);
@@ -1186,12 +1112,10 @@ int cmd_remove(int argc, char *argv[]) {
         }
     }
     
-    // Remove packages from elm.json
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
         
         if (elm_json->type == ELM_PROJECT_APPLICATION) {
-            // Try removing from each map
             package_map_remove(elm_json->dependencies_direct, change->author, change->name);
             package_map_remove(elm_json->dependencies_indirect, change->author, change->name);
             package_map_remove(elm_json->dependencies_test_direct, change->author, change->name);
@@ -1202,7 +1126,6 @@ int cmd_remove(int argc, char *argv[]) {
         }
     }
     
-    // Save updated elm.json
     printf("Saving elm.json...\n");
     if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
         fprintf(stderr, "Error: Failed to write elm.json\n");
@@ -1239,7 +1162,6 @@ static void print_check_usage(void) {
 int cmd_check(int argc, char *argv[]) {
     const char *elm_json_path = NULL;
 
-    // Parse arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_check_usage();
@@ -1257,12 +1179,10 @@ int cmd_check(int argc, char *argv[]) {
         }
     }
 
-    // Use default elm.json if not specified
     if (!elm_json_path) {
         elm_json_path = ELM_JSON_PATH;
     }
 
-    // Initialize environment to get registry from ELM_HOME
     InstallEnv *env = install_env_create();
     if (!env) {
         log_error("Failed to create install environment");
@@ -1277,10 +1197,8 @@ int cmd_check(int argc, char *argv[]) {
 
     log_debug("Using registry from: %s", env->cache->registry_path);
 
-    // Check for upgrades using the registry
     int result = check_all_upgrades(elm_json_path, env->registry);
 
-    // Clean up
     install_env_free(env);
 
     return result;
@@ -1314,14 +1232,12 @@ static char* find_package_elm_json(const char *pkg_path) {
             continue;
         }
 
-        // Check if this is a directory
         size_t subdir_len = strlen(pkg_path) + strlen(entry->d_name) + 2;
         char *subdir_path = arena_malloc(subdir_len);
         if (!subdir_path) continue;
         snprintf(subdir_path, subdir_len, "%s/%s", pkg_path, entry->d_name);
 
         if (stat(subdir_path, &st) == 0 && S_ISDIR(st.st_mode)) {
-            // Check for elm.json in this subdirectory
             size_t elm_json_len = strlen(subdir_path) + strlen("/elm.json") + 1;
             char *elm_json_path = arena_malloc(elm_json_len);
             if (elm_json_path) {
@@ -1378,11 +1294,9 @@ static void print_info_usage(void) {
     printf("  --help                             # Show this help\n");
 }
 
-// Helper function to check if a package depends on the target package
 static bool package_depends_on(const char *pkg_author, const char *pkg_name, const char *pkg_version,
                                const char *target_author, const char *target_name,
                                InstallEnv *env) {
-    // Get the package's elm.json
     char *pkg_path = cache_get_package_path(env->cache, pkg_author, pkg_name, pkg_version);
     if (!pkg_path) {
         return false;
@@ -1397,7 +1311,6 @@ static bool package_depends_on(const char *pkg_author, const char *pkg_name, con
     }
 
     if (!pkg_elm_json) {
-        // Try to download if not cached
         if (cache_download_package_with_env(env, pkg_author, pkg_name, pkg_version)) {
             elm_json_path = find_package_elm_json(pkg_path);
             if (elm_json_path) {
@@ -1415,7 +1328,6 @@ static bool package_depends_on(const char *pkg_author, const char *pkg_name, con
 
     bool depends = false;
 
-    // Check regular dependencies
     if (pkg_elm_json->package_dependencies) {
         Package *dep = package_map_find(pkg_elm_json->package_dependencies, target_author, target_name);
         if (dep) {
@@ -1423,7 +1335,6 @@ static bool package_depends_on(const char *pkg_author, const char *pkg_name, con
         }
     }
 
-    // Check test dependencies if not found yet
     if (!depends && pkg_elm_json->package_test_dependencies) {
         Package *dep = package_map_find(pkg_elm_json->package_test_dependencies, target_author, target_name);
         if (dep) {
@@ -1436,24 +1347,20 @@ static bool package_depends_on(const char *pkg_author, const char *pkg_name, con
 }
 
 static int show_package_dependencies(const char *author, const char *name, const char *version, InstallEnv *env) {
-    // Build path to package directory
     char *pkg_path = cache_get_package_path(env->cache, author, name, version);
     if (!pkg_path) {
         log_error("Failed to get package path");
         return 1;
     }
 
-    // Find elm.json (could be at root or in a subdirectory)
     char *elm_json_path = find_package_elm_json(pkg_path);
 
-    // Try to read elm.json
     ElmJson *elm_json = NULL;
     if (elm_json_path) {
         elm_json = elm_json_read(elm_json_path);
     }
 
     if (!elm_json) {
-        // Package not cached or elm.json not found, try to download it
         log_debug("Package not in cache, attempting download");
         if (!cache_download_package_with_env(env, author, name, version)) {
             log_error("Failed to download package %s/%s@%s", author, name, version);
@@ -1462,7 +1369,6 @@ static int show_package_dependencies(const char *author, const char *name, const
             return 1;
         }
 
-        // Retry finding elm.json after download
         if (elm_json_path) arena_free(elm_json_path);
         elm_json_path = find_package_elm_json(pkg_path);
 
@@ -1481,7 +1387,6 @@ static int show_package_dependencies(const char *author, const char *name, const
     if (elm_json_path) arena_free(elm_json_path);
     arena_free(pkg_path);
 
-    // Display package information
     printf("\n");
     printf("Package: %s/%s @ %s\n", author, name, version);
     printf("========================================\n\n");
@@ -1492,7 +1397,6 @@ static int show_package_dependencies(const char *author, const char *name, const
         if (deps->count == 0) {
             printf("No dependencies\n");
         } else {
-            // Calculate max width for aligned output (like install command)
             int max_width = 0;
             for (int i = 0; i < deps->count; i++) {
                 Package *pkg = &deps->packages[i];
@@ -1500,7 +1404,6 @@ static int show_package_dependencies(const char *author, const char *name, const
                 if (pkg_len > max_width) max_width = pkg_len;
             }
 
-            // Check test dependencies for width too
             if (elm_json->package_test_dependencies && elm_json->package_test_dependencies->count > 0) {
                 PackageMap *test_deps = elm_json->package_test_dependencies;
                 for (int i = 0; i < test_deps->count; i++) {
@@ -1519,11 +1422,9 @@ static int show_package_dependencies(const char *author, const char *name, const
             }
         }
 
-        // Also show test dependencies if any
         if (elm_json->package_test_dependencies && elm_json->package_test_dependencies->count > 0) {
             PackageMap *test_deps = elm_json->package_test_dependencies;
 
-            // Calculate max width if not already done
             int max_width = 0;
             for (int i = 0; i < test_deps->count; i++) {
                 Package *pkg = &test_deps->packages[i];
@@ -1531,7 +1432,6 @@ static int show_package_dependencies(const char *author, const char *name, const
                 if (pkg_len > max_width) max_width = pkg_len;
             }
 
-            // Also check main dependencies
             if (elm_json->package_dependencies) {
                 for (int i = 0; i < elm_json->package_dependencies->count; i++) {
                     Package *pkg = &elm_json->package_dependencies->packages[i];
@@ -1552,10 +1452,8 @@ static int show_package_dependencies(const char *author, const char *name, const
         printf("(Not a package - this is an application)\n");
     }
 
-    // Now check for reverse dependencies - packages in the current elm.json that depend on this package
     ElmJson *current_elm_json = elm_json_read(ELM_JSON_PATH);
     if (current_elm_json) {
-        // Collect all packages from current elm.json
         PackageMap *all_deps = package_map_create();
 
         if (current_elm_json->dependencies_direct) {
@@ -1568,7 +1466,6 @@ static int show_package_dependencies(const char *author, const char *name, const
         if (current_elm_json->dependencies_indirect) {
             for (int i = 0; i < current_elm_json->dependencies_indirect->count; i++) {
                 Package *pkg = &current_elm_json->dependencies_indirect->packages[i];
-                // Only add if not already present
                 if (!package_map_find(all_deps, pkg->author, pkg->name)) {
                     package_map_add(all_deps, pkg->author, pkg->name, pkg->version);
                 }
@@ -1593,7 +1490,6 @@ static int show_package_dependencies(const char *author, const char *name, const
             }
         }
 
-        // For package elm.json
         if (current_elm_json->package_dependencies) {
             for (int i = 0; i < current_elm_json->package_dependencies->count; i++) {
                 Package *pkg = &current_elm_json->package_dependencies->packages[i];
@@ -1610,7 +1506,6 @@ static int show_package_dependencies(const char *author, const char *name, const
             }
         }
 
-        // Now check each package to see if it depends on our target
         PackageMap *reverse_deps = package_map_create();
 
         for (int i = 0; i < all_deps->count; i++) {
@@ -1626,7 +1521,6 @@ static int show_package_dependencies(const char *author, const char *name, const
             }
         }
 
-        // Display reverse dependencies
         if (reverse_deps->count > 0) {
             // Calculate max width for aligned output
             int max_width = 0;
@@ -1659,7 +1553,6 @@ int cmd_deps(int argc, char *argv[]) {
     const char *package_arg = NULL;
     const char *version_arg = NULL;
 
-    // Parse arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_deps_usage();
@@ -1669,7 +1562,6 @@ int cmd_deps(int argc, char *argv[]) {
             print_deps_usage();
             return 1;
         } else {
-            // Positional arguments
             if (!package_arg) {
                 package_arg = argv[i];
             } else if (!version_arg) {
@@ -1682,14 +1574,12 @@ int cmd_deps(int argc, char *argv[]) {
         }
     }
 
-    // Package argument is required for deps command
     if (!package_arg) {
         fprintf(stderr, "Error: Package name is required\n");
         print_deps_usage();
         return 1;
     }
 
-    // Initialize environment to get info
     InstallEnv *env = install_env_create();
     if (!env) {
         log_error("Failed to create install environment");
@@ -1710,7 +1600,6 @@ int cmd_deps(int argc, char *argv[]) {
         return 1;
     }
 
-    // Check if package exists in registry
     RegistryEntry *registry_entry = registry_find(env->registry, author, name);
     if (!registry_entry) {
         log_error("I cannot find package '%s/%s'", author, name);
@@ -1721,12 +1610,10 @@ int cmd_deps(int argc, char *argv[]) {
         return 1;
     }
 
-    // Determine which version to use
     const char *version_to_use = NULL;
     bool version_found = false;
 
     if (version_arg) {
-        // Version specified on command line - validate it exists
         for (size_t i = 0; i < registry_entry->version_count; i++) {
             char *v_str = version_to_string(&registry_entry->versions[i]);
             if (v_str && strcmp(v_str, version_arg) == 0) {
@@ -1757,7 +1644,6 @@ int cmd_deps(int argc, char *argv[]) {
             return 1;
         }
     } else {
-        // No version specified - check elm.json first
         ElmJson *elm_json = elm_json_read(ELM_JSON_PATH);
         if (elm_json) {
             Package *existing_pkg = find_existing_package(elm_json, author, name);
@@ -1769,7 +1655,6 @@ int cmd_deps(int argc, char *argv[]) {
             elm_json_free(elm_json);
         }
 
-        // If not in elm.json, use latest from registry
         if (!version_found && registry_entry->version_count > 0) {
             // Versions are stored newest first
             char *latest = version_to_string(&registry_entry->versions[0]);
@@ -1789,14 +1674,11 @@ int cmd_deps(int argc, char *argv[]) {
         return 1;
     }
 
-    // Show dependencies for the package
     int result = show_package_dependencies(author, name, version_to_use, env);
 
-    // Clean up version string if it was allocated
     if (version_to_use != version_arg && version_found && !version_arg) {
         ElmJson *elm_json = elm_json_read(ELM_JSON_PATH);
         if (!elm_json || !find_existing_package(elm_json, author, name)) {
-            // Only free if we allocated it (latest from registry)
             arena_free((char*)version_to_use);
         }
         if (elm_json) {
@@ -1811,7 +1693,6 @@ int cmd_deps(int argc, char *argv[]) {
 }
 
 int cmd_info(int argc, char *argv[]) {
-    // Parse arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_info_usage();
@@ -1828,7 +1709,6 @@ int cmd_info(int argc, char *argv[]) {
         }
     }
 
-    // Initialize environment to get info
     InstallEnv *env = install_env_create();
     if (!env) {
         log_error("Failed to create install environment");
@@ -1841,21 +1721,17 @@ int cmd_info(int argc, char *argv[]) {
         return 1;
     }
 
-    // Show general package management info
     printf("\n");
     printf("Package Management Information\n");
     printf("===============================\n\n");
 
-    // Display ELM_HOME
     printf("ELM_HOME: %s\n", env->cache->elm_home);
 
-    // Display registry information
     printf("\nRegistry Cache:\n");
     printf("  Location: %s\n", env->cache->registry_path);
     printf("  Packages: %zu\n", env->registry->entry_count);
     printf("  Versions: %zu\n", env->registry->total_versions);
 
-    // Display registry URL and connectivity
     printf("\nRegistry URL: %s\n", env->registry_url);
     if (env->offline) {
         printf("  Status: Offline (using cached data)\n");
@@ -1863,13 +1739,11 @@ int cmd_info(int argc, char *argv[]) {
         printf("  Status: Connected\n");
     }
 
-    // Check if we're in a project directory
     ElmJson *elm_json = elm_json_read(ELM_JSON_PATH);
     if (elm_json) {
         printf("\nProject Information\n");
         printf("-------------------\n");
 
-        // Count and display installed packages
         int total_packages = 0;
         if (elm_json->type == ELM_PROJECT_APPLICATION) {
             total_packages = elm_json->dependencies_direct->count +
@@ -1892,7 +1766,6 @@ int cmd_info(int argc, char *argv[]) {
         }
         printf("  Total:                   %d\n", total_packages);
 
-        // Display package details
         printf("\nInstalled Package Versions:\n");
         if (elm_json->type == ELM_PROJECT_APPLICATION) {
             for (int i = 0; i < elm_json->dependencies_direct->count; i++) {
@@ -1910,7 +1783,6 @@ int cmd_info(int argc, char *argv[]) {
             }
         }
 
-        // Check for upgrades
         printf("\n");
         check_all_upgrades(ELM_JSON_PATH, env->registry);
 
@@ -1921,7 +1793,6 @@ int cmd_info(int argc, char *argv[]) {
 
     printf("\n");
 
-    // Clean up
     install_env_free(env);
 
     return 0;
@@ -1937,7 +1808,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
 
     log_debug("Upgrading %s/%s%s%s", author, name, major_upgrade ? " (major allowed)" : "", major_ignore_test ? " (ignoring test deps)" : "");
 
-    // Check if package exists in elm.json and determine its location
     Package *existing_pkg = find_existing_package(elm_json, author, name);
     if (!existing_pkg) {
         fprintf(stderr, "Error: Package %s/%s is not installed\n", author, name);
@@ -1947,7 +1817,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
         return 1;
     }
 
-    // Check if package exists in registry
     RegistryEntry *registry_entry = registry_find(env->registry, author, name);
     if (!registry_entry) {
         log_error("I cannot find package '%s/%s' in registry", author, name);
@@ -1956,10 +1825,9 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
         return 1;
     }
 
-    // Find the latest version based on major_upgrade flag
     const char *latest_version = NULL;
     if (major_upgrade) {
-        // Latest version overall (first in the list)
+        // Latest version overall is  the first in the list
         if (registry_entry->version_count > 0) {
             latest_version = version_to_string(&registry_entry->versions[0]);
         }
@@ -1985,7 +1853,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
         return 0;
     }
 
-    // Check if already at latest version
     if (strcmp(existing_pkg->version, latest_version) == 0) {
         printf("Package %s/%s is already at the latest %s version (%s)\n",
                author, name, major_upgrade ? "major" : "minor", latest_version);
@@ -2004,7 +1871,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
 
         // Only check if we're actually crossing a major version boundary
         if (new_major != current_major) {
-            // Collect all packages from current elm.json
             PackageMap *all_deps = package_map_create();
 
             if (elm_json->dependencies_direct) {
@@ -2059,20 +1925,17 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
                 }
             }
 
-            // Check each package to see if it depends on our target
             PackageMap *reverse_deps = package_map_create();
             PackageMap *reverse_deps_test = package_map_create();
 
             for (int i = 0; i < all_deps->count; i++) {
                 Package *pkg = &all_deps->packages[i];
 
-                // Skip the target package itself
                 if (strcmp(pkg->author, author) == 0 && strcmp(pkg->name, name) == 0) {
                     continue;
                 }
 
                 if (package_depends_on(pkg->author, pkg->name, pkg->version, author, name, env)) {
-                    // Determine if this is a test dependency
                     bool is_test_dep = false;
                     if (elm_json->dependencies_test_direct && package_map_find(elm_json->dependencies_test_direct, pkg->author, pkg->name)) {
                         is_test_dep = true;
@@ -2102,16 +1965,13 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
                 PackageMap *blocking_deps = package_map_create();
                 PackageMap *blocking_test_deps = package_map_create();
 
-                // Check non-test dependencies
                 for (int i = 0; i < reverse_deps->count; i++) {
                     Package *pkg = &reverse_deps->packages[i];
 
-                    // Check if an upgrade is available for this package
                     RegistryEntry *dep_registry = registry_find(env->registry, pkg->author, pkg->name);
                     bool has_upgrade = false;
 
                     if (dep_registry && dep_registry->version_count > 0) {
-                        // Check if there's a newer version than what's currently installed
                         const char *newest = version_to_string(&dep_registry->versions[0]);
                         if (strcmp(newest, pkg->version) != 0) {
                             has_upgrade = true;
@@ -2130,16 +1990,13 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
                     }
                 }
 
-                // Check test dependencies
                 for (int i = 0; i < reverse_deps_test->count; i++) {
                     Package *pkg = &reverse_deps_test->packages[i];
 
-                    // Check if an upgrade is available for this package
                     RegistryEntry *dep_registry = registry_find(env->registry, pkg->author, pkg->name);
                     bool has_upgrade = false;
 
                     if (dep_registry && dep_registry->version_count > 0) {
-                        // Check if there's a newer version than what's currently installed
                         const char *newest = version_to_string(&dep_registry->versions[0]);
                         if (strcmp(newest, pkg->version) != 0) {
                             has_upgrade = true;
@@ -2160,7 +2017,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
 
                 printf("\n");
 
-                // Handle blocking dependencies
                 if (has_blocking_deps) {
                     fprintf(stderr, "Error: Cannot upgrade %s/%s to %d.x.x because the following packages\n",
                             author, name, new_major);
@@ -2187,7 +2043,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
                     return 1;
                 }
 
-                // When major_ignore_test is set, only warn about test dependencies
                 if (has_test_blocking_deps && major_ignore_test) {
                     printf("Warning: The following test dependencies would normally block this upgrade:\n\n");
 
@@ -2200,6 +2055,7 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
                     printf("Note: You may need to update or remove these test dependencies manually.\n\n");
                 } else if (has_test_blocking_deps && !major_ignore_test) {
                     // Normal --major mode: test dependencies also block
+                    // TODO: test dependencies should not block!
                     fprintf(stderr, "Error: Cannot upgrade %s/%s to %d.x.x because the following test dependencies\n",
                             author, name, new_major);
                     fprintf(stderr, "depend on version %d.x.x and have no newer versions available:\n\n",
@@ -2237,7 +2093,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
         }
     }
 
-    // Use the solver to resolve dependencies for the upgraded package
     log_debug("Resolving dependencies for %s/%s upgrade to %s", author, name, latest_version);
 
     SolverState *solver = solver_init(env, true);
@@ -2284,7 +2139,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
         return 1;
     }
 
-    // Count adds and changes
     int add_count = 0;
     int change_count = 0;
 
@@ -2297,7 +2151,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
         }
     }
 
-    // Create temporary arrays for adds and changes
     PackageChange *adds = arena_malloc(sizeof(PackageChange) * add_count);
     PackageChange *changes = arena_malloc(sizeof(PackageChange) * change_count);
 
@@ -2313,11 +2166,9 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
         }
     }
 
-    // Sort both arrays
     qsort(adds, add_count, sizeof(PackageChange), compare_package_changes);
     qsort(changes, change_count, sizeof(PackageChange), compare_package_changes);
 
-    // Calculate max width for formatting
     int max_width = 0;
     for (int i = 0; i < add_count; i++) {
         PackageChange *change = &adds[i];
@@ -2330,11 +2181,9 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
         if (pkg_len > max_width) max_width = pkg_len;
     }
 
-    // Print the plan
     printf("Here is my plan:\n");
     printf("  \n");
 
-    // Print adds
     if (add_count > 0) {
         printf("  Add:\n");
         for (int i = 0; i < add_count; i++) {
@@ -2346,7 +2195,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
         printf("  \n");
     }
 
-    // Print changes
     if (change_count > 0) {
         printf("  Change:\n");
         for (int i = 0; i < change_count; i++) {
@@ -2365,7 +2213,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
         printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
         fflush(stdout);
 
-        // Read user input
         char response[10];
         if (!fgets(response, sizeof(response), stdin)) {
             fprintf(stderr, "Error reading input\n");
@@ -2376,7 +2223,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
             return 1;
         }
 
-        // Check response
         if (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n') {
             printf("Aborted.\n");
             install_plan_free(out_plan);
@@ -2387,7 +2233,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
         }
     }
 
-    // Apply the changes to elm.json
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
         PackageMap *target_map = NULL;
@@ -2457,7 +2302,6 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
         }
     }
 
-    // Save updated elm.json
     printf("Saving elm.json...\n");
     if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
         fprintf(stderr, "Error: Failed to write elm.json\n");
@@ -2485,14 +2329,12 @@ static int upgrade_all_packages(ElmJson *elm_json, InstallEnv *env, bool major_u
 
     log_debug("Upgrading all packages%s", major_upgrade ? " (major allowed)" : "");
 
-    // Initialize solver
     SolverState *solver = solver_init(env, true);
     if (!solver) {
         log_error("Failed to initialize solver");
         return 1;
     }
 
-    // Call solver to compute upgrade plan
     InstallPlan *out_plan = NULL;
     SolverResult result = solver_upgrade_all(solver, elm_json, major_upgrade, &out_plan);
 
@@ -2521,7 +2363,6 @@ static int upgrade_all_packages(ElmJson *elm_json, InstallEnv *env, bool major_u
         return 1;
     }
 
-    // Check if there are any upgrades
     if (out_plan->count == 0) {
         printf("No upgrades available. All packages are at their latest %s version.\n",
                major_upgrade ? "major" : "minor");
@@ -2529,10 +2370,8 @@ static int upgrade_all_packages(ElmJson *elm_json, InstallEnv *env, bool major_u
         return 0;
     }
 
-    // Sort changes alphabetically
     qsort(out_plan->changes, out_plan->count, sizeof(PackageChange), compare_package_changes);
 
-    // Calculate max width for formatting
     int max_width = 0;
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
@@ -2540,7 +2379,6 @@ static int upgrade_all_packages(ElmJson *elm_json, InstallEnv *env, bool major_u
         if (pkg_len > max_width) max_width = pkg_len;
     }
 
-    // Print the plan
     printf("Here is my plan:\n");
     printf("  \n");
     printf("  Change:\n");
@@ -2558,7 +2396,6 @@ static int upgrade_all_packages(ElmJson *elm_json, InstallEnv *env, bool major_u
         printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
         fflush(stdout);
 
-        // Read user input
         char response[10];
         if (!fgets(response, sizeof(response), stdin)) {
             fprintf(stderr, "Error reading input\n");
@@ -2566,7 +2403,6 @@ static int upgrade_all_packages(ElmJson *elm_json, InstallEnv *env, bool major_u
             return 1;
         }
 
-        // Check response
         if (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n') {
             printf("Aborted.\n");
             install_plan_free(out_plan);
@@ -2574,11 +2410,9 @@ static int upgrade_all_packages(ElmJson *elm_json, InstallEnv *env, bool major_u
         }
     }
 
-    // Apply the changes to elm.json, preserving package locations
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
 
-        // Find which map contains this package and update it there
         if (elm_json->type == ELM_PROJECT_APPLICATION) {
             Package *pkg = package_map_find(elm_json->dependencies_direct, change->author, change->name);
             if (pkg) {
@@ -2627,7 +2461,6 @@ static int upgrade_all_packages(ElmJson *elm_json, InstallEnv *env, bool major_u
                   change->author, change->name);
     }
 
-    // Save updated elm.json
     printf("Saving elm.json...\n");
     if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
         fprintf(stderr, "Error: Failed to write elm.json\n");
@@ -2671,7 +2504,6 @@ int cmd_upgrade(int argc, char *argv[]) {
     bool cmd_quiet = false;
     const char *package_name = NULL;
 
-    // Parse arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_upgrade_usage();
@@ -2711,16 +2543,13 @@ int cmd_upgrade(int argc, char *argv[]) {
     // otherwise, if -v is specified OR global verbose is on, show progress
     LogLevel original_level = g_log_level;
     if (cmd_quiet) {
-        // Suppress progress logging
         if (g_log_level >= LOG_LEVEL_PROGRESS) {
             log_set_level(LOG_LEVEL_WARN);
         }
     } else if (cmd_verbose && !log_is_progress()) {
-        // Enable progress logging only (not debug)
         log_set_level(LOG_LEVEL_PROGRESS);
     }
 
-    // Initialize environment
     InstallEnv *env = install_env_create();
     if (!env) {
         log_error("Failed to create install environment");
@@ -2735,7 +2564,6 @@ int cmd_upgrade(int argc, char *argv[]) {
         return 1;
     }
 
-    // Read elm.json
     ElmJson *elm_json = elm_json_read(ELM_JSON_PATH);
     if (!elm_json) {
         log_error("Could not read elm.json");
@@ -2748,18 +2576,14 @@ int cmd_upgrade(int argc, char *argv[]) {
     int result = 0;
 
     if (upgrade_all) {
-        // Upgrade all packages
         result = upgrade_all_packages(elm_json, env, major_upgrade, major_ignore_test, auto_yes);
     } else {
-        // Upgrade specific package
         result = upgrade_single_package(package_name, elm_json, env, major_upgrade, major_ignore_test, auto_yes);
     }
 
-    // Cleanup
     elm_json_free(elm_json);
     install_env_free(env);
 
-    // Restore original log level
     log_set_level(original_level);
 
     return result;

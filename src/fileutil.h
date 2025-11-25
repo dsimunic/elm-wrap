@@ -8,6 +8,13 @@
  */
 bool extract_zip(const char *zip_path, const char *dest_dir);
 
+/* Extract specific files from a ZIP file to a destination directory
+ * Only extracts: elm.json, docs.json, LICENSE, README.md, and src/ directory
+ * Does not overwrite elm.json or docs.json if they already exist at destination
+ * Returns true on success, false on failure
+ */
+bool extract_zip_selective(const char *zip_path, const char *dest_dir);
+
 /* Find the first subdirectory in a directory
  * Returns allocated string with subdirectory path, or NULL if not found
  * Caller must free the returned string with arena_free()

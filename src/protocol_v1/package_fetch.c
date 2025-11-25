@@ -83,7 +83,6 @@ void package_fetch_clear_progress_callback(void) {
     g_progress_user_data = NULL;
 }
 
-/* Report progress using the global callback if set */
 static void report_progress(const char *author, const char *name, const char *version,
                           size_t current_bytes, size_t total_bytes)
     __attribute__((unused));
@@ -100,7 +99,6 @@ static void report_progress(const char *author, const char *name, const char *ve
  * Internal Helper Functions
  * ======================================================================== */
 
-/* Convert hex character to value (0-15) */
 static int hex_char_to_int(char c) {
     if (c >= '0' && c <= '9') return c - '0';
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
@@ -108,7 +106,6 @@ static int hex_char_to_int(char c) {
     return -1;
 }
 
-/* Convert hex string to bytes */
 static bool hex_string_to_bytes(const char *hex, BYTE *bytes, size_t byte_len) {
     if (!hex || !bytes) return false;
 
@@ -127,7 +124,6 @@ static bool hex_string_to_bytes(const char *hex, BYTE *bytes, size_t byte_len) {
     return true;
 }
 
-/* Compute SHA-1 hash of a file */
 static bool compute_file_sha1(const char *filepath, BYTE hash[SHA1_BLOCK_SIZE]) {
     if (!filepath || !hash) return false;
 
@@ -186,20 +182,17 @@ bool ensure_directory_recursive(const char *path) {
 bool verify_file_sha1(const char *filepath, const char *expected_hex) {
     if (!filepath || !expected_hex) return false;
 
-    /* Compute actual hash */
     BYTE actual_hash[SHA1_BLOCK_SIZE];
     if (!compute_file_sha1(filepath, actual_hash)) {
         return false;
     }
 
-    /* Convert expected hex string to bytes */
     BYTE expected_hash[SHA1_BLOCK_SIZE];
     if (!hex_string_to_bytes(expected_hex, expected_hash, SHA1_BLOCK_SIZE)) {
         fprintf(stderr, "Error: Invalid SHA-1 hex string: %s\n", expected_hex);
         return false;
     }
 
-    /* Compare hashes */
     if (memcmp(actual_hash, expected_hash, SHA1_BLOCK_SIZE) != 0) {
         fprintf(stderr, "Error: SHA-1 hash mismatch\n");
         fprintf(stderr, "  Expected: %s\n", expected_hex);
@@ -222,7 +215,6 @@ char* compute_file_sha1_hex(const char *filepath) {
         return NULL;
     }
 
-    /* Convert to hex string */
     char *hex = arena_malloc(SHA1_BLOCK_SIZE * 2 + 1);
     if (!hex) return NULL;
 
@@ -333,17 +325,14 @@ bool fetch_package_metadata(InstallEnv *env, const char *author,
                             const char *name, const char *version) {
     if (!env || !author || !name || !version) return false;
 
-    /* Check if offline */
     if (env->offline) {
         fprintf(stderr, "Error: Cannot download metadata in offline mode\n");
         return false;
     }
 
-    /* Build package directory path */
     char *pkg_dir = build_package_dir_path(env->cache->packages_dir, author, name, version);
     if (!pkg_dir) return false;
 
-    /* Ensure directory exists */
     if (!ensure_directory_recursive(pkg_dir)) {
         fprintf(stderr, "Error: Failed to create package directory: %s\n", pkg_dir);
         arena_free(pkg_dir);
@@ -353,7 +342,6 @@ bool fetch_package_metadata(InstallEnv *env, const char *author,
     bool success = true;
     struct stat st;
 
-    /* Array of metadata files to download */
     const char *files[] = {"endpoint.json", "elm.json", "docs.json"};
     const size_t file_count = sizeof(files) / sizeof(files[0]);
 
@@ -366,13 +354,11 @@ bool fetch_package_metadata(InstallEnv *env, const char *author,
             continue;
         }
 
-        /* Skip if file already exists */
         if (stat(file_path, &st) == 0 && S_ISREG(st.st_mode)) {
             arena_free(file_path);
             continue;
         }
 
-        /* Build URL */
         char *url = build_registry_url(env->registry_url, author, name, version, filename);
         if (!url) {
             arena_free(file_path);
@@ -402,7 +388,6 @@ char* fetch_package_archive(InstallEnv *env, const char *author,
                             PackageEndpoint *endpoint) {
     if (!env || !author || !name || !version || !endpoint) return NULL;
 
-    /* Check if offline */
     if (env->offline) {
         fprintf(stderr, "Error: Cannot download package archive in offline mode\n");
         return NULL;
@@ -413,6 +398,7 @@ char* fetch_package_archive(InstallEnv *env, const char *author,
     log_progress("  Expected SHA-1: %s", endpoint->hash);
 
     /* Create unique temporary file for download */
+    //REVIEW: Magic number. Shouldn't this be PATH_MAX?
     char temp_template[256];
     snprintf(temp_template, sizeof(temp_template),
              "%s/elm-package-XXXXXX.zip", env->cache->elm_home);
@@ -426,7 +412,6 @@ char* fetch_package_archive(InstallEnv *env, const char *author,
     /* Close the fd - http_download_file will reopen it */
     close(temp_fd);
 
-    /* Download the archive */
     HttpResult result = http_download_file(env->curl_session, endpoint->url, temp_template);
     if (result != HTTP_OK) {
         fprintf(stderr, "Error: Failed to download package archive\n");
@@ -438,7 +423,6 @@ char* fetch_package_archive(InstallEnv *env, const char *author,
 
     log_progress("  Downloaded to: %s", temp_template);
 
-    /* Verify SHA-1 hash */
     log_progress("  Verifying SHA-1 hash...");
     if (!verify_file_sha1(temp_template, endpoint->hash)) {
         fprintf(stderr, "Error: SHA-1 verification failed\n");
@@ -458,7 +442,6 @@ char* fetch_package_complete(InstallEnv *env, const char *author,
 
     log_progress("Fetching package %s/%s@%s...", author, name, version);
 
-    /* First, ensure metadata exists */
     if (!package_metadata_exists(env->cache, author, name, version)) {
         if (!fetch_package_metadata(env, author, name, version)) {
             fprintf(stderr, "Error: Failed to fetch metadata for %s/%s@%s\n",
@@ -467,14 +450,12 @@ char* fetch_package_complete(InstallEnv *env, const char *author,
         }
     }
 
-    /* Read endpoint.json from cache */
     char *endpoint_path = build_package_file_path(env->cache->packages_dir, author, name, version, "endpoint.json");
     if (!endpoint_path) {
         fprintf(stderr, "Error: Failed to build endpoint path\n");
         return NULL;
     }
 
-    /* Read endpoint.json */
     FILE *endpoint_file = fopen(endpoint_path, "r");
     if (!endpoint_file) {
         fprintf(stderr, "Error: Cannot open endpoint.json: %s\n", endpoint_path);
@@ -498,7 +479,6 @@ char* fetch_package_complete(InstallEnv *env, const char *author,
     endpoint_data[read_size] = '\0';
     fclose(endpoint_file);
 
-    /* Parse endpoint.json */
     PackageEndpoint *endpoint = package_endpoint_parse(endpoint_data);
     arena_free(endpoint_data);
 
@@ -507,7 +487,6 @@ char* fetch_package_complete(InstallEnv *env, const char *author,
         return NULL;
     }
 
-    /* Download and verify archive */
     char *archive_path = fetch_package_archive(env, author, name, version, endpoint);
     package_endpoint_free(endpoint);
 

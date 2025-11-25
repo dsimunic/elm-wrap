@@ -16,7 +16,6 @@
 #define PATH_MAX 4096
 #endif
 
-/* Ensure a directory exists, creating it and parent directories if necessary */
 static bool ensure_directory(const char *path) {
     struct stat st;
     if (stat(path, &st) == 0) {
@@ -44,7 +43,6 @@ static bool ensure_directory(const char *path) {
     return true;
 }
 
-/* Extract a ZIP file to a destination directory */
 bool extract_zip(const char *zip_path, const char *dest_dir) {
     mz_zip_archive zip;
     memset(&zip, 0, sizeof(zip));
@@ -65,20 +63,17 @@ bool extract_zip(const char *zip_path, const char *dest_dir) {
             break;
         }
 
-        /* Build output path */
+        //REVIEW: magic number.
         char output_path[4096];
         snprintf(output_path, sizeof(output_path), "%s/%s", dest_dir, file_stat.m_filename);
 
         if (mz_zip_reader_is_file_a_directory(&zip, i)) {
-            /* Create directory */
             if (!ensure_directory(output_path)) {
                 fprintf(stderr, "Error: Failed to create directory: %s\n", output_path);
                 success = false;
                 break;
             }
         } else {
-            /* Extract file */
-            /* Ensure parent directory exists */
             char *output_copy = arena_strdup(output_path);
             if (!output_copy) {
                 success = false;
@@ -93,7 +88,6 @@ bool extract_zip(const char *zip_path, const char *dest_dir) {
             }
             arena_free(output_copy);
 
-            /* Extract the file */
             if (!mz_zip_reader_extract_to_file(&zip, i, output_path, 0)) {
                 fprintf(stderr, "Error: Failed to extract file: %s\n", file_stat.m_filename);
                 success = false;
@@ -106,7 +100,101 @@ bool extract_zip(const char *zip_path, const char *dest_dir) {
     return success;
 }
 
-/* Find the first subdirectory in a directory */
+static bool should_extract_path(const char *filename) {
+    if (!filename) return false;
+
+    /* Skip leading directory components (e.g., "author-package-hash/") */
+    const char *base = strchr(filename, '/');
+    if (!base) {
+        base = filename;
+    } else {
+        base++; /* Skip the slash */
+    }
+
+    if (strcmp(base, "elm.json") == 0) return true;
+    if (strcmp(base, "docs.json") == 0) return true;
+    if (strcmp(base, "LICENSE") == 0) return true;
+    if (strcmp(base, "README.md") == 0) return true;
+
+    if (strncmp(base, "src/", 4) == 0) return true;
+    if (strcmp(base, "src") == 0) return true;
+
+    return false;
+}
+
+bool extract_zip_selective(const char *zip_path, const char *dest_dir) {
+    mz_zip_archive zip;
+    memset(&zip, 0, sizeof(zip));
+
+    if (!mz_zip_reader_init_file(&zip, zip_path, 0)) {
+        fprintf(stderr, "Error: Failed to open ZIP file: %s\n", zip_path);
+        return false;
+    }
+
+    int num_files = mz_zip_reader_get_num_files(&zip);
+    bool success = true;
+
+    for (int i = 0; i < num_files; i++) {
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(&zip, i, &file_stat)) {
+            fprintf(stderr, "Error: Failed to get file stat for index %d\n", i);
+            success = false;
+            break;
+        }
+
+        if (!should_extract_path(file_stat.m_filename)) {
+            continue;
+        }
+
+        /* Find the base path (skip leading directory component if present) */
+        const char *base = strchr(file_stat.m_filename, '/');
+        const char *rel_path = base ? base + 1 : file_stat.m_filename;
+
+        //REVIEW: magic number.
+        char output_path[4096];
+        snprintf(output_path, sizeof(output_path), "%s/%s", dest_dir, rel_path);
+
+        if (mz_zip_reader_is_file_a_directory(&zip, i)) {
+            if (!ensure_directory(output_path)) {
+                fprintf(stderr, "Error: Failed to create directory: %s\n", output_path);
+                success = false;
+                break;
+            }
+        } else {
+            if (strcmp(rel_path, "elm.json") == 0 || strcmp(rel_path, "docs.json") == 0) {
+                struct stat st;
+                if (stat(output_path, &st) == 0) {
+                    log_debug("Skipping %s (already exists)", rel_path);
+                    continue;
+                }
+            }
+
+            char *output_copy = arena_strdup(output_path);
+            if (!output_copy) {
+                success = false;
+                break;
+            }
+            char *parent = dirname(output_copy);
+            if (!ensure_directory(parent)) {
+                fprintf(stderr, "Error: Failed to create parent directory: %s\n", parent);
+                arena_free(output_copy);
+                success = false;
+                break;
+            }
+            arena_free(output_copy);
+
+            if (!mz_zip_reader_extract_to_file(&zip, i, output_path, 0)) {
+                fprintf(stderr, "Error: Failed to extract file: %s\n", file_stat.m_filename);
+                success = false;
+                break;
+            }
+        }
+    }
+
+    mz_zip_reader_end(&zip);
+    return success;
+}
+
 char* find_first_subdirectory(const char *dir_path) {
     DIR *dir = opendir(dir_path);
     if (!dir) {
@@ -117,12 +205,11 @@ char* find_first_subdirectory(const char *dir_path) {
     char *result = NULL;
 
     while ((entry = readdir(dir)) != NULL) {
-        /* Skip . and .. */
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
-        /* Build full path */
+        //REVIEW: magic number.
         char full_path[4096];
         snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, entry->d_name);
 
@@ -137,7 +224,6 @@ char* find_first_subdirectory(const char *dir_path) {
     return result;
 }
 
-/* Move a single file or directory */
 static bool move_item(const char *src, const char *dest) {
     /* Try rename first (fast, atomic) */
     if (rename(src, dest) == 0) {
@@ -187,7 +273,6 @@ static bool move_item(const char *src, const char *dest) {
     }
 }
 
-/* Move contents of source directory to destination directory */
 bool move_directory_contents(const char *src_dir, const char *dest_dir) {
     DIR *dir = opendir(src_dir);
     if (!dir) {
@@ -199,11 +284,11 @@ bool move_directory_contents(const char *src_dir, const char *dest_dir) {
     bool success = true;
 
     while ((entry = readdir(dir)) != NULL) {
-        /* Skip . and .. */
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
+        //REVIEW: magic number.
         char src_path[4096];
         char dest_path[4096];
         snprintf(src_path, sizeof(src_path), "%s/%s", src_dir, entry->d_name);
@@ -219,7 +304,6 @@ bool move_directory_contents(const char *src_dir, const char *dest_dir) {
     return success;
 }
 
-/* Recursively delete a directory and all its contents */
 bool remove_directory_recursive(const char *path) {
     struct stat st;
     if (stat(path, &st) != 0) {
@@ -266,7 +350,6 @@ bool remove_directory_recursive(const char *path) {
     return success;
 }
 
-/* Recursively copy a directory and all its contents */
 bool copy_directory_recursive(const char *src_path, const char *dest_path) {
     struct stat st;
     if (stat(src_path, &st) != 0) {
@@ -274,7 +357,6 @@ bool copy_directory_recursive(const char *src_path, const char *dest_path) {
     }
 
     if (!S_ISDIR(st.st_mode)) {
-        /* It's a file, copy it */
         FILE *src_file = fopen(src_path, "rb");
         if (!src_file) return false;
 
@@ -303,7 +385,6 @@ bool copy_directory_recursive(const char *src_path, const char *dest_path) {
         return success;
     }
 
-    /* It's a directory, create it and copy contents */
     if (!ensure_directory(dest_path)) {
         return false;
     }
@@ -317,11 +398,11 @@ bool copy_directory_recursive(const char *src_path, const char *dest_path) {
     bool success = true;
 
     while ((entry = readdir(dir)) != NULL) {
-        /* Skip . and .. */
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
+        //REVIEW: magic number.
         char src_entry[4096];
         char dest_entry[4096];
         snprintf(src_entry, sizeof(src_entry), "%s/%s", src_path, entry->d_name);
