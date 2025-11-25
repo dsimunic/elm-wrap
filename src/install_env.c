@@ -4,6 +4,7 @@
 #include "vendor/sha1.h"
 #include "log.h"
 #include "fileutil.h"
+#include "protocol_v1/package_fetch.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -30,10 +31,8 @@ static bool parse_all_packages_json(const char *json_str, Registry *registry) {
         return false;
     }
 
-    /* Reset registry counters */
     registry->total_versions = 0;
 
-    /* Iterate over package entries */
     cJSON *package = NULL;
     cJSON_ArrayForEach(package, json) {
         if (!cJSON_IsArray(package)) continue;
@@ -355,126 +354,9 @@ bool install_env_update_registry(InstallEnv *env) {
     return true;
 }
 
-/* Convert hex character to value (0-15) */
-static int hex_char_to_int(char c) {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-    return -1;
-}
-
-/* Convert hex string to bytes */
-static bool hex_string_to_bytes(const char *hex, BYTE *bytes, size_t byte_len) {
-    if (!hex || !bytes) return false;
-
-    size_t hex_len = strlen(hex);
-    if (hex_len != byte_len * 2) return false;
-
-    for (size_t i = 0; i < byte_len; i++) {
-        int high = hex_char_to_int(hex[i * 2]);
-        int low = hex_char_to_int(hex[i * 2 + 1]);
-
-        if (high < 0 || low < 0) return false;
-
-        bytes[i] = (BYTE)((high << 4) | low);
-    }
-
-    return true;
-}
-
-/* Compute SHA-1 hash of a file */
-static bool compute_file_sha1(const char *filepath, BYTE hash[SHA1_BLOCK_SIZE]) {
-    if (!filepath || !hash) return false;
-
-    FILE *file = fopen(filepath, "rb");
-    if (!file) {
-        fprintf(stderr, "Error: Cannot open file for SHA-1 computation: %s\n", filepath);
-        return false;
-    }
-
-    SHA1_CTX ctx;
-    sha1_init(&ctx);
-
-    BYTE buffer[4096];
-    size_t bytes_read;
-
-    while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
-        sha1_update(&ctx, buffer, bytes_read);
-    }
-
-    fclose(file);
-    sha1_final(&ctx, hash);
-
-    return true;
-}
-
-/* Verify SHA-1 hash of a file against expected hex string */
-static bool verify_file_sha1(const char *filepath, const char *expected_hex) {
-    if (!filepath || !expected_hex) return false;
-
-    /* Compute actual hash */
-    BYTE actual_hash[SHA1_BLOCK_SIZE];
-    if (!compute_file_sha1(filepath, actual_hash)) {
-        return false;
-    }
-
-    /* Convert expected hex string to bytes */
-    BYTE expected_hash[SHA1_BLOCK_SIZE];
-    if (!hex_string_to_bytes(expected_hex, expected_hash, SHA1_BLOCK_SIZE)) {
-        fprintf(stderr, "Error: Invalid SHA-1 hex string: %s\n", expected_hex);
-        return false;
-    }
-
-    /* Compare hashes */
-    if (memcmp(actual_hash, expected_hash, SHA1_BLOCK_SIZE) != 0) {
-        fprintf(stderr, "Error: SHA-1 hash mismatch\n");
-        fprintf(stderr, "  Expected: %s\n", expected_hex);
-        fprintf(stderr, "  Actual:   ");
-        for (int i = 0; i < SHA1_BLOCK_SIZE; i++) {
-            fprintf(stderr, "%02x", actual_hash[i]);
-        }
-        fprintf(stderr, "\n");
-        return false;
-    }
-
-    return true;
-}
-
-/* Ensure directory exists (recursively create parent directories) */
-static bool ensure_directory_exists(const char *path) {
-    if (!path || path[0] == '\0') return false;
-
-    /* Check if directory already exists */
-    struct stat st;
-    if (stat(path, &st) == 0) {
-        return S_ISDIR(st.st_mode);
-    }
-
-    /* Create parent directory first */
-    char *path_copy = arena_strdup(path);
-    if (!path_copy) return false;
-
-    char *last_slash = strrchr(path_copy, '/');
-    if (last_slash && last_slash != path_copy) {
-        *last_slash = '\0';
-        if (!ensure_directory_exists(path_copy)) {
-            arena_free(path_copy);
-            return false;
-        }
-        *last_slash = '/';
-    }
-
-    arena_free(path_copy);
-
-    /* Create this directory */
-    return mkdir(path, 0755) == 0;
-}
-
-/* Download and extract a package */
 bool install_env_download_package(InstallEnv *env, const char *author, const char *name, const char *version) {
     if (!env || !author || !name || !version) return false;
 
-    /* Check if offline */
     if (env->offline) {
         fprintf(stderr, "Error: Cannot download package in offline mode\n");
         return false;
@@ -482,108 +364,35 @@ bool install_env_download_package(InstallEnv *env, const char *author, const cha
 
     log_progress("Downloading %s/%s@%s...", author, name, version);
 
-    /* Construct endpoint.json URL */
-    char endpoint_url[512];
-    snprintf(endpoint_url, sizeof(endpoint_url),
-             "%s/packages/%s/%s/%s/endpoint.json",
-             env->registry_url, author, name, version);
-
-    /* Fetch endpoint.json */
-    MemoryBuffer *endpoint_buf = memory_buffer_create();
-    if (!endpoint_buf) {
-        fprintf(stderr, "Error: Failed to allocate memory buffer\n");
+    char *archive_path = fetch_package_complete(env, author, name, version);
+    if (!archive_path) {
+        fprintf(stderr, "Error: Failed to fetch package %s/%s@%s\n", author, name, version);
         return false;
     }
 
-    HttpResult result = http_get_json(env->curl_session, endpoint_url, endpoint_buf);
-    if (result != HTTP_OK) {
-        fprintf(stderr, "Error: Failed to fetch package endpoint\n");
-        fprintf(stderr, "  URL: %s\n", endpoint_url);
-        fprintf(stderr, "  Error: %s\n", http_result_to_string(result));
-        memory_buffer_free(endpoint_buf);
-        return false;
-    }
-
-    /* Parse endpoint.json to get archive URL and hash */
-    cJSON *endpoint = cJSON_Parse(endpoint_buf->data);
-    memory_buffer_free(endpoint_buf);
-
-    if (!endpoint) {
-        fprintf(stderr, "Error: Failed to parse endpoint.json\n");
-        return false;
-    }
-
-    cJSON *url_obj = cJSON_GetObjectItem(endpoint, "url");
-    cJSON *hash_obj = cJSON_GetObjectItem(endpoint, "hash");
-
-    if (!url_obj || !cJSON_IsString(url_obj) || !hash_obj || !cJSON_IsString(hash_obj)) {
-        fprintf(stderr, "Error: Invalid endpoint.json format\n");
-        cJSON_Delete(endpoint);
-        return false;
-    }
-
-    const char *archive_url = url_obj->valuestring;
-    const char *expected_hash = hash_obj->valuestring;
-
-    log_progress("  Archive URL: %s", archive_url);
-    log_progress("  Expected SHA-1: %s", expected_hash);
-
-    /* Create temporary file for download */
-    char temp_file[256];
-    snprintf(temp_file, sizeof(temp_file), "/tmp/elm-package-%s-%s-%s.zip", author, name, version);
-
-    /* Download the archive */
-    result = http_download_file(env->curl_session, archive_url, temp_file);
-    if (result != HTTP_OK) {
-        fprintf(stderr, "Error: Failed to download package archive\n");
-        fprintf(stderr, "  URL: %s\n", archive_url);
-        fprintf(stderr, "  Error: %s\n", http_result_to_string(result));
-        cJSON_Delete(endpoint);
-        return false;
-    }
-
-    log_progress("  Downloaded to: %s", temp_file);
-
-    /* Verify SHA-1 hash */
-    log_progress("  Verifying SHA-1 hash...");
-    if (!verify_file_sha1(temp_file, expected_hash)) {
-        fprintf(stderr, "Error: SHA-1 verification failed\n");
-        remove(temp_file);
-        cJSON_Delete(endpoint);
-        return false;
-    }
-
-    log_progress("  SHA-1 verification passed");
-
-    /* Get package directory path */
-    size_t pkg_dir_len = strlen(env->cache->packages_dir) + strlen(author) + strlen(name) + strlen(version) + 4;
-    char *pkg_dir = arena_malloc(pkg_dir_len);
+    char *pkg_dir = build_package_dir_path(env->cache->packages_dir, author, name, version);
     if (!pkg_dir) {
         fprintf(stderr, "Error: Failed to allocate package directory path\n");
-        remove(temp_file);
-        cJSON_Delete(endpoint);
+        remove(archive_path);
+        arena_free(archive_path);
         return false;
     }
 
-    snprintf(pkg_dir, pkg_dir_len, "%s/%s/%s/%s", env->cache->packages_dir, author, name, version);
-
-    /* Ensure package directory exists */
-    if (!ensure_directory_exists(pkg_dir)) {
+    if (!ensure_directory_recursive(pkg_dir)) {
         fprintf(stderr, "Error: Failed to create package directory: %s\n", pkg_dir);
         arena_free(pkg_dir);
-        remove(temp_file);
-        cJSON_Delete(endpoint);
+        remove(archive_path);
+        arena_free(archive_path);
         return false;
     }
 
-    /* Extract the archive */
     log_progress("  Extracting to: %s", pkg_dir);
 
-    if (!extract_zip(temp_file, pkg_dir)) {
+    if (!extract_zip(archive_path, pkg_dir)) {
         fprintf(stderr, "Error: Failed to extract package archive\n");
         arena_free(pkg_dir);
-        remove(temp_file);
-        cJSON_Delete(endpoint);
+        remove(archive_path);
+        arena_free(archive_path);
         return false;
     }
 
@@ -601,10 +410,9 @@ bool install_env_download_package(InstallEnv *env, const char *author, const cha
         arena_free(subdir);
     }
 
-    /* Clean up */
-    remove(temp_file);
+    remove(archive_path);
+    arena_free(archive_path);
     arena_free(pkg_dir);
-    cJSON_Delete(endpoint);
 
     log_progress("  Successfully installed %s/%s@%s", author, name, version);
 

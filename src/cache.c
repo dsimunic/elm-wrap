@@ -173,12 +173,41 @@ char* cache_get_package_path(CacheConfig *config, const char *author, const char
 bool cache_package_exists(CacheConfig *config, const char *author, const char *name, const char *version) {
     char *path = cache_get_package_path(config, author, name, version);
     if (!path) return false;
-    
+
     struct stat st;
     bool exists = (stat(path, &st) == 0 && S_ISDIR(st.st_mode));
-    
+
     arena_free(path);
     return exists;
+}
+
+bool cache_package_fully_downloaded(CacheConfig *config, const char *author, const char *name, const char *version) {
+    if (!config || !author || !name || !version) return false;
+
+    char *pkg_path = cache_get_package_path(config, author, name, version);
+    if (!pkg_path) return false;
+
+    /* Check if package directory exists */
+    struct stat st;
+    if (stat(pkg_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        arena_free(pkg_path);
+        return false;
+    }
+
+    /* Check if src/ directory exists */
+    size_t src_len = strlen(pkg_path) + strlen("/src") + 1;
+    char *src_path = arena_malloc(src_len);
+    if (!src_path) {
+        arena_free(pkg_path);
+        return false;
+    }
+
+    snprintf(src_path, src_len, "%s/src", pkg_path);
+    bool has_src = (stat(src_path, &st) == 0 && S_ISDIR(st.st_mode));
+
+    arena_free(pkg_path);
+    arena_free(src_path);
+    return has_src;
 }
 
 bool cache_registry_exists(CacheConfig *config) {

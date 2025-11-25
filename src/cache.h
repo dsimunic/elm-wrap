@@ -18,6 +18,7 @@ void cache_config_free(CacheConfig *config);
 /* Package cache operations */
 char* cache_get_package_path(CacheConfig *config, const char *author, const char *name, const char *version);
 bool cache_package_exists(CacheConfig *config, const char *author, const char *name, const char *version);
+bool cache_package_fully_downloaded(CacheConfig *config, const char *author, const char *name, const char *version);
 bool cache_package_any_version_exists(CacheConfig *config, const char *author, const char *name);
 bool cache_registry_exists(CacheConfig *config);
 

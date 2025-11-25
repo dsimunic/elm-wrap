@@ -61,6 +61,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/cJSON.c \
           $(SRCDIR)/http_client.c \
           $(SRCDIR)/registry.c \
+          $(SRCDIR)/protocol_v1/package_fetch.c \
           $(SRCDIR)/install_env.c \
           $(SRCDIR)/fileutil.c \
           $(SRCDIR)/pgsolver/pg_core.c \
@@ -88,6 +89,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/cJSON.o \
           $(BUILDDIR)/http_client.o \
           $(BUILDDIR)/registry.o \
+          $(BUILDDIR)/package_fetch.o \
           $(BUILDDIR)/install_env.o \
           $(BUILDDIR)/fileutil.o \
           $(BUILDDIR)/pg_core.o \
@@ -220,8 +222,12 @@ $(BUILDDIR)/http_client.o: $(SRCDIR)/http_client.c $(SRCDIR)/http_client.h | $(B
 $(BUILDDIR)/registry.o: $(SRCDIR)/registry.c $(SRCDIR)/registry.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Build package_fetch object
+$(BUILDDIR)/package_fetch.o: $(SRCDIR)/protocol_v1/package_fetch.c $(SRCDIR)/protocol_v1/package_fetch.h $(SRCDIR)/install_env.h $(SRCDIR)/cache.h $(SRCDIR)/http_client.h $(SRCDIR)/cJSON.h $(SRCDIR)/vendor/sha1.h $(SRCDIR)/log.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # Build install_env object
-$(BUILDDIR)/install_env.o: $(SRCDIR)/install_env.c $(SRCDIR)/install_env.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/http_client.h $(SRCDIR)/cJSON.h $(SRCDIR)/vendor/sha1.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+$(BUILDDIR)/install_env.o: $(SRCDIR)/install_env.c $(SRCDIR)/install_env.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/http_client.h $(SRCDIR)/cJSON.h $(SRCDIR)/vendor/sha1.h $(SRCDIR)/fileutil.h $(SRCDIR)/protocol_v1/package_fetch.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build fileutil object
