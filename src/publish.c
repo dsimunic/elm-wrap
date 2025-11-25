@@ -1,4 +1,5 @@
 #include "publish.h"
+#include "commands/publish/docs/docs.h"
 #include "elm_json.h"
 #include "cache.h"
 #include "install_env.h"
@@ -20,7 +21,18 @@
 #define ELM_JSON_PATH "elm.json"
 
 static void print_publish_usage(void) {
-    printf("Usage: %s publish\n", program_name);
+    printf("Usage: %s publish SUBCOMMAND [OPTIONS]\n", program_name);
+    printf("\n");
+    printf("Subcommands:\n");
+    printf("  package            Publish a package to the Elm package registry\n");
+    printf("  docs <PATH>        Generate documentation JSON for a package\n");
+    printf("\n");
+    printf("Options:\n");
+    printf("  -h, --help         Show this help message\n");
+}
+
+static void print_publish_package_usage(void) {
+    printf("Usage: %s publish package\n", program_name);
     printf("\n");
     printf("Publish a package to the Elm package registry.\n");
     printf("\n");
@@ -221,11 +233,11 @@ static int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
     return 0;
 }
 
-int cmd_publish(int argc, char *argv[]) {
+static int cmd_publish_package(int argc, char *argv[]) {
     // Check for help flag
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            print_publish_usage();
+            print_publish_package_usage();
             return 0;
         }
     }
@@ -310,4 +322,31 @@ int cmd_publish(int argc, char *argv[]) {
     perror("execve");
     arena_free(elm_args);
     return 1;
+}
+
+int cmd_publish(int argc, char *argv[]) {
+    if (argc < 2) {
+        // No subcommand specified - for backward compatibility, default to package
+        return cmd_publish_package(argc, argv);
+    }
+
+    const char *subcmd = argv[1];
+
+    if (strcmp(subcmd, "-h") == 0 || strcmp(subcmd, "--help") == 0) {
+        print_publish_usage();
+        return 0;
+    }
+
+    if (strcmp(subcmd, "package") == 0) {
+        // Pass remaining args to package command
+        return cmd_publish_package(argc - 1, argv + 1);
+    }
+
+    if (strcmp(subcmd, "docs") == 0) {
+        // Pass remaining args to docs command
+        return cmd_publish_docs(argc - 1, argv + 1);
+    }
+
+    // Unknown subcommand - for backward compatibility, treat as publish package
+    return cmd_publish_package(argc, argv);
 }

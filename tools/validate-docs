@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WRAP_DOCS_BIN="$PROJECT_ROOT/bin/wrap-docs"
+
+# Parse arguments
+FROM_FILE=""
+PACKAGES_DIR=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --from-file)
+            FROM_FILE="$2"
+            shift 2
+            ;;
+        *)
+            PACKAGES_DIR="$1"
+            shift
+            ;;
+    esac
+done
+
+# Use default if no directory specified
+if [ -z "$PACKAGES_DIR" ] && [ -z "$FROM_FILE" ]; then
+    PACKAGES_DIR="$PROJECT_ROOT/test/samples"
+fi
+
+# Check if wrap-docs binary exists
+if [ ! -x "$WRAP_DOCS_BIN" ]; then
+    echo "Error: wrap-docs binary not found at $WRAP_DOCS_BIN" >&2
+    exit 1
+fi
+
+# Check if packages directory exists (when not using --from-file)
+if [ -n "$PACKAGES_DIR" ] && [ ! -d "$PACKAGES_DIR" ]; then
+    echo "Error: Packages directory not found at $PACKAGES_DIR" >&2
+    exit 1
+fi
+
+# Check if from-file exists
+if [ -n "$FROM_FILE" ] && [ ! -f "$FROM_FILE" ]; then
+    echo "Error: File not found at $FROM_FILE" >&2
+    exit 1
+fi
+
+# Create log files
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+LOG_DIR="$PROJECT_ROOT/tmp"
+mkdir -p "$LOG_DIR"
+FAIL_LOG="$LOG_DIR/validate-docs-failures-$TIMESTAMP.log"
+DETAIL_LOG="$LOG_DIR/validate-docs-detail-$TIMESTAMP.log"
+
+# Initialize counters
+SUCCESS_COUNT=0
+FAIL_COUNT=0
+
+if [ -n "$FROM_FILE" ]; then
+    echo "Re-validating failed packages from: $FROM_FILE"
+else
+    echo "Validating documentation in: $PACKAGES_DIR"
+fi
+echo "Detailed log: $DETAIL_LOG"
+echo "Processing packages..."
+echo ""
+
+# Function to process a single package directory
+process_package() {
+    local package_dir="$1"
+    local elm_json_path="$package_dir/elm.json"
+    
+    # Check if elm.json exists
+    if [ ! -f "$elm_json_path" ]; then
+        return
+    fi
+    
+    # Check if docs.json exists - skip silently if not
+    local docs_json_path="$package_dir/docs.json"
+    if [ ! -f "$docs_json_path" ]; then
+        return
+    fi
+
+    # Check if src directory exists - skip silently if not
+    local src_dir="$package_dir/src"
+    if [ ! -d "$src_dir" ]; then
+        return
+    fi
+
+    # Extract exposed-modules from elm.json
+    local exposed_modules
+    exposed_modules=$(jq -r '.["exposed-modules"] // [] | if type == "array" then .[] else .[] | .[] end' "$elm_json_path" 2>/dev/null)
+
+    if [ -z "$exposed_modules" ]; then
+        return
+    fi
+
+    # Create temporary directory
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    
+    # Generate docs for the src directory
+    local all_docs="$tmpdir/all-docs.json"
+    if ! "$WRAP_DOCS_BIN" "$src_dir" > "$all_docs" 2>> "$DETAIL_LOG"; then
+        echo "$package_dir" >> "$FAIL_LOG"
+        echo "FAILED: $package_dir - wrap-docs execution failed" >> "$DETAIL_LOG"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        rm -rf "$tmpdir"
+        return
+    fi
+
+    # Filter to only include exposed modules
+    local generated_docs="$tmpdir/generated-docs.json"
+    local exposed_filter
+    exposed_filter=$(echo "$exposed_modules" | jq -R -s 'split("\n") | map(select(length > 0))')
+
+    if ! jq --argjson exposed "$exposed_filter" 'map(select(.name as $n | $exposed | index($n)))' "$all_docs" > "$generated_docs" 2>/dev/null; then
+        echo "$package_dir" >> "$FAIL_LOG"
+        echo "FAILED: $package_dir - failed to filter exposed modules" >> "$DETAIL_LOG"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        rm -rf "$tmpdir"
+        return
+    fi
+
+    # Normalize both JSON files and compare
+    local normalized_generated="$tmpdir/normalized-generated.json"
+    local normalized_original="$tmpdir/normalized-original.json"
+
+    if ! jq -S . "$generated_docs" > "$normalized_generated" 2>/dev/null; then
+        echo "$package_dir" >> "$FAIL_LOG"
+        echo "FAILED: $package_dir - invalid JSON in generated docs" >> "$DETAIL_LOG"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        rm -rf "$tmpdir"
+        return
+    fi
+
+    if ! jq -S . "$docs_json_path" > "$normalized_original" 2>/dev/null; then
+        echo "$package_dir" >> "$FAIL_LOG"
+        echo "FAILED: $package_dir - invalid JSON in original docs.json" >> "$DETAIL_LOG"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        rm -rf "$tmpdir"
+        return
+    fi
+
+    # Compare the normalized JSON files
+    if diff -u "$normalized_original" "$normalized_generated" > "$tmpdir/diff.txt" 2>&1; then
+        echo "SUCCESS: $package_dir" >> "$DETAIL_LOG"
+        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    else
+        echo "$package_dir" >> "$FAIL_LOG"
+        {
+            echo "FAILED: $package_dir - documentation mismatch"
+            echo "--- Diff ---"
+            cat "$tmpdir/diff.txt"
+            echo ""
+        } >> "$DETAIL_LOG"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+    fi
+
+    # Clean up temp directory
+    rm -rf "$tmpdir"
+}
+
+# Process packages
+if [ -n "$FROM_FILE" ]; then
+    # Read package directories from file
+    while IFS= read -r package_dir; do
+        [ -z "$package_dir" ] && continue
+        process_package "$package_dir"
+    done < "$FROM_FILE"
+else
+    # Find all elm.json files and process their directories
+    while IFS= read -r -d '' elm_json_path; do
+        package_dir="$(dirname "$elm_json_path")"
+        process_package "$package_dir"
+    done < <(find "$PACKAGES_DIR" -name "elm.json" -type f -print0 | sort -z)
+fi
+
+# Print summary
+echo ""
+echo "Compared docs.json for $((SUCCESS_COUNT + FAIL_COUNT)) modules: succeeded $SUCCESS_COUNT, failed $FAIL_COUNT."
+if [ $FAIL_COUNT -gt 0 ]; then
+    echo "Fail report is in the fail log: $FAIL_LOG"
+fi
+echo "Detailed log: $DETAIL_LOG"

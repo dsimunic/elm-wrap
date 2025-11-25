@@ -25,8 +25,8 @@ void print_usage(const char *prog) {
     printf("  install <PACKAGE>  Install packages for your Elm project\n");
     printf("  bump               Bump version based on API changes\n");
     printf("  diff [VERSION]     Show API differences between versions\n");
-    printf("  publish            Publish a package to the registry\n");
     printf("\n");
+    printf("  publish SUBCOMMAND Publishing commands\n");
     printf("  package SUBCOMMAND Package management commands\n");
     printf("\nOptions:\n");
     printf("  -v, --verbose      Show detailed logging output\n");

@@ -7,3 +7,6 @@ bin/
 elm-stuff/
 repository_cache/
 package_repository/
+tmp/
+doc/wip/
+.DS_Store

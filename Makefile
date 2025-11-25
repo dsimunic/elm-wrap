@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Werror -std=c99 -D_POSIX_C_SOURCE=200809L -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -O2
+CFLAGS = -Wall -Wextra -Werror -std=c99 -D_POSIX_C_SOURCE=200809L -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -O2 -flto
 
 # Detect operating system
 UNAME_S := $(shell uname -s)
@@ -53,6 +53,11 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/bump.c \
           $(SRCDIR)/diff.c \
           $(SRCDIR)/publish.c \
+          $(SRCDIR)/commands/publish/docs/docs.c \
+          $(SRCDIR)/commands/publish/docs/elm_docs.c \
+          $(SRCDIR)/commands/publish/docs/vendor/tree-sitter/lib.c \
+          $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/parser.c \
+          $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/scanner.c \
           $(SRCDIR)/install.c \
           $(SRCDIR)/install_check.c \
           $(SRCDIR)/elm_json.c \
@@ -81,6 +86,11 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/bump.o \
           $(BUILDDIR)/diff.o \
           $(BUILDDIR)/publish.o \
+          $(BUILDDIR)/docs.o \
+          $(BUILDDIR)/elm_docs.o \
+          $(BUILDDIR)/ts_lib.o \
+          $(BUILDDIR)/ts_elm_parser.o \
+          $(BUILDDIR)/ts_elm_scanner.o \
           $(BUILDDIR)/install.o \
           $(BUILDDIR)/install_check.o \
           $(BUILDDIR)/elm_json.o \
@@ -171,8 +181,28 @@ $(BUILDDIR)/diff.o: $(SRCDIR)/diff.c $(SRCDIR)/diff.h $(SRCDIR)/elm_json.h $(SRC
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build publish object
-$(BUILDDIR)/publish.o: $(SRCDIR)/publish.c $(SRCDIR)/publish.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h | $(BUILDDIR)
+$(BUILDDIR)/publish.o: $(SRCDIR)/publish.c $(SRCDIR)/publish.h $(SRCDIR)/commands/publish/docs/docs.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build docs object
+$(BUILDDIR)/docs.o: $(SRCDIR)/commands/publish/docs/docs.c $(SRCDIR)/commands/publish/docs/docs.h $(SRCDIR)/commands/publish/docs/elm_docs.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build elm_docs object
+$(BUILDDIR)/elm_docs.o: $(SRCDIR)/commands/publish/docs/elm_docs.c $(SRCDIR)/commands/publish/docs/elm_docs.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build tree-sitter lib object
+$(BUILDDIR)/ts_lib.o: $(SRCDIR)/commands/publish/docs/vendor/tree-sitter/lib.c | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build tree-sitter-elm parser object
+$(BUILDDIR)/ts_elm_parser.o: $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/parser.c | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build tree-sitter-elm scanner object
+$(BUILDDIR)/ts_elm_scanner.o: $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/scanner.c | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
 
 # Build install object
 $(BUILDDIR)/install.o: $(SRCDIR)/install.c $(SRCDIR)/install.h $(SRCDIR)/install_check.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
