@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Default paths
+DEFAULT_REPOSITORY_DIR="/Volumes/Devel/var/elm-wrap/package_repository/0.19.1/packages/"
+DEFAULT_TARGET_DIR="$PROJECT_ROOT/tmp/docs"
+
+# Logging function
+log() {
+    echo "$@"
+}
+
+log_err() {
+    echo "$@" >&2
+}
+
+# Usage message
+usage() {
+    log "Usage: $(basename "$0") [<repository-path> <target-path>] <author/package/version>"
+    log ""
+    log "Shows detailed diff for a specific package after validation."
+    log ""
+    log "Arguments:"
+    log "  <repository-path>       Path to the package repository (default: $DEFAULT_REPOSITORY_DIR)"
+    log "  <target-path>           Path where docs files are stored (default: tmp/docs)"
+    log "  <author/package/version> Package identifier (e.g., elm/core/1.0.0)"
+    exit 1
+}
+
+# Parse arguments
+if [ $# -eq 1 ]; then
+    REPOSITORY_DIR="$DEFAULT_REPOSITORY_DIR"
+    TARGET_DIR="$DEFAULT_TARGET_DIR"
+    PACKAGE_PATH="$1"
+elif [ $# -eq 3 ]; then
+    REPOSITORY_DIR="$1"
+    TARGET_DIR="$2"
+    PACKAGE_PATH="$3"
+else
+    usage
+fi
+
+# Check if repository directory exists
+if [ ! -d "$REPOSITORY_DIR" ]; then
+    log_err "Error: Repository directory not found at $REPOSITORY_DIR"
+    exit 1
+fi
+
+# Check if target directory exists
+if [ ! -d "$TARGET_DIR" ]; then
+    log_err "Error: Target directory not found at $TARGET_DIR"
+    exit 1
+fi
+
+# Convert to absolute paths
+REPOSITORY_DIR="$(cd "$REPOSITORY_DIR" && pwd)"
+TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+
+# Convert package path (author/package/version) to flat name (author_package_version)
+FLAT_NAME="${PACKAGE_PATH//\//_}"
+
+# Construct file paths
+ORIGINAL_FILE="$TARGET_DIR/${FLAT_NAME}_docs.json"
+GENERATED_FILE="$TARGET_DIR/${FLAT_NAME}_docs.generated.json"
+PACKAGE_DIR="$REPOSITORY_DIR/$PACKAGE_PATH"
+ELM_JSON="$PACKAGE_DIR/elm.json"
+
+# Check if package directory exists
+if [ ! -d "$PACKAGE_DIR" ]; then
+    log_err "Error: Package directory not found at $PACKAGE_DIR"
+    exit 1
+fi
+
+log "=== Package: $PACKAGE_PATH ==="
+log ""
+log "Repository path: $PACKAGE_DIR"
+log ""
+
+# Show diff between original and generated docs
+log "=== Diff (original vs generated) ==="
+if [ -f "$ORIGINAL_FILE" ] && [ -f "$GENERATED_FILE" ]; then
+    if diff -u "$ORIGINAL_FILE" "$GENERATED_FILE"; then
+        log "(no differences)"
+    fi
+else
+    if [ ! -f "$ORIGINAL_FILE" ]; then
+        log_err "Original docs not found: $ORIGINAL_FILE"
+    fi
+    if [ ! -f "$GENERATED_FILE" ]; then
+        log_err "Generated docs not found: $GENERATED_FILE"
+    fi
+fi
+
+log ""
+
+# Show elm.json
+log "=== elm.json ==="
+if [ -f "$ELM_JSON" ]; then
+    cat "$ELM_JSON"
+else
+    log_err "elm.json not found at $ELM_JSON"
+fi

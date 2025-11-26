@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Usage message
+usage() {
+    echo "Usage: $(basename "$0") <source-path> <target-path>"
+    echo ""
+    echo "Recursively finds packages with docs.json in <source-path> and copies"
+    echo "them to <target-path> as <author>_<name>_<version>_docs.json files."
+    exit 1
+}
+
+# Check arguments
+if [ $# -ne 2 ]; then
+    usage
+fi
+
+SOURCE_DIR="$1"
+TARGET_DIR="$2"
+
+# Check if source directory exists
+if [ ! -d "$SOURCE_DIR" ]; then
+    echo "Error: Source directory not found at $SOURCE_DIR" >&2
+    exit 1
+fi
+
+# Convert to absolute paths
+SOURCE_DIR="$(cd "$SOURCE_DIR" && pwd)"
+TARGET_DIR="$(mkdir -p "$TARGET_DIR" && cd "$TARGET_DIR" && pwd)"
+
+# Initialize counters
+COPIED_COUNT=0
+SKIPPED_COUNT=0
+
+echo "Collecting original docs from: $SOURCE_DIR"
+echo "Copying to: $TARGET_DIR"
+echo "Processing packages..."
+echo ""
+
+# Function to process a single package directory
+process_package() {
+    local package_dir="$1"
+    local elm_json_path="$package_dir/elm.json"
+    
+    # Check if elm.json exists
+    if [ ! -f "$elm_json_path" ]; then
+        return
+    fi
+    
+    # Check if docs.json exists - skip silently if not
+    local docs_json_path="$package_dir/docs.json"
+    if [ ! -f "$docs_json_path" ]; then
+        return
+    fi
+
+    # Check if src directory exists - skip silently if not
+    local src_dir="$package_dir/src"
+    if [ ! -d "$src_dir" ]; then
+        return
+    fi
+
+    # Calculate relative path from source directory and convert to flat filename
+    local relative_path="${package_dir#$SOURCE_DIR}"
+    relative_path="${relative_path#/}"  # Remove leading slash if present
+    
+    # Replace path separators with underscores to create flat filename
+    local flat_name="${relative_path//\//_}"
+
+    # Format docs.json with jq (normalizing line endings) and save with flat name
+    jq . "$docs_json_path" | tr -d '\r' > "$TARGET_DIR/${flat_name}_docs.json"
+
+    echo "Copied: ${flat_name}_docs.json"
+    COPIED_COUNT=$((COPIED_COUNT + 1))
+}
+
+# Find all elm.json files and process their directories
+while IFS= read -r -d '' elm_json_path; do
+    package_dir="$(dirname "$elm_json_path")"
+    process_package "$package_dir"
+done < <(find "$SOURCE_DIR" -name "elm.json" -type f -print0 | sort -z)
+
+# Print summary
+echo ""
+echo "Done. Copied $COPIED_COUNT packages to $TARGET_DIR"

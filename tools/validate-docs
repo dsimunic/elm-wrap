@@ -7,67 +7,69 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ELM_WRAP_BIN="$PROJECT_ROOT/bin/elm-wrap"
 
-# Parse arguments
-FROM_FILE=""
-PACKAGES_DIR=""
+# Logging function
+log() {
+    echo "$@"
+}
 
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --from-file)
-            FROM_FILE="$2"
-            shift 2
-            ;;
-        *)
-            PACKAGES_DIR="$1"
-            shift
-            ;;
-    esac
-done
+log_err() {
+    echo "$@" >&2
+}
 
-# Use default if no directory specified
-if [ -z "$PACKAGES_DIR" ] && [ -z "$FROM_FILE" ]; then
-    PACKAGES_DIR="$PROJECT_ROOT/test/samples"
+# Usage message
+usage() {
+    log "Usage: $(basename "$0") <repository-path> <target-path>"
+    log ""
+    log "Generates docs for all packages in <repository-path> and compares them"
+    log "against original docs.json files collected in <target-path>."
+    exit 1
+}
+
+# Check arguments
+if [ $# -ne 2 ]; then
+    usage
 fi
 
-# Check if wrap-docs binary exists
+REPOSITORY_DIR="$1"
+TARGET_DIR="$2"
+
+# Check if repository directory exists
+if [ ! -d "$REPOSITORY_DIR" ]; then
+    log_err "Error: Repository directory not found at $REPOSITORY_DIR"
+    exit 1
+fi
+
+# Check if target directory exists
+if [ ! -d "$TARGET_DIR" ]; then
+    log_err "Error: Target directory not found at $TARGET_DIR"
+    exit 1
+fi
+
+# Check if elm-wrap binary exists
 if [ ! -x "$ELM_WRAP_BIN" ]; then
-    echo "Error: elm-wrap binary not found at $ELM_WRAP_BIN" >&2
+    log_err "Error: elm-wrap binary not found at $ELM_WRAP_BIN"
     exit 1
 fi
 
-# Check if packages directory exists (when not using --from-file)
-if [ -n "$PACKAGES_DIR" ] && [ ! -d "$PACKAGES_DIR" ]; then
-    echo "Error: Packages directory not found at $PACKAGES_DIR" >&2
-    exit 1
-fi
-
-# Check if from-file exists
-if [ -n "$FROM_FILE" ] && [ ! -f "$FROM_FILE" ]; then
-    echo "Error: File not found at $FROM_FILE" >&2
-    exit 1
-fi
-
-# Create log files
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-LOG_DIR="$PROJECT_ROOT/tmp"
-mkdir -p "$LOG_DIR"
-FAIL_LOG="$LOG_DIR/validate-docs-failures-$TIMESTAMP.log"
-DETAIL_LOG="$LOG_DIR/validate-docs-detail-$TIMESTAMP.log"
+# Convert to absolute paths
+REPOSITORY_DIR="$(cd "$REPOSITORY_DIR" && pwd)"
+TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 
 # Initialize counters
-SUCCESS_COUNT=0
-FAIL_COUNT=0
+GENERATED_COUNT=0
+GENERATE_FAIL_COUNT=0
 
-if [ -n "$FROM_FILE" ]; then
-    echo "Re-validating failed packages from: $FROM_FILE"
-else
-    echo "Validating documentation in: $PACKAGES_DIR"
-fi
-echo "Detailed log: $DETAIL_LOG"
-echo "Processing packages..."
-echo ""
+log "Validating documentation"
+log "Repository: $REPOSITORY_DIR"
+log "Target: $TARGET_DIR"
+log ""
 
-# Function to process a single package directory
+# Record start time
+START_TIME=$(date +%s)
+
+# Phase 1: Generate docs for all packages
+log "Phase 1: Generating documentation..."
+
 process_package() {
     local package_dir="$1"
     local elm_json_path="$package_dir/elm.json"
@@ -89,100 +91,117 @@ process_package() {
         return
     fi
 
-    # Extract exposed-modules from elm.json
-    local exposed_modules
-    exposed_modules=$(jq -r '.["exposed-modules"] // [] | if type == "array" then .[] else .[] | .[] end' "$elm_json_path" 2>/dev/null)
+    # Calculate relative path from repository directory and convert to flat filename
+    local relative_path="${package_dir#$REPOSITORY_DIR}"
+    relative_path="${relative_path#/}"  # Remove leading slash if present
+    
+    # Replace path separators with underscores to create flat filename
+    local flat_name="${relative_path//\//_}"
+    local output_file="$TARGET_DIR/${flat_name}_docs.generated.json"
 
-    if [ -z "$exposed_modules" ]; then
-        return
-    fi
-
-    # Create temporary directory
+    # Generate docs using elm-wrap (capture output and errors separately)
     local tmpdir
     tmpdir=$(mktemp -d)
+    local raw_output="$tmpdir/raw.json"
+    local elm_wrap_stderr="$tmpdir/elm-wrap.stderr"
+    local jq_stderr="$tmpdir/jq.stderr"
     
-    # Generate docs for the package directory
-    local all_docs="$tmpdir/all-docs.json"
-    if ! "$ELM_WRAP_BIN" publish docs "$package_dir" > "$all_docs" 2>> "$DETAIL_LOG"; then
-        echo "$package_dir" >> "$FAIL_LOG"
-        echo "FAILED: $package_dir - wrap-docs execution failed" >> "$DETAIL_LOG"
-        FAIL_COUNT=$((FAIL_COUNT + 1))
+    # Run elm-wrap and capture exit status
+    local elm_wrap_status=0
+    "$ELM_WRAP_BIN" publish docs "$package_dir" > "$raw_output" 2> "$elm_wrap_stderr" || elm_wrap_status=$?
+    
+    if [ $elm_wrap_status -ne 0 ]; then
+        log_err "[generate-failed] $relative_path"
+        log_err "  elm-wrap exit status: $elm_wrap_status"
+        if [ -s "$elm_wrap_stderr" ]; then
+            log_err "  elm-wrap stderr: $(cat "$elm_wrap_stderr")"
+        fi
+        GENERATE_FAIL_COUNT=$((GENERATE_FAIL_COUNT + 1))
         rm -rf "$tmpdir"
         return
     fi
-
-    # Filter to only include exposed modules
-    local generated_docs="$tmpdir/generated-docs.json"
-    local exposed_filter
-    exposed_filter=$(echo "$exposed_modules" | jq -R -s 'split("\n") | map(select(length > 0))')
-
-    if ! jq --argjson exposed "$exposed_filter" 'map(select(.name as $n | $exposed | index($n)))' "$all_docs" > "$generated_docs" 2>/dev/null; then
-        echo "$package_dir" >> "$FAIL_LOG"
-        echo "FAILED: $package_dir - failed to filter exposed modules" >> "$DETAIL_LOG"
-        FAIL_COUNT=$((FAIL_COUNT + 1))
+    
+    # Run jq to format the output
+    local jq_status=0
+    jq . "$raw_output" > "$output_file" 2> "$jq_stderr" || jq_status=$?
+    
+    if [ $jq_status -ne 0 ]; then
+        log_err "[generate-failed] $relative_path"
+        log_err "  jq exit status: $jq_status"
+        if [ -s "$jq_stderr" ]; then
+            log_err "  jq stderr: $(cat "$jq_stderr")"
+        fi
+        GENERATE_FAIL_COUNT=$((GENERATE_FAIL_COUNT + 1))
+        rm -f "$output_file"
         rm -rf "$tmpdir"
         return
     fi
-
-    # Normalize both JSON files and compare
-    # Also normalize line endings to handle Windows CRLF vs Unix LF
-    local normalized_generated="$tmpdir/normalized-generated.json"
-    local normalized_original="$tmpdir/normalized-original.json"
-
-    if ! jq -S . "$generated_docs" | tr -d '\r' > "$normalized_generated" 2>/dev/null; then
-        echo "$package_dir" >> "$FAIL_LOG"
-        echo "FAILED: $package_dir - invalid JSON in generated docs" >> "$DETAIL_LOG"
-        FAIL_COUNT=$((FAIL_COUNT + 1))
-        rm -rf "$tmpdir"
-        return
-    fi
-
-    if ! jq -S . "$docs_json_path" | tr -d '\r' > "$normalized_original" 2>/dev/null; then
-        echo "$package_dir" >> "$FAIL_LOG"
-        echo "FAILED: $package_dir - invalid JSON in original docs.json" >> "$DETAIL_LOG"
-        FAIL_COUNT=$((FAIL_COUNT + 1))
-        rm -rf "$tmpdir"
-        return
-    fi
-
-    # Compare the normalized JSON files
-    if diff -u "$normalized_original" "$normalized_generated" > "$tmpdir/diff.txt" 2>&1; then
-        echo "SUCCESS: $package_dir" >> "$DETAIL_LOG"
-        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-    else
-        echo "$package_dir" >> "$FAIL_LOG"
-        {
-            echo "FAILED: $package_dir - documentation mismatch"
-            echo "--- Diff ---"
-            cat "$tmpdir/diff.txt"
-            echo ""
-        } >> "$DETAIL_LOG"
-        FAIL_COUNT=$((FAIL_COUNT + 1))
-    fi
-
-    # Clean up temp directory
+    
+    GENERATED_COUNT=$((GENERATED_COUNT + 1))
     rm -rf "$tmpdir"
 }
 
-# Process packages
-if [ -n "$FROM_FILE" ]; then
-    # Read package directories from file
-    while IFS= read -r package_dir; do
-        [ -z "$package_dir" ] && continue
-        process_package "$package_dir"
-    done < "$FROM_FILE"
-else
-    # Find all elm.json files and process their directories
-    while IFS= read -r -d '' elm_json_path; do
-        package_dir="$(dirname "$elm_json_path")"
-        process_package "$package_dir"
-    done < <(find "$PACKAGES_DIR" -name "elm.json" -type f -print0 | sort -z)
-fi
+# Find all elm.json files and process their directories
+while IFS= read -r -d '' elm_json_path; do
+    package_dir="$(dirname "$elm_json_path")"
+    process_package "$package_dir"
+done < <(find "$REPOSITORY_DIR" -name "elm.json" -type f -print0 | sort -z)
 
-# Print summary
-echo ""
-echo "Compared docs.json for $((SUCCESS_COUNT + FAIL_COUNT)) modules: succeeded $SUCCESS_COUNT, failed $FAIL_COUNT."
-if [ $FAIL_COUNT -gt 0 ]; then
-    echo "Fail report is in the fail log: $FAIL_LOG"
+GENERATE_END_TIME=$(date +%s)
+GENERATE_DURATION=$((GENERATE_END_TIME - START_TIME))
+
+log ""
+log "Phase 1 complete: Generated $GENERATED_COUNT docs in ${GENERATE_DURATION}s (${GENERATE_FAIL_COUNT} failures)"
+log ""
+
+# Phase 2: Compare generated docs with originals
+log "Phase 2: Comparing documentation..."
+
+SUCCESS_COUNT=0
+FAIL_COUNT=0
+MISSING_ORIGINAL=0
+
+# Find all generated docs and compare with originals
+for generated_file in "$TARGET_DIR"/*_docs.generated.json; do
+    [ -f "$generated_file" ] || continue
+    
+    # Extract the base name (without _docs.generated.json)
+    base_name="$(basename "$generated_file" _docs.generated.json)"
+    original_file="$TARGET_DIR/${base_name}_docs.json"
+    
+    # Check if original exists
+    if [ ! -f "$original_file" ]; then
+        MISSING_ORIGINAL=$((MISSING_ORIGINAL + 1))
+        continue
+    fi
+    
+    # Convert flat name back to author/package/version format
+    # The flat name is like: author_package_version
+    # We need to convert underscores back to slashes
+    package_path="${base_name//_//}"
+    
+    # Compare the files
+    if diff -q "$original_file" "$generated_file" > /dev/null 2>&1; then
+        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    else
+        log_err "[different] $package_path"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+    fi
+done
+
+END_TIME=$(date +%s)
+TOTAL_DURATION=$((END_TIME - START_TIME))
+TOTAL_COMPARED=$((SUCCESS_COUNT + FAIL_COUNT))
+
+log ""
+log "Phase 2 complete."
+log ""
+log "=== Summary ==="
+log "Total packages processed: $GENERATED_COUNT"
+log "Total packages compared: $TOTAL_COMPARED"
+log "Successes: $SUCCESS_COUNT"
+log "Failures: $FAIL_COUNT"
+if [ $MISSING_ORIGINAL -gt 0 ]; then
+    log "Missing originals: $MISSING_ORIGINAL"
 fi
-echo "Detailed log: $DETAIL_LOG"
+log "Total time: ${TOTAL_DURATION}s"
