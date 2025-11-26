@@ -100,3 +100,4 @@ grep -r --include="*.c" '\bstrdup\s*(' src/ | grep -v arena_strdup
 ## Summary
 
 **Golden Rule**: In application code, always use `arena_*` functions. Never use standard allocation functions directly.
+**No commits**: NEVER commit to Git yourself.
