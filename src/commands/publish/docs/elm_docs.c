@@ -1,4 +1,5 @@
 #include "elm_docs.h"
+#include "dependency_cache.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,6 +59,50 @@ typedef struct {
     int imports_count;
     int imports_capacity;
 } ImportMap;
+
+/* Direct module imports (not via exposing, just module availability) */
+typedef struct {
+    char **modules;
+    int modules_count;
+    int modules_capacity;
+} DirectModuleImports;
+
+static void init_direct_imports(DirectModuleImports *imports) {
+    imports->modules = arena_malloc(16 * sizeof(char*));
+    imports->modules_count = 0;
+    imports->modules_capacity = 16;
+}
+
+static void add_direct_import(DirectModuleImports *imports, const char *module_name) {
+    /* Check if already exists */
+    for (int i = 0; i < imports->modules_count; i++) {
+        if (strcmp(imports->modules[i], module_name) == 0) {
+            return;  /* Already added */
+        }
+    }
+
+    if (imports->modules_count >= imports->modules_capacity) {
+        imports->modules_capacity *= 2;
+        imports->modules = arena_realloc(imports->modules, imports->modules_capacity * sizeof(char*));
+    }
+    imports->modules[imports->modules_count++] = arena_strdup(module_name);
+}
+
+static bool is_directly_imported(DirectModuleImports *imports, const char *module_name) {
+    for (int i = 0; i < imports->modules_count; i++) {
+        if (strcmp(imports->modules[i], module_name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void free_direct_imports(DirectModuleImports *imports) {
+    for (int i = 0; i < imports->modules_count; i++) {
+        arena_free(imports->modules[i]);
+    }
+    arena_free(imports->modules);
+}
 
 /* Module alias tracking (for 'import Foo as F') */
 typedef struct {
@@ -276,7 +321,7 @@ static char *extract_module_info(TSNode root, const char *source_code, ExportLis
 }
 
 /* Helper function to parse imports */
-static void extract_imports(TSNode root, const char *source_code, ImportMap *import_map, ModuleAliasMap *alias_map) {
+static void extract_imports(TSNode root, const char *source_code, ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports, DependencyCache *dep_cache) {
     uint32_t child_count = ts_node_child_count(root);
 
     for (uint32_t i = 0; i < child_count; i++) {
@@ -295,6 +340,23 @@ static void extract_imports(TSNode root, const char *source_code, ImportMap *imp
 
                 if (strcmp(import_child_type, "upper_case_qid") == 0) {
                     module_name = get_node_text(import_child, source_code);
+                    /* Track this as a directly imported module */
+                    if (module_name && direct_imports) {
+                        /* Extract just the first component for single-word modules */
+                        /* e.g., "Html" from "Html" or "Json.Decode" -> "Json" and "Json.Decode" */
+                        add_direct_import(direct_imports, module_name);
+
+                        /* Also add the base module (first component) */
+                        char *dot = strchr(module_name, '.');
+                        if (dot) {
+                            size_t base_len = dot - module_name;
+                            char *base_module = arena_malloc(base_len + 1);
+                            memcpy(base_module, module_name, base_len);
+                            base_module[base_len] = '\0';
+                            add_direct_import(direct_imports, base_module);
+                            arena_free(base_module);
+                        }
+                    }
                 } else if (strcmp(import_child_type, "as_clause") == 0) {
                     /* Extract the alias from as_clause */
                     uint32_t as_child_count = ts_node_child_count(import_child);
@@ -312,7 +374,18 @@ static void extract_imports(TSNode root, const char *source_code, ImportMap *imp
                         TSNode exp_child = ts_node_child(import_child, k);
                         const char *exp_type = ts_node_type(exp_child);
 
-                        if (strcmp(exp_type, "exposed_type") == 0) {
+                        if (strcmp(exp_type, "double_dot") == 0) {
+                            /* import ModuleName exposing (..) - need to get all exports */
+                            if (dep_cache) {
+                                CachedModuleExports *exports = dependency_cache_get_exports(dep_cache, module_name);
+                                if (exports && exports->parsed) {
+                                    /* Add all exported types to the import map */
+                                    for (int t = 0; t < exports->exported_types_count; t++) {
+                                        add_import(import_map, exports->exported_types[t], module_name);
+                                    }
+                                }
+                            }
+                        } else if (strcmp(exp_type, "exposed_type") == 0) {
                             /* Extract type name */
                             uint32_t type_child_count = ts_node_child_count(exp_child);
                             for (uint32_t m = 0; m < type_child_count; m++) {
@@ -453,6 +526,7 @@ static char *normalize_whitespace(const char *str) {
 /* Helper function to qualify type names based on import map and local types */
 static char *qualify_type_names(const char *type_str, const char *module_name,
                                   ImportMap *import_map, ModuleAliasMap *alias_map,
+                                  DirectModuleImports *direct_imports,
                                   char **local_types, int local_types_count) {
     size_t buf_size = strlen(type_str) * 3 + 1024;  /* Extra space for qualifications */
     char *result = arena_malloc(buf_size);
@@ -461,53 +535,65 @@ static char *qualify_type_names(const char *type_str, const char *module_name,
 
     while (*p && pos < buf_size - 200) {
         if (*p >= 'A' && *p <= 'Z') {
-            /* Found an uppercase identifier - might be a type */
-            const char *start = p;
-            while ((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
-                   (*p >= '0' && *p <= '9') || *p == '_') {
-                p++;
-            }
-            size_t len = p - start;
-            char typename[256];
-            if (len < sizeof(typename)) {
-                memcpy(typename, start, len);
-                typename[len] = '\0';
-
-                /* Check if this is part of an already-qualified type in the SOURCE */
-                /* Look backward: if there's a dot before this, it's already qualified */
-                bool already_qualified = false;
-                if (start > type_str && *(start - 1) == '.') {
-                    already_qualified = true;
+            /* Check if this uppercase letter is part of a camelCase identifier */
+            /* by checking if the previous character was alphanumeric */
+            bool is_camel_case = false;
+            if (p > type_str) {
+                char prev = *(p - 1);
+                if ((prev >= 'a' && prev <= 'z') || (prev >= '0' && prev <= '9') || prev == '_') {
+                    is_camel_case = true;
                 }
+            }
 
-                /* Check if this is a module prefix (followed by a dot) */
-                bool is_module_prefix = (*p == '.');
+            if (is_camel_case) {
+                /* Part of camelCase identifier - copy as-is */
+                result[pos++] = *p++;
+            } else {
+                /* Found an uppercase identifier - might be a type */
+                const char *start = p;
+                while ((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
+                       (*p >= '0' && *p <= '9') || *p == '_') {
+                    p++;
+                }
+                size_t len = p - start;
+                char typename[256];
+                if (len < sizeof(typename)) {
+                    memcpy(typename, start, len);
+                    typename[len] = '\0';
 
-                if (already_qualified) {
-                    /* Keep as-is - already qualified */
-                    memcpy(result + pos, start, len);
-                    pos += len;
-                } else if (is_module_prefix) {
-                    /* This is a module prefix - check if it's an alias that needs expanding */
-                    const char *full_module = lookup_module_alias(alias_map, typename);
-                    if (full_module) {
-                        /* Expand the alias to the full module name */
-                        size_t flen = strlen(full_module);
-                        memcpy(result + pos, full_module, flen);
-                        pos += flen;
-                    } else {
-                        /* Keep as-is - not an alias */
+                    /* Check if this is part of an already-qualified type in the SOURCE */
+                    /* Look backward: if there's a dot before this, it's already qualified */
+                    bool already_qualified = false;
+                    if (start > type_str && *(start - 1) == '.') {
+                        already_qualified = true;
+                    }
+
+                    /* Check if this is a module prefix (followed by a dot) */
+                    bool is_module_prefix = (*p == '.');
+
+                    if (already_qualified) {
+                        /* Keep as-is - already qualified */
                         memcpy(result + pos, start, len);
                         pos += len;
-                    }
-                } else {
-                    /* Check if it's imported */
-                    const char *import_module = lookup_import(import_map, typename);
-                    if (import_module) {
-                        /* Use the imported module name */
-                        pos += snprintf(result + pos, buf_size - pos, "%s.%s", import_module, typename);
+                    } else if (is_module_prefix) {
+                        /* This is a module prefix - expand alias unless it's also directly imported */
+                        /* When both direct import and alias exist, prefer the direct import (don't expand) */
+                        const char *full_module = lookup_module_alias(alias_map, typename);
+                        bool should_expand = (full_module != NULL) &&
+                                            !is_directly_imported(direct_imports, typename);
+
+                        if (should_expand) {
+                            /* Expand the alias to the full module name */
+                            size_t flen = strlen(full_module);
+                            memcpy(result + pos, full_module, flen);
+                            pos += flen;
+                        } else {
+                            /* Keep as-is - either not an alias, or also directly imported */
+                            memcpy(result + pos, start, len);
+                            pos += len;
+                        }
                     } else {
-                        /* Check if it's a local type */
+                        /* Check if it's a local type first - local types take precedence over imports */
                         bool is_local = false;
                         for (int i = 0; i < local_types_count; i++) {
                             if (strcmp(typename, local_types[i]) == 0) {
@@ -520,61 +606,68 @@ static char *qualify_type_names(const char *type_str, const char *module_name,
                             /* Qualify with current module */
                             pos += snprintf(result + pos, buf_size - pos, "%s.%s", module_name, typename);
                         } else {
-                            /* Unknown type - might be from Basics or core modules that aren't explicitly imported */
-                            /* Core types that need to be qualified */
-                            const char *qualified = NULL;
-                            if (strcmp(typename, "Task") == 0) {
-                                qualified = "Task.Task";
-                            } else if (strcmp(typename, "Cmd") == 0) {
-                                qualified = "Platform.Cmd.Cmd";
-                            } else if (strcmp(typename, "Sub") == 0) {
-                                qualified = "Platform.Sub.Sub";
-                            } else if (strcmp(typename, "Maybe") == 0) {
-                                qualified = "Maybe.Maybe";
-                            } else if (strcmp(typename, "List") == 0) {
-                                qualified = "List.List";
-                            } else if (strcmp(typename, "Result") == 0) {
-                                qualified = "Result.Result";
-                            } else if (strcmp(typename, "Dict") == 0) {
-                                qualified = "Dict.Dict";
-                            } else if (strcmp(typename, "Set") == 0) {
-                                qualified = "Set.Set";
-                            } else if (strcmp(typename, "Array") == 0) {
-                                qualified = "Array.Array";
-                            } else if (strcmp(typename, "Never") == 0) {
-                                qualified = "Basics.Never";
-                            } else if (strcmp(typename, "Int") == 0) {
-                                qualified = "Basics.Int";
-                            } else if (strcmp(typename, "Float") == 0) {
-                                qualified = "Basics.Float";
-                            } else if (strcmp(typename, "String") == 0) {
-                                qualified = "String.String";
-                            } else if (strcmp(typename, "Bool") == 0) {
-                                qualified = "Basics.Bool";
-                            } else if (strcmp(typename, "Order") == 0) {
-                                qualified = "Basics.Order";
-                            } else if (strcmp(typename, "Char") == 0) {
-                                qualified = "Char.Char";
-                            } else if (strcmp(typename, "Decoder") == 0) {
-                                qualified = "Json.Decode.Decoder";
-                            } else if (strcmp(typename, "Encoder") == 0) {
-                                qualified = "Json.Encode.Encoder";
-                            } else if (strcmp(typename, "Value") == 0) {
-                                qualified = "Json.Encode.Value";
-                            } else if (strcmp(typename, "Html") == 0) {
-                                qualified = "Html.Html";
-                            } else if (strcmp(typename, "Attribute") == 0) {
-                                qualified = "Html.Attribute";
-                            }
-
-                            if (qualified) {
-                                size_t qlen = strlen(qualified);
-                                memcpy(result + pos, qualified, qlen);
-                                pos += qlen;
+                            /* Check if it's imported */
+                            const char *import_module = lookup_import(import_map, typename);
+                            if (import_module) {
+                                /* Use the imported module name */
+                                pos += snprintf(result + pos, buf_size - pos, "%s.%s", import_module, typename);
                             } else {
-                                /* Keep as-is - might be a type variable */
-                                memcpy(result + pos, start, len);
-                                pos += len;
+                                /* Unknown type - might be from Basics or core modules that aren't explicitly imported */
+                                /* Core types that need to be qualified */
+                                const char *qualified = NULL;
+                                if (strcmp(typename, "Task") == 0) {
+                                    qualified = "Task.Task";
+                                } else if (strcmp(typename, "Cmd") == 0) {
+                                    qualified = "Platform.Cmd.Cmd";
+                                } else if (strcmp(typename, "Sub") == 0) {
+                                    qualified = "Platform.Sub.Sub";
+                                } else if (strcmp(typename, "Maybe") == 0) {
+                                    qualified = "Maybe.Maybe";
+                                } else if (strcmp(typename, "List") == 0) {
+                                    qualified = "List.List";
+                                } else if (strcmp(typename, "Result") == 0) {
+                                    qualified = "Result.Result";
+                                } else if (strcmp(typename, "Dict") == 0) {
+                                    qualified = "Dict.Dict";
+                                } else if (strcmp(typename, "Set") == 0) {
+                                    qualified = "Set.Set";
+                                } else if (strcmp(typename, "Array") == 0) {
+                                    qualified = "Array.Array";
+                                } else if (strcmp(typename, "Never") == 0) {
+                                    qualified = "Basics.Never";
+                                } else if (strcmp(typename, "Int") == 0) {
+                                    qualified = "Basics.Int";
+                                } else if (strcmp(typename, "Float") == 0) {
+                                    qualified = "Basics.Float";
+                                } else if (strcmp(typename, "String") == 0) {
+                                    qualified = "String.String";
+                                } else if (strcmp(typename, "Bool") == 0) {
+                                    qualified = "Basics.Bool";
+                                } else if (strcmp(typename, "Order") == 0) {
+                                    qualified = "Basics.Order";
+                                } else if (strcmp(typename, "Char") == 0) {
+                                    qualified = "Char.Char";
+                                } else if (strcmp(typename, "Decoder") == 0) {
+                                    qualified = "Json.Decode.Decoder";
+                                } else if (strcmp(typename, "Encoder") == 0) {
+                                    qualified = "Json.Encode.Encoder";
+                                } else if (strcmp(typename, "Value") == 0) {
+                                    qualified = "Json.Encode.Value";
+                                } else if (strcmp(typename, "Html") == 0) {
+                                    qualified = "Html.Html";
+                                } else if (strcmp(typename, "Attribute") == 0) {
+                                    qualified = "Html.Attribute";
+                                }
+
+                                if (qualified) {
+                                    size_t qlen = strlen(qualified);
+                                    memcpy(result + pos, qualified, qlen);
+                                    pos += qlen;
+                                } else {
+                                    /* Keep as-is - might be a type variable */
+                                    memcpy(result + pos, start, len);
+                                    pos += len;
+                                }
                             }
                         }
                     }
@@ -588,23 +681,90 @@ static char *qualify_type_names(const char *type_str, const char *module_name,
     return result;
 }
 
+/* Helper function to collect comment byte ranges */
+typedef struct {
+    uint32_t start;
+    uint32_t end;
+} ByteRange;
+
+static void collect_comment_ranges(TSNode node, ByteRange *ranges, int *count, int capacity) {
+    const char *node_type = ts_node_type(node);
+
+    /* If this is a comment node, record its range */
+    if (strcmp(node_type, "block_comment") == 0 || strcmp(node_type, "line_comment") == 0) {
+        if (*count < capacity) {
+            ranges[*count].start = ts_node_start_byte(node);
+            ranges[*count].end = ts_node_end_byte(node);
+            (*count)++;
+        }
+        return;  /* Don't recurse into comment nodes */
+    }
+
+    /* Recursively check children */
+    uint32_t child_count = ts_node_child_count(node);
+    for (uint32_t i = 0; i < child_count; i++) {
+        TSNode child = ts_node_child(node, i);
+        collect_comment_ranges(child, ranges, count, capacity);
+    }
+}
+
+/* Helper function to extract text from node, skipping comment ranges */
+static char *extract_text_skip_comments(TSNode node, const char *source_code) {
+    uint32_t node_start = ts_node_start_byte(node);
+    uint32_t node_end = ts_node_end_byte(node);
+    uint32_t node_length = node_end - node_start;
+
+    /* Collect all comment ranges within this node */
+    ByteRange comment_ranges[64];
+    int comment_count = 0;
+    collect_comment_ranges(node, comment_ranges, &comment_count, 64);
+
+    /* Allocate buffer for result */
+    char *buffer = arena_malloc(node_length + 1);
+    size_t pos = 0;
+
+    /* Copy text, skipping comment ranges */
+    uint32_t current = node_start;
+    for (int i = 0; i < comment_count; i++) {
+        /* Copy text before this comment */
+        if (current < comment_ranges[i].start) {
+            uint32_t len = comment_ranges[i].start - current;
+            memcpy(buffer + pos, source_code + current, len);
+            pos += len;
+        }
+        /* Skip the comment itself and move to after it */
+        current = comment_ranges[i].end;
+    }
+
+    /* Copy remaining text after last comment */
+    if (current < node_end) {
+        uint32_t len = node_end - current;
+        memcpy(buffer + pos, source_code + current, len);
+        pos += len;
+    }
+
+    buffer[pos] = '\0';
+    return buffer;
+}
+
 /* Helper function to extract and canonicalize type expression */
 static char *extract_type_expression(TSNode type_node, const char *source_code, const char *module_name,
                                        ImportMap *import_map, ModuleAliasMap *alias_map,
+                                       DirectModuleImports *direct_imports,
                                        char **local_types, int local_types_count) {
     if (ts_node_is_null(type_node)) {
         return arena_strdup("");
     }
 
-    /* Extract the raw type text */
-    char *raw_type = get_node_text(type_node, source_code);
+    /* Extract the raw type text, skipping comments */
+    char *raw_text = extract_text_skip_comments(type_node, source_code);
 
-    /* Normalize whitespace first */
-    char *normalized = normalize_whitespace(raw_type);
-    arena_free(raw_type);
+    /* Normalize whitespace */
+    char *normalized = normalize_whitespace(raw_text);
+    arena_free(raw_text);
 
     /* Qualify type names */
-    char *qualified = qualify_type_names(normalized, module_name, import_map, alias_map, local_types, local_types_count);
+    char *qualified = qualify_type_names(normalized, module_name, import_map, alias_map, direct_imports, local_types, local_types_count);
     arena_free(normalized);
 
     return qualified;
@@ -612,7 +772,7 @@ static char *extract_type_expression(TSNode type_node, const char *source_code, 
 
 /* Extract value declaration (function/constant) */
 static bool extract_value_decl(TSNode node, const char *source_code, ElmValue *value, const char *module_name,
-                                 ImportMap *import_map, ModuleAliasMap *alias_map,
+                                 ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
                                  char **local_types, int local_types_count) {
     /* Find type_annotation sibling first */
     TSNode type_annotation = ts_node_prev_named_sibling(node);
@@ -655,7 +815,7 @@ static bool extract_value_decl(TSNode node, const char *source_code, ElmValue *v
         const char *child_type = ts_node_type(child);
 
         if (strcmp(child_type, "type_expression") == 0) {
-            type_str = extract_type_expression(child, source_code, module_name, import_map, alias_map, local_types, local_types_count);
+            type_str = extract_type_expression(child, source_code, module_name, import_map, alias_map, direct_imports, local_types, local_types_count);
             break;
         }
     }
@@ -677,7 +837,7 @@ static bool extract_value_decl(TSNode node, const char *source_code, ElmValue *v
 
 /* Extract type alias */
 static bool extract_type_alias(TSNode node, const char *source_code, ElmAlias *alias, const char *module_name,
-                                 ImportMap *import_map, ModuleAliasMap *alias_map,
+                                 ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
                                  char **local_types, int local_types_count) {
     char *alias_name = NULL;
     char *type_expr = NULL;
@@ -698,7 +858,7 @@ static bool extract_type_alias(TSNode node, const char *source_code, ElmAlias *a
             }
             args[args_count++] = get_node_text(child, source_code);
         } else if (strcmp(child_type, "type_expression") == 0) {
-            type_expr = extract_type_expression(child, source_code, module_name, import_map, alias_map, local_types, local_types_count);
+            type_expr = extract_type_expression(child, source_code, module_name, import_map, alias_map, direct_imports, local_types, local_types_count);
         }
     }
 
@@ -723,7 +883,7 @@ static bool extract_type_alias(TSNode node, const char *source_code, ElmAlias *a
 
 /* Extract union type */
 static bool extract_union_type(TSNode node, const char *source_code, ElmUnion *union_type, const char *module_name,
-                                 ImportMap *import_map, ModuleAliasMap *alias_map,
+                                 ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
                                  char **local_types, int local_types_count) {
     char *type_name = NULL;
     char **args = NULL;
@@ -789,13 +949,15 @@ static bool extract_union_type(TSNode node, const char *source_code, ElmUnion *u
                 if (strcmp(variant_child_type, "upper_case_identifier") == 0 && !constructor_name) {
                     constructor_name = get_node_text(variant_child, source_code);
                 } else if (strcmp(variant_child_type, "type_expression") == 0 ||
-                           strcmp(variant_child_type, "type_ref") == 0) {
-                    /* Constructor argument (either wrapped in parens or standalone) */
+                           strcmp(variant_child_type, "type_ref") == 0 ||
+                           strcmp(variant_child_type, "record_type") == 0 ||
+                           strcmp(variant_child_type, "tuple_type") == 0) {
+                    /* Constructor argument (type expression, ref, record, or tuple) */
                     if (arg_types_count == 0) {
                         arg_types = arena_malloc(8 * sizeof(char*));
                     }
                     arg_types[arg_types_count++] = extract_type_expression(variant_child, source_code, module_name,
-                                                                             import_map, alias_map, local_types, local_types_count);
+                                                                             import_map, alias_map, direct_imports, local_types, local_types_count);
                 }
             }
 
@@ -815,7 +977,7 @@ static bool extract_union_type(TSNode node, const char *source_code, ElmUnion *u
 }
 
 /* Main parsing function */
-bool parse_elm_file(const char *filepath, ElmModuleDocs *docs) {
+bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *dep_cache) {
     /* Initialize the docs structure */
     memset(docs, 0, sizeof(ElmModuleDocs));
 
@@ -862,12 +1024,14 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs) {
     ExportList exports;
     docs->name = extract_module_info(root_node, source_code, &exports);
 
-    /* Parse imports and module aliases */
+    /* Parse imports, module aliases, and direct imports */
     ImportMap import_map;
     init_import_map(&import_map);
     ModuleAliasMap alias_map;
     init_module_alias_map(&alias_map);
-    extract_imports(root_node, source_code, &import_map, &alias_map);
+    DirectModuleImports direct_imports;
+    init_direct_imports(&direct_imports);
+    extract_imports(root_node, source_code, &import_map, &alias_map, &direct_imports, dep_cache);
 
     /* Extract module-level comment (comes AFTER module declaration) */
     uint32_t child_count = ts_node_child_count(root_node);
@@ -938,7 +1102,7 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs) {
         if (strcmp(type, "value_declaration") == 0) {
             /* Found a function/value declaration */
             ElmValue value;
-            if (extract_value_decl(child, source_code, &value, docs->name, &import_map, &alias_map, local_types, local_types_count)) {
+            if (extract_value_decl(child, source_code, &value, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count)) {
                 /* Only include if exported */
                 if (is_exported_value(value.name, &exports)) {
                     if (docs->values_count >= values_capacity) {
@@ -956,7 +1120,7 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs) {
         } else if (strcmp(type, "type_alias_declaration") == 0) {
             /* Found a type alias */
             ElmAlias alias;
-            if (extract_type_alias(child, source_code, &alias, docs->name, &import_map, &alias_map, local_types, local_types_count)) {
+            if (extract_type_alias(child, source_code, &alias, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count)) {
                 /* Only include if exported */
                 if (is_exported_type(alias.name, &exports)) {
                     if (docs->aliases_count >= aliases_capacity) {
@@ -978,7 +1142,7 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs) {
         } else if (strcmp(type, "type_declaration") == 0) {
             /* Found a union type */
             ElmUnion union_type;
-            if (extract_union_type(child, source_code, &union_type, docs->name, &import_map, &alias_map, local_types, local_types_count)) {
+            if (extract_union_type(child, source_code, &union_type, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count)) {
                 /* Only include if exported */
                 if (is_exported_type(union_type.name, &exports)) {
                     /* Check if constructors should be exposed */
@@ -1028,9 +1192,10 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs) {
     }
     arena_free(local_types);
 
-    /* Clean up import map and alias map */
+    /* Clean up import map, alias map, and direct imports */
     free_import_map(&import_map);
     free_module_alias_map(&alias_map);
+    free_direct_imports(&direct_imports);
 
     /* Sort declarations alphabetically by name */
     /* Sort values */

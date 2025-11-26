@@ -1,7 +1,9 @@
 #include "docs.h"
 #include "elm_docs.h"
+#include "dependency_cache.h"
 #include "../../../alloc.h"
 #include "../../../progname.h"
+#include "../../../cache.h"
 #include <stdio.h>
 #include <string.h>
 #include <dirent.h>
@@ -224,10 +226,22 @@ static int process_files(FileList *files, const char *base_path) {
         fprintf(stderr, "No elm.json found or failed to parse, including all modules\n");
     }
 
+    /* Initialize dependency cache */
+    CacheConfig *cache_config = cache_config_init();
+    DependencyCache *dep_cache = NULL;
+    if (cache_config && cache_config->elm_home) {
+        dep_cache = dependency_cache_create(cache_config->elm_home, base_path);
+        fprintf(stderr, "Initialized dependency cache with ELM_HOME: %s\n", cache_config->elm_home);
+    } else {
+        fprintf(stderr, "Warning: Could not initialize dependency cache (ELM_HOME not found)\n");
+    }
+
     /* Allocate array for all module docs */
     ElmModuleDocs *all_docs = arena_calloc(files->count, sizeof(ElmModuleDocs));
     if (!all_docs) {
         exposed_modules_free(&exposed);
+        if (dep_cache) dependency_cache_free(dep_cache);
+        if (cache_config) cache_config_free(cache_config);
         return 1;
     }
 
@@ -236,7 +250,7 @@ static int process_files(FileList *files, const char *base_path) {
     for (int i = 0; i < files->count; i++) {
         fprintf(stderr, "Processing: %s\n", files->paths[i]);
 
-        if (!parse_elm_file(files->paths[i], &all_docs[doc_index])) {
+        if (!parse_elm_file(files->paths[i], &all_docs[doc_index], dep_cache)) {
             fprintf(stderr, "Warning: Failed to parse %s\n", files->paths[i]);
         } else {
             /* Check if module is exposed (if we have elm.json) */
@@ -269,6 +283,14 @@ static int process_files(FileList *files, const char *base_path) {
     }
     arena_free(all_docs);
     exposed_modules_free(&exposed);
+
+    /* Free dependency cache */
+    if (dep_cache) {
+        dependency_cache_free(dep_cache);
+    }
+    if (cache_config) {
+        cache_config_free(cache_config);
+    }
 
     return 0;
 }

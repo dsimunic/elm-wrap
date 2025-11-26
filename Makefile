@@ -55,6 +55,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/publish.c \
           $(SRCDIR)/commands/publish/docs/docs.c \
           $(SRCDIR)/commands/publish/docs/elm_docs.c \
+          $(SRCDIR)/commands/publish/docs/dependency_cache.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter/lib.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/parser.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/scanner.c \
@@ -88,6 +89,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/publish.o \
           $(BUILDDIR)/docs.o \
           $(BUILDDIR)/elm_docs.o \
+          $(BUILDDIR)/dependency_cache.o \
           $(BUILDDIR)/ts_lib.o \
           $(BUILDDIR)/ts_elm_parser.o \
           $(BUILDDIR)/ts_elm_scanner.o \
@@ -185,11 +187,15 @@ $(BUILDDIR)/publish.o: $(SRCDIR)/publish.c $(SRCDIR)/publish.h $(SRCDIR)/command
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build docs object
-$(BUILDDIR)/docs.o: $(SRCDIR)/commands/publish/docs/docs.c $(SRCDIR)/commands/publish/docs/docs.h $(SRCDIR)/commands/publish/docs/elm_docs.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
+$(BUILDDIR)/docs.o: $(SRCDIR)/commands/publish/docs/docs.c $(SRCDIR)/commands/publish/docs/docs.h $(SRCDIR)/commands/publish/docs/elm_docs.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/cache.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build elm_docs object
-$(BUILDDIR)/elm_docs.o: $(SRCDIR)/commands/publish/docs/elm_docs.c $(SRCDIR)/commands/publish/docs/elm_docs.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+$(BUILDDIR)/elm_docs.o: $(SRCDIR)/commands/publish/docs/elm_docs.c $(SRCDIR)/commands/publish/docs/elm_docs.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build dependency_cache object
+$(BUILDDIR)/dependency_cache.o: $(SRCDIR)/commands/publish/docs/dependency_cache.c $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
 
 # Build tree-sitter lib object
