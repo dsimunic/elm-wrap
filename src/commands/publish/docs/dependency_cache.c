@@ -107,10 +107,35 @@ static char *find_module_in_dependencies(struct DependencyCache *cache, const ch
     for (int i = 0; i < deps->count; i++) {
         Package *pkg = &deps->packages[i];
 
+        /* Extract the minimum version from constraint (e.g., "1.0.0 <= v < 2.0.0" -> "1.0.0")
+         * The version field may contain a constraint or just a version number.
+         * We parse it to extract the lower bound version. */
+        char min_version[64] = {0};
+        const char *v = pkg->version;
+
+        /* Skip leading whitespace */
+        while (*v && (*v == ' ' || *v == '\t')) v++;
+
+        /* Extract version number (digits and dots) */
+        int pos = 0;
+        while (*v && pos < (int)sizeof(min_version) - 1) {
+            if ((*v >= '0' && *v <= '9') || *v == '.') {
+                min_version[pos++] = *v++;
+            } else {
+                break;  /* Stop at first non-version character */
+            }
+        }
+        min_version[pos] = '\0';
+
+        /* If we couldn't extract a version, skip this dependency */
+        if (min_version[0] == '\0') {
+            continue;
+        }
+
         /* Build path to package in ELM_HOME */
         char package_dir[2048];
         snprintf(package_dir, sizeof(package_dir), "%s/packages/%s/%s/%s/src",
-                 cache->elm_home, pkg->author, pkg->name, pkg->version);
+                 cache->elm_home, pkg->author, pkg->name, min_version);
 
         /* Convert module name to file path */
         rel_path = module_name_to_file_path(module_name);
@@ -287,7 +312,21 @@ struct DependencyCache* dependency_cache_create(const char *elm_home, const char
     struct DependencyCache *cache = arena_malloc(sizeof(struct DependencyCache));
     if (!cache) return NULL;
 
-    cache->elm_home = arena_strdup(elm_home);
+    /* Check if package_path is inside a package repository structure like:
+     * /path/to/repository/0.19.1/packages/author/name/version
+     * If so, use the repository root (up to and including the version dir) as elm_home */
+    const char *effective_elm_home = elm_home;
+    const char *packages_marker = strstr(package_path, "/packages/");
+    if (packages_marker) {
+        /* Extract everything before /packages/ (e.g., "/path/to/repository/0.19.1") */
+        size_t len = packages_marker - package_path;
+        char *repo_root = arena_malloc(len + 1);
+        memcpy(repo_root, package_path, len);
+        repo_root[len] = '\0';
+        effective_elm_home = repo_root;
+    }
+
+    cache->elm_home = arena_strdup(effective_elm_home);
     cache->package_path = arena_strdup(package_path);
     cache->modules = arena_malloc(32 * sizeof(CachedModuleExports));
     cache->modules_count = 0;

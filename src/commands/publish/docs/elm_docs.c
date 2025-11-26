@@ -193,7 +193,9 @@ static void add_import(ImportMap *map, const char *type_name, const char *module
 }
 
 static const char *lookup_import(ImportMap *map, const char *type_name) {
-    for (int i = 0; i < map->imports_count; i++) {
+    /* Search backwards to implement "last import wins" semantics:
+     * When the same type is exposed from multiple modules, the last import takes precedence */
+    for (int i = map->imports_count - 1; i >= 0; i--) {
         if (strcmp(map->imports[i].type_name, type_name) == 0) {
             return map->imports[i].module_name;
         }
@@ -512,17 +514,6 @@ static void extract_imports(TSNode root, const char *source_code, ImportMap *imp
                     /* Remove any alias that was pointing to this module */
                     remove_alias_for_module(alias_map, module_name);
                     add_direct_import(direct_imports, module_name);
-
-                    /* Also add the base module (first component) */
-                    char *dot = strchr(module_name, '.');
-                    if (dot) {
-                        size_t base_len = dot - module_name;
-                        char *base_module = arena_malloc(base_len + 1);
-                        memcpy(base_module, module_name, base_len);
-                        base_module[base_len] = '\0';
-                        add_direct_import(direct_imports, base_module);
-                        arena_free(base_module);
-                    }
                 } else {
                     /* Aliased import: original module name is no longer available */
                     remove_direct_import(direct_imports, module_name);
@@ -790,34 +781,49 @@ static char *normalize_whitespace(const char *str) {
     bool *is_tuple_paren = arena_malloc(pos * sizeof(bool));
     int *paren_match = arena_malloc(pos * sizeof(int));  /* For each '(', store index of matching ')' */
     bool *has_comma = arena_malloc(pos * sizeof(bool));   /* For each position, whether it contains a comma */
+    bool *has_arrow = arena_malloc(pos * sizeof(bool));   /* For each position, whether it contains an arrow */
 
     /* Initialize arrays */
     for (size_t i = 0; i < pos; i++) {
         is_tuple_paren[i] = false;
         paren_match[i] = -1;
         has_comma[i] = false;
+        has_arrow[i] = false;
     }
 
-    /* Build a stack to match parens and track commas */
+    /* Build a stack to match parens and track commas and arrows */
     int *paren_stack = arena_malloc(pos * sizeof(int));
+    int *brace_depth_stack = arena_malloc(pos * sizeof(int));  /* Track brace depth at each paren level */
     int stack_top = -1;
+    int brace_depth = 0;
 
     for (size_t i = 0; i < pos; i++) {
-        if (result[i] == '(') {
+        if (result[i] == '{') {
+            brace_depth++;
+        } else if (result[i] == '}') {
+            if (brace_depth > 0) brace_depth--;
+        } else if (result[i] == '(') {
             stack_top++;
             paren_stack[stack_top] = i;
+            brace_depth_stack[stack_top] = brace_depth;
             has_comma[i] = false;  /* This paren pair hasn't seen a comma yet */
+            has_arrow[i] = false;  /* This paren pair hasn't seen an arrow yet */
         } else if (result[i] == ',') {
-            /* Mark that the current paren level has a comma */
-            if (stack_top >= 0) {
+            /* Mark that the current paren level has a comma, but only if not inside braces */
+            if (stack_top >= 0 && brace_depth == brace_depth_stack[stack_top]) {
                 has_comma[paren_stack[stack_top]] = true;
+            }
+        } else if (result[i] == '-' && i + 1 < pos && result[i + 1] == '>') {
+            /* Mark that the current paren level has an arrow */
+            if (stack_top >= 0) {
+                has_arrow[paren_stack[stack_top]] = true;
             }
         } else if (result[i] == ')') {
             if (stack_top >= 0) {
                 int open_idx = paren_stack[stack_top];
                 paren_match[open_idx] = i;
-                /* If this paren pair has a comma, mark both as tuple parens */
-                if (has_comma[open_idx]) {
+                /* If this paren pair has a comma and NO arrow, mark both as tuple parens */
+                if (has_comma[open_idx] && !has_arrow[open_idx]) {
                     is_tuple_paren[open_idx] = true;
                     is_tuple_paren[i] = true;
                 }
@@ -827,8 +833,10 @@ static char *normalize_whitespace(const char *str) {
     }
 
     arena_free(paren_stack);
+    arena_free(brace_depth_stack);
     arena_free(paren_match);
     arena_free(has_comma);
+    arena_free(has_arrow);
 
     /* Second pass: build final string */
     for (size_t i = 0; i < pos; i++) {
