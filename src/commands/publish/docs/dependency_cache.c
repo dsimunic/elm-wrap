@@ -68,6 +68,19 @@ static char *module_name_to_file_path(const char *module_name) {
 
 /* Find a module file in the package's dependencies */
 static char *find_module_in_dependencies(struct DependencyCache *cache, const char *module_name) {
+    /* First, check if the module exists in the current package's src/ directory */
+    char *rel_path = module_name_to_file_path(module_name);
+    char local_path[2048];
+    snprintf(local_path, sizeof(local_path), "%s/src/%s", cache->package_path, rel_path);
+
+    struct stat st;
+    if (stat(local_path, &st) == 0 && S_ISREG(st.st_mode)) {
+        arena_free(rel_path);
+        return arena_strdup(local_path);
+    }
+    arena_free(rel_path);
+
+    /* Not found locally, search in dependencies */
     /* Read the package's elm.json to get dependencies */
     char elm_json_path[1024];
     snprintf(elm_json_path, sizeof(elm_json_path), "%s/elm.json", cache->package_path);
@@ -100,13 +113,12 @@ static char *find_module_in_dependencies(struct DependencyCache *cache, const ch
                  cache->elm_home, pkg->author, pkg->name, pkg->version);
 
         /* Convert module name to file path */
-        char *rel_path = module_name_to_file_path(module_name);
+        rel_path = module_name_to_file_path(module_name);
         char full_path[2048];
         snprintf(full_path, sizeof(full_path), "%s/%s", package_dir, rel_path);
         arena_free(rel_path);
 
         /* Check if file exists */
-        struct stat st;
         if (stat(full_path, &st) == 0 && S_ISREG(st.st_mode)) {
             elm_json_free(elm_json);
             return arena_strdup(full_path);

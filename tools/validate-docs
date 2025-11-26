@@ -76,6 +76,18 @@ TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 # Initialize counters
 GENERATED_COUNT=0
 GENERATE_FAIL_COUNT=0
+SUCCESS_COUNT=0
+FAIL_COUNT=0
+MISSING_ORIGINAL=0
+
+# Check VALIDATE_STOP_AFTER environment variable
+STOP_AFTER=""
+if [ -n "${VALIDATE_STOP_AFTER:-}" ]; then
+    if [[ "$VALIDATE_STOP_AFTER" =~ ^[0-9]+$ ]]; then
+        STOP_AFTER="$VALIDATE_STOP_AFTER"
+        log "Will stop after $STOP_AFTER failed comparison(s)"
+    fi
+fi
 
 log "Validating documentation"
 log "Repository: $REPOSITORY_DIR"
@@ -85,28 +97,30 @@ log ""
 # Record start time
 START_TIME=$(date +%s)
 
-# Phase 1: Generate docs for all packages
-log "Phase 1: Generating documentation..."
+# Generate and compare docs for each package
+log "Generating and comparing documentation..."
 
+# Process a single package: generate docs and compare with original
+# Returns 0 on success, 1 if we should stop early due to STOP_AFTER limit
 process_package() {
     local package_dir="$1"
     local elm_json_path="$package_dir/elm.json"
     
     # Check if elm.json exists
     if [ ! -f "$elm_json_path" ]; then
-        return
+        return 0
     fi
     
     # Check if docs.json exists - skip silently if not
     local docs_json_path="$package_dir/docs.json"
     if [ ! -f "$docs_json_path" ]; then
-        return
+        return 0
     fi
 
     # Check if src directory exists - skip silently if not
     local src_dir="$package_dir/src"
     if [ ! -d "$src_dir" ]; then
-        return
+        return 0
     fi
 
     # Calculate relative path from repository directory and convert to flat filename
@@ -116,6 +130,7 @@ process_package() {
     # Replace path separators with underscores to create flat filename
     local flat_name="${relative_path//\//_}"
     local output_file="$TARGET_DIR/${flat_name}_docs.generated.json"
+    local original_file="$TARGET_DIR/${flat_name}_docs.json"
 
     # Generate docs using elm-wrap (capture output and errors separately)
     local tmpdir
@@ -136,7 +151,7 @@ process_package() {
         fi
         GENERATE_FAIL_COUNT=$((GENERATE_FAIL_COUNT + 1))
         rm -rf "$tmpdir"
-        return
+        return 0
     fi
     
     # Run jq to format the output
@@ -152,14 +167,38 @@ process_package() {
         GENERATE_FAIL_COUNT=$((GENERATE_FAIL_COUNT + 1))
         rm -f "$output_file"
         rm -rf "$tmpdir"
-        return
+        return 0
     fi
     
     GENERATED_COUNT=$((GENERATED_COUNT + 1))
     rm -rf "$tmpdir"
+
+    # Compare with original
+    if [ ! -f "$original_file" ]; then
+        MISSING_ORIGINAL=$((MISSING_ORIGINAL + 1))
+        return 0
+    fi
+
+    # Convert flat name back to author/package/version format for display
+    local package_path="${flat_name//_//}"
+
+    if diff -q "$original_file" "$output_file" > /dev/null 2>&1; then
+        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    else
+        log_err "[different] $package_path"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        
+        # Check if we should stop early
+        if [ -n "$STOP_AFTER" ] && [ "$FAIL_COUNT" -ge "$STOP_AFTER" ]; then
+            return 1
+        fi
+    fi
+    
+    return 0
 }
 
-# Phase 1: Generate docs
+# Process packages
+STOPPED_EARLY=0
 if [ -n "$SINGLE_PACKAGE" ]; then
     # Single package mode
     package_dir="$REPOSITORY_DIR/$SINGLE_PACKAGE"
@@ -168,81 +207,27 @@ if [ -n "$SINGLE_PACKAGE" ]; then
         exit 1
     fi
     process_package "$package_dir"
+    result=$?
+    
+    # For single package mode, also show view-diff on failure
+    if [ $GENERATE_FAIL_COUNT -gt 0 ] || [ $FAIL_COUNT -gt 0 ]; then
+        "$SCRIPT_DIR/view-diff" "$REPOSITORY_DIR" "$TARGET_DIR" "$SINGLE_PACKAGE"
+        exit 100
+    elif [ $SUCCESS_COUNT -gt 0 ]; then
+        log "SUCCESS: $SINGLE_PACKAGE"
+        exit 0
+    fi
 else
     # All packages mode
     while IFS= read -r -d '' elm_json_path; do
         package_dir="$(dirname "$elm_json_path")"
         process_package "$package_dir"
+        result=$?
+        if [ $result -ne 0 ]; then
+            STOPPED_EARLY=1
+            break
+        fi
     done < <(find "$REPOSITORY_DIR" -name "elm.json" -type f -print0 | sort -z)
-fi
-
-GENERATE_END_TIME=$(date +%s)
-GENERATE_DURATION=$((GENERATE_END_TIME - START_TIME))
-
-log ""
-log "Phase 1 complete: Generated $GENERATED_COUNT docs in ${GENERATE_DURATION}s (${GENERATE_FAIL_COUNT} failures)"
-log ""
-
-# Phase 2: Compare generated docs with originals
-log "Phase 2: Comparing documentation..."
-
-SUCCESS_COUNT=0
-FAIL_COUNT=0
-MISSING_ORIGINAL=0
-
-# Compare docs
-if [ -n "$SINGLE_PACKAGE" ]; then
-    # Single package mode - compare just the one file
-    flat_name="${SINGLE_PACKAGE//\//_}"
-    generated_file="$TARGET_DIR/${flat_name}_docs.generated.json"
-    original_file="$TARGET_DIR/${flat_name}_docs.json"
-    
-    if [ ! -f "$generated_file" ]; then
-        log_err "Generated docs not found: $generated_file"
-        "$SCRIPT_DIR/view-diff" "$REPOSITORY_DIR" "$TARGET_DIR" "$SINGLE_PACKAGE"
-        exit 100
-    elif [ ! -f "$original_file" ]; then
-        log_err "Original docs not found: $original_file"
-        "$SCRIPT_DIR/view-diff" "$REPOSITORY_DIR" "$TARGET_DIR" "$SINGLE_PACKAGE"
-        exit 100
-    else
-        if diff -q "$original_file" "$generated_file" > /dev/null 2>&1; then
-            log "SUCCESS: $SINGLE_PACKAGE"
-            exit 0
-        else
-            log_err "[different] $SINGLE_PACKAGE"
-            "$SCRIPT_DIR/view-diff" "$REPOSITORY_DIR" "$TARGET_DIR" "$SINGLE_PACKAGE"
-            exit 100
-        fi
-    fi
-else
-    # All packages mode - find all generated docs and compare with originals
-    for generated_file in "$TARGET_DIR"/*_docs.generated.json; do
-        [ -f "$generated_file" ] || continue
-        
-        # Extract the base name (without _docs.generated.json)
-        base_name="$(basename "$generated_file" _docs.generated.json)"
-        original_file="$TARGET_DIR/${base_name}_docs.json"
-        
-        # Check if original exists
-        if [ ! -f "$original_file" ]; then
-            MISSING_ORIGINAL=$((MISSING_ORIGINAL + 1))
-            continue
-        fi
-    
-        # Convert flat name back to author/package/version format
-        # The flat name is like: author_package_version
-        # We need to convert underscores back to slashes
-        package_path="${base_name//_//}"
-        
-        # Compare the files
-        if diff -q "$original_file" "$generated_file" > /dev/null 2>&1; then
-            SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-        else
-            log_err "[different] $package_path"
-            FAIL_COUNT=$((FAIL_COUNT + 1))
-        fi
-    done
 fi
 
 END_TIME=$(date +%s)
@@ -250,10 +235,13 @@ TOTAL_DURATION=$((END_TIME - START_TIME))
 TOTAL_COMPARED=$((SUCCESS_COUNT + FAIL_COUNT))
 
 log ""
-log "Phase 2 complete."
-log ""
+if [ $STOPPED_EARLY -eq 1 ]; then
+    log "Stopped early after $STOP_AFTER failed comparison(s)"
+    log ""
+fi
 log "=== Summary ==="
 log "Total packages processed: $GENERATED_COUNT"
+log "Generation failures: $GENERATE_FAIL_COUNT"
 log "Total packages compared: $TOTAL_COMPARED"
 log "Successes: $SUCCESS_COUNT"
 log "Failures: $FAIL_COUNT"
