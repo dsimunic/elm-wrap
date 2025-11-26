@@ -1497,6 +1497,7 @@ static bool extract_type_alias(TSNode node, const char *source_code, ElmAlias *a
     char *type_expr = NULL;
     char **args = NULL;
     int args_count = 0;
+    int args_capacity = 0;
 
     uint32_t child_count = ts_node_child_count(node);
     for (uint32_t i = 0; i < child_count; i++) {
@@ -1507,8 +1508,9 @@ static bool extract_type_alias(TSNode node, const char *source_code, ElmAlias *a
             alias_name = get_node_text(child, source_code);
         } else if (strcmp(child_type, "lower_type_name") == 0) {
             /* Type parameter */
-            if (args_count == 0) {
-                args = arena_malloc(8 * sizeof(char*));
+            if (args_count >= args_capacity) {
+                args_capacity = args_capacity == 0 ? 8 : args_capacity * 2;
+                args = arena_realloc(args, args_capacity * sizeof(char*));
             }
             args[args_count++] = get_node_text(child, source_code);
         } else if (strcmp(child_type, "type_expression") == 0) {
@@ -1543,6 +1545,7 @@ static bool extract_union_type(TSNode node, const char *source_code, ElmUnion *u
     char *type_name = NULL;
     char **args = NULL;
     int args_count = 0;
+    int args_capacity = 0;
 
     uint32_t child_count = ts_node_child_count(node);
     for (uint32_t i = 0; i < child_count; i++) {
@@ -1553,8 +1556,9 @@ static bool extract_union_type(TSNode node, const char *source_code, ElmUnion *u
             type_name = get_node_text(child, source_code);
         } else if (strcmp(child_type, "lower_type_name") == 0) {
             /* Type parameter */
-            if (args_count == 0) {
-                args = arena_malloc(8 * sizeof(char*));
+            if (args_count >= args_capacity) {
+                args_capacity = args_capacity == 0 ? 8 : args_capacity * 2;
+                args = arena_realloc(args, args_capacity * sizeof(char*));
             }
             args[args_count++] = get_node_text(child, source_code);
         } else if (strcmp(child_type, "union_variant") == 0) {
