@@ -178,6 +178,12 @@ static CachedModuleExports *parse_module_exports(const char *module_path, const 
     exports->exported_types_count = 0;
     exports->parsed = true;
 
+    /* Allocate array for exported types */
+    int capacity = 16;
+    exports->exported_types = arena_malloc(capacity * sizeof(char*));
+    
+    bool expose_all = false;
+
     /* Find module_declaration node */
     uint32_t child_count = ts_node_child_count(root_node);
     for (uint32_t i = 0; i < child_count; i++) {
@@ -195,15 +201,14 @@ static CachedModuleExports *parse_module_exports(const char *module_path, const 
                     /* Parse exposing list */
                     uint32_t exp_child_count = ts_node_child_count(mod_child);
 
-                    /* Allocate array for exported types */
-                    int capacity = 16;
-                    exports->exported_types = arena_malloc(capacity * sizeof(char*));
-
                     for (uint32_t k = 0; k < exp_child_count; k++) {
                         TSNode exp_child = ts_node_child(mod_child, k);
                         const char *exp_type = ts_node_type(exp_child);
 
-                        if (strcmp(exp_type, "exposed_type") == 0) {
+                        if (strcmp(exp_type, "double_dot") == 0) {
+                            /* Module exposes everything - need to scan for all type definitions */
+                            expose_all = true;
+                        } else if (strcmp(exp_type, "exposed_type") == 0) {
                             /* Extract type name */
                             uint32_t type_child_count = ts_node_child_count(exp_child);
                             for (uint32_t m = 0; m < type_child_count; m++) {
@@ -226,6 +231,34 @@ static CachedModuleExports *parse_module_exports(const char *module_path, const 
                 }
             }
             break;
+        }
+    }
+    
+    /* If module exposes all, scan the file for type definitions */
+    if (expose_all) {
+        for (uint32_t i = 0; i < child_count; i++) {
+            TSNode child = ts_node_child(root_node, i);
+            const char *type = ts_node_type(child);
+            
+            if (strcmp(type, "type_declaration") == 0 || strcmp(type, "type_alias_declaration") == 0) {
+                /* Find the type name (upper_case_identifier) */
+                uint32_t type_child_count = ts_node_child_count(child);
+                for (uint32_t j = 0; j < type_child_count; j++) {
+                    TSNode type_child = ts_node_child(child, j);
+                    if (strcmp(ts_node_type(type_child), "upper_case_identifier") == 0) {
+                        char *type_name = get_node_text(type_child, source_code);
+                        
+                        /* Expand array if needed */
+                        if (exports->exported_types_count >= capacity) {
+                            capacity *= 2;
+                            exports->exported_types = arena_realloc(exports->exported_types, capacity * sizeof(char*));
+                        }
+                        
+                        exports->exported_types[exports->exported_types_count++] = type_name;
+                        break;
+                    }
+                }
+            }
         }
     }
 

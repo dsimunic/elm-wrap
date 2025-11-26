@@ -116,6 +116,20 @@ typedef struct {
     int aliases_capacity;
 } ModuleAliasMap;
 
+/* Type alias tracking for expansion */
+typedef struct {
+    char *type_name;       /* The type name (e.g., "Decoder") */
+    char **type_vars;      /* Type variables (e.g., ["a"]) */
+    int type_vars_count;
+    char *expansion;       /* The expansion (e.g., "Context -> Edn -> Result String a") */
+} TypeAliasExpansion;
+
+typedef struct {
+    TypeAliasExpansion *aliases;
+    int aliases_count;
+    int aliases_capacity;
+} TypeAliasMap;
+
 /* Export list tracking */
 typedef struct {
     char **exposed_values;
@@ -190,6 +204,46 @@ static void free_module_alias_map(ModuleAliasMap *map) {
     for (int i = 0; i < map->aliases_count; i++) {
         arena_free(map->aliases[i].alias);
         arena_free(map->aliases[i].full_module);
+    }
+    arena_free(map->aliases);
+}
+
+/* Type alias map functions */
+static void init_type_alias_map(TypeAliasMap *map) {
+    map->aliases = arena_malloc(16 * sizeof(TypeAliasExpansion));
+    map->aliases_count = 0;
+    map->aliases_capacity = 16;
+}
+
+static void add_type_alias(TypeAliasMap *map, const char *type_name, char **type_vars, int type_vars_count, const char *expansion) {
+    if (map->aliases_count >= map->aliases_capacity) {
+        map->aliases_capacity *= 2;
+        map->aliases = arena_realloc(map->aliases, map->aliases_capacity * sizeof(TypeAliasExpansion));
+    }
+    map->aliases[map->aliases_count].type_name = arena_strdup(type_name);
+    map->aliases[map->aliases_count].type_vars = type_vars;
+    map->aliases[map->aliases_count].type_vars_count = type_vars_count;
+    map->aliases[map->aliases_count].expansion = arena_strdup(expansion);
+    map->aliases_count++;
+}
+
+static const TypeAliasExpansion *lookup_type_alias(TypeAliasMap *map, const char *type_name) {
+    for (int i = 0; i < map->aliases_count; i++) {
+        if (strcmp(map->aliases[i].type_name, type_name) == 0) {
+            return &map->aliases[i];
+        }
+    }
+    return NULL;
+}
+
+static void free_type_alias_map(TypeAliasMap *map) {
+    for (int i = 0; i < map->aliases_count; i++) {
+        arena_free(map->aliases[i].type_name);
+        for (int j = 0; j < map->aliases[i].type_vars_count; j++) {
+            arena_free(map->aliases[i].type_vars[j]);
+        }
+        arena_free(map->aliases[i].type_vars);
+        arena_free(map->aliases[i].expansion);
     }
     arena_free(map->aliases);
 }
@@ -320,6 +374,9 @@ static char *extract_module_info(TSNode root, const char *source_code, ExportLis
     return module_name ? module_name : arena_strdup("Unknown");
 }
 
+/* Forward declaration */
+static void apply_wellknown_module_exports(ImportMap *import_map, const char *module_name);
+
 /* Helper function to parse imports */
 static void extract_imports(TSNode root, const char *source_code, ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports, DependencyCache *dep_cache) {
     uint32_t child_count = ts_node_child_count(root);
@@ -376,14 +433,20 @@ static void extract_imports(TSNode root, const char *source_code, ImportMap *imp
 
                         if (strcmp(exp_type, "double_dot") == 0) {
                             /* import ModuleName exposing (..) - need to get all exports */
+                            bool found_exports = false;
                             if (dep_cache) {
                                 CachedModuleExports *exports = dependency_cache_get_exports(dep_cache, module_name);
-                                if (exports && exports->parsed) {
+                                if (exports && exports->parsed && exports->exported_types_count > 0) {
                                     /* Add all exported types to the import map */
                                     for (int t = 0; t < exports->exported_types_count; t++) {
                                         add_import(import_map, exports->exported_types[t], module_name);
                                     }
+                                    found_exports = true;
                                 }
+                            }
+                            /* Fallback to well-known module exports if dependency cache failed */
+                            if (!found_exports) {
+                                apply_wellknown_module_exports(import_map, module_name);
                             }
                         } else if (strcmp(exp_type, "exposed_type") == 0) {
                             /* Extract type name */
@@ -422,6 +485,90 @@ static void extract_imports(TSNode root, const char *source_code, ImportMap *imp
             }
         }
     }
+}
+
+/* Placeholder for well-known module exports fallback - currently disabled for testing */
+static void apply_wellknown_module_exports(ImportMap *import_map, const char *module_name) {
+    (void)import_map;
+    (void)module_name;
+    /* Fallback disabled - relying on dependency cache to parse module sources */
+}
+
+/* Apply Elm's implicit imports
+ * Elm implicitly imports the following from elm/core:
+ *   import Basics exposing (..)
+ *   import List exposing (List, (::))
+ *   import Maybe exposing (Maybe(..))
+ *   import Result exposing (Result(..))
+ *   import String exposing (String)
+ *   import Char exposing (Char)
+ *   import Tuple
+ *   import Debug
+ *   import Platform exposing (Program)
+ *   import Platform.Cmd as Cmd exposing (Cmd)
+ *   import Platform.Sub as Sub exposing (Sub)
+ * 
+ * We set up direct imports and aliases here; actual type exports are resolved
+ * via dependency cache when processing explicit imports or via this function
+ * for implicitly exposed types.
+ */
+static void apply_implicit_imports(ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports, DependencyCache *dep_cache) {
+    /* Set up direct imports for all implicit modules */
+    add_direct_import(direct_imports, "Basics");
+    add_direct_import(direct_imports, "List");
+    add_direct_import(direct_imports, "Maybe");
+    add_direct_import(direct_imports, "Result");
+    add_direct_import(direct_imports, "String");
+    add_direct_import(direct_imports, "Char");
+    add_direct_import(direct_imports, "Tuple");
+    add_direct_import(direct_imports, "Debug");
+    add_direct_import(direct_imports, "Platform");
+    add_direct_import(direct_imports, "Platform.Cmd");
+    add_direct_import(direct_imports, "Platform.Sub");
+    
+    /* Set up module aliases */
+    add_module_alias(alias_map, "Cmd", "Platform.Cmd");
+    add_module_alias(alias_map, "Sub", "Platform.Sub");
+    
+    /* Now resolve the exposed types via dependency cache */
+    
+    /* Basics exposing (..) */
+    if (dep_cache) {
+        CachedModuleExports *basics = dependency_cache_get_exports(dep_cache, "Basics");
+        if (basics && basics->parsed && basics->exported_types_count > 0) {
+            for (int i = 0; i < basics->exported_types_count; i++) {
+                add_import(import_map, basics->exported_types[i], "Basics");
+            }
+        }
+    }
+    
+    /* List exposing (List, (::)) - just List type */
+    add_import(import_map, "List", "List");
+    
+    /* Maybe exposing (Maybe(..)) */
+    add_import(import_map, "Maybe", "Maybe");
+    add_import(import_map, "Just", "Maybe");
+    add_import(import_map, "Nothing", "Maybe");
+    
+    /* Result exposing (Result(..)) */
+    add_import(import_map, "Result", "Result");
+    add_import(import_map, "Ok", "Result");
+    add_import(import_map, "Err", "Result");
+    
+    /* String exposing (String) */
+    add_import(import_map, "String", "String");
+    
+    /* Char exposing (Char) */
+    add_import(import_map, "Char", "Char");
+    
+    /* Platform exposing (Program) */
+    add_import(import_map, "Program", "Platform");
+    
+    /* Platform.Cmd as Cmd exposing (Cmd) */
+    add_import(import_map, "Cmd", "Platform.Cmd");
+    
+    /* Platform.Sub as Sub exposing (Sub) */
+    add_import(import_map, "Sub", "Platform.Sub");
 }
 
 /* Helper function to clean documentation comment */
@@ -523,6 +670,268 @@ static char *normalize_whitespace(const char *str) {
     return final;
 }
 
+/* Forward declarations */
+static int count_type_arrows(const char *type_str);
+
+/* Helper function to parse a single type argument from a string
+ * Returns the end position of the argument, or NULL if no valid argument found
+ * Handles: simple identifiers, qualified types, parenthesized types, record types, tuple types */
+static const char *parse_type_arg(const char *start, char *out_arg, size_t out_size) {
+    const char *p = start;
+    
+    /* Skip leading whitespace */
+    while (*p == ' ') p++;
+    
+    if (!*p) return NULL;
+    
+    const char *arg_start = p;
+    const char *arg_end = p;
+    int depth = 0;
+    
+    if (*p == '(') {
+        /* Parenthesized type or tuple */
+        depth = 1;
+        arg_end++;
+        while (*arg_end && depth > 0) {
+            if (*arg_end == '(') depth++;
+            else if (*arg_end == ')') depth--;
+            arg_end++;
+        }
+    } else if (*p == '{') {
+        /* Record type */
+        depth = 1;
+        arg_end++;
+        while (*arg_end && depth > 0) {
+            if (*arg_end == '{') depth++;
+            else if (*arg_end == '}') depth--;
+            arg_end++;
+        }
+    } else if ((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z')) {
+        /* Type name, qualified type, or type variable */
+        while (*arg_end && ((*arg_end >= 'A' && *arg_end <= 'Z') ||
+                           (*arg_end >= 'a' && *arg_end <= 'z') ||
+                           (*arg_end >= '0' && *arg_end <= '9') ||
+                           *arg_end == '_' || *arg_end == '.')) {
+            arg_end++;
+        }
+        /* Check if this type has type arguments itself (e.g., "List Int") */
+        /* Only consume simple type names here; nested type applications are parenthesized */
+    } else {
+        return NULL;  /* Not a valid type start */
+    }
+    
+    size_t arg_len = arg_end - arg_start;
+    if (arg_len == 0 || arg_len >= out_size) return NULL;
+    
+    memcpy(out_arg, arg_start, arg_len);
+    out_arg[arg_len] = '\0';
+    
+    return arg_end;
+}
+
+/* Helper function to substitute type variables with type arguments in an expansion string */
+static char *substitute_type_vars(const char *expansion, char **type_vars, int type_vars_count,
+                                   char **type_args, int type_args_count) {
+    if (type_vars_count == 0 || type_args_count == 0) {
+        return arena_strdup(expansion);
+    }
+    
+    /* Use the minimum count to avoid out-of-bounds access */
+    int subst_count = type_vars_count < type_args_count ? type_vars_count : type_args_count;
+    
+    /* Calculate maximum possible size */
+    size_t max_arg_len = 0;
+    for (int i = 0; i < type_args_count; i++) {
+        size_t len = strlen(type_args[i]);
+        if (len > max_arg_len) max_arg_len = len;
+    }
+    
+    size_t new_size = strlen(expansion) * 2 + max_arg_len * 20 + 1024;
+    char *result = arena_malloc(new_size);
+    size_t pos = 0;
+    const char *p = expansion;
+    
+    while (*p && pos < new_size - max_arg_len - 10) {
+        /* Check if this is an identifier (potential type variable) */
+        if ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z')) {
+            const char *id_start = p;
+            while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+                   (*p >= '0' && *p <= '9') || *p == '_') {
+                p++;
+            }
+            size_t id_len = p - id_start;
+            
+            /* Check if this identifier matches any type variable */
+            bool substituted = false;
+            for (int i = 0; i < subst_count; i++) {
+                size_t var_len = strlen(type_vars[i]);
+                if (id_len == var_len && memcmp(id_start, type_vars[i], var_len) == 0) {
+                    /* Substitute with the corresponding type argument */
+                    size_t arg_len = strlen(type_args[i]);
+                    memcpy(result + pos, type_args[i], arg_len);
+                    pos += arg_len;
+                    substituted = true;
+                    break;
+                }
+            }
+            
+            if (!substituted) {
+                /* Not a type variable - copy as-is */
+                memcpy(result + pos, id_start, id_len);
+                pos += id_len;
+            }
+        } else {
+            result[pos++] = *p++;
+        }
+    }
+    
+    result[pos] = '\0';
+    return result;
+}
+
+/* Helper function to check if a string contains a function arrow */
+static bool contains_function_arrow(const char *str) {
+    /* Look for " -> " pattern (with spaces) */
+    const char *p = str;
+    while (*p && *(p + 1)) {  /* Ensure we have at least 2 chars ahead */
+        if (*p == '-' && *(p + 1) == '>' &&
+            (p > str && *(p - 1) == ' ') &&
+            *(p + 2) && *(p + 2) == ' ') {  /* Check *(p + 2) exists before dereferencing */
+            return true;
+        }
+        p++;
+    }
+    return false;
+}
+
+/* Helper function to expand type aliases that are function types
+ * Only expands the final return type, not parameter types
+ * Only expands if implementation has more params than type arrows suggest */
+static char *expand_function_type_aliases(const char *type_str, TypeAliasMap *type_alias_map, int implementation_param_count) {
+    if (!type_str || !type_alias_map) {
+        return arena_strdup(type_str ? type_str : "");
+    }
+
+    /* Count arrows in the type to determine expected parameter count */
+    int arrow_count = count_type_arrows(type_str);
+
+    /* Only expand if implementation has more parameters than the type suggests */
+    /* This means the return type alias is being "called" with the extra parameters */
+    if (implementation_param_count <= arrow_count) {
+        return arena_strdup(type_str);
+    }
+
+    /* Find the last occurrence of " -> " (function arrow) */
+    const char *last_arrow = NULL;
+    const char *p = type_str;
+    int paren_depth = 0;
+
+    while (*p) {
+        if (*p == '(') {
+            paren_depth++;
+        } else if (*p == ')') {
+            paren_depth--;
+        } else if (paren_depth == 0 && *p == '-' && *(p + 1) == '>' &&
+                   (p > type_str && *(p - 1) == ' ') && *(p + 2) == ' ') {
+            last_arrow = p;
+        }
+        p++;
+    }
+
+    /* If there's no arrow, expand the entire type */
+    /* If there's an arrow, only expand the part after the last arrow */
+    const char *expand_start = last_arrow ? last_arrow + 3 : type_str;  /* Skip " -> " */
+    while (*expand_start == ' ') expand_start++;  /* Skip leading spaces */
+
+    /* Extract the return type */
+    size_t prefix_len = expand_start - type_str;
+
+    /* Check if the return type is a type alias */
+    const char *return_type_start = expand_start;
+    const char *rt = return_type_start;
+
+    /* Skip to the first uppercase letter (start of type name) */
+    while (*rt && !((*rt >= 'A' && *rt <= 'Z'))) {
+        rt++;
+    }
+
+    if (*rt >= 'A' && *rt <= 'Z') {
+        /* Extract the type name */
+        const char *type_name_start = rt;
+        while ((*rt >= 'A' && *rt <= 'Z') || (*rt >= 'a' && *rt <= 'z') ||
+               (*rt >= '0' && *rt <= '9') || *rt == '_' || *rt == '.') {
+            rt++;
+        }
+
+        size_t type_name_len = rt - type_name_start;
+        char type_name[256];
+        if (type_name_len < sizeof(type_name)) {
+            memcpy(type_name, type_name_start, type_name_len);
+            type_name[type_name_len] = '\0';
+
+            /* Skip module qualifiers - only look at the last part */
+            char *last_dot = strrchr(type_name, '.');
+            const char *simple_name = last_dot ? last_dot + 1 : type_name;
+
+            /* Look up the type alias */
+            const TypeAliasExpansion *alias = lookup_type_alias(type_alias_map, simple_name);
+
+            if (alias && contains_function_arrow(alias->expansion)) {
+                /* This is a function type alias - expand it */
+
+                /* Parse type arguments from the return type if present */
+                /* For example: "Decoder Bool" -> type arg is "Bool" */
+                /*              "Result String Int" -> type args are "String", "Int" */
+                const char *type_args_pos = rt;
+                
+                /* Collect all type arguments */
+                char **type_args = arena_malloc(8 * sizeof(char*));
+                int type_args_count = 0;
+                int type_args_capacity = 8;
+                
+                while (*type_args_pos && type_args_count < alias->type_vars_count) {
+                    char arg_buf[512];
+                    const char *next_pos = parse_type_arg(type_args_pos, arg_buf, sizeof(arg_buf));
+                    if (!next_pos) break;
+                    
+                    if (type_args_count >= type_args_capacity) {
+                        type_args_capacity *= 2;
+                        type_args = arena_realloc(type_args, type_args_capacity * sizeof(char*));
+                    }
+                    type_args[type_args_count++] = arena_strdup(arg_buf);
+                    type_args_pos = next_pos;
+                }
+
+                /* Substitute type variables in the expansion */
+                char *expanded = substitute_type_vars(alias->expansion, alias->type_vars, 
+                                                       alias->type_vars_count, type_args, type_args_count);
+
+                /* Free type args */
+                for (int i = 0; i < type_args_count; i++) {
+                    arena_free(type_args[i]);
+                }
+                arena_free(type_args);
+
+                size_t buf_size = prefix_len + strlen(expanded) + 10;
+                char *result = arena_malloc(buf_size);
+
+                /* Copy the prefix (everything before the return type) */
+                memcpy(result, type_str, prefix_len);
+
+                /* Copy the expanded type */
+                strcpy(result + prefix_len, expanded);
+
+                arena_free(expanded);
+
+                return result;
+            }
+        }
+    }
+
+    /* No expansion needed - return a copy of the original */
+    return arena_strdup(type_str);
+}
+
 /* Helper function to qualify type names based on import map and local types */
 static char *qualify_type_names(const char *type_str, const char *module_name,
                                   ImportMap *import_map, ModuleAliasMap *alias_map,
@@ -606,68 +1015,15 @@ static char *qualify_type_names(const char *type_str, const char *module_name,
                             /* Qualify with current module */
                             pos += snprintf(result + pos, buf_size - pos, "%s.%s", module_name, typename);
                         } else {
-                            /* Check if it's imported */
+                            /* Check if it's imported (including implicit imports) */
                             const char *import_module = lookup_import(import_map, typename);
                             if (import_module) {
                                 /* Use the imported module name */
                                 pos += snprintf(result + pos, buf_size - pos, "%s.%s", import_module, typename);
                             } else {
-                                /* Unknown type - might be from Basics or core modules that aren't explicitly imported */
-                                /* Core types that need to be qualified */
-                                const char *qualified = NULL;
-                                if (strcmp(typename, "Task") == 0) {
-                                    qualified = "Task.Task";
-                                } else if (strcmp(typename, "Cmd") == 0) {
-                                    qualified = "Platform.Cmd.Cmd";
-                                } else if (strcmp(typename, "Sub") == 0) {
-                                    qualified = "Platform.Sub.Sub";
-                                } else if (strcmp(typename, "Maybe") == 0) {
-                                    qualified = "Maybe.Maybe";
-                                } else if (strcmp(typename, "List") == 0) {
-                                    qualified = "List.List";
-                                } else if (strcmp(typename, "Result") == 0) {
-                                    qualified = "Result.Result";
-                                } else if (strcmp(typename, "Dict") == 0) {
-                                    qualified = "Dict.Dict";
-                                } else if (strcmp(typename, "Set") == 0) {
-                                    qualified = "Set.Set";
-                                } else if (strcmp(typename, "Array") == 0) {
-                                    qualified = "Array.Array";
-                                } else if (strcmp(typename, "Never") == 0) {
-                                    qualified = "Basics.Never";
-                                } else if (strcmp(typename, "Int") == 0) {
-                                    qualified = "Basics.Int";
-                                } else if (strcmp(typename, "Float") == 0) {
-                                    qualified = "Basics.Float";
-                                } else if (strcmp(typename, "String") == 0) {
-                                    qualified = "String.String";
-                                } else if (strcmp(typename, "Bool") == 0) {
-                                    qualified = "Basics.Bool";
-                                } else if (strcmp(typename, "Order") == 0) {
-                                    qualified = "Basics.Order";
-                                } else if (strcmp(typename, "Char") == 0) {
-                                    qualified = "Char.Char";
-                                } else if (strcmp(typename, "Decoder") == 0) {
-                                    qualified = "Json.Decode.Decoder";
-                                } else if (strcmp(typename, "Encoder") == 0) {
-                                    qualified = "Json.Encode.Encoder";
-                                } else if (strcmp(typename, "Value") == 0) {
-                                    qualified = "Json.Encode.Value";
-                                } else if (strcmp(typename, "Html") == 0) {
-                                    qualified = "Html.Html";
-                                } else if (strcmp(typename, "Attribute") == 0) {
-                                    qualified = "Html.Attribute";
-                                }
-
-                                if (qualified) {
-                                    size_t qlen = strlen(qualified);
-                                    memcpy(result + pos, qualified, qlen);
-                                    pos += qlen;
-                                } else {
-                                    /* Keep as-is - might be a type variable */
-                                    memcpy(result + pos, start, len);
-                                    pos += len;
-                                }
+                                /* Unknown type - keep as-is (likely a type variable) */
+                                memcpy(result + pos, start, len);
+                                pos += len;
                             }
                         }
                     }
@@ -747,11 +1103,77 @@ static char *extract_text_skip_comments(TSNode node, const char *source_code) {
     return buffer;
 }
 
+/* Helper function to count function arrows in type string (excluding arrows inside parens) */
+static int count_type_arrows(const char *type_str) {
+    int arrow_count = 0;
+    int paren_depth = 0;
+    const char *p = type_str;
+
+    while (*p) {
+        if (*p == '(') {
+            paren_depth++;
+        } else if (*p == ')') {
+            paren_depth--;
+        } else if (paren_depth == 0 && *p == '-' && *(p + 1) == '>' &&
+                   (p > type_str && *(p - 1) == ' ') && *(p + 2) == ' ') {
+            arrow_count++;
+        }
+        p++;
+    }
+    return arrow_count;
+}
+
+/* Helper function to count implementation parameters */
+static int count_implementation_params(TSNode value_decl_node, const char *source_code) {
+    (void)source_code;
+    int param_count = 0;
+
+    /* Find function_declaration_left */
+    uint32_t child_count = ts_node_child_count(value_decl_node);
+    for (uint32_t i = 0; i < child_count; i++) {
+        TSNode child = ts_node_child(value_decl_node, i);
+        const char *child_type = ts_node_type(child);
+
+        if (strcmp(child_type, "function_declaration_left") == 0) {
+            /* Count children that are parameters (lower_pattern, pattern, etc.) */
+            /* Skip the first child which is the function name */
+            uint32_t func_child_count = ts_node_child_count(child);
+            bool found_func_name = false;
+            for (uint32_t j = 0; j < func_child_count; j++) {
+                TSNode func_child = ts_node_child(child, j);
+                const char *func_child_type = ts_node_type(func_child);
+
+                /* Skip the function name (first lower_case_identifier) */
+                if (!found_func_name && strcmp(func_child_type, "lower_case_identifier") == 0) {
+                    found_func_name = true;
+                    continue;
+                }
+
+                /* Count anything that looks like a parameter */
+                if (strcmp(func_child_type, "lower_pattern") == 0 ||
+                    strcmp(func_child_type, "pattern") == 0 ||
+                    strcmp(func_child_type, "lower_case_identifier") == 0 ||
+                    strcmp(func_child_type, "anything_pattern") == 0 ||
+                    strcmp(func_child_type, "tuple_pattern") == 0 ||
+                    strcmp(func_child_type, "list_pattern") == 0 ||
+                    strcmp(func_child_type, "record_pattern") == 0 ||
+                    strcmp(func_child_type, "union_pattern") == 0) {
+                    param_count++;
+                }
+            }
+            break;
+        }
+    }
+
+    return param_count;
+}
+
 /* Helper function to extract and canonicalize type expression */
 static char *extract_type_expression(TSNode type_node, const char *source_code, const char *module_name,
                                        ImportMap *import_map, ModuleAliasMap *alias_map,
                                        DirectModuleImports *direct_imports,
-                                       char **local_types, int local_types_count) {
+                                       char **local_types, int local_types_count,
+                                       TypeAliasMap *type_alias_map, int implementation_param_count) {
     if (ts_node_is_null(type_node)) {
         return arena_strdup("");
     }
@@ -763,9 +1185,13 @@ static char *extract_type_expression(TSNode type_node, const char *source_code, 
     char *normalized = normalize_whitespace(raw_text);
     arena_free(raw_text);
 
-    /* Qualify type names */
-    char *qualified = qualify_type_names(normalized, module_name, import_map, alias_map, direct_imports, local_types, local_types_count);
+    /* Expand function type aliases (only if we have implementation param count) */
+    char *expanded = expand_function_type_aliases(normalized, type_alias_map, implementation_param_count);
     arena_free(normalized);
+
+    /* Qualify type names */
+    char *qualified = qualify_type_names(expanded, module_name, import_map, alias_map, direct_imports, local_types, local_types_count);
+    arena_free(expanded);
 
     return qualified;
 }
@@ -773,7 +1199,7 @@ static char *extract_type_expression(TSNode type_node, const char *source_code, 
 /* Extract value declaration (function/constant) */
 static bool extract_value_decl(TSNode node, const char *source_code, ElmValue *value, const char *module_name,
                                  ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
-                                 char **local_types, int local_types_count) {
+                                 char **local_types, int local_types_count, TypeAliasMap *type_alias_map) {
     /* Find type_annotation sibling first */
     TSNode type_annotation = ts_node_prev_named_sibling(node);
     if (ts_node_is_null(type_annotation) ||
@@ -807,6 +1233,9 @@ static bool extract_value_decl(TSNode node, const char *source_code, ElmValue *v
         return false;
     }
 
+    /* Count implementation parameters */
+    int impl_param_count = count_implementation_params(node, source_code);
+
     /* Extract type from type_annotation */
     char *type_str = NULL;
     uint32_t ann_child_count = ts_node_child_count(type_annotation);
@@ -815,7 +1244,7 @@ static bool extract_value_decl(TSNode node, const char *source_code, ElmValue *v
         const char *child_type = ts_node_type(child);
 
         if (strcmp(child_type, "type_expression") == 0) {
-            type_str = extract_type_expression(child, source_code, module_name, import_map, alias_map, direct_imports, local_types, local_types_count);
+            type_str = extract_type_expression(child, source_code, module_name, import_map, alias_map, direct_imports, local_types, local_types_count, type_alias_map, impl_param_count);
             break;
         }
     }
@@ -838,7 +1267,8 @@ static bool extract_value_decl(TSNode node, const char *source_code, ElmValue *v
 /* Extract type alias */
 static bool extract_type_alias(TSNode node, const char *source_code, ElmAlias *alias, const char *module_name,
                                  ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
-                                 char **local_types, int local_types_count) {
+                                 char **local_types, int local_types_count, TypeAliasMap *type_alias_map) {
+    (void)type_alias_map;  /* Not used - avoid circular expansion when extracting alias definitions */
     char *alias_name = NULL;
     char *type_expr = NULL;
     char **args = NULL;
@@ -858,7 +1288,8 @@ static bool extract_type_alias(TSNode node, const char *source_code, ElmAlias *a
             }
             args[args_count++] = get_node_text(child, source_code);
         } else if (strcmp(child_type, "type_expression") == 0) {
-            type_expr = extract_type_expression(child, source_code, module_name, import_map, alias_map, direct_imports, local_types, local_types_count);
+            /* Don't expand aliases when extracting alias definitions to avoid circular expansion */
+            type_expr = extract_type_expression(child, source_code, module_name, import_map, alias_map, direct_imports, local_types, local_types_count, NULL, 0);
         }
     }
 
@@ -884,7 +1315,7 @@ static bool extract_type_alias(TSNode node, const char *source_code, ElmAlias *a
 /* Extract union type */
 static bool extract_union_type(TSNode node, const char *source_code, ElmUnion *union_type, const char *module_name,
                                  ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
-                                 char **local_types, int local_types_count) {
+                                 char **local_types, int local_types_count, TypeAliasMap *type_alias_map) {
     char *type_name = NULL;
     char **args = NULL;
     int args_count = 0;
@@ -957,7 +1388,7 @@ static bool extract_union_type(TSNode node, const char *source_code, ElmUnion *u
                         arg_types = arena_malloc(8 * sizeof(char*));
                     }
                     arg_types[arg_types_count++] = extract_type_expression(variant_child, source_code, module_name,
-                                                                             import_map, alias_map, direct_imports, local_types, local_types_count);
+                                                                             import_map, alias_map, direct_imports, local_types, local_types_count, type_alias_map, 0);
                 }
             }
 
@@ -1031,6 +1462,11 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
     init_module_alias_map(&alias_map);
     DirectModuleImports direct_imports;
     init_direct_imports(&direct_imports);
+    
+    /* Apply Elm's implicit imports first (lowest priority) */
+    apply_implicit_imports(&import_map, &alias_map, &direct_imports, dep_cache);
+    
+    /* Then parse explicit imports (will override implicit ones if there's a conflict) */
     extract_imports(root_node, source_code, &import_map, &alias_map, &direct_imports, dep_cache);
 
     /* Extract module-level comment (comes AFTER module declaration) */
@@ -1067,10 +1503,13 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
     docs->aliases_count = 0;
     docs->unions_count = 0;
 
-    /* First pass: collect local type names */
+    /* First pass: collect local type names and build type alias map */
     int local_types_capacity = 16;
     int local_types_count = 0;
     char **local_types = arena_malloc(local_types_capacity * sizeof(char*));
+
+    TypeAliasMap type_alias_map;
+    init_type_alias_map(&type_alias_map);
 
     for (uint32_t i = 0; i < child_count; i++) {
         TSNode child = ts_node_child(root_node, i);
@@ -1092,6 +1531,44 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
                 }
             }
         }
+
+        /* Build type alias map for function type aliases */
+        if (strcmp(type, "type_alias_declaration") == 0) {
+            char *alias_name = NULL;
+            char **type_vars = arena_malloc(8 * sizeof(char*));
+            int type_vars_count = 0;
+            char *expansion = NULL;
+
+            uint32_t type_child_count = ts_node_child_count(child);
+            for (uint32_t j = 0; j < type_child_count; j++) {
+                TSNode type_child = ts_node_child(child, j);
+                const char *child_type = ts_node_type(type_child);
+
+                if (strcmp(child_type, "upper_case_identifier") == 0 && !alias_name) {
+                    alias_name = get_node_text(type_child, source_code);
+                } else if (strcmp(child_type, "lower_type_name") == 0) {
+                    type_vars[type_vars_count++] = get_node_text(type_child, source_code);
+                } else if (strcmp(child_type, "type_expression") == 0) {
+                    /* Extract raw expansion without qualification */
+                    char *raw_text = extract_text_skip_comments(type_child, source_code);
+                    expansion = normalize_whitespace(raw_text);
+                    arena_free(raw_text);
+                }
+            }
+
+            if (alias_name && expansion) {
+                add_type_alias(&type_alias_map, alias_name, type_vars, type_vars_count, expansion);
+                arena_free(alias_name);
+                arena_free(expansion);
+            } else {
+                if (alias_name) arena_free(alias_name);
+                if (expansion) arena_free(expansion);
+                for (int k = 0; k < type_vars_count; k++) {
+                    arena_free(type_vars[k]);
+                }
+                arena_free(type_vars);
+            }
+        }
     }
 
     /* Second pass: Walk the tree to extract declarations */
@@ -1102,7 +1579,7 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
         if (strcmp(type, "value_declaration") == 0) {
             /* Found a function/value declaration */
             ElmValue value;
-            if (extract_value_decl(child, source_code, &value, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count)) {
+            if (extract_value_decl(child, source_code, &value, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count, &type_alias_map)) {
                 /* Only include if exported */
                 if (is_exported_value(value.name, &exports)) {
                     if (docs->values_count >= values_capacity) {
@@ -1120,7 +1597,7 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
         } else if (strcmp(type, "type_alias_declaration") == 0) {
             /* Found a type alias */
             ElmAlias alias;
-            if (extract_type_alias(child, source_code, &alias, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count)) {
+            if (extract_type_alias(child, source_code, &alias, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count, &type_alias_map)) {
                 /* Only include if exported */
                 if (is_exported_type(alias.name, &exports)) {
                     if (docs->aliases_count >= aliases_capacity) {
@@ -1142,7 +1619,7 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
         } else if (strcmp(type, "type_declaration") == 0) {
             /* Found a union type */
             ElmUnion union_type;
-            if (extract_union_type(child, source_code, &union_type, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count)) {
+            if (extract_union_type(child, source_code, &union_type, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count, &type_alias_map)) {
                 /* Only include if exported */
                 if (is_exported_type(union_type.name, &exports)) {
                     /* Check if constructors should be exposed */
@@ -1192,10 +1669,11 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
     }
     arena_free(local_types);
 
-    /* Clean up import map, alias map, and direct imports */
+    /* Clean up import map, alias map, direct imports, and type alias map */
     free_import_map(&import_map);
     free_module_alias_map(&alias_map);
     free_direct_imports(&direct_imports);
+    free_type_alias_map(&type_alias_map);
 
     /* Sort declarations alphabetically by name */
     /* Sort values */
