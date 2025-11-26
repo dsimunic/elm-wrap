@@ -37,4 +37,10 @@ bool remove_directory_recursive(const char *path);
  */
 bool copy_directory_recursive(const char *src_path, const char *dest_path);
 
+/* Selectively copy specific files from source directory to destination directory
+ * Only copies: elm.json, docs.json, LICENSE, README.md, and src/ directory
+ * Returns true on success, false on failure
+ */
+bool copy_directory_selective(const char *src_path, const char *dest_path);
+
 #endif /* FILEUTIL_H */

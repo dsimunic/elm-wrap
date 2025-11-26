@@ -39,6 +39,7 @@ void print_package_usage(const char *prog) {
     printf("Usage: %s package SUBCOMMAND [OPTIONS]\n", prog);
     printf("\nSubcommands:\n");
     printf("  install [<PACKAGE>]  Install packages for your Elm project\n");
+    printf("  cache [<PACKAGE>]    Download packages to cache without prompting\n");
     printf("  remove <PACKAGE>     Remove a package from your Elm project\n");
     printf("  upgrade [PACKAGE]    Upgrade packages to latest versions\n");
     printf("  check [elm.json]     Check for available package upgrades\n");
@@ -66,6 +67,11 @@ int cmd_package(int argc, char *argv[], const char *prog) {
     if (strcmp(subcmd, "install") == 0) {
         // Pass remaining args to install command
         return cmd_install(argc - 1, argv + 1);
+    }
+
+    if (strcmp(subcmd, "cache") == 0) {
+        // Pass remaining args to cache command
+        return cmd_cache(argc - 1, argv + 1);
     }
 
     if (strcmp(subcmd, "remove") == 0) {

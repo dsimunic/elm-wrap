@@ -6,6 +6,9 @@
 /* Install command entry point */
 int cmd_install(int argc, char *argv[]);
 
+/* Cache command entry point */
+int cmd_cache(int argc, char *argv[]);
+
 /* Remove command entry point */
 int cmd_remove(int argc, char *argv[]);
 

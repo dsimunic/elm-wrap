@@ -421,3 +421,91 @@ bool copy_directory_recursive(const char *src_path, const char *dest_path) {
 
     return success;
 }
+
+bool copy_directory_selective(const char *src_path, const char *dest_path) {
+    struct stat st;
+    if (stat(src_path, &st) != 0) {
+        return false;
+    }
+
+    if (!S_ISDIR(st.st_mode)) {
+        fprintf(stderr, "Error: Source path must be a directory: %s\n", src_path);
+        return false;
+    }
+
+    if (!ensure_directory(dest_path)) {
+        return false;
+    }
+
+    /* List of files to copy from the root directory */
+    const char *files_to_copy[] = {"elm.json", "docs.json", "LICENSE", "README.md", NULL};
+    bool success = true;
+
+    /* Copy individual files */
+    for (int i = 0; files_to_copy[i] != NULL; i++) {
+        char src_file[4096];
+        char dest_file[4096];
+        snprintf(src_file, sizeof(src_file), "%s/%s", src_path, files_to_copy[i]);
+        snprintf(dest_file, sizeof(dest_file), "%s/%s", dest_path, files_to_copy[i]);
+
+        /* Check if source file exists */
+        if (stat(src_file, &st) == 0 && !S_ISDIR(st.st_mode)) {
+            /* Copy the file */
+            FILE *src_fp = fopen(src_file, "rb");
+            if (!src_fp) {
+                /* File exists but can't be opened - treat as error */
+                fprintf(stderr, "Error: Failed to open %s for reading\n", src_file);
+                success = false;
+                continue;
+            }
+
+            FILE *dest_fp = fopen(dest_file, "wb");
+            if (!dest_fp) {
+                fclose(src_fp);
+                fprintf(stderr, "Error: Failed to open %s for writing\n", dest_file);
+                success = false;
+                continue;
+            }
+
+            char buffer[8192];
+            size_t n;
+            bool copy_success = true;
+            while ((n = fread(buffer, 1, sizeof(buffer), src_fp)) > 0) {
+                if (fwrite(buffer, 1, n, dest_fp) != n) {
+                    copy_success = false;
+                    break;
+                }
+            }
+
+            fclose(src_fp);
+            fclose(dest_fp);
+
+            if (!copy_success) {
+                fprintf(stderr, "Error: Failed to copy %s\n", files_to_copy[i]);
+                success = false;
+            } else {
+                /* Preserve permissions */
+                chmod(dest_file, st.st_mode);
+            }
+        }
+        /* If file doesn't exist, that's okay - not all files are required */
+    }
+
+    /* Copy src/ directory recursively */
+    char src_dir[4096];
+    char dest_dir[4096];
+    snprintf(src_dir, sizeof(src_dir), "%s/src", src_path);
+    snprintf(dest_dir, sizeof(dest_dir), "%s/src", dest_path);
+
+    if (stat(src_dir, &st) == 0 && S_ISDIR(st.st_mode)) {
+        if (!copy_directory_recursive(src_dir, dest_dir)) {
+            fprintf(stderr, "Error: Failed to copy src/ directory\n");
+            success = false;
+        }
+    } else {
+        fprintf(stderr, "Error: src/ directory not found in %s\n", src_path);
+        success = false;
+    }
+
+    return success;
+}
