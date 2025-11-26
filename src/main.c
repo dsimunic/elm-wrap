@@ -11,6 +11,7 @@
 #include "bump.h"
 #include "diff.h"
 #include "publish.h"
+#include "config.h"
 #include "alloc.h"
 #include "log.h"
 #include "progname.h"
@@ -26,6 +27,7 @@ void print_usage(const char *prog) {
     printf("  bump               Bump version based on API changes\n");
     printf("  diff [VERSION]     Show API differences between versions\n");
     printf("\n");
+    printf("  config             Display current configuration\n");
     printf("  publish SUBCOMMAND Publishing commands\n");
     printf("  package SUBCOMMAND Package management commands\n");
     printf("\nOptions:\n");
@@ -184,6 +186,10 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "publish") == 0) {
             return cmd_publish(argc - 1, argv + 1);
+        }
+
+        if (strcmp(argv[1], "config") == 0) {
+            return cmd_config(argc - 1, argv + 1);
         }
 
         // Unknown command

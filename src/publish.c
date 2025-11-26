@@ -4,6 +4,7 @@
 #include "cache.h"
 #include "install_env.h"
 #include "registry.h"
+#include "elm_compiler.h"
 #include "alloc.h"
 #include "log.h"
 #include "progname.h"
@@ -13,11 +14,6 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <limits.h>
-
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
 
 #define ELM_JSON_PATH "elm.json"
 
@@ -41,51 +37,6 @@ static void print_publish_package_usage(void) {
     printf("before calling 'elm publish'.\n");
     printf("\n");
     printf("All options are passed through to 'elm publish'.\n");
-}
-
-// Search for elm binary in PATH
-// Returns NULL if not found
-static char *find_elm_binary(void) {
-    const char *path_env = getenv("PATH");
-    if (!path_env) {
-        return NULL;
-    }
-
-    // Make a copy of PATH since strtok modifies the string
-    char *path_copy = arena_strdup(path_env);
-    if (!path_copy) {
-        return NULL;
-    }
-
-    char *dir = strtok(path_copy, ":");
-    while (dir != NULL) {
-        char *candidate = arena_malloc(PATH_MAX);
-        if (!candidate) {
-            return NULL;
-        }
-
-        snprintf(candidate, PATH_MAX, "%s/elm", dir);
-
-        // Check if file exists and is executable
-        struct stat st;
-        if (stat(candidate, &st) == 0 && (st.st_mode & S_IXUSR)) {
-            return candidate;
-        }
-
-        dir = strtok(NULL, ":");
-    }
-
-    return NULL;
-}
-
-// Get the elm compiler path from environment variable or search PATH
-static char *get_elm_compiler_path(void) {
-    const char *compiler_path = getenv("ELM_WRAP_ELM_COMPILER_PATH");
-    if (compiler_path) {
-        return arena_strdup(compiler_path);
-    }
-
-    return find_elm_binary();
 }
 
 // Build environment array with current environment plus https_proxy
@@ -320,7 +271,7 @@ static int cmd_publish_package(int argc, char *argv[]) {
     printf("\nAll dependencies cached. Running elm publish...\n\n");
 
     // Get elm compiler path
-    char *elm_path = get_elm_compiler_path();
+    char *elm_path = elm_compiler_get_path();
     if (!elm_path) {
         log_error("Could not find elm binary");
         log_error("Please install elm or set the ELM_WRAP_ELM_COMPILER_PATH environment variable");

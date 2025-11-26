@@ -1,5 +1,6 @@
 #include "cache.h"
 #include "install_env.h"
+#include "elm_compiler.h"
 #include "alloc.h"
 #include <stdlib.h>
 #include <string.h>
@@ -103,12 +104,22 @@ static bool ensure_path_exists(const char *path) {
 CacheConfig* cache_config_init(void) {
     CacheConfig *config = arena_calloc(1, sizeof(CacheConfig));
     if (!config) return NULL;
-    
+
+    /* Determine Elm version in priority order:
+     * 1. ELM_VERSION environment variable
+     * 2. Compiler version from running --version
+     * 3. DEFAULT_ELM_VERSION constant
+     */
     const char *env_version = getenv("ELM_VERSION");
     if (env_version && env_version[0] != '\0') {
         config->elm_version = arena_strdup(env_version);
     } else {
-        config->elm_version = arena_strdup(DEFAULT_ELM_VERSION);
+        char *compiler_version = elm_compiler_get_version();
+        if (compiler_version) {
+            config->elm_version = compiler_version;
+        } else {
+            config->elm_version = arena_strdup(DEFAULT_ELM_VERSION);
+        }
     }
 
     if (!config->elm_version) {
@@ -116,14 +127,29 @@ CacheConfig* cache_config_init(void) {
         return NULL;
     }
 
-    // Get ELM_HOME from environment or use default
-    char *env_elm_home = getenv("ELM_HOME");
+    /* Get ELM_HOME from environment or use default
+     * If ELM_HOME is set, suffix it with the determined version
+     */
+    const char *env_elm_home = getenv("ELM_HOME");
     if (env_elm_home && env_elm_home[0] != '\0') {
-        config->elm_home = arena_strdup(env_elm_home);
+        /* Strip trailing slashes from env_elm_home */
+        size_t home_len = strlen(env_elm_home);
+        while (home_len > 0 && (env_elm_home[home_len - 1] == '/' || env_elm_home[home_len - 1] == '\\')) {
+            home_len--;
+        }
+
+        /* Suffix with version: ELM_HOME/version */
+        size_t len = home_len + strlen("/") + strlen(config->elm_version) + 1;
+        config->elm_home = arena_malloc(len);
+        if (!config->elm_home) {
+            cache_config_free(config);
+            return NULL;
+        }
+        snprintf(config->elm_home, len, "%.*s/%s", (int)home_len, env_elm_home, config->elm_version);
     } else {
         config->elm_home = get_default_elm_home(config->elm_version);
     }
-    
+
     if (!config->elm_home) {
         cache_config_free(config);
         return NULL;

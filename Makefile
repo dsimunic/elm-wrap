@@ -53,6 +53,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/bump.c \
           $(SRCDIR)/diff.c \
           $(SRCDIR)/publish.c \
+          $(SRCDIR)/config.c \
           $(SRCDIR)/commands/publish/docs/docs.c \
           $(SRCDIR)/commands/publish/docs/elm_docs.c \
           $(SRCDIR)/commands/publish/docs/dependency_cache.c \
@@ -62,6 +63,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/install.c \
           $(SRCDIR)/install_check.c \
           $(SRCDIR)/elm_json.c \
+          $(SRCDIR)/elm_compiler.c \
           $(SRCDIR)/cache.c \
           $(SRCDIR)/solver.c \
           $(SRCDIR)/cJSON.c \
@@ -87,6 +89,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/bump.o \
           $(BUILDDIR)/diff.o \
           $(BUILDDIR)/publish.o \
+          $(BUILDDIR)/config.o \
           $(BUILDDIR)/docs.o \
           $(BUILDDIR)/elm_docs.o \
           $(BUILDDIR)/dependency_cache.o \
@@ -96,6 +99,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/install.o \
           $(BUILDDIR)/install_check.o \
           $(BUILDDIR)/elm_json.o \
+          $(BUILDDIR)/elm_compiler.o \
           $(BUILDDIR)/cache.o \
           $(BUILDDIR)/solver.o \
           $(BUILDDIR)/cJSON.o \
@@ -143,7 +147,7 @@ $(BUILDDIR)/buildinfo.o: $(BUILDINFO_SRC)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build main object
-$(BUILDDIR)/main.o: $(SRCDIR)/main.c $(SRCDIR)/buildinfo.h $(SRCDIR)/install.h $(SRCDIR)/make.h $(SRCDIR)/init.h $(SRCDIR)/repl.h $(SRCDIR)/reactor.h $(SRCDIR)/bump.h $(SRCDIR)/diff.h $(SRCDIR)/publish.h | $(BUILDDIR)
+$(BUILDDIR)/main.o: $(SRCDIR)/main.c $(SRCDIR)/buildinfo.h $(SRCDIR)/install.h $(SRCDIR)/make.h $(SRCDIR)/init.h $(SRCDIR)/repl.h $(SRCDIR)/reactor.h $(SRCDIR)/bump.h $(SRCDIR)/diff.h $(SRCDIR)/publish.h $(SRCDIR)/config.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build alloc object
@@ -163,27 +167,31 @@ $(BUILDDIR)/init.o: $(SRCDIR)/init.c $(SRCDIR)/init.h $(SRCDIR)/install_env.h | 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build make object
-$(BUILDDIR)/make.o: $(SRCDIR)/make.c $(SRCDIR)/make.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h | $(BUILDDIR)
+$(BUILDDIR)/make.o: $(SRCDIR)/make.c $(SRCDIR)/make.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build repl object
-$(BUILDDIR)/repl.o: $(SRCDIR)/repl.c $(SRCDIR)/repl.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h | $(BUILDDIR)
+$(BUILDDIR)/repl.o: $(SRCDIR)/repl.c $(SRCDIR)/repl.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build reactor object
-$(BUILDDIR)/reactor.o: $(SRCDIR)/reactor.c $(SRCDIR)/reactor.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h | $(BUILDDIR)
+$(BUILDDIR)/reactor.o: $(SRCDIR)/reactor.c $(SRCDIR)/reactor.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build bump object
-$(BUILDDIR)/bump.o: $(SRCDIR)/bump.c $(SRCDIR)/bump.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h | $(BUILDDIR)
+$(BUILDDIR)/bump.o: $(SRCDIR)/bump.c $(SRCDIR)/bump.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build diff object
-$(BUILDDIR)/diff.o: $(SRCDIR)/diff.c $(SRCDIR)/diff.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h | $(BUILDDIR)
+$(BUILDDIR)/diff.o: $(SRCDIR)/diff.c $(SRCDIR)/diff.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build publish object
-$(BUILDDIR)/publish.o: $(SRCDIR)/publish.c $(SRCDIR)/publish.h $(SRCDIR)/commands/publish/docs/docs.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h | $(BUILDDIR)
+$(BUILDDIR)/publish.o: $(SRCDIR)/publish.c $(SRCDIR)/publish.h $(SRCDIR)/commands/publish/docs/docs.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build config object
+$(BUILDDIR)/config.o: $(SRCDIR)/config.c $(SRCDIR)/config.h $(SRCDIR)/cache.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build docs object
@@ -222,8 +230,12 @@ $(BUILDDIR)/install_check.o: $(SRCDIR)/install_check.c $(SRCDIR)/install_check.h
 $(BUILDDIR)/elm_json.o: $(SRCDIR)/elm_json.c $(SRCDIR)/elm_json.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Build elm_compiler object
+$(BUILDDIR)/elm_compiler.o: $(SRCDIR)/elm_compiler.c $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # Build cache object
-$(BUILDDIR)/cache.o: $(SRCDIR)/cache.c $(SRCDIR)/cache.h | $(BUILDDIR)
+$(BUILDDIR)/cache.o: $(SRCDIR)/cache.c $(SRCDIR)/cache.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build solver object
