@@ -9,7 +9,7 @@
 /* External tree-sitter language function */
 extern TSLanguage *tree_sitter_elm(void);
 
-/* Helper function to read file contents */
+/* Helper function to read file contents and normalize line endings to \n */
 static char *read_file(const char *filepath) {
     FILE *file = fopen(filepath, "r");
     if (!file) {
@@ -31,7 +31,25 @@ static char *read_file(const char *filepath) {
     content[read_size] = '\0';
     fclose(file);
 
-    return content;
+    /* Normalize line endings: convert \r\n and \r to \n */
+    char *normalized = arena_malloc(read_size + 1);
+    size_t write_pos = 0;
+    for (size_t i = 0; i < read_size; i++) {
+        if (content[i] == '\r') {
+            /* Skip \r - if followed by \n, we'll get it next iteration */
+            if (i + 1 < read_size && content[i + 1] == '\n') {
+                continue;  /* \r\n -> skip the \r, keep the \n */
+            } else {
+                normalized[write_pos++] = '\n';  /* standalone \r -> convert to \n */
+            }
+        } else {
+            normalized[write_pos++] = content[i];
+        }
+    }
+    normalized[write_pos] = '\0';
+
+    arena_free(content);
+    return normalized;
 }
 
 /* Helper function to get node text */
