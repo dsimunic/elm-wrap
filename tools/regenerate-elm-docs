@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Regenerate docs.json for Elm packages listed in a log file
+# Usage: regenerate-elm-docs <log-file>
+
+if [[ $# -ne 1 ]]; then
+    echo "Usage: regenerate-elm-docs <log-file>" >&2
+    exit 1
+fi
+
+LOG_FILE="$1"
+
+if [[ ! -f "$LOG_FILE" ]]; then
+    echo "Error: File not found: $LOG_FILE" >&2
+    exit 1
+fi
+
+ELM_HOME="/Volumes/Devel/var/elm-wrap/package_repository"
+export ELM_HOME
+
+while IFS= read -r package_dir; do
+    # Skip empty lines
+    [[ -z "$package_dir" ]] && continue
+    
+    # Check if directory exists
+    if [[ ! -d "$package_dir" ]]; then
+        echo "Error: Directory not found: $package_dir" >&2
+        continue
+    fi
+    
+    # Run elm make in the package directory
+    if ! (cd "$package_dir" && elm make --docs=docs.json) >/dev/null 2>&1; then
+        echo "Error: elm make failed in: $package_dir" >&2
+    fi
+done < "$LOG_FILE"

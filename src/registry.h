@@ -49,6 +49,16 @@ Version version_parse(const char *version_str);
 int registry_version_compare(const Version *a, const Version *b);
 char* version_to_string(const Version *v);
 
+/* Version constraint resolution */
+/* Parse "1.0.0 <= v < 2.0.0" and return the highest matching version from registry.
+ * Returns true if a matching version was found, false otherwise.
+ * The resolved version is written to out_version if successful. */
+bool registry_resolve_constraint(Registry *registry, const char *author, const char *name, 
+                                 const char *constraint, Version *out_version);
+
+/* Check if a version string is a constraint (contains "<=" or "<") vs exact version */
+bool registry_is_version_constraint(const char *version_str);
+
 /* Utility */
 void registry_print(const Registry *registry);
 

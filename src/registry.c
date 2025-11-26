@@ -505,6 +505,71 @@ bool registry_add_version(Registry *registry, const char *author, const char *na
     return true;
 }
 
+/* Check if a version string is a constraint (contains "<=" or "<") vs exact version */
+bool registry_is_version_constraint(const char *version_str) {
+    if (!version_str) return false;
+    return strstr(version_str, "<=") != NULL || strstr(version_str, "<") != NULL;
+}
+
+/* Parse Elm version constraint "1.0.0 <= v < 2.0.0" and find highest matching version */
+bool registry_resolve_constraint(Registry *registry, const char *author, const char *name,
+                                 const char *constraint, Version *out_version) {
+    if (!registry || !author || !name || !constraint || !out_version) {
+        return false;
+    }
+    
+    /* Parse the constraint format: "1.0.0 <= v < 2.0.0" */
+    int lower_major, lower_minor, lower_patch;
+    int upper_major, upper_minor, upper_patch;
+    
+    int matched = sscanf(constraint, " %d.%d.%d <= v < %d.%d.%d",
+                         &lower_major, &lower_minor, &lower_patch,
+                         &upper_major, &upper_minor, &upper_patch);
+    
+    if (matched != 6) {
+        /* Not a constraint format, try parsing as exact version */
+        matched = sscanf(constraint, "%d.%d.%d", &lower_major, &lower_minor, &lower_patch);
+        if (matched == 3) {
+            out_version->major = (uint16_t)lower_major;
+            out_version->minor = (uint16_t)lower_minor;
+            out_version->patch = (uint16_t)lower_patch;
+            return true;
+        }
+        return false;
+    }
+    
+    Version lower_bound = {(uint16_t)lower_major, (uint16_t)lower_minor, (uint16_t)lower_patch};
+    Version upper_bound = {(uint16_t)upper_major, (uint16_t)upper_minor, (uint16_t)upper_patch};
+    
+    /* Find the package in the registry */
+    RegistryEntry *entry = registry_find(registry, author, name);
+    if (!entry || entry->version_count == 0) {
+        return false;
+    }
+    
+    /* Versions are stored newest first, so iterate and find the first (highest) matching one */
+    for (size_t i = 0; i < entry->version_count; i++) {
+        Version *v = &entry->versions[i];
+        
+        /* Check: lower_bound <= v < upper_bound */
+        /* v >= lower_bound (inclusive) */
+        if (registry_version_compare(v, &lower_bound) < 0) {
+            continue;  /* v is below lower bound */
+        }
+        
+        /* v < upper_bound (exclusive) */
+        if (registry_version_compare(v, &upper_bound) >= 0) {
+            continue;  /* v is at or above upper bound */
+        }
+        
+        /* This version matches the constraint */
+        *out_version = *v;
+        return true;
+    }
+    
+    return false;  /* No matching version found */
+}
+
 /* Utility */
 void registry_print(const Registry *registry) {
     if (!registry) return;

@@ -2,6 +2,7 @@
 #include "elm_json.h"
 #include "cache.h"
 #include "install_env.h"
+#include "registry.h"
 #include "alloc.h"
 #include "log.h"
 #include "progname.h"
@@ -187,7 +188,7 @@ static int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
             }
         }
     } else {
-        // Package project
+        // Package project - dependencies use version constraints like "1.0.0 <= v < 2.0.0"
         total = elm_json->package_dependencies->count +
                 elm_json->package_test_dependencies->count;
 
@@ -196,29 +197,65 @@ static int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
         // Download package dependencies
         for (int i = 0; i < elm_json->package_dependencies->count; i++) {
             Package *pkg = &elm_json->package_dependencies->packages[i];
-            if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
-                printf("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
-                if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
-                    log_error("Failed to download %s/%s@%s", pkg->author, pkg->name, pkg->version);
+            
+            // Resolve version constraint to actual version
+            Version resolved_version;
+            char *version_str;
+            if (registry_is_version_constraint(pkg->version)) {
+                if (!registry_resolve_constraint(env->registry, pkg->author, pkg->name, 
+                                                  pkg->version, &resolved_version)) {
+                    log_error("Failed to resolve version constraint for %s/%s: %s", 
+                              pkg->author, pkg->name, pkg->version);
+                    return 1;
+                }
+                version_str = version_to_string(&resolved_version);
+            } else {
+                version_str = pkg->version;
+            }
+            
+            if (!cache_package_exists(env->cache, pkg->author, pkg->name, version_str)) {
+                printf("Downloading %s/%s %s\n", pkg->author, pkg->name, version_str);
+                if (!cache_download_package_with_env(env, pkg->author, pkg->name, version_str)) {
+                    log_error("Failed to download %s/%s@%s", pkg->author, pkg->name, version_str);
+                    if (version_str != pkg->version) arena_free(version_str);
                     return 1;
                 }
             } else {
-                log_debug("Package %s/%s@%s already cached", pkg->author, pkg->name, pkg->version);
+                log_debug("Package %s/%s@%s already cached", pkg->author, pkg->name, version_str);
             }
+            if (version_str != pkg->version) arena_free(version_str);
         }
 
         // Download test dependencies
         for (int i = 0; i < elm_json->package_test_dependencies->count; i++) {
             Package *pkg = &elm_json->package_test_dependencies->packages[i];
-            if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
-                printf("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
-                if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
-                    log_error("Failed to download %s/%s@%s", pkg->author, pkg->name, pkg->version);
+            
+            // Resolve version constraint to actual version
+            Version resolved_version;
+            char *version_str;
+            if (registry_is_version_constraint(pkg->version)) {
+                if (!registry_resolve_constraint(env->registry, pkg->author, pkg->name, 
+                                                  pkg->version, &resolved_version)) {
+                    log_error("Failed to resolve version constraint for %s/%s: %s", 
+                              pkg->author, pkg->name, pkg->version);
+                    return 1;
+                }
+                version_str = version_to_string(&resolved_version);
+            } else {
+                version_str = pkg->version;
+            }
+            
+            if (!cache_package_exists(env->cache, pkg->author, pkg->name, version_str)) {
+                printf("Downloading %s/%s %s\n", pkg->author, pkg->name, version_str);
+                if (!cache_download_package_with_env(env, pkg->author, pkg->name, version_str)) {
+                    log_error("Failed to download %s/%s@%s", pkg->author, pkg->name, version_str);
+                    if (version_str != pkg->version) arena_free(version_str);
                     return 1;
                 }
             } else {
-                log_debug("Package %s/%s@%s already cached", pkg->author, pkg->name, pkg->version);
+                log_debug("Package %s/%s@%s already cached", pkg->author, pkg->name, version_str);
             }
+            if (version_str != pkg->version) arena_free(version_str);
         }
     }
 

@@ -10,3 +10,5 @@ package_repository/
 tmp/
 doc/wip/
 .DS_Store
+test/example/
+test/example-lamdera/

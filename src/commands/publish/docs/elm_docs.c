@@ -88,6 +88,21 @@ static void add_direct_import(DirectModuleImports *imports, const char *module_n
     imports->modules[imports->modules_count++] = arena_strdup(module_name);
 }
 
+/* Remove a module from direct imports (used when alias overwrites a direct import) */
+static void remove_direct_import(DirectModuleImports *imports, const char *module_name) {
+    for (int i = 0; i < imports->modules_count; i++) {
+        if (strcmp(imports->modules[i], module_name) == 0) {
+            arena_free(imports->modules[i]);
+            /* Shift remaining entries */
+            for (int j = i; j < imports->modules_count - 1; j++) {
+                imports->modules[j] = imports->modules[j + 1];
+            }
+            imports->modules_count--;
+            return;
+        }
+    }
+}
+
 static bool is_directly_imported(DirectModuleImports *imports, const char *module_name) {
     for (int i = 0; i < imports->modules_count; i++) {
         if (strcmp(imports->modules[i], module_name) == 0) {
@@ -108,6 +123,8 @@ static void free_direct_imports(DirectModuleImports *imports) {
 typedef struct {
     char *alias;           /* The alias used in this module (e.g., "D") */
     char *full_module;     /* The full module name (e.g., "Json.Decode") */
+    bool is_ambiguous;     /* True if multiple different modules use this alias */
+    char *ambiguous_with;  /* If ambiguous, the other module name (for error reporting) */
 } ModuleAlias;
 
 typedef struct {
@@ -181,22 +198,73 @@ static void init_module_alias_map(ModuleAliasMap *map) {
     map->aliases_capacity = 16;
 }
 
+/* Remove any alias that points to the given module (used when direct import overwrites alias) */
+static void remove_alias_for_module(ModuleAliasMap *map, const char *full_module) {
+    for (int i = 0; i < map->aliases_count; i++) {
+        if (strcmp(map->aliases[i].full_module, full_module) == 0) {
+            arena_free(map->aliases[i].alias);
+            arena_free(map->aliases[i].full_module);
+            if (map->aliases[i].ambiguous_with) {
+                arena_free(map->aliases[i].ambiguous_with);
+            }
+            /* Shift remaining entries */
+            for (int j = i; j < map->aliases_count - 1; j++) {
+                map->aliases[j] = map->aliases[j + 1];
+            }
+            map->aliases_count--;
+            i--;  /* Re-check this index since we shifted */
+        }
+    }
+}
+
 static void add_module_alias(ModuleAliasMap *map, const char *alias, const char *full_module) {
+    /* Check if this alias already exists */
+    for (int i = 0; i < map->aliases_count; i++) {
+        if (strcmp(map->aliases[i].alias, alias) == 0) {
+            /* Same module with same alias is fine (not ambiguous) */
+            if (strcmp(map->aliases[i].full_module, full_module) == 0) {
+                /* Already have this exact mapping, nothing to do */
+                return;
+            }
+            /* Different module with same alias - mark as AMBIGUOUS */
+            /* This matches Elm compiler behavior: two different modules */
+            /* imported with the same alias causes ambiguity errors on use */
+            if (!map->aliases[i].is_ambiguous) {
+                map->aliases[i].is_ambiguous = true;
+                map->aliases[i].ambiguous_with = arena_strdup(full_module);
+            }
+            /* Note: we keep the original full_module for error reporting */
+            return;
+        }
+    }
+
     if (map->aliases_count >= map->aliases_capacity) {
         map->aliases_capacity *= 2;
         map->aliases = arena_realloc(map->aliases, map->aliases_capacity * sizeof(ModuleAlias));
     }
     map->aliases[map->aliases_count].alias = arena_strdup(alias);
     map->aliases[map->aliases_count].full_module = arena_strdup(full_module);
+    map->aliases[map->aliases_count].is_ambiguous = false;
+    map->aliases[map->aliases_count].ambiguous_with = NULL;
     map->aliases_count++;
 }
 
-static const char *lookup_module_alias(ModuleAliasMap *map, const char *alias) {
+/* Returns the full module name, or NULL if not found or ambiguous */
+/* Sets *is_ambiguous to true if the alias refers to multiple different modules */
+static const char *lookup_module_alias(ModuleAliasMap *map, const char *alias, bool *is_ambiguous, const char **ambiguous_module1, const char **ambiguous_module2) {
     for (int i = 0; i < map->aliases_count; i++) {
         if (strcmp(map->aliases[i].alias, alias) == 0) {
+            if (map->aliases[i].is_ambiguous) {
+                if (is_ambiguous) *is_ambiguous = true;
+                if (ambiguous_module1) *ambiguous_module1 = map->aliases[i].full_module;
+                if (ambiguous_module2) *ambiguous_module2 = map->aliases[i].ambiguous_with;
+                return NULL;  /* Ambiguous - cannot resolve */
+            }
+            if (is_ambiguous) *is_ambiguous = false;
             return map->aliases[i].full_module;
         }
     }
+    if (is_ambiguous) *is_ambiguous = false;
     return NULL;
 }
 
@@ -204,6 +272,9 @@ static void free_module_alias_map(ModuleAliasMap *map) {
     for (int i = 0; i < map->aliases_count; i++) {
         arena_free(map->aliases[i].alias);
         arena_free(map->aliases[i].full_module);
+        if (map->aliases[i].ambiguous_with) {
+            arena_free(map->aliases[i].ambiguous_with);
+        }
     }
     arena_free(map->aliases);
 }
@@ -388,8 +459,9 @@ static void extract_imports(TSNode root, const char *source_code, ImportMap *imp
         if (strcmp(type, "import_clause") == 0) {
             char *module_name = NULL;
             char *module_alias = NULL;
+            bool has_as_clause = false;
 
-            /* Find the module name and optional alias */
+            /* First pass: find module name and check for alias */
             uint32_t import_child_count = ts_node_child_count(child);
             for (uint32_t j = 0; j < import_child_count; j++) {
                 TSNode import_child = ts_node_child(child, j);
@@ -397,24 +469,8 @@ static void extract_imports(TSNode root, const char *source_code, ImportMap *imp
 
                 if (strcmp(import_child_type, "upper_case_qid") == 0) {
                     module_name = get_node_text(import_child, source_code);
-                    /* Track this as a directly imported module */
-                    if (module_name && direct_imports) {
-                        /* Extract just the first component for single-word modules */
-                        /* e.g., "Html" from "Html" or "Json.Decode" -> "Json" and "Json.Decode" */
-                        add_direct_import(direct_imports, module_name);
-
-                        /* Also add the base module (first component) */
-                        char *dot = strchr(module_name, '.');
-                        if (dot) {
-                            size_t base_len = dot - module_name;
-                            char *base_module = arena_malloc(base_len + 1);
-                            memcpy(base_module, module_name, base_len);
-                            base_module[base_len] = '\0';
-                            add_direct_import(direct_imports, base_module);
-                            arena_free(base_module);
-                        }
-                    }
                 } else if (strcmp(import_child_type, "as_clause") == 0) {
+                    has_as_clause = true;
                     /* Extract the alias from as_clause */
                     uint32_t as_child_count = ts_node_child_count(import_child);
                     for (uint32_t k = 0; k < as_child_count; k++) {
@@ -424,7 +480,43 @@ static void extract_imports(TSNode root, const char *source_code, ImportMap *imp
                             break;
                         }
                     }
-                } else if (strcmp(import_child_type, "exposing_list") == 0 && module_name) {
+                }
+            }
+
+            /* Handle "last import wins" semantics:
+             * - If this is a direct import (no alias), remove any existing alias for this module
+             *   and add it to direct_imports
+             * - If this is an aliased import, remove the module from direct_imports
+             *   (if present) since the alias now takes precedence */
+            if (module_name && direct_imports) {
+                if (!has_as_clause) {
+                    /* Direct import: module is now available by its original name */
+                    /* Remove any alias that was pointing to this module */
+                    remove_alias_for_module(alias_map, module_name);
+                    add_direct_import(direct_imports, module_name);
+
+                    /* Also add the base module (first component) */
+                    char *dot = strchr(module_name, '.');
+                    if (dot) {
+                        size_t base_len = dot - module_name;
+                        char *base_module = arena_malloc(base_len + 1);
+                        memcpy(base_module, module_name, base_len);
+                        base_module[base_len] = '\0';
+                        add_direct_import(direct_imports, base_module);
+                        arena_free(base_module);
+                    }
+                } else {
+                    /* Aliased import: original module name is no longer available */
+                    remove_direct_import(direct_imports, module_name);
+                }
+            }
+
+            /* Second pass: process exposing list */
+            for (uint32_t j = 0; j < import_child_count; j++) {
+                TSNode import_child = ts_node_child(child, j);
+                const char *import_child_type = ts_node_type(import_child);
+
+                if (strcmp(import_child_type, "exposing_list") == 0 && module_name) {
                     /* Parse the exposing list */
                     uint32_t exp_child_count = ts_node_child_count(import_child);
                     for (uint32_t k = 0; k < exp_child_count; k++) {
@@ -531,17 +623,33 @@ static void apply_implicit_imports(ImportMap *import_map, ModuleAliasMap *alias_
     add_module_alias(alias_map, "Sub", "Platform.Sub");
     
     /* Now resolve the exposed types via dependency cache */
-    
+
     /* Basics exposing (..) */
+    /* First add the compiler primitive types that won't be found by scanning */
+    add_import(import_map, "Int", "Basics");
+    add_import(import_map, "Float", "Basics");
+    add_import(import_map, "Bool", "Basics");
+    add_import(import_map, "True", "Basics");
+    add_import(import_map, "False", "Basics");
+    add_import(import_map, "Order", "Basics");
+    add_import(import_map, "LT", "Basics");
+    add_import(import_map, "EQ", "Basics");
+    add_import(import_map, "GT", "Basics");
+    add_import(import_map, "Never", "Basics");
+
+    /* Then add any other types found by scanning the Basics module */
     if (dep_cache) {
         CachedModuleExports *basics = dependency_cache_get_exports(dep_cache, "Basics");
         if (basics && basics->parsed && basics->exported_types_count > 0) {
             for (int i = 0; i < basics->exported_types_count; i++) {
-                add_import(import_map, basics->exported_types[i], "Basics");
+                /* Check if we already added it (to avoid duplicates) */
+                if (lookup_import(import_map, basics->exported_types[i]) == NULL) {
+                    add_import(import_map, basics->exported_types[i], "Basics");
+                }
             }
         }
     }
-    
+
     /* List exposing (List, (::)) - just List type */
     add_import(import_map, "List", "List");
     
@@ -654,17 +762,69 @@ static char *normalize_whitespace(const char *str) {
 
     result[pos] = '\0';
 
-    /* Remove spaces before commas */
-    char *final = arena_malloc(pos + 1);
+    /* Remove spaces before commas, ensure spaces around colons in record types, */
+    /* and handle spaces before closing parens based on tuple vs function type context */
+    char *final = arena_malloc(pos * 3 + 1);  /* Extra space for potential additions */
     size_t final_pos = 0;
+
+    /* Track paren nesting and whether each level contains a comma (tuple) */
+    int max_depth = 64;
+
+    /* First pass: mark which paren levels contain commas (tuples) */
+    bool *is_tuple_paren = arena_malloc(pos * sizeof(bool));
+    int depth = 0;
+    bool *depth_has_comma = arena_malloc(max_depth * sizeof(bool));
+    for (int i = 0; i < max_depth; i++) depth_has_comma[i] = false;
+
+    for (size_t i = 0; i < pos; i++) {
+        if (result[i] == '(') {
+            depth++;
+            if (depth < max_depth) depth_has_comma[depth] = false;
+        } else if (result[i] == ',') {
+            if (depth > 0 && depth < max_depth) depth_has_comma[depth] = true;
+        } else if (result[i] == ')') {
+            is_tuple_paren[i] = (depth > 0 && depth < max_depth && depth_has_comma[depth]);
+            if (depth > 0) depth--;
+        } else {
+            is_tuple_paren[i] = false;
+        }
+    }
+
+    /* Second pass: build final string */
     for (size_t i = 0; i < pos; i++) {
         if (result[i] == ' ' && i + 1 < pos && result[i + 1] == ',') {
             /* Skip space before comma */
             continue;
+        } else if (result[i] == ' ' && i + 1 < pos && result[i + 1] == ')') {
+            /* Keep space before closing paren only if it's a tuple */
+            if (!is_tuple_paren[i + 1]) {
+                continue;  /* Skip space before non-tuple closing paren */
+            }
+            final[final_pos++] = result[i];
+        } else if (result[i] == ')' && is_tuple_paren[i]) {
+            /* Ensure space before closing paren in tuples */
+            if (final_pos > 0 && final[final_pos - 1] != ' ') {
+                final[final_pos++] = ' ';
+            }
+            final[final_pos++] = result[i];
+        } else if (result[i] == ':') {
+            /* Ensure space before colon if not present */
+            if (final_pos > 0 && final[final_pos - 1] != ' ') {
+                final[final_pos++] = ' ';
+            }
+            final[final_pos++] = ':';
+            /* Ensure space after colon if not already present */
+            if (i + 1 < pos && result[i + 1] != ' ') {
+                final[final_pos++] = ' ';
+            }
+        } else {
+            final[final_pos++] = result[i];
         }
-        final[final_pos++] = result[i];
     }
     final[final_pos] = '\0';
+
+    arena_free(is_tuple_paren);
+    arena_free(depth_has_comma);
     arena_free(result);
 
     return final;
@@ -985,21 +1145,39 @@ static char *qualify_type_names(const char *type_str, const char *module_name,
                         memcpy(result + pos, start, len);
                         pos += len;
                     } else if (is_module_prefix) {
-                        /* This is a module prefix - expand alias unless it's also directly imported */
-                        /* When both direct import and alias exist, prefer the direct import (don't expand) */
-                        const char *full_module = lookup_module_alias(alias_map, typename);
-                        bool should_expand = (full_module != NULL) &&
-                                            !is_directly_imported(direct_imports, typename);
-
-                        if (should_expand) {
-                            /* Expand the alias to the full module name */
-                            size_t flen = strlen(full_module);
-                            memcpy(result + pos, full_module, flen);
-                            pos += flen;
-                        } else {
-                            /* Keep as-is - either not an alias, or also directly imported */
+                        /* This is a module prefix - check if it's an alias that should be expanded.
+                         * Since aliased modules are NOT added to direct_imports (the original name
+                         * is unavailable in Elm when aliased), we expand whenever we find an alias.
+                         * The is_directly_imported check handles the rare case where a module is
+                         * imported both directly AND via an alias (two separate import statements). */
+                        bool is_ambiguous = false;
+                        const char *ambig_mod1 = NULL;
+                        const char *ambig_mod2 = NULL;
+                        const char *full_module = lookup_module_alias(alias_map, typename, &is_ambiguous, &ambig_mod1, &ambig_mod2);
+                        
+                        if (is_ambiguous) {
+                            /* AMBIGUOUS: Two different modules use the same alias.
+                             * This matches Elm compiler behavior - it's an error to use this alias.
+                             * We report it to stderr and keep the alias unexpanded. */
+                            fprintf(stderr, "Warning: Ambiguous alias '%s' - refers to both '%s' and '%s'\n",
+                                    typename, ambig_mod1 ? ambig_mod1 : "?", ambig_mod2 ? ambig_mod2 : "?");
+                            /* Keep as-is - cannot resolve */
                             memcpy(result + pos, start, len);
                             pos += len;
+                        } else {
+                            bool should_expand = (full_module != NULL) &&
+                                                !is_directly_imported(direct_imports, typename);
+
+                            if (should_expand) {
+                                /* Expand the alias to the full module name */
+                                size_t flen = strlen(full_module);
+                                memcpy(result + pos, full_module, flen);
+                                pos += flen;
+                            } else {
+                                /* Keep as-is - either not an alias, or also directly imported */
+                                memcpy(result + pos, start, len);
+                                pos += len;
+                            }
                         }
                     } else {
                         /* Check if it's a local type first - local types take precedence over imports */
