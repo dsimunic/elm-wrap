@@ -5,7 +5,7 @@ set -euo pipefail
 # Get script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-WRAP_DOCS_BIN="$PROJECT_ROOT/bin/wrap-docs"
+ELM_WRAP_BIN="$PROJECT_ROOT/bin/elm-wrap"
 
 # Parse arguments
 FROM_FILE=""
@@ -30,8 +30,8 @@ if [ -z "$PACKAGES_DIR" ] && [ -z "$FROM_FILE" ]; then
 fi
 
 # Check if wrap-docs binary exists
-if [ ! -x "$WRAP_DOCS_BIN" ]; then
-    echo "Error: wrap-docs binary not found at $WRAP_DOCS_BIN" >&2
+if [ ! -x "$ELM_WRAP_BIN" ]; then
+    echo "Error: elm-wrap binary not found at $ELM_WRAP_BIN" >&2
     exit 1
 fi
 
@@ -101,9 +101,9 @@ process_package() {
     local tmpdir
     tmpdir=$(mktemp -d)
     
-    # Generate docs for the src directory
+    # Generate docs for the package directory
     local all_docs="$tmpdir/all-docs.json"
-    if ! "$WRAP_DOCS_BIN" "$src_dir" > "$all_docs" 2>> "$DETAIL_LOG"; then
+    if ! "$ELM_WRAP_BIN" publish docs "$package_dir" > "$all_docs" 2>> "$DETAIL_LOG"; then
         echo "$package_dir" >> "$FAIL_LOG"
         echo "FAILED: $package_dir - wrap-docs execution failed" >> "$DETAIL_LOG"
         FAIL_COUNT=$((FAIL_COUNT + 1))
@@ -125,10 +125,11 @@ process_package() {
     fi
 
     # Normalize both JSON files and compare
+    # Also normalize line endings to handle Windows CRLF vs Unix LF
     local normalized_generated="$tmpdir/normalized-generated.json"
     local normalized_original="$tmpdir/normalized-original.json"
 
-    if ! jq -S . "$generated_docs" > "$normalized_generated" 2>/dev/null; then
+    if ! jq -S . "$generated_docs" | tr -d '\r' > "$normalized_generated" 2>/dev/null; then
         echo "$package_dir" >> "$FAIL_LOG"
         echo "FAILED: $package_dir - invalid JSON in generated docs" >> "$DETAIL_LOG"
         FAIL_COUNT=$((FAIL_COUNT + 1))
@@ -136,7 +137,7 @@ process_package() {
         return
     fi
 
-    if ! jq -S . "$docs_json_path" > "$normalized_original" 2>/dev/null; then
+    if ! jq -S . "$docs_json_path" | tr -d '\r' > "$normalized_original" 2>/dev/null; then
         echo "$package_dir" >> "$FAIL_LOG"
         echo "FAILED: $package_dir - invalid JSON in original docs.json" >> "$DETAIL_LOG"
         FAIL_COUNT=$((FAIL_COUNT + 1))
