@@ -7,6 +7,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ELM_WRAP_BIN="$PROJECT_ROOT/bin/elm-wrap"
 
+# Default paths
+DEFAULT_REPOSITORY_DIR="/Volumes/Devel/var/elm-wrap/package_repository/0.19.1/packages/"
+DEFAULT_TARGET_DIR="$PROJECT_ROOT/tmp/docs"
+
 # Logging function
 log() {
     echo "$@"
@@ -18,20 +22,34 @@ log_err() {
 
 # Usage message
 usage() {
-    log "Usage: $(basename "$0") <repository-path> <target-path>"
+    log "Usage: $(basename "$0") [<repository-path> <target-path>]"
+    log "       $(basename "$0") <author/package/version>"
     log ""
-    log "Generates docs for all packages in <repository-path> and compares them"
+    log "Generates docs for packages in <repository-path> and compares them"
     log "against original docs.json files collected in <target-path>."
+    log ""
+    log "If a single argument is provided, validates only that package using default paths."
+    log ""
+    log "Default repository: $DEFAULT_REPOSITORY_DIR"
+    log "Default target: tmp/docs"
     exit 1
 }
 
-# Check arguments
-if [ $# -ne 2 ]; then
+# Parse arguments
+SINGLE_PACKAGE=""
+if [ $# -eq 0 ]; then
+    REPOSITORY_DIR="$DEFAULT_REPOSITORY_DIR"
+    TARGET_DIR="$DEFAULT_TARGET_DIR"
+elif [ $# -eq 1 ]; then
+    REPOSITORY_DIR="$DEFAULT_REPOSITORY_DIR"
+    TARGET_DIR="$DEFAULT_TARGET_DIR"
+    SINGLE_PACKAGE="$1"
+elif [ $# -eq 2 ]; then
+    REPOSITORY_DIR="$1"
+    TARGET_DIR="$2"
+else
     usage
 fi
-
-REPOSITORY_DIR="$1"
-TARGET_DIR="$2"
 
 # Check if repository directory exists
 if [ ! -d "$REPOSITORY_DIR" ]; then
@@ -92,7 +110,7 @@ process_package() {
     fi
 
     # Calculate relative path from repository directory and convert to flat filename
-    local relative_path="${package_dir#$REPOSITORY_DIR}"
+    local relative_path="${package_dir#"$REPOSITORY_DIR"}"
     relative_path="${relative_path#/}"  # Remove leading slash if present
     
     # Replace path separators with underscores to create flat filename
@@ -141,11 +159,22 @@ process_package() {
     rm -rf "$tmpdir"
 }
 
-# Find all elm.json files and process their directories
-while IFS= read -r -d '' elm_json_path; do
-    package_dir="$(dirname "$elm_json_path")"
+# Phase 1: Generate docs
+if [ -n "$SINGLE_PACKAGE" ]; then
+    # Single package mode
+    package_dir="$REPOSITORY_DIR/$SINGLE_PACKAGE"
+    if [ ! -d "$package_dir" ]; then
+        log_err "Error: Package directory not found at $package_dir"
+        exit 1
+    fi
     process_package "$package_dir"
-done < <(find "$REPOSITORY_DIR" -name "elm.json" -type f -print0 | sort -z)
+else
+    # All packages mode
+    while IFS= read -r -d '' elm_json_path; do
+        package_dir="$(dirname "$elm_json_path")"
+        process_package "$package_dir"
+    done < <(find "$REPOSITORY_DIR" -name "elm.json" -type f -print0 | sort -z)
+fi
 
 GENERATE_END_TIME=$(date +%s)
 GENERATE_DURATION=$((GENERATE_END_TIME - START_TIME))
@@ -161,33 +190,60 @@ SUCCESS_COUNT=0
 FAIL_COUNT=0
 MISSING_ORIGINAL=0
 
-# Find all generated docs and compare with originals
-for generated_file in "$TARGET_DIR"/*_docs.generated.json; do
-    [ -f "$generated_file" ] || continue
+# Compare docs
+if [ -n "$SINGLE_PACKAGE" ]; then
+    # Single package mode - compare just the one file
+    flat_name="${SINGLE_PACKAGE//\//_}"
+    generated_file="$TARGET_DIR/${flat_name}_docs.generated.json"
+    original_file="$TARGET_DIR/${flat_name}_docs.json"
     
-    # Extract the base name (without _docs.generated.json)
-    base_name="$(basename "$generated_file" _docs.generated.json)"
-    original_file="$TARGET_DIR/${base_name}_docs.json"
-    
-    # Check if original exists
-    if [ ! -f "$original_file" ]; then
-        MISSING_ORIGINAL=$((MISSING_ORIGINAL + 1))
-        continue
-    fi
-    
-    # Convert flat name back to author/package/version format
-    # The flat name is like: author_package_version
-    # We need to convert underscores back to slashes
-    package_path="${base_name//_//}"
-    
-    # Compare the files
-    if diff -q "$original_file" "$generated_file" > /dev/null 2>&1; then
-        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    if [ ! -f "$generated_file" ]; then
+        log_err "Generated docs not found: $generated_file"
+        "$SCRIPT_DIR/view-diff" "$REPOSITORY_DIR" "$TARGET_DIR" "$SINGLE_PACKAGE"
+        exit 100
+    elif [ ! -f "$original_file" ]; then
+        log_err "Original docs not found: $original_file"
+        "$SCRIPT_DIR/view-diff" "$REPOSITORY_DIR" "$TARGET_DIR" "$SINGLE_PACKAGE"
+        exit 100
     else
-        log_err "[different] $package_path"
-        FAIL_COUNT=$((FAIL_COUNT + 1))
+        if diff -q "$original_file" "$generated_file" > /dev/null 2>&1; then
+            log "SUCCESS: $SINGLE_PACKAGE"
+            exit 0
+        else
+            log_err "[different] $SINGLE_PACKAGE"
+            "$SCRIPT_DIR/view-diff" "$REPOSITORY_DIR" "$TARGET_DIR" "$SINGLE_PACKAGE"
+            exit 100
+        fi
     fi
-done
+else
+    # All packages mode - find all generated docs and compare with originals
+    for generated_file in "$TARGET_DIR"/*_docs.generated.json; do
+        [ -f "$generated_file" ] || continue
+        
+        # Extract the base name (without _docs.generated.json)
+        base_name="$(basename "$generated_file" _docs.generated.json)"
+        original_file="$TARGET_DIR/${base_name}_docs.json"
+        
+        # Check if original exists
+        if [ ! -f "$original_file" ]; then
+            MISSING_ORIGINAL=$((MISSING_ORIGINAL + 1))
+            continue
+        fi
+    
+        # Convert flat name back to author/package/version format
+        # The flat name is like: author_package_version
+        # We need to convert underscores back to slashes
+        package_path="${base_name//_//}"
+        
+        # Compare the files
+        if diff -q "$original_file" "$generated_file" > /dev/null 2>&1; then
+            SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+        else
+            log_err "[different] $package_path"
+            FAIL_COUNT=$((FAIL_COUNT + 1))
+        fi
+    done
+fi
 
 END_TIME=$(date +%s)
 TOTAL_DURATION=$((END_TIME - START_TIME))
