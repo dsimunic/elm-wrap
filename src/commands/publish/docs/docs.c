@@ -277,15 +277,43 @@ static int process_files(FileList *files, const char *base_path) {
             fprintf(stderr, "Warning: Failed to parse %s\n", files->paths[i]);
         } else {
             /* Check if module is exposed (if we have elm.json) */
-            bool should_include = !has_elm_json ||
-                                 exposed_modules_contains(&exposed, all_docs[doc_index].name);
+            bool is_exposed = !has_elm_json ||
+                             exposed_modules_contains(&exposed, all_docs[doc_index].name);
+
+            /* Check if file path matches module name convention (Foo.Bar -> src/Foo/Bar.elm) */
+            bool path_matches_module = true;
+            if (all_docs[doc_index].name) {
+                /* Build expected path from module name */
+                char expected_path[1024];
+                int path_len = snprintf(expected_path, sizeof(expected_path), "%s/src/", base_path);
+
+                /* Convert module name to path (Foo.Bar.Baz -> Foo/Bar/Baz.elm) */
+                for (const char *p = all_docs[doc_index].name; *p; p++) {
+                    if (*p == '.') {
+                        expected_path[path_len++] = '/';
+                    } else {
+                        expected_path[path_len++] = *p;
+                    }
+                }
+                strcpy(expected_path + path_len, ".elm");
+
+                /* Compare with actual file path */
+                path_matches_module = (strcmp(files->paths[i], expected_path) == 0);
+            }
+
+            bool should_include = is_exposed && path_matches_module;
 
             if (should_include) {
                 fprintf(stderr, "Successfully parsed: %s (Module: %s)\n",
                         files->paths[i], all_docs[doc_index].name);
                 doc_index++;
             } else {
-                fprintf(stderr, "Skipping non-exposed module: %s\n", all_docs[doc_index].name);
+                if (!path_matches_module) {
+                    fprintf(stderr, "Skipping module %s in file %s (file path doesn't match module name)\n",
+                            all_docs[doc_index].name, files->paths[i]);
+                } else {
+                    fprintf(stderr, "Skipping non-exposed module: %s\n", all_docs[doc_index].name);
+                }
                 free_elm_docs(&all_docs[doc_index]);
             }
         }

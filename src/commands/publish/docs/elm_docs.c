@@ -728,7 +728,14 @@ static char *find_preceding_comment(TSNode node, TSNode root, const char *source
             char *raw = get_node_text(prev_sibling, source_code);
             char *cleaned = clean_comment(raw);
             arena_free(raw);
-            return cleaned;
+            /* If this was a doc comment, return it. Otherwise continue searching. */
+            if (cleaned && strlen(cleaned) > 0) {
+                return cleaned;
+            }
+            arena_free(cleaned);
+            /* Continue searching for a doc comment */
+            prev_sibling = ts_node_prev_sibling(prev_sibling);
+            continue;
         }
 
         /* Skip whitespace/newline nodes */
@@ -871,6 +878,15 @@ static char *normalize_whitespace(const char *str) {
             if (i + 1 < pos && result[i + 1] != ' ') {
                 final[final_pos++] = ' ';
             }
+        } else if (result[i] == '(' && !is_tuple_paren[i]) {
+            /* Opening paren of a non-tuple (function type, parenthesized type) */
+            final[final_pos++] = result[i];
+            /* Skip any space after opening paren in non-tuples */
+            /* This handles the case where type substitution or other processing
+             * may have introduced unwanted spaces */
+        } else if (result[i] == ' ' && i > 0 && result[i - 1] == '(' && !is_tuple_paren[i - 1]) {
+            /* Skip space after non-tuple opening paren */
+            continue;
         } else if (result[i] == ':') {
             /* Ensure space before colon if not present */
             if (final_pos > 0 && final[final_pos - 1] != ' ') {
