@@ -785,28 +785,50 @@ static char *normalize_whitespace(const char *str) {
     char *final = arena_malloc(pos * 3 + 1);  /* Extra space for potential additions */
     size_t final_pos = 0;
 
-    /* Track paren nesting and whether each level contains a comma (tuple) */
-    int max_depth = 64;
-
-    /* First pass: mark which paren levels contain commas (tuples) */
+    /* First pass: mark which paren pairs contain commas (tuples) */
+    /* We match each opening paren with its closing paren */
     bool *is_tuple_paren = arena_malloc(pos * sizeof(bool));
-    int depth = 0;
-    bool *depth_has_comma = arena_malloc(max_depth * sizeof(bool));
-    for (int i = 0; i < max_depth; i++) depth_has_comma[i] = false;
+    int *paren_match = arena_malloc(pos * sizeof(int));  /* For each '(', store index of matching ')' */
+    bool *has_comma = arena_malloc(pos * sizeof(bool));   /* For each position, whether it contains a comma */
+
+    /* Initialize arrays */
+    for (size_t i = 0; i < pos; i++) {
+        is_tuple_paren[i] = false;
+        paren_match[i] = -1;
+        has_comma[i] = false;
+    }
+
+    /* Build a stack to match parens and track commas */
+    int *paren_stack = arena_malloc(pos * sizeof(int));
+    int stack_top = -1;
 
     for (size_t i = 0; i < pos; i++) {
         if (result[i] == '(') {
-            depth++;
-            if (depth < max_depth) depth_has_comma[depth] = false;
+            stack_top++;
+            paren_stack[stack_top] = i;
+            has_comma[i] = false;  /* This paren pair hasn't seen a comma yet */
         } else if (result[i] == ',') {
-            if (depth > 0 && depth < max_depth) depth_has_comma[depth] = true;
+            /* Mark that the current paren level has a comma */
+            if (stack_top >= 0) {
+                has_comma[paren_stack[stack_top]] = true;
+            }
         } else if (result[i] == ')') {
-            is_tuple_paren[i] = (depth > 0 && depth < max_depth && depth_has_comma[depth]);
-            if (depth > 0) depth--;
-        } else {
-            is_tuple_paren[i] = false;
+            if (stack_top >= 0) {
+                int open_idx = paren_stack[stack_top];
+                paren_match[open_idx] = i;
+                /* If this paren pair has a comma, mark both as tuple parens */
+                if (has_comma[open_idx]) {
+                    is_tuple_paren[open_idx] = true;
+                    is_tuple_paren[i] = true;
+                }
+                stack_top--;
+            }
         }
     }
+
+    arena_free(paren_stack);
+    arena_free(paren_match);
+    arena_free(has_comma);
 
     /* Second pass: build final string */
     for (size_t i = 0; i < pos; i++) {
@@ -819,6 +841,13 @@ static char *normalize_whitespace(const char *str) {
                 continue;  /* Skip space before non-tuple closing paren */
             }
             final[final_pos++] = result[i];
+        } else if (result[i] == '(' && is_tuple_paren[i]) {
+            /* Opening paren of a tuple */
+            final[final_pos++] = result[i];
+            /* Ensure space after opening paren in tuples */
+            if (i + 1 < pos && result[i + 1] != ' ') {
+                final[final_pos++] = ' ';
+            }
         } else if (result[i] == ')' && is_tuple_paren[i]) {
             /* Ensure space before closing paren in tuples */
             if (final_pos > 0 && final[final_pos - 1] != ' ') {
@@ -842,7 +871,6 @@ static char *normalize_whitespace(const char *str) {
     final[final_pos] = '\0';
 
     arena_free(is_tuple_paren);
-    arena_free(depth_has_comma);
     arena_free(result);
 
     return final;
@@ -1578,8 +1606,9 @@ static bool extract_union_type(TSNode node, const char *source_code, ElmUnion *u
                 } else if (strcmp(variant_child_type, "type_expression") == 0 ||
                            strcmp(variant_child_type, "type_ref") == 0 ||
                            strcmp(variant_child_type, "record_type") == 0 ||
-                           strcmp(variant_child_type, "tuple_type") == 0) {
-                    /* Constructor argument (type expression, ref, record, or tuple) */
+                           strcmp(variant_child_type, "tuple_type") == 0 ||
+                           strcmp(variant_child_type, "type_variable") == 0) {
+                    /* Constructor argument (type expression, ref, record, tuple, or type variable) */
                     if (arg_types_count == 0) {
                         arg_types = arena_malloc(8 * sizeof(char*));
                     }
