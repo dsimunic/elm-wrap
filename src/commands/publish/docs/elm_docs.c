@@ -781,17 +781,15 @@ static char *normalize_whitespace(const char *str) {
     bool *is_tuple_paren = arena_malloc(pos * sizeof(bool));
     int *paren_match = arena_malloc(pos * sizeof(int));  /* For each '(', store index of matching ')' */
     bool *has_comma = arena_malloc(pos * sizeof(bool));   /* For each position, whether it contains a comma */
-    bool *has_arrow = arena_malloc(pos * sizeof(bool));   /* For each position, whether it contains an arrow */
 
     /* Initialize arrays */
     for (size_t i = 0; i < pos; i++) {
         is_tuple_paren[i] = false;
         paren_match[i] = -1;
         has_comma[i] = false;
-        has_arrow[i] = false;
     }
 
-    /* Build a stack to match parens and track commas and arrows */
+    /* Build a stack to match parens and track commas */
     int *paren_stack = arena_malloc(pos * sizeof(int));
     int *brace_depth_stack = arena_malloc(pos * sizeof(int));  /* Track brace depth at each paren level */
     int stack_top = -1;
@@ -807,23 +805,17 @@ static char *normalize_whitespace(const char *str) {
             paren_stack[stack_top] = i;
             brace_depth_stack[stack_top] = brace_depth;
             has_comma[i] = false;  /* This paren pair hasn't seen a comma yet */
-            has_arrow[i] = false;  /* This paren pair hasn't seen an arrow yet */
         } else if (result[i] == ',') {
             /* Mark that the current paren level has a comma, but only if not inside braces */
             if (stack_top >= 0 && brace_depth == brace_depth_stack[stack_top]) {
                 has_comma[paren_stack[stack_top]] = true;
             }
-        } else if (result[i] == '-' && i + 1 < pos && result[i + 1] == '>') {
-            /* Mark that the current paren level has an arrow */
-            if (stack_top >= 0) {
-                has_arrow[paren_stack[stack_top]] = true;
-            }
         } else if (result[i] == ')') {
             if (stack_top >= 0) {
                 int open_idx = paren_stack[stack_top];
                 paren_match[open_idx] = i;
-                /* If this paren pair has a comma and NO arrow, mark both as tuple parens */
-                if (has_comma[open_idx] && !has_arrow[open_idx]) {
+                /* If this paren pair has a comma, mark both as tuple parens */
+                if (has_comma[open_idx]) {
                     is_tuple_paren[open_idx] = true;
                     is_tuple_paren[i] = true;
                 }
@@ -836,19 +828,42 @@ static char *normalize_whitespace(const char *str) {
     arena_free(brace_depth_stack);
     arena_free(paren_match);
     arena_free(has_comma);
-    arena_free(has_arrow);
 
     /* Second pass: build final string */
     for (size_t i = 0; i < pos; i++) {
         if (result[i] == ' ' && i + 1 < pos && result[i + 1] == ',') {
             /* Skip space before comma */
             continue;
+        } else if (result[i] == ',') {
+            /* Add comma and ensure space after it */
+            final[final_pos++] = result[i];
+            if (i + 1 < pos && result[i + 1] != ' ') {
+                final[final_pos++] = ' ';
+            }
         } else if (result[i] == ' ' && i + 1 < pos && result[i + 1] == ')') {
             /* Keep space before closing paren only if it's a tuple */
             if (!is_tuple_paren[i + 1]) {
                 continue;  /* Skip space before non-tuple closing paren */
             }
             final[final_pos++] = result[i];
+        } else if (result[i] == ')') {
+            /* Handle closing paren */
+            if (is_tuple_paren[i]) {
+                /* Ensure space before closing paren in tuples */
+                if (final_pos > 0 && final[final_pos - 1] != ' ') {
+                    final[final_pos++] = ' ';
+                }
+            }
+            final[final_pos++] = result[i];
+            /* Ensure space after closing paren if followed by -> */
+            if (i + 1 < pos && result[i + 1] == '-' && i + 2 < pos && result[i + 2] == '>') {
+                /* No space before ->, add one */
+                final[final_pos++] = ' ';
+            } else if (i + 1 < pos && result[i + 1] == ' ' &&
+                       i + 2 < pos && result[i + 2] == '-' &&
+                       i + 3 < pos && result[i + 3] == '>') {
+                /* Already has space before ->, keep it (will be added in next iteration) */
+            }
         } else if (result[i] == '(' && is_tuple_paren[i]) {
             /* Opening paren of a tuple */
             final[final_pos++] = result[i];
@@ -856,12 +871,6 @@ static char *normalize_whitespace(const char *str) {
             if (i + 1 < pos && result[i + 1] != ' ') {
                 final[final_pos++] = ' ';
             }
-        } else if (result[i] == ')' && is_tuple_paren[i]) {
-            /* Ensure space before closing paren in tuples */
-            if (final_pos > 0 && final[final_pos - 1] != ' ') {
-                final[final_pos++] = ' ';
-            }
-            final[final_pos++] = result[i];
         } else if (result[i] == ':') {
             /* Ensure space before colon if not present */
             if (final_pos > 0 && final[final_pos - 1] != ' ') {
@@ -869,6 +878,17 @@ static char *normalize_whitespace(const char *str) {
             }
             final[final_pos++] = ':';
             /* Ensure space after colon if not already present */
+            if (i + 1 < pos && result[i + 1] != ' ') {
+                final[final_pos++] = ' ';
+            }
+        } else if (result[i] == '-' && i + 1 < pos && result[i + 1] == '>') {
+            /* Ensure space before -> if not present */
+            if (final_pos > 0 && final[final_pos - 1] != ' ') {
+                final[final_pos++] = ' ';
+            }
+            final[final_pos++] = result[i];
+            final[final_pos++] = result[++i];  /* Add the '>' */
+            /* Ensure space after -> if not already present */
             if (i + 1 < pos && result[i + 1] != ' ') {
                 final[final_pos++] = ' ';
             }
@@ -1400,6 +1420,88 @@ static int count_implementation_params(TSNode value_decl_node, const char *sourc
     return param_count;
 }
 
+/* Helper function to remove unnecessary outer parentheses from return type
+ * Example: "A -> B -> (C -> D)" becomes "A -> B -> C -> D"
+ * This matches Elm's canonical documentation format */
+static char *remove_return_type_parens(const char *type_str) {
+    if (!type_str) return arena_strdup("");
+
+    /* Find the last top-level arrow */
+    const char *last_arrow = NULL;
+    const char *p = type_str;
+    int paren_depth = 0;
+    int brace_depth = 0;
+
+    while (*p) {
+        if (*p == '(') {
+            paren_depth++;
+        } else if (*p == ')') {
+            paren_depth--;
+        } else if (*p == '{') {
+            brace_depth++;
+        } else if (*p == '}') {
+            brace_depth--;
+        } else if (paren_depth == 0 && brace_depth == 0 &&
+                   *p == '-' && *(p + 1) == '>' &&
+                   (p > type_str && *(p - 1) == ' ') && *(p + 2) == ' ') {
+            last_arrow = p;
+        }
+        p++;
+    }
+
+    /* If there's no arrow, return as-is */
+    if (!last_arrow) {
+        return arena_strdup(type_str);
+    }
+
+    /* Find the start of the return type (skip " -> " and leading spaces) */
+    const char *return_start = last_arrow + 3;  /* Skip " -> " */
+    while (*return_start == ' ') return_start++;
+
+    /* Check if the return type is wrapped in unnecessary outer parentheses */
+    if (*return_start != '(') {
+        return arena_strdup(type_str);
+    }
+
+    /* Check if these parens wrap the entire return type */
+    const char *scan = return_start + 1;
+    int depth = 1;
+    const char *return_end = NULL;
+    bool has_comma = false;  /* Track if there's a comma inside (indicates tuple) */
+
+    while (*scan && depth > 0) {
+        if (*scan == '(') depth++;
+        else if (*scan == ')') {
+            depth--;
+            if (depth == 0) {
+                return_end = scan;
+            }
+        } else if (*scan == ',' && depth == 1) {
+            /* Comma at the top level inside these parens - this is a tuple */
+            has_comma = true;
+        }
+        scan++;
+    }
+
+    /* Only remove parens if:
+     * 1. They wrap the entire return type
+     * 2. They don't contain a comma (not a tuple) */
+    if (return_end && *(return_end + 1) == '\0' && !has_comma) {
+        /* Build the new type string without these outer parens */
+        size_t prefix_len = return_start - type_str;
+        size_t inner_len = return_end - return_start - 1;  /* Skip opening '(' */
+
+        char *result = arena_malloc(prefix_len + inner_len + 1);
+        memcpy(result, type_str, prefix_len);
+        memcpy(result + prefix_len, return_start + 1, inner_len);
+        result[prefix_len + inner_len] = '\0';
+
+        return result;
+    }
+
+    return arena_strdup(type_str);
+}
+
 /* Helper function to extract and canonicalize type expression */
 static char *extract_type_expression(TSNode type_node, const char *source_code, const char *module_name,
                                        ImportMap *import_map, ModuleAliasMap *alias_map,
@@ -1425,7 +1527,11 @@ static char *extract_type_expression(TSNode type_node, const char *source_code, 
     char *qualified = qualify_type_names(expanded, module_name, import_map, alias_map, direct_imports, local_types, local_types_count);
     arena_free(expanded);
 
-    return qualified;
+    /* Remove unnecessary outer parentheses from return type */
+    char *canonical = remove_return_type_parens(qualified);
+    arena_free(qualified);
+
+    return canonical;
 }
 
 /* Extract value declaration (function/constant) */
@@ -1713,12 +1819,21 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
         TSNode child = ts_node_child(root_node, i);
         if (strcmp(ts_node_type(child), "module_declaration") == 0) {
             /* Look for block_comment after the module declaration */
-            if (i + 1 < child_count) {
-                TSNode next = ts_node_child(root_node, i + 1);
-                if (strcmp(ts_node_type(next), "block_comment") == 0) {
+            /* Skip over any line comments or other nodes to find the first block_comment */
+            for (uint32_t j = i + 1; j < child_count; j++) {
+                TSNode next = ts_node_child(root_node, j);
+                const char *next_type = ts_node_type(next);
+                if (strcmp(next_type, "block_comment") == 0) {
                     char *raw = get_node_text(next, source_code);
                     docs->comment = clean_comment(raw);
                     arena_free(raw);
+                    break;
+                }
+                /* Stop searching if we hit a declaration (not a comment or import) */
+                if (strcmp(next_type, "value_declaration") == 0 ||
+                    strcmp(next_type, "type_alias_declaration") == 0 ||
+                    strcmp(next_type, "type_declaration") == 0) {
+                    break;
                 }
             }
             break;

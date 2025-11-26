@@ -89,43 +89,66 @@ static bool parse_elm_json(const char *elm_json_path, ExposedModules *em) {
         return false;
     }
 
-    /* Find the opening bracket */
-    char *bracket = strchr(exposed, '[');
+    /* Skip past the key to find the value */
+    char *value_start = exposed + strlen("\"exposed-modules\"");
+    while (*value_start && (*value_start == ':' || isspace(*value_start))) {
+        value_start++;
+    }
+
+    /* Check if it's an object (categorized) or array (simple) */
+    bool is_categorized = (*value_start == '{');
+
+    /* Find the opening bracket of first array */
+    char *bracket = strchr(value_start, '[');
     if (!bracket) {
         arena_free(content);
         return false;
     }
 
-    /* Parse module names within the array */
-    char *p = bracket + 1;
-    while (*p) {
-        /* Skip whitespace */
-        while (*p && isspace(*p)) p++;
+    /* Parse all arrays (for categorized format, there may be multiple) */
+    char *search_pos = bracket;
+    char *end_marker = is_categorized ? strchr(value_start, '}') : strchr(bracket, ']');
 
-        /* Check for end of array */
-        if (*p == ']') break;
+    while (search_pos && search_pos < end_marker) {
+        /* Parse module names within this array */
+        char *p = search_pos + 1;
+        while (*p) {
+            /* Skip whitespace */
+            while (*p && isspace(*p)) p++;
 
-        /* Find opening quote */
-        if (*p == '"') {
-            p++;
-            char *start = p;
-            /* Find closing quote */
-            while (*p && *p != '"') p++;
+            /* Check for end of this array */
+            if (*p == ']') break;
+
+            /* Find opening quote */
             if (*p == '"') {
-                /* Extract module name */
-                int len = p - start;
-                char *module = arena_malloc(len + 1);
-                strncpy(module, start, len);
-                module[len] = 0;
-                exposed_modules_add(em, module);
-                arena_free(module);
                 p++;
+                char *start = p;
+                /* Find closing quote */
+                while (*p && *p != '"') p++;
+                if (*p == '"') {
+                    /* Extract module name */
+                    int len = p - start;
+                    char *module = arena_malloc(len + 1);
+                    strncpy(module, start, len);
+                    module[len] = 0;
+                    exposed_modules_add(em, module);
+                    arena_free(module);
+                    p++;
+                }
             }
+
+            /* Skip to next element or end */
+            while (*p && *p != ',' && *p != ']') p++;
+            if (*p == ',') p++;
         }
 
-        /* Skip to next element or end */
-        while (*p && *p != ',' && *p != ']') p++;
-        if (*p == ',') p++;
+        /* For categorized format, find next array if any */
+        if (is_categorized) {
+            search_pos = strchr(p, '[');
+        } else {
+            /* For simple array format, we're done */
+            break;
+        }
     }
 
     arena_free(content);
