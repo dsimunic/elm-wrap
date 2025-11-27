@@ -32,4 +32,10 @@ bool extract_union_type(TSNode node, const char *source_code, ElmUnion *union_ty
                         char **local_types, int local_types_count, TypeAliasMap *type_alias_map,
                         DependencyCache *dep_cache);
 
+/* Extract binop (infix operator) */
+bool extract_binop(TSNode node, const char *source_code, ElmBinop *binop, const char *module_name,
+                   ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
+                   char **local_types, int local_types_count, TypeAliasMap *type_alias_map,
+                   DependencyCache *dep_cache);
+
 #endif /* DECL_EXTRACT_H */

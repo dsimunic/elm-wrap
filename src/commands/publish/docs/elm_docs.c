@@ -129,13 +129,16 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
     int values_capacity = 16;
     int aliases_capacity = 8;
     int unions_capacity = 8;
+    int binops_capacity = 4;
 
     docs->values = arena_malloc(values_capacity * sizeof(ElmValue));
     docs->aliases = arena_malloc(aliases_capacity * sizeof(ElmAlias));
     docs->unions = arena_malloc(unions_capacity * sizeof(ElmUnion));
+    docs->binops = arena_malloc(binops_capacity * sizeof(ElmBinop));
     docs->values_count = 0;
     docs->aliases_count = 0;
     docs->unions_count = 0;
+    docs->binops_count = 0;
 
     /* First pass: collect local type names and build type alias map */
     int local_types_capacity = 16;
@@ -294,6 +297,25 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
                     arena_free(union_type.cases);
                 }
             }
+        } else if (strcmp(type, "infix_declaration") == 0) {
+            /* Found an infix operator declaration */
+            ElmBinop binop;
+            if (extract_binop(child, source_code, &binop, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count, &type_alias_map, dep_cache)) {
+                /* Only include if exported (operators are exported like values) */
+                if (is_exported_value(binop.name, &exports)) {
+                    if (docs->binops_count >= binops_capacity) {
+                        binops_capacity *= 2;
+                        docs->binops = arena_realloc(docs->binops, binops_capacity * sizeof(ElmBinop));
+                    }
+                    docs->binops[docs->binops_count++] = binop;
+                } else {
+                    /* Not exported, free the binop */
+                    arena_free(binop.name);
+                    arena_free(binop.comment);
+                    arena_free(binop.type);
+                    arena_free(binop.associativity);
+                }
+            }
         }
     }
 
@@ -354,8 +376,8 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
         }
     }
 
-    fprintf(stderr, "Successfully parsed: %s (Module: %s, %d values, %d aliases, %d unions)\n",
-            filepath, docs->name, docs->values_count, docs->aliases_count, docs->unions_count);
+    fprintf(stderr, "Successfully parsed: %s (Module: %s, %d values, %d aliases, %d unions, %d binops)\n",
+            filepath, docs->name, docs->values_count, docs->aliases_count, docs->unions_count, docs->binops_count);
 
     /* Clean up export list */
     free_export_list(&exports);

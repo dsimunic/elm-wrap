@@ -48,6 +48,15 @@ char *extract_module_info(TSNode root, const char *source_code, ExportList *expo
                             exports->exposed_values = arena_realloc(exports->exposed_values,
                                 (exports->exposed_values_count + 1) * sizeof(char*));
                             exports->exposed_values[exports->exposed_values_count++] = value_name;
+                        } else if (strcmp(exp_type, "exposed_operator") == 0) {
+                            /* Exposed operator (e.g., (|=), (|.)) */
+                            TSNode operator_node = ts_node_child_by_field_name(exp_child, "operator", 8);
+                            if (!ts_node_is_null(operator_node)) {
+                                char *operator_name = get_node_text(operator_node, source_code);
+                                exports->exposed_values = arena_realloc(exports->exposed_values,
+                                    (exports->exposed_values_count + 1) * sizeof(char*));
+                                exports->exposed_values[exports->exposed_values_count++] = operator_name;
+                            }
                         } else if (strcmp(exp_type, "exposed_type") == 0) {
                             /* Exposed type */
                             char *type_name = NULL;

@@ -4,6 +4,7 @@
 #include "comment_extract.h"
 #include "../../../alloc.h"
 #include <string.h>
+#include <stdlib.h>
 
 /* Helper function to extract and canonicalize type expression */
 char *extract_type_expression(TSNode type_node, const char *source_code, const char *module_name,
@@ -257,6 +258,139 @@ bool extract_union_type(TSNode node, const char *source_code, ElmUnion *union_ty
 
     union_type->cases = cases;
     union_type->cases_count = cases_count;
+
+    return true;
+}
+
+/* Extract binop (infix operator) */
+bool extract_binop(TSNode node, const char *source_code, ElmBinop *binop, const char *module_name,
+                   ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
+                   char **local_types, int local_types_count, TypeAliasMap *type_alias_map,
+                   DependencyCache *dep_cache) {
+    /* Extract operator name using field name */
+    TSNode operator_node = ts_node_child_by_field_name(node, "operator", 8);
+    if (ts_node_is_null(operator_node)) {
+        return false;
+    }
+    char *operator_name = get_node_text(operator_node, source_code);
+
+    /* Extract associativity using field name */
+    TSNode assoc_node = ts_node_child_by_field_name(node, "associativity", 13);
+    if (ts_node_is_null(assoc_node)) {
+        arena_free(operator_name);
+        return false;
+    }
+    char *associativity = get_node_text(assoc_node, source_code);
+
+    /* Extract precedence using field name */
+    TSNode prec_node = ts_node_child_by_field_name(node, "precedence", 10);
+    if (ts_node_is_null(prec_node)) {
+        arena_free(operator_name);
+        arena_free(associativity);
+        return false;
+    }
+    char *precedence_str = get_node_text(prec_node, source_code);
+    int precedence = atoi(precedence_str);
+    arena_free(precedence_str);
+
+    /* Find the value_expr child to get the function name */
+    char *func_name = NULL;
+    uint32_t child_count = ts_node_child_count(node);
+    for (uint32_t i = 0; i < child_count; i++) {
+        TSNode child = ts_node_child(node, i);
+        if (strcmp(ts_node_type(child), "value_expr") == 0) {
+            /* Get the function name from value_expr */
+            func_name = get_node_text(child, source_code);
+            break;
+        }
+    }
+
+    if (!func_name) {
+        arena_free(operator_name);
+        arena_free(associativity);
+        return false;
+    }
+
+    /* Now we need to find the type annotation for this function
+     * Scan the parent (file_declaration list) for type_annotation with matching name */
+    TSNode parent = ts_node_parent(node);
+    char *type_str = NULL;
+    TSNode type_annotation_node = {0}; /* Will hold the type annotation node for comment extraction */
+
+    if (!ts_node_is_null(parent)) {
+        uint32_t parent_child_count = ts_node_child_count(parent);
+        for (uint32_t i = 0; i < parent_child_count; i++) {
+            TSNode sibling = ts_node_child(parent, i);
+            if (strcmp(ts_node_type(sibling), "type_annotation") == 0) {
+                /* Check if this type annotation is for our function */
+                uint32_t ann_child_count = ts_node_child_count(sibling);
+                for (uint32_t j = 0; j < ann_child_count; j++) {
+                    TSNode ann_child = ts_node_child(sibling, j);
+                    if (strcmp(ts_node_type(ann_child), "lower_case_identifier") == 0) {
+                        char *ann_name = get_node_text(ann_child, source_code);
+                        bool match = (strcmp(ann_name, func_name) == 0);
+                        arena_free(ann_name);
+
+                        if (match) {
+                            /* Found the matching type annotation, save it for comment extraction */
+                            type_annotation_node = sibling;
+
+                            /* Extract the type */
+                            for (uint32_t k = 0; k < ann_child_count; k++) {
+                                TSNode type_child = ts_node_child(sibling, k);
+                                if (strcmp(ts_node_type(type_child), "type_expression") == 0) {
+                                    /* Count implementation parameters by finding the value_declaration */
+                                    int impl_param_count = 0;
+                                    for (uint32_t m = 0; m < parent_child_count; m++) {
+                                        TSNode decl = ts_node_child(parent, m);
+                                        if (strcmp(ts_node_type(decl), "value_declaration") == 0) {
+                                            impl_param_count = count_implementation_params(decl, source_code);
+                                            break;
+                                        }
+                                    }
+
+                                    type_str = extract_type_expression(type_child, source_code, module_name,
+                                                                       import_map, alias_map, direct_imports,
+                                                                       local_types, local_types_count,
+                                                                       type_alias_map, impl_param_count, dep_cache);
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (type_str) break;
+            }
+        }
+    }
+
+    /* If we couldn't find the type, that's an error */
+    if (!type_str) {
+        arena_free(operator_name);
+        arena_free(associativity);
+        arena_free(func_name);
+        return false;
+    }
+
+    /* Extract comment from the function's type annotation, not the infix declaration */
+    char *comment = NULL;
+    if (!ts_node_is_null(type_annotation_node)) {
+        comment = find_preceding_comment(type_annotation_node, parent, source_code);
+    }
+    if (!comment) {
+        comment = arena_strdup("");
+    }
+
+    /* Clean up func_name as we don't need it anymore */
+    arena_free(func_name);
+
+    /* Set the binop fields */
+    binop->name = operator_name;
+    binop->comment = comment;
+    binop->type = type_str;
+    binop->precedence = precedence;
+    binop->associativity = associativity;
 
     return true;
 }
