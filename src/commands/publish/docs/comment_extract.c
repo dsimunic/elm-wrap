@@ -1,6 +1,7 @@
 #include "comment_extract.h"
 #include "tree_util.h"
 #include "../../../alloc.h"
+#include <stdbool.h>
 #include <string.h>
 
 /* Helper function to clean documentation comment */
@@ -41,14 +42,20 @@ char *find_preceding_comment(TSNode node, TSNode root, const char *source_code) 
 
         if (strcmp(type, "block_comment") == 0) {
             char *raw = get_node_text(prev_sibling, source_code);
+
+            /* Check if this is a doc comment (starts with {-|) */
+            bool is_doc_comment = (raw && strlen(raw) >= 3 && strncmp(raw, "{-|", 3) == 0);
+
             char *cleaned = clean_comment(raw);
             arena_free(raw);
-            /* If this was a doc comment, return it. Otherwise continue searching. */
-            if (cleaned && strlen(cleaned) > 0) {
+
+            /* If this was a doc comment, return it (even if empty like {-|-}) */
+            if (is_doc_comment) {
                 return cleaned;
             }
+
+            /* Not a doc comment, continue searching */
             arena_free(cleaned);
-            /* Continue searching for a doc comment */
             prev_sibling = ts_node_prev_sibling(prev_sibling);
             continue;
         }
