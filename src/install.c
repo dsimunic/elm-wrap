@@ -10,6 +10,7 @@
 #include "log.h"
 #include "progname.h"
 #include "fileutil.h"
+#include "commands/cache/check/cache_check.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1079,7 +1080,42 @@ static bool cache_download_package_recursive(InstallEnv *env, const char *author
     return success;
 }
 
+static void print_cache_usage(void) {
+    printf("Usage: %s package cache SUBCOMMAND [OPTIONS]\n", program_name);
+    printf("\n");
+    printf("Cache management commands.\n");
+    printf("\n");
+    printf("Subcommands:\n");
+    printf("  <PACKAGE>                          Download package to cache\n");
+    printf("  check <PACKAGE>                    Check cache status for a package\n");
+    printf("\n");
+    printf("Examples:\n");
+    printf("  %s package cache elm/html                  # Download elm/html and its dependencies\n", program_name);
+    printf("  %s package cache check elm/html            # Check cache status for elm/html\n", program_name);
+    printf("  %s package cache check elm/html --fix-broken # Re-download broken versions\n", program_name);
+    printf("  %s package cache --from-url <url> elm/html # Download from URL to cache\n", program_name);
+    printf("  %s package cache --from-file ./pkg elm/html # Download from local file to cache\n", program_name);
+    printf("  %s package cache --major elm/html         # Download next major version\n", program_name);
+    printf("\n");
+    printf("Download Options:\n");
+    printf("  --from-file <path> <package>    # Download from local file/directory to cache\n");
+    printf("  --from-url <url> <package>      # Download from URL to cache\n");
+    printf("  --major <package>               # Download next major version to cache\n");
+    printf("  -v, --verbose                   # Show progress reports\n");
+    printf("  -q, --quiet                     # Suppress progress reports\n");
+    printf("  --help                          # Show this help\n");
+    printf("\n");
+    printf("Check Options:\n");
+    printf("  --purge-broken                  # Remove broken directories without re-downloading\n");
+    printf("  --fix-broken                    # Try to re-download broken versions\n");
+}
+
 int cmd_cache(int argc, char *argv[]) {
+    /* Check for 'check' subcommand first */
+    if (argc >= 2 && strcmp(argv[1], "check") == 0) {
+        return cmd_cache_check(argc - 1, argv + 1);
+    }
+
     const char *package_arg = NULL;
     const char *from_file_path = NULL;
     const char *from_url = NULL;
@@ -1091,23 +1127,7 @@ int cmd_cache(int argc, char *argv[]) {
     // Parse arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            printf("Usage: %s package cache [<PACKAGE>]\n", program_name);
-            printf("\n");
-            printf("Download packages to cache without prompting or modifying elm.json.\n");
-            printf("\n");
-            printf("Examples:\n");
-            printf("  %s package cache elm/html                  # Download elm/html and its dependencies\n", program_name);
-            printf("  %s package cache --from-url <url> elm/html # Download from URL to cache\n", program_name);
-            printf("  %s package cache --from-file ./pkg elm/html # Download from local file to cache\n", program_name);
-            printf("  %s package cache --major elm/html         # Download next major version\n", program_name);
-            printf("\n");
-            printf("Options:\n");
-            printf("  --from-file <path> <package>    # Download from local file/directory to cache\n");
-            printf("  --from-url <url> <package>      # Download from URL to cache\n");
-            printf("  --major <package>               # Download next major version to cache\n");
-            printf("  -v, --verbose                   # Show progress reports\n");
-            printf("  -q, --quiet                     # Suppress progress reports\n");
-            printf("  --help                          # Show this help\n");
+            print_cache_usage();
             return 0;
         } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
             cmd_verbose = true;

@@ -131,14 +131,30 @@ void extract_imports(TSNode root, const char *source_code, ImportMap *import_map
             /* Handle import semantics:
              * - Aliased imports: the alias name shadows any direct import with same name
              * - Direct imports: the module is available by its original name
+             * - If alias name matches a direct import of a DIFFERENT module, create ambiguity
+             *   for type-based resolution (e.g., "import WebGL" + "import WebGL.Matrices as WebGL")
              * Note: Aliases and direct imports can coexist for the same module */
             if (module_name && direct_imports) {
                 if (!has_as_clause) {
                     /* Direct import: module is now available by its original name */
                     add_direct_import(direct_imports, module_name);
-                } else {
-                    /* Aliased import: alias name shadows any direct import with same name */
-                    remove_direct_import(direct_imports, module_alias);
+                } else if (module_alias) {
+                    /* Aliased import: only remove from direct imports if it's the SAME module
+                     * being re-imported with an alias. If it's a DIFFERENT module with the same
+                     * name, don't remove - this creates an ambiguity resolved by type checking.
+                     *
+                     * Example 1: "import Html" then "import Html as H"
+                     *   -> Remove "Html" from direct imports (same module)
+                     *
+                     * Example 2: "import WebGL" then "import WebGL.Matrices as WebGL"
+                     *   -> Don't remove "WebGL" (different modules - WebGL vs WebGL.Matrices)
+                     *   -> Will be resolved by checking which exports the referenced type */
+                    if (is_directly_imported(direct_imports, module_alias) &&
+                        strcmp(module_alias, module_name) == 0) {
+                        /* Same module being re-imported with alias - remove redundant direct import */
+                        remove_direct_import(direct_imports, module_alias);
+                    }
+                    /* If different modules with same name, don't remove - creates ambiguity for type resolution */
                 }
             }
 
