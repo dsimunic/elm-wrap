@@ -111,31 +111,37 @@ void add_module_alias(ModuleAliasMap *map, const char *alias, const char *full_m
     /* Check if this alias already exists */
     for (int i = 0; i < map->aliases_count; i++) {
         if (strcmp(map->aliases[i].alias, alias) == 0) {
-            /* Same module with same alias is fine (not ambiguous) */
-            if (strcmp(map->aliases[i].full_module, full_module) == 0) {
-                /* Already have this exact mapping, nothing to do */
-                return;
+            /* Check if this exact module is already in the list */
+            for (int j = 0; j < map->aliases[i].full_modules_count; j++) {
+                if (strcmp(map->aliases[i].full_modules[j], full_module) == 0) {
+                    /* Already have this exact mapping, nothing to do */
+                    return;
+                }
             }
-            /* Different module with same alias - mark as AMBIGUOUS */
-            /* This matches Elm compiler behavior: two different modules */
-            /* imported with the same alias causes ambiguity errors on use */
-            if (!map->aliases[i].is_ambiguous) {
-                map->aliases[i].is_ambiguous = true;
-                map->aliases[i].ambiguous_with = arena_strdup(full_module);
+            /* Different module with same alias - add it to the array */
+            if (map->aliases[i].full_modules_count >= map->aliases[i].full_modules_capacity) {
+                map->aliases[i].full_modules_capacity =
+                    map->aliases[i].full_modules_capacity == 0 ? 4 : map->aliases[i].full_modules_capacity * 2;
+                map->aliases[i].full_modules = arena_realloc(
+                    map->aliases[i].full_modules,
+                    map->aliases[i].full_modules_capacity * sizeof(char*)
+                );
             }
-            /* Note: we keep the original full_module for error reporting */
+            map->aliases[i].full_modules[map->aliases[i].full_modules_count++] = arena_strdup(full_module);
             return;
         }
     }
 
+    /* New alias - create entry with first module */
     if (map->aliases_count >= map->aliases_capacity) {
         map->aliases_capacity *= 2;
         map->aliases = arena_realloc(map->aliases, map->aliases_capacity * sizeof(ModuleAlias));
     }
     map->aliases[map->aliases_count].alias = arena_strdup(alias);
-    map->aliases[map->aliases_count].full_module = arena_strdup(full_module);
-    map->aliases[map->aliases_count].is_ambiguous = false;
-    map->aliases[map->aliases_count].ambiguous_with = NULL;
+    map->aliases[map->aliases_count].full_modules_capacity = 4;
+    map->aliases[map->aliases_count].full_modules = arena_malloc(4 * sizeof(char*));
+    map->aliases[map->aliases_count].full_modules[0] = arena_strdup(full_module);
+    map->aliases[map->aliases_count].full_modules_count = 1;
     map->aliases_count++;
 }
 
@@ -167,35 +173,40 @@ const char *lookup_module_alias(ModuleAliasMap *map, const char *alias,
                                 const char **ambiguous_module2) {
     for (int i = 0; i < map->aliases_count; i++) {
         if (strcmp(map->aliases[i].alias, alias) == 0) {
-            if (map->aliases[i].is_ambiguous) {
-                /* Try to resolve ambiguous alias by checking which module exports the type */
-                if (referenced_type && dep_cache) {
-                    const char *mod1 = map->aliases[i].full_module;
-                    const char *mod2 = map->aliases[i].ambiguous_with;
+            int module_count = map->aliases[i].full_modules_count;
 
-                    bool mod1_has = module_exports_type(dep_cache, mod1, referenced_type);
-                    bool mod2_has = module_exports_type(dep_cache, mod2, referenced_type);
+            /* If only one module uses this alias, return it immediately */
+            if (module_count == 1) {
+                if (is_ambiguous) *is_ambiguous = false;
+                return map->aliases[i].full_modules[0];
+            }
 
-                    if (mod1_has && !mod2_has) {
-                        /* Only mod1 exports it - resolved! */
-                        if (is_ambiguous) *is_ambiguous = false;
-                        return mod1;
-                    } else if (mod2_has && !mod1_has) {
-                        /* Only mod2 exports it - resolved! */
-                        if (is_ambiguous) *is_ambiguous = false;
-                        return mod2;
+            /* Multiple modules use this alias - try type-based resolution */
+            if (referenced_type && dep_cache) {
+                const char *resolved_module = NULL;
+                int matches = 0;
+
+                /* Check which modules export the referenced type */
+                for (int j = 0; j < module_count; j++) {
+                    if (module_exports_type(dep_cache, map->aliases[i].full_modules[j], referenced_type)) {
+                        resolved_module = map->aliases[i].full_modules[j];
+                        matches++;
                     }
-                    /* If both export it or neither exports it, fall through to ambiguous handling */
                 }
 
-                /* Still ambiguous or couldn't resolve */
-                if (is_ambiguous) *is_ambiguous = true;
-                if (ambiguous_module1) *ambiguous_module1 = map->aliases[i].full_module;
-                if (ambiguous_module2) *ambiguous_module2 = map->aliases[i].ambiguous_with;
-                return NULL;  /* Ambiguous - cannot resolve */
+                /* If exactly one module exports it, we've resolved the ambiguity! */
+                if (matches == 1) {
+                    if (is_ambiguous) *is_ambiguous = false;
+                    return resolved_module;
+                }
+                /* If multiple modules export it or none export it, fall through to error handling */
             }
-            if (is_ambiguous) *is_ambiguous = false;
-            return map->aliases[i].full_module;
+
+            /* Still ambiguous - report error with first two modules for backward compatibility */
+            if (is_ambiguous) *is_ambiguous = true;
+            if (ambiguous_module1 && module_count > 0) *ambiguous_module1 = map->aliases[i].full_modules[0];
+            if (ambiguous_module2 && module_count > 1) *ambiguous_module2 = map->aliases[i].full_modules[1];
+            return NULL;  /* Ambiguous - cannot resolve */
         }
     }
     if (is_ambiguous) *is_ambiguous = false;
@@ -205,10 +216,10 @@ const char *lookup_module_alias(ModuleAliasMap *map, const char *alias,
 void free_module_alias_map(ModuleAliasMap *map) {
     for (int i = 0; i < map->aliases_count; i++) {
         arena_free(map->aliases[i].alias);
-        arena_free(map->aliases[i].full_module);
-        if (map->aliases[i].ambiguous_with) {
-            arena_free(map->aliases[i].ambiguous_with);
+        for (int j = 0; j < map->aliases[i].full_modules_count; j++) {
+            arena_free(map->aliases[i].full_modules[j]);
         }
+        arena_free(map->aliases[i].full_modules);
     }
     arena_free(map->aliases);
 }

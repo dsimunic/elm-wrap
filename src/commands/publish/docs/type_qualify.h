@@ -37,4 +37,10 @@ char *qualify_type_names(const char *type_str, const char *module_name,
  * This matches Elm's canonical documentation format */
 char *remove_return_type_parens(const char *type_str);
 
+/* Helper function to remove unnecessary parentheses from function argument positions.
+ * Example: "a -> (Maybe.Maybe b) -> Result.Result a ()" 
+ *    becomes: "a -> Maybe.Maybe b -> Result.Result a ()"
+ * Keeps parens that contain function arrows, commas (tuples), or are empty (unit type). */
+char *remove_unnecessary_arg_parens(const char *type_str);
+
 #endif /* TYPE_QUALIFY_H */

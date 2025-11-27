@@ -2,10 +2,13 @@
 #include "../../../alloc.h"
 #include "../../../elm_json.h"
 #include "../../../cache.h"
+#include "../../../cJSON.h"
+#include "../../../registry.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <tree_sitter/api.h>
 
 /* External tree-sitter language function */
@@ -47,6 +50,109 @@ static char *get_node_text(TSNode node, const char *source_code) {
     memcpy(text, source_code + start, length);
     text[length] = '\0';
     return text;
+}
+
+/* Resolve the highest version matching a constraint using registry.dat
+ * Returns an allocated string with the version, or NULL if not found */
+static char *resolve_version_from_registry(const char *elm_home, const char *author,
+                                            const char *name, const char *constraint) {
+    /* Build path to registry.dat */
+    char registry_path[2048];
+    snprintf(registry_path, sizeof(registry_path), "%s/packages/registry.dat", elm_home);
+
+    /* Check if registry.dat exists */
+    struct stat st;
+    if (stat(registry_path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        return NULL;  /* registry.dat doesn't exist, caller should fall back to scanning */
+    }
+
+    /* Load registry */
+    Registry *registry = registry_load_from_dat(registry_path, NULL);
+    if (!registry) {
+        return NULL;
+    }
+
+    /* Resolve constraint to highest matching version */
+    Version resolved_version;
+    bool found = registry_resolve_constraint(registry, author, name, constraint, &resolved_version);
+
+    registry_free(registry);
+
+    if (!found) {
+        return NULL;
+    }
+
+    /* Convert version to string */
+    char *version_str = version_to_string(&resolved_version);
+    return version_str;
+}
+
+/* Scan filesystem to find highest version matching a constraint
+ * Fallback when registry.dat is not available */
+static char *resolve_version_from_filesystem(const char *elm_home, const char *author,
+                                              const char *name, const char *constraint) {
+    /* Parse the constraint to get bounds */
+    int lower_major, lower_minor, lower_patch;
+    int upper_major, upper_minor, upper_patch;
+
+    int matched = sscanf(constraint, " %d.%d.%d <= v < %d.%d.%d",
+                         &lower_major, &lower_minor, &lower_patch,
+                         &upper_major, &upper_minor, &upper_patch);
+
+    if (matched != 6) {
+        /* Not a constraint, might be exact version - just return it */
+        matched = sscanf(constraint, "%d.%d.%d", &lower_major, &lower_minor, &lower_patch);
+        if (matched == 3) {
+            char *result = arena_malloc(32);
+            snprintf(result, 32, "%d.%d.%d", lower_major, lower_minor, lower_patch);
+            return result;
+        }
+        return NULL;
+    }
+
+    Version lower_bound = {(uint16_t)lower_major, (uint16_t)lower_minor, (uint16_t)lower_patch};
+    Version upper_bound = {(uint16_t)upper_major, (uint16_t)upper_minor, (uint16_t)upper_patch};
+
+    /* Scan package directory for available versions */
+    char package_dir[2048];
+    snprintf(package_dir, sizeof(package_dir), "%s/packages/%s/%s", elm_home, author, name);
+
+    DIR *dir = opendir(package_dir);
+    if (!dir) {
+        return NULL;
+    }
+
+    Version highest_version = {0, 0, 0};
+    bool found_any = false;
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+
+        /* Try to parse as version */
+        int maj, min, pat;
+        if (sscanf(entry->d_name, "%d.%d.%d", &maj, &min, &pat) == 3) {
+            Version v = {(uint16_t)maj, (uint16_t)min, (uint16_t)pat};
+
+            /* Check if within constraint bounds */
+            if (registry_version_compare(&v, &lower_bound) >= 0 &&
+                registry_version_compare(&v, &upper_bound) < 0) {
+                /* This version matches */
+                if (!found_any || registry_version_compare(&v, &highest_version) > 0) {
+                    highest_version = v;
+                    found_any = true;
+                }
+            }
+        }
+    }
+
+    closedir(dir);
+
+    if (!found_any) {
+        return NULL;
+    }
+
+    return version_to_string(&highest_version);
 }
 
 /* Build a module file path from module name (e.g., "Json.Decode" -> "Json/Decode.elm") */
@@ -107,35 +213,24 @@ static char *find_module_in_dependencies(struct DependencyCache *cache, const ch
     for (int i = 0; i < deps->count; i++) {
         Package *pkg = &deps->packages[i];
 
-        /* Extract the minimum version from constraint (e.g., "1.0.0 <= v < 2.0.0" -> "1.0.0")
-         * The version field may contain a constraint or just a version number.
-         * We parse it to extract the lower bound version. */
-        char min_version[64] = {0};
-        const char *v = pkg->version;
+        /* Resolve to the HIGHEST version matching the constraint */
+        char *resolved_version = resolve_version_from_registry(cache->elm_home, pkg->author,
+                                                                 pkg->name, pkg->version);
 
-        /* Skip leading whitespace */
-        while (*v && (*v == ' ' || *v == '\t')) v++;
-
-        /* Extract version number (digits and dots) */
-        int pos = 0;
-        while (*v && pos < (int)sizeof(min_version) - 1) {
-            if ((*v >= '0' && *v <= '9') || *v == '.') {
-                min_version[pos++] = *v++;
-            } else {
-                break;  /* Stop at first non-version character */
-            }
+        /* Fall back to filesystem scanning if registry lookup failed */
+        if (!resolved_version) {
+            resolved_version = resolve_version_from_filesystem(cache->elm_home, pkg->author,
+                                                                pkg->name, pkg->version);
         }
-        min_version[pos] = '\0';
 
-        /* If we couldn't extract a version, skip this dependency */
-        if (min_version[0] == '\0') {
-            continue;
+        if (!resolved_version) {
+            continue;  /* Couldn't resolve version */
         }
 
         /* Build path to package in ELM_HOME */
         char package_dir[2048];
         snprintf(package_dir, sizeof(package_dir), "%s/packages/%s/%s/%s/src",
-                 cache->elm_home, pkg->author, pkg->name, min_version);
+                 cache->elm_home, pkg->author, pkg->name, resolved_version);
 
         /* Convert module name to file path */
         rel_path = module_name_to_file_path(module_name);
@@ -145,13 +240,121 @@ static char *find_module_in_dependencies(struct DependencyCache *cache, const ch
 
         /* Check if file exists */
         if (stat(full_path, &st) == 0 && S_ISREG(st.st_mode)) {
+            arena_free(resolved_version);
             elm_json_free(elm_json);
             return arena_strdup(full_path);
         }
+
+        arena_free(resolved_version);
     }
 
     elm_json_free(elm_json);
     return NULL;
+}
+
+/* Parse a docs.json file to extract exported types from a package module */
+static CachedModuleExports *parse_module_exports_from_docs_json(const char *docs_json_path, const char *module_name) {
+    /* Read docs.json content */
+    char *json_content = read_file_contents(docs_json_path);
+    if (!json_content) {
+        CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
+        exports->module_name = arena_strdup(module_name);
+        exports->exported_types = NULL;
+        exports->exported_types_count = 0;
+        exports->parsed = false;
+        return exports;
+    }
+
+    /* Parse JSON */
+    cJSON *json = cJSON_Parse(json_content);
+    arena_free(json_content);
+
+    if (!json) {
+        CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
+        exports->module_name = arena_strdup(module_name);
+        exports->exported_types = NULL;
+        exports->exported_types_count = 0;
+        exports->parsed = false;
+        return exports;
+    }
+
+    /* docs.json is an array of module objects */
+    if (!cJSON_IsArray(json)) {
+        cJSON_Delete(json);
+        CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
+        exports->module_name = arena_strdup(module_name);
+        exports->exported_types = NULL;
+        exports->exported_types_count = 0;
+        exports->parsed = false;
+        return exports;
+    }
+
+    /* Find the module with matching name */
+    cJSON *target_module = NULL;
+    cJSON *module_item = NULL;
+    cJSON_ArrayForEach(module_item, json) {
+        cJSON *name_item = cJSON_GetObjectItem(module_item, "name");
+        if (name_item && cJSON_IsString(name_item)) {
+            if (strcmp(name_item->valuestring, module_name) == 0) {
+                target_module = module_item;
+                break;
+            }
+        }
+    }
+
+    if (!target_module) {
+        cJSON_Delete(json);
+        CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
+        exports->module_name = arena_strdup(module_name);
+        exports->exported_types = NULL;
+        exports->exported_types_count = 0;
+        exports->parsed = false;
+        return exports;
+    }
+
+    /* Initialize exports */
+    CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
+    exports->module_name = arena_strdup(module_name);
+    exports->parsed = true;
+
+    int capacity = 16;
+    exports->exported_types = arena_malloc(capacity * sizeof(char*));
+    exports->exported_types_count = 0;
+
+    /* Extract type names from "unions" array */
+    cJSON *unions = cJSON_GetObjectItem(target_module, "unions");
+    if (unions && cJSON_IsArray(unions)) {
+        cJSON *union_item = NULL;
+        cJSON_ArrayForEach(union_item, unions) {
+            cJSON *name_item = cJSON_GetObjectItem(union_item, "name");
+            if (name_item && cJSON_IsString(name_item)) {
+                if (exports->exported_types_count >= capacity) {
+                    capacity *= 2;
+                    exports->exported_types = arena_realloc(exports->exported_types, capacity * sizeof(char*));
+                }
+                exports->exported_types[exports->exported_types_count++] = arena_strdup(name_item->valuestring);
+            }
+        }
+    }
+
+    /* Extract type names from "aliases" array */
+    cJSON *aliases = cJSON_GetObjectItem(target_module, "aliases");
+    if (aliases && cJSON_IsArray(aliases)) {
+        cJSON *alias_item = NULL;
+        cJSON_ArrayForEach(alias_item, aliases) {
+            cJSON *name_item = cJSON_GetObjectItem(alias_item, "name");
+            if (name_item && cJSON_IsString(name_item)) {
+                if (exports->exported_types_count >= capacity) {
+                    capacity *= 2;
+                    exports->exported_types = arena_realloc(exports->exported_types, capacity * sizeof(char*));
+                }
+                exports->exported_types[exports->exported_types_count++] = arena_strdup(name_item->valuestring);
+            }
+        }
+    }
+
+    cJSON_Delete(json);
+    return exports;
 }
 
 /* Parse a module file to extract its exported types */
@@ -378,25 +581,81 @@ CachedModuleExports* dependency_cache_get_exports(struct DependencyCache *cache,
 
     /* Find the module file */
     char *module_path = find_module_in_dependencies(cache, module_name);
-    if (!module_path) {
-        /* Module not found - add a failed entry to cache */
-        if (cache->modules_count >= cache->modules_capacity) {
-            cache->modules_capacity *= 2;
-            cache->modules = arena_realloc(cache->modules, cache->modules_capacity * sizeof(CachedModuleExports));
-        }
+    CachedModuleExports *exports = NULL;
 
-        cache->modules[cache->modules_count].module_name = arena_strdup(module_name);
-        cache->modules[cache->modules_count].exported_types = NULL;
-        cache->modules[cache->modules_count].exported_types_count = 0;
-        cache->modules[cache->modules_count].parsed = false;
-        cache->modules_count++;
-
-        return &cache->modules[cache->modules_count - 1];
+    if (module_path) {
+        /* Parse the module from source */
+        exports = parse_module_exports(module_path, module_name);
+        arena_free(module_path);
     }
 
-    /* Parse the module */
-    CachedModuleExports *exports = parse_module_exports(module_path, module_name);
-    arena_free(module_path);
+    /* If source parsing failed or no source file exists, try docs.json */
+    if (!exports || !exports->parsed) {
+        /* Try to find docs.json in dependency packages */
+        ElmJson *elm_json = NULL;
+        char elm_json_path[1024];
+        snprintf(elm_json_path, sizeof(elm_json_path), "%s/elm.json", cache->package_path);
+        elm_json = elm_json_read(elm_json_path);
+
+        if (elm_json) {
+            PackageMap *deps = NULL;
+            if (elm_json->type == ELM_PROJECT_APPLICATION) {
+                deps = elm_json->dependencies_direct;
+            } else if (elm_json->type == ELM_PROJECT_PACKAGE) {
+                deps = elm_json->package_dependencies;
+            }
+
+            if (deps) {
+                for (int i = 0; i < deps->count; i++) {
+                    Package *pkg = &deps->packages[i];
+
+                    /* Resolve to the HIGHEST version matching the constraint */
+                    char *resolved_version = resolve_version_from_registry(cache->elm_home, pkg->author,
+                                                                             pkg->name, pkg->version);
+
+                    /* Fall back to filesystem scanning if registry lookup failed */
+                    if (!resolved_version) {
+                        resolved_version = resolve_version_from_filesystem(cache->elm_home, pkg->author,
+                                                                            pkg->name, pkg->version);
+                    }
+
+                    if (!resolved_version) {
+                        continue;  /* Couldn't resolve version */
+                    }
+
+                    /* Try to read docs.json from package directory */
+                    char docs_json_path[2048];
+                    snprintf(docs_json_path, sizeof(docs_json_path), "%s/packages/%s/%s/%s/docs.json",
+                             cache->elm_home, pkg->author, pkg->name, resolved_version);
+
+                    struct stat st;
+                    if (stat(docs_json_path, &st) == 0 && S_ISREG(st.st_mode)) {
+                        /* Try to parse this docs.json */
+                        CachedModuleExports *docs_exports = parse_module_exports_from_docs_json(docs_json_path, module_name);
+                        if (docs_exports && docs_exports->parsed) {
+                            if (exports) arena_free(exports);
+                            exports = docs_exports;
+                            arena_free(resolved_version);
+                            break;
+                        }
+                        if (docs_exports) arena_free(docs_exports);
+                    }
+
+                    arena_free(resolved_version);
+                }
+            }
+            elm_json_free(elm_json);
+        }
+    }
+
+    /* If still no exports, create a failed entry */
+    if (!exports) {
+        exports = arena_malloc(sizeof(CachedModuleExports));
+        exports->module_name = arena_strdup(module_name);
+        exports->exported_types = NULL;
+        exports->exported_types_count = 0;
+        exports->parsed = false;
+    }
 
     /* Add to cache */
     if (cache->modules_count >= cache->modules_capacity) {

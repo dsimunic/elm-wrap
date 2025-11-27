@@ -25,10 +25,10 @@ typedef struct {
 
 /* Module alias tracking (for 'import Foo as F') */
 typedef struct {
-    char *alias;           /* The alias used in this module (e.g., "D") */
-    char *full_module;     /* The full module name (e.g., "Json.Decode") */
-    bool is_ambiguous;     /* True if multiple different modules use this alias */
-    char *ambiguous_with;  /* If ambiguous, the other module name (for error reporting) */
+    char *alias;               /* The alias used in this module (e.g., "D") */
+    char **full_modules;       /* Array of all module names using this alias */
+    int full_modules_count;    /* Number of modules in the array */
+    int full_modules_capacity; /* Allocated capacity */
 } ModuleAlias;
 
 typedef struct {

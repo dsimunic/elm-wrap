@@ -517,6 +517,176 @@ char *expand_function_type_aliases(const char *type_str, TypeAliasMap *type_alia
     return arena_strdup(type_str);
 }
 
+/* Helper function to check if parentheses around a type component are necessary.
+ * Parens are necessary if:
+ * 1. The content contains a function arrow " -> " at the top level (function type as argument)
+ * 2. The content contains a comma at the top level (tuple)
+ * 3. The content is empty (unit type ())
+ * Returns true if parens are necessary, false if they can be removed. */
+static bool parens_are_necessary(const char *inner, size_t inner_len) {
+    /* Empty parens = unit type (), must keep */
+    if (inner_len == 0) {
+        return true;
+    }
+
+    int paren_depth = 0;
+    int brace_depth = 0;
+
+    for (size_t i = 0; i < inner_len; i++) {
+        char c = inner[i];
+
+        if (c == '(') {
+            paren_depth++;
+        } else if (c == ')') {
+            paren_depth--;
+        } else if (c == '{') {
+            brace_depth++;
+        } else if (c == '}') {
+            brace_depth--;
+        } else if (paren_depth == 0 && brace_depth == 0) {
+            /* Check for comma at top level (tuple) */
+            if (c == ',') {
+                return true;
+            }
+            /* Check for function arrow at top level */
+            if (c == '-' && i + 1 < inner_len && inner[i + 1] == '>') {
+                /* Verify it's a proper arrow with surrounding spaces */
+                bool has_space_before = (i > 0 && inner[i - 1] == ' ');
+                bool has_space_after = (i + 2 < inner_len && inner[i + 2] == ' ');
+                if (has_space_before && has_space_after) {
+                    return true;  /* Function type - parens needed */
+                }
+            }
+        }
+    }
+
+    return false;  /* No arrow or comma at top level - parens not needed */
+}
+
+/* Helper function to remove unnecessary parentheses from function argument positions.
+ * For example: "a -> (Maybe.Maybe b) -> Result.Result a ()" 
+ *    becomes:  "a -> Maybe.Maybe b -> Result.Result a ()"
+ * 
+ * This handles cases where type alias expansion introduces parens that are no longer
+ * needed in the function type context.
+ * 
+ * IMPORTANT: This only removes parens that wrap an ENTIRE function argument component
+ * (i.e., the part between " -> " arrows). It does NOT remove parens that are arguments
+ * to type constructors like `Field a b (Html (Msg x))` - those parens are necessary.
+ * 
+ * Parens are kept when they:
+ * 1. Contain a function arrow (grouping a function type as an argument)
+ * 2. Contain a comma (tuple)
+ * 3. Are empty (unit type)
+ */
+char *remove_unnecessary_arg_parens(const char *type_str) {
+    if (!type_str || !*type_str) {
+        return arena_strdup(type_str ? type_str : "");
+    }
+
+    /* Strategy: Split by top-level " -> ", process each component, rejoin.
+     * A component's outer parens are unnecessary only if:
+     * 1. They wrap the ENTIRE component (not just part of it)
+     * 2. The inner content doesn't contain top-level " -> " or ","
+     * 3. The inner content is not empty
+     */
+
+    size_t len = strlen(type_str);
+    
+    /* First, find all top-level " -> " positions */
+    const char *arrows[64];  /* Max 64 arrows should be plenty */
+    int arrow_count = 0;
+    
+    const char *p = type_str;
+    int paren_depth = 0;
+    int brace_depth = 0;
+    
+    while (*p && arrow_count < 64) {
+        if (*p == '(') paren_depth++;
+        else if (*p == ')') paren_depth--;
+        else if (*p == '{') brace_depth++;
+        else if (*p == '}') brace_depth--;
+        else if (paren_depth == 0 && brace_depth == 0 &&
+                 *p == ' ' && *(p+1) == '-' && *(p+2) == '>' && *(p+3) == ' ') {
+            arrows[arrow_count++] = p;
+            p += 3;  /* Skip past " ->" , the loop will advance past the trailing space */
+        }
+        p++;
+    }
+    
+    /* If no arrows, nothing to process for function arguments */
+    if (arrow_count == 0) {
+        return arena_strdup(type_str);
+    }
+    
+    /* Build result by processing each component */
+    char *result = arena_malloc(len + 1);
+    size_t result_pos = 0;
+    
+    const char *comp_start = type_str;
+    
+    for (int i = 0; i <= arrow_count; i++) {
+        const char *comp_end = (i < arrow_count) ? arrows[i] : (type_str + len);
+        size_t comp_len = comp_end - comp_start;
+        
+        /* Skip leading spaces */
+        while (comp_len > 0 && *comp_start == ' ') {
+            comp_start++;
+            comp_len--;
+        }
+        /* Skip trailing spaces */
+        while (comp_len > 0 && *(comp_start + comp_len - 1) == ' ') {
+            comp_len--;
+        }
+        
+        /* Check if this component is wrapped in parens that cover the entire component */
+        bool should_unwrap = false;
+        if (comp_len >= 2 && *comp_start == '(') {
+            /* Check if the matching ')' is at the end */
+            int depth = 1;
+            const char *scan = comp_start + 1;
+            const char *comp_limit = comp_start + comp_len;
+            
+            while (scan < comp_limit && depth > 0) {
+                if (*scan == '(') depth++;
+                else if (*scan == ')') depth--;
+                scan++;
+            }
+            
+            /* If depth reached 0 exactly at the end, parens wrap entire component */
+            if (depth == 0 && scan == comp_limit) {
+                /* Check if inner content requires parens */
+                const char *inner = comp_start + 1;
+                size_t inner_len = comp_len - 2;  /* Exclude both parens */
+                
+                if (!parens_are_necessary(inner, inner_len)) {
+                    should_unwrap = true;
+                }
+            }
+        }
+        
+        /* Copy component (unwrapped if applicable) */
+        if (should_unwrap) {
+            memcpy(result + result_pos, comp_start + 1, comp_len - 2);
+            result_pos += comp_len - 2;
+        } else {
+            memcpy(result + result_pos, comp_start, comp_len);
+            result_pos += comp_len;
+        }
+        
+        /* Add " -> " separator if not the last component */
+        if (i < arrow_count) {
+            memcpy(result + result_pos, " -> ", 4);
+            result_pos += 4;
+            comp_start = arrows[i] + 4;  /* Skip past " -> " */
+        }
+    }
+    
+    result[result_pos] = '\0';
+    
+    return result;
+}
+
 /* Helper function to qualify type names based on import map and local types */
 char *qualify_type_names(const char *type_str, const char *module_name,
                          ImportMap *import_map, ModuleAliasMap *alias_map,

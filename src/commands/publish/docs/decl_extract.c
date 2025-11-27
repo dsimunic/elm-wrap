@@ -32,8 +32,12 @@ char *extract_type_expression(TSNode type_node, const char *source_code, const c
     arena_free(expanded);
 
     /* Remove unnecessary outer parentheses from return type */
-    char *canonical = remove_return_type_parens(qualified);
+    char *return_cleaned = remove_return_type_parens(qualified);
     arena_free(qualified);
+
+    /* Remove unnecessary parentheses from function argument positions */
+    char *canonical = remove_unnecessary_arg_parens(return_cleaned);
+    arena_free(return_cleaned);
 
     return canonical;
 }
