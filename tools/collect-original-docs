@@ -67,8 +67,8 @@ process_package() {
     # Replace path separators with underscores to create flat filename
     local flat_name="${relative_path//\//_}"
 
-    # Format docs.json with jq (normalizing line endings) and save with flat name
-    jq . "$docs_json_path" | tr -d '\r' > "$TARGET_DIR/${flat_name}_docs.json"
+    # Normalize \r\n to \n (in JSON string escapes) then format with jq
+    sed "s/\\\\r\\\\n/\\\\n/g" "$docs_json_path" | jq . > "$TARGET_DIR/${flat_name}_docs.json"
 
     echo "Copied: ${flat_name}_docs.json"
     COPIED_COUNT=$((COPIED_COUNT + 1))

@@ -10,6 +10,7 @@ ELM_WRAP_BIN="$PROJECT_ROOT/bin/elm-wrap"
 # Default paths
 DEFAULT_REPOSITORY_DIR="/Volumes/Devel/var/elm-wrap/package_repository/0.19.1/packages/"
 DEFAULT_TARGET_DIR="$PROJECT_ROOT/tmp/docs"
+PATCHES_DIR="$SCRIPT_DIR/docs-patches"
 
 # Logging function
 log() {
@@ -77,6 +78,7 @@ TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 GENERATED_COUNT=0
 GENERATE_FAIL_COUNT=0
 SUCCESS_COUNT=0
+WHITELISTED_COUNT=0
 FAIL_COUNT=0
 MISSING_ORIGINAL=0
 
@@ -96,6 +98,39 @@ log ""
 
 # Record start time
 START_TIME=$(date +%s)
+
+# Check if a patch exists for this package and apply it to test if it accounts for all differences
+# Usage: check_patch_whitelisted <original_file> <generated_file> <flat_name>
+# Returns 0 if patch exists and applying it makes files match, 1 otherwise
+check_patch_whitelisted() {
+    local original_file="$1"
+    local generated_file="$2"
+    local flat_name="$3"
+    
+    local patch_file="$PATCHES_DIR/${flat_name}.patch"
+    
+    # If no patch file exists, not whitelisted
+    if [ ! -f "$patch_file" ]; then
+        return 1
+    fi
+    
+    # Create a temporary copy of the generated file
+    local tmpfile
+    tmpfile=$(mktemp)
+    cp "$generated_file" "$tmpfile"
+    
+    # Try to apply the patch
+    if patch --quiet --forward "$tmpfile" < "$patch_file" 2>/dev/null; then
+        # Patch applied successfully, compare with original
+        if diff -q "$original_file" "$tmpfile" > /dev/null 2>&1; then
+            rm -f "$tmpfile"
+            return 0
+        fi
+    fi
+    
+    rm -f "$tmpfile"
+    return 1
+}
 
 # Generate and compare docs for each package
 log "Generating and comparing documentation..."
@@ -184,6 +219,8 @@ process_package() {
 
     if diff -q "$original_file" "$output_file" > /dev/null 2>&1; then
         SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    elif check_patch_whitelisted "$original_file" "$output_file" "$flat_name"; then
+        WHITELISTED_COUNT=$((WHITELISTED_COUNT + 1))
     else
         log_err "[different] $package_path"
         FAIL_COUNT=$((FAIL_COUNT + 1))
@@ -232,7 +269,7 @@ fi
 
 END_TIME=$(date +%s)
 TOTAL_DURATION=$((END_TIME - START_TIME))
-TOTAL_COMPARED=$((SUCCESS_COUNT + FAIL_COUNT))
+TOTAL_COMPARED=$((SUCCESS_COUNT + WHITELISTED_COUNT + FAIL_COUNT))
 
 log ""
 if [ $STOPPED_EARLY -eq 1 ]; then
@@ -244,6 +281,9 @@ log "Total packages processed: $GENERATED_COUNT"
 log "Generation failures: $GENERATE_FAIL_COUNT"
 log "Total packages compared: $TOTAL_COMPARED"
 log "Successes: $SUCCESS_COUNT"
+if [ $WHITELISTED_COUNT -gt 0 ]; then
+    log "Whitelisted: $WHITELISTED_COUNT"
+fi
 log "Failures: $FAIL_COUNT"
 if [ $MISSING_ORIGINAL -gt 0 ]; then
     log "Missing originals: $MISSING_ORIGINAL"

@@ -12,3 +12,4 @@ doc/wip/
 .DS_Store
 test/example/
 test/example-lamdera/
+tools/docs-patches/

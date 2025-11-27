@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Default paths
+DEFAULT_REPOSITORY_DIR="/Volumes/Devel/var/elm-wrap/package_repository/0.19.1/packages/"
+DEFAULT_TARGET_DIR="$PROJECT_ROOT/tmp/docs"
+PATCHES_DIR="$SCRIPT_DIR/docs-patches"
+
+# Logging function
+log() {
+    echo "$@"
+}
+
+log_err() {
+    echo "$@" >&2
+}
+
+# Usage message
+usage() {
+    log "Usage: $(basename "$0") [<repository-path> <target-path>] <author/package/version>"
+    log ""
+    log "Creates a whitelist patch for a package's expected documentation diff."
+    log ""
+    log "Arguments:"
+    log "  <repository-path>       Path to the package repository (default: $DEFAULT_REPOSITORY_DIR)"
+    log "  <target-path>           Path where docs files are stored (default: tmp/docs)"
+    log "  <author/package/version> Package identifier (e.g., elm/core/1.0.0)"
+    log ""
+    log "The patch file will be saved to: $PATCHES_DIR/<author>_<package>_<version>.patch"
+    exit 1
+}
+
+# Parse arguments
+if [ $# -eq 1 ]; then
+    REPOSITORY_DIR="$DEFAULT_REPOSITORY_DIR"
+    TARGET_DIR="$DEFAULT_TARGET_DIR"
+    PACKAGE_PATH="$1"
+elif [ $# -eq 3 ]; then
+    REPOSITORY_DIR="$1"
+    TARGET_DIR="$2"
+    PACKAGE_PATH="$3"
+else
+    usage
+fi
+
+# Check if repository directory exists
+if [ ! -d "$REPOSITORY_DIR" ]; then
+    log_err "Error: Repository directory not found at $REPOSITORY_DIR"
+    exit 1
+fi
+
+# Check if target directory exists
+if [ ! -d "$TARGET_DIR" ]; then
+    log_err "Error: Target directory not found at $TARGET_DIR"
+    exit 1
+fi
+
+# Convert to absolute paths
+REPOSITORY_DIR="$(cd "$REPOSITORY_DIR" && pwd)"
+TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+
+# Convert package path (author/package/version) to flat name (author_package_version)
+FLAT_NAME="${PACKAGE_PATH//\//_}"
+
+# Construct file paths
+ORIGINAL_FILE="$TARGET_DIR/${FLAT_NAME}_docs.json"
+GENERATED_FILE="$TARGET_DIR/${FLAT_NAME}_docs.generated.json"
+PATCH_FILE="$PATCHES_DIR/${FLAT_NAME}.patch"
+
+# Check if files exist
+if [ ! -f "$ORIGINAL_FILE" ]; then
+    log_err "Error: Original docs not found: $ORIGINAL_FILE"
+    log_err "Run 'tools/collect-original-docs' first to collect original docs."
+    exit 1
+fi
+
+if [ ! -f "$GENERATED_FILE" ]; then
+    log_err "Error: Generated docs not found: $GENERATED_FILE"
+    log_err "Run 'tools/validate-docs $PACKAGE_PATH' first to generate docs."
+    exit 1
+fi
+
+# Check if there's actually a difference
+if diff -q "$ORIGINAL_FILE" "$GENERATED_FILE" > /dev/null 2>&1; then
+    log "No difference found between original and generated docs."
+    log "Nothing to whitelist."
+    exit 0
+fi
+
+# Ensure patches directory exists
+mkdir -p "$PATCHES_DIR"
+
+# Show the diff first
+log "=== Package: $PACKAGE_PATH ==="
+log ""
+log "=== Diff (generated → original) ==="
+diff -u "$GENERATED_FILE" "$ORIGINAL_FILE" || true
+log ""
+
+# Create the patch (generated → original, so applying to generated yields original)
+diff -u "$GENERATED_FILE" "$ORIGINAL_FILE" > "$PATCH_FILE" || true
+
+log "=== Patch saved ==="
+log "Created: $PATCH_FILE"
+log ""
+
+# Verify the patch works
+log "=== Verifying patch ==="
+TMPFILE=$(mktemp)
+cp "$GENERATED_FILE" "$TMPFILE"
+
+if patch --quiet --forward "$TMPFILE" < "$PATCH_FILE" 2>/dev/null; then
+    if diff -q "$ORIGINAL_FILE" "$TMPFILE" > /dev/null 2>&1; then
+        log "✓ Patch verified successfully"
+    else
+        log_err "✗ Warning: Patched file doesn't match original exactly"
+    fi
+else
+    log_err "✗ Warning: Patch failed to apply cleanly"
+fi
+
+rm -f "$TMPFILE"
