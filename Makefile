@@ -56,6 +56,13 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/config.c \
           $(SRCDIR)/commands/publish/docs/docs.c \
           $(SRCDIR)/commands/publish/docs/elm_docs.c \
+          $(SRCDIR)/commands/publish/docs/type_maps.c \
+          $(SRCDIR)/commands/publish/docs/tree_util.c \
+          $(SRCDIR)/commands/publish/docs/comment_extract.c \
+          $(SRCDIR)/commands/publish/docs/type_qualify.c \
+          $(SRCDIR)/commands/publish/docs/module_parse.c \
+          $(SRCDIR)/commands/publish/docs/decl_extract.c \
+          $(SRCDIR)/commands/publish/docs/docs_json.c \
           $(SRCDIR)/commands/publish/docs/dependency_cache.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter/lib.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/parser.c \
@@ -92,6 +99,13 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/config.o \
           $(BUILDDIR)/docs.o \
           $(BUILDDIR)/elm_docs.o \
+          $(BUILDDIR)/type_maps.o \
+          $(BUILDDIR)/tree_util.o \
+          $(BUILDDIR)/comment_extract.o \
+          $(BUILDDIR)/type_qualify.o \
+          $(BUILDDIR)/module_parse.o \
+          $(BUILDDIR)/decl_extract.o \
+          $(BUILDDIR)/docs_json.o \
           $(BUILDDIR)/dependency_cache.o \
           $(BUILDDIR)/ts_lib.o \
           $(BUILDDIR)/ts_elm_parser.o \
@@ -195,12 +209,40 @@ $(BUILDDIR)/config.o: $(SRCDIR)/config.c $(SRCDIR)/config.h $(SRCDIR)/cache.h $(
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build docs object
-$(BUILDDIR)/docs.o: $(SRCDIR)/commands/publish/docs/docs.c $(SRCDIR)/commands/publish/docs/docs.h $(SRCDIR)/commands/publish/docs/elm_docs.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/cache.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
+$(BUILDDIR)/docs.o: $(SRCDIR)/commands/publish/docs/docs.c $(SRCDIR)/commands/publish/docs/docs.h $(SRCDIR)/commands/publish/docs/elm_docs.h $(SRCDIR)/commands/publish/docs/docs_json.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/cache.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build elm_docs object
-$(BUILDDIR)/elm_docs.o: $(SRCDIR)/commands/publish/docs/elm_docs.c $(SRCDIR)/commands/publish/docs/elm_docs.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+$(BUILDDIR)/elm_docs.o: $(SRCDIR)/commands/publish/docs/elm_docs.c $(SRCDIR)/commands/publish/docs/elm_docs.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/commands/publish/docs/type_maps.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/commands/publish/docs/comment_extract.h $(SRCDIR)/commands/publish/docs/type_qualify.h $(SRCDIR)/commands/publish/docs/module_parse.h $(SRCDIR)/commands/publish/docs/decl_extract.h $(SRCDIR)/commands/publish/docs/docs_json.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build type_maps object
+$(BUILDDIR)/type_maps.o: $(SRCDIR)/commands/publish/docs/type_maps.c $(SRCDIR)/commands/publish/docs/type_maps.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build tree_util object
+$(BUILDDIR)/tree_util.o: $(SRCDIR)/commands/publish/docs/tree_util.c $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build comment_extract object
+$(BUILDDIR)/comment_extract.o: $(SRCDIR)/commands/publish/docs/comment_extract.c $(SRCDIR)/commands/publish/docs/comment_extract.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build type_qualify object
+$(BUILDDIR)/type_qualify.o: $(SRCDIR)/commands/publish/docs/type_qualify.c $(SRCDIR)/commands/publish/docs/type_qualify.h $(SRCDIR)/commands/publish/docs/type_maps.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build module_parse object
+$(BUILDDIR)/module_parse.o: $(SRCDIR)/commands/publish/docs/module_parse.c $(SRCDIR)/commands/publish/docs/module_parse.h $(SRCDIR)/commands/publish/docs/type_maps.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build decl_extract object
+$(BUILDDIR)/decl_extract.o: $(SRCDIR)/commands/publish/docs/decl_extract.c $(SRCDIR)/commands/publish/docs/decl_extract.h $(SRCDIR)/commands/publish/docs/type_maps.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/commands/publish/docs/type_qualify.h $(SRCDIR)/commands/publish/docs/comment_extract.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build docs_json object
+$(BUILDDIR)/docs_json.o: $(SRCDIR)/commands/publish/docs/docs_json.c $(SRCDIR)/commands/publish/docs/docs_json.h $(SRCDIR)/commands/publish/docs/elm_docs.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build dependency_cache object
 $(BUILDDIR)/dependency_cache.o: $(SRCDIR)/commands/publish/docs/dependency_cache.c $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/alloc.h | $(BUILDDIR)

@@ -1,5 +1,6 @@
 #include "docs.h"
 #include "elm_docs.h"
+#include "docs_json.h"
 #include "dependency_cache.h"
 #include "../../../alloc.h"
 #include "../../../progname.h"

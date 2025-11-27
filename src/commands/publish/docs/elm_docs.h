@@ -2,9 +2,7 @@
 #define ELM_DOCS_H
 
 #include <stdbool.h>
-
-/* Forward declaration */
-typedef struct DependencyCache DependencyCache;
+#include "dependency_cache.h"
 
 /* Data structures for documentation */
 typedef struct {
@@ -60,6 +58,5 @@ typedef struct {
 /* Function declarations */
 bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *dep_cache);
 void free_elm_docs(ElmModuleDocs *docs);
-void print_docs_json(ElmModuleDocs *docs, int docs_count);
 
 #endif /* ELM_DOCS_H */

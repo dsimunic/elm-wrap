@@ -6,8 +6,8 @@
 /* Forward declaration - typedef is provided by including file */
 typedef struct CachedModuleExports CachedModuleExports;
 
-/* Note: DependencyCache is forward-declared in elm_docs.h */
-struct DependencyCache;
+/* Forward declaration with typedef */
+typedef struct DependencyCache DependencyCache;
 
 /* Cached exports for a single module */
 struct CachedModuleExports {
