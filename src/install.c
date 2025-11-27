@@ -1087,12 +1087,13 @@ static void print_cache_usage(void) {
     printf("Cache management commands.\n");
     printf("\n");
     printf("Subcommands:\n");
-    printf("  <PACKAGE>                          Download package to cache\n");
+    printf("  <PACKAGE> [VERSION]                Download package to cache\n");
     printf("  check <PACKAGE>                    Check cache status for a package\n");
     printf("  full-scan                          Scan entire cache and verify all packages\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s package cache elm/html                  # Download elm/html and its dependencies\n", program_name);
+    printf("  %s package cache elm/html                  # Download latest elm/html\n", program_name);
+    printf("  %s package cache elm/html 1.0.0            # Download specific version\n", program_name);
     printf("  %s package cache check elm/html            # Check cache status for elm/html\n", program_name);
     printf("  %s package cache check elm/html --fix-broken # Re-download broken versions\n", program_name);
     printf("  %s package cache full-scan                 # Scan all packages in cache\n", program_name);
@@ -1101,6 +1102,7 @@ static void print_cache_usage(void) {
     printf("  %s package cache --major elm/html         # Download next major version\n", program_name);
     printf("\n");
     printf("Download Options:\n");
+    printf("  <PACKAGE> <VERSION>             # Download specific version (e.g., 1.0.0)\n");
     printf("  --from-file <path> <package>    # Download from local file/directory to cache\n");
     printf("  --from-url <url> <package>      # Download from URL to cache\n");
     printf("  --major <package>               # Download next major version to cache\n");
@@ -1127,6 +1129,7 @@ int cmd_cache(int argc, char *argv[]) {
     }
 
     const char *package_arg = NULL;
+    const char *version_arg = NULL;
     const char *from_file_path = NULL;
     const char *from_url = NULL;
     const char *major_package_name = NULL;
@@ -1173,11 +1176,15 @@ int cmd_cache(int argc, char *argv[]) {
                 return 1;
             }
         } else if (argv[i][0] != '-') {
-            if (package_arg) {
-                fprintf(stderr, "Error: Multiple package names specified\n");
+            if (!package_arg) {
+                package_arg = argv[i];
+            } else if (!version_arg) {
+                /* Second positional arg is version (e.g., "1.0.0") */
+                version_arg = argv[i];
+            } else {
+                fprintf(stderr, "Error: Too many positional arguments\n");
                 return 1;
             }
-            package_arg = argv[i];
         } else {
             fprintf(stderr, "Error: Unknown option: %s\n", argv[i]);
             return 1;
@@ -1399,8 +1406,40 @@ int cmd_cache(int argc, char *argv[]) {
             return 1;
         }
 
-        // For --major, find next major version
-        if (major_upgrade) {
+        // Use specified version or find appropriate version
+        if (version_arg) {
+            // User specified a specific version - validate it exists
+            Version requested = version_parse(version_arg);
+            bool found = false;
+            for (size_t i = 0; i < registry_entry->version_count; i++) {
+                if (registry_version_compare(&registry_entry->versions[i], &requested) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                log_error("Version %s not found for package %s/%s", version_arg, author, name);
+                log_error("Available versions:");
+                size_t show_count = registry_entry->version_count < 10 ? registry_entry->version_count : 10;
+                for (size_t i = 0; i < show_count; i++) {
+                    char *v = version_to_string(&registry_entry->versions[i]);
+                    if (v) {
+                        log_error("  %s", v);
+                        arena_free(v);
+                    }
+                }
+                if (registry_entry->version_count > 10) {
+                    log_error("  ... and %zu more", registry_entry->version_count - 10);
+                }
+                arena_free(author);
+                arena_free(name);
+                install_env_free(env);
+                log_set_level(original_level);
+                return 1;
+            }
+            version = arena_strdup(version_arg);
+        } else if (major_upgrade) {
+            // For --major, find next major version
             // Would need current version to determine "next major"
             // For cache, just use latest for now
             version = version_to_string(&registry_entry->versions[0]);
