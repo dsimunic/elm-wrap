@@ -243,11 +243,27 @@ static int process_files(FileList *files, const char *base_path) {
     char elm_json_path[1024];
     snprintf(elm_json_path, sizeof(elm_json_path), "%s/elm.json", base_path);
 
+    /* Check if elm.json exists */
+    FILE *elm_json_check = fopen(elm_json_path, "r");
+    bool elm_json_exists = (elm_json_check != NULL);
+    if (elm_json_check) {
+        fclose(elm_json_check);
+    }
+
     bool has_elm_json = parse_elm_json(elm_json_path, &exposed);
     if (has_elm_json) {
         fprintf(stderr, "Found elm.json with %d exposed module(s)\n", exposed.count);
+    } else if (elm_json_exists) {
+        /* File exists but parse failed - this is an error for packages */
+        fprintf(stderr, "ERROR: elm.json exists but is missing required 'exposed-modules' field or has invalid format\n");
+        fprintf(stderr, "Package elm.json must contain 'exposed-modules' field with at least one module\n");
+        exposed_modules_free(&exposed);
+        return 1;
     } else {
-        fprintf(stderr, "No elm.json found or failed to parse, including all modules\n");
+        fprintf(stderr, "ERROR: elm.json not found at %s\n", elm_json_path);
+        fprintf(stderr, "Package documentation requires a valid elm.json with 'exposed-modules' field\n");
+        exposed_modules_free(&exposed);
+        return 1;
     }
 
     /* Initialize dependency cache */
@@ -277,9 +293,8 @@ static int process_files(FileList *files, const char *base_path) {
         if (!parse_elm_file(files->paths[i], &all_docs[doc_index], dep_cache)) {
             fprintf(stderr, "Warning: Failed to parse %s\n", files->paths[i]);
         } else {
-            /* Check if module is exposed (if we have elm.json) */
-            bool is_exposed = !has_elm_json ||
-                             exposed_modules_contains(&exposed, all_docs[doc_index].name);
+            /* Check if module is exposed */
+            bool is_exposed = exposed_modules_contains(&exposed, all_docs[doc_index].name);
 
             if (is_exposed) {
                 fprintf(stderr, "Successfully parsed: %s (Module: %s)\n",
