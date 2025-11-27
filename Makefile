@@ -64,6 +64,8 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/publish/docs/decl_extract.c \
           $(SRCDIR)/commands/publish/docs/docs_json.c \
           $(SRCDIR)/commands/publish/docs/dependency_cache.c \
+          $(SRCDIR)/commands/code/code.c \
+          $(SRCDIR)/commands/code/format.c \
           $(SRCDIR)/commands/cache/check/cache_check.c \
           $(SRCDIR)/commands/cache/full_scan/cache_full_scan.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter/lib.c \
@@ -109,6 +111,8 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/decl_extract.o \
           $(BUILDDIR)/docs_json.o \
           $(BUILDDIR)/dependency_cache.o \
+          $(BUILDDIR)/code.o \
+          $(BUILDDIR)/format.o \
           $(BUILDDIR)/cache_check.o \
           $(BUILDDIR)/cache_full_scan.o \
           $(BUILDDIR)/ts_lib.o \
@@ -250,6 +254,14 @@ $(BUILDDIR)/docs_json.o: $(SRCDIR)/commands/publish/docs/docs_json.c $(SRCDIR)/c
 
 # Build dependency_cache object
 $(BUILDDIR)/dependency_cache.o: $(SRCDIR)/commands/publish/docs/dependency_cache.c $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build code command object
+$(BUILDDIR)/code.o: $(SRCDIR)/commands/code/code.c $(SRCDIR)/commands/code/code.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build format command object
+$(BUILDDIR)/format.o: $(SRCDIR)/commands/code/format.c $(SRCDIR)/commands/code/code.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
 
 # Build cache_check object

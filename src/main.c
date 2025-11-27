@@ -12,6 +12,7 @@
 #include "diff.h"
 #include "publish.h"
 #include "config.h"
+#include "commands/code/code.h"
 #include "alloc.h"
 #include "log.h"
 #include "progname.h"
@@ -30,6 +31,7 @@ void print_usage(const char *prog) {
     printf("  config             Display current configuration\n");
     printf("  publish SUBCOMMAND Publishing commands\n");
     printf("  package SUBCOMMAND Package management commands\n");
+    printf("  code SUBCOMMAND    Code analysis and transformation commands\n");
     printf("\nOptions:\n");
     printf("  -v, --verbose      Show detailed logging output\n");
     printf("  -V                 Show version number\n");
@@ -190,6 +192,10 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "config") == 0) {
             return cmd_config(argc - 1, argv + 1);
+        }
+
+        if (strcmp(argv[1], "code") == 0) {
+            return cmd_code(argc - 1, argv + 1);
         }
 
         // Unknown command
