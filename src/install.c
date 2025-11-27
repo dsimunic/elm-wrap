@@ -11,6 +11,7 @@
 #include "progname.h"
 #include "fileutil.h"
 #include "commands/cache/check/cache_check.h"
+#include "commands/cache/full_scan/cache_full_scan.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1088,11 +1089,13 @@ static void print_cache_usage(void) {
     printf("Subcommands:\n");
     printf("  <PACKAGE>                          Download package to cache\n");
     printf("  check <PACKAGE>                    Check cache status for a package\n");
+    printf("  full-scan                          Scan entire cache and verify all packages\n");
     printf("\n");
     printf("Examples:\n");
     printf("  %s package cache elm/html                  # Download elm/html and its dependencies\n", program_name);
     printf("  %s package cache check elm/html            # Check cache status for elm/html\n", program_name);
     printf("  %s package cache check elm/html --fix-broken # Re-download broken versions\n", program_name);
+    printf("  %s package cache full-scan                 # Scan all packages in cache\n", program_name);
     printf("  %s package cache --from-url <url> elm/html # Download from URL to cache\n", program_name);
     printf("  %s package cache --from-file ./pkg elm/html # Download from local file to cache\n", program_name);
     printf("  %s package cache --major elm/html         # Download next major version\n", program_name);
@@ -1108,12 +1111,19 @@ static void print_cache_usage(void) {
     printf("Check Options:\n");
     printf("  --purge-broken                  # Remove broken directories without re-downloading\n");
     printf("  --fix-broken                    # Try to re-download broken versions\n");
+    printf("\n");
+    printf("Full-scan Options:\n");
+    printf("  -q, --quiet                     # Only show summary counts\n");
+    printf("  -v, --verbose                   # Show all issues including missing latest\n");
 }
 
 int cmd_cache(int argc, char *argv[]) {
-    /* Check for 'check' subcommand first */
+    /* Check for subcommands first */
     if (argc >= 2 && strcmp(argv[1], "check") == 0) {
         return cmd_cache_check(argc - 1, argv + 1);
+    }
+    if (argc >= 2 && strcmp(argv[1], "full-scan") == 0) {
+        return cmd_cache_full_scan(argc - 1, argv + 1);
     }
 
     const char *package_arg = NULL;

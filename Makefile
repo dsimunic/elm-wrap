@@ -65,6 +65,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/publish/docs/docs_json.c \
           $(SRCDIR)/commands/publish/docs/dependency_cache.c \
           $(SRCDIR)/commands/cache/check/cache_check.c \
+          $(SRCDIR)/commands/cache/full_scan/cache_full_scan.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter/lib.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/parser.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/scanner.c \
@@ -109,6 +110,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/docs_json.o \
           $(BUILDDIR)/dependency_cache.o \
           $(BUILDDIR)/cache_check.o \
+          $(BUILDDIR)/cache_full_scan.o \
           $(BUILDDIR)/ts_lib.o \
           $(BUILDDIR)/ts_elm_parser.o \
           $(BUILDDIR)/ts_elm_scanner.o \
@@ -252,6 +254,10 @@ $(BUILDDIR)/dependency_cache.o: $(SRCDIR)/commands/publish/docs/dependency_cache
 
 # Build cache_check object
 $(BUILDDIR)/cache_check.o: $(SRCDIR)/commands/cache/check/cache_check.c $(SRCDIR)/commands/cache/check/cache_check.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/install_env.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build cache_full_scan object
+$(BUILDDIR)/cache_full_scan.o: $(SRCDIR)/commands/cache/full_scan/cache_full_scan.c $(SRCDIR)/commands/cache/full_scan/cache_full_scan.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/install_env.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build tree-sitter lib object
