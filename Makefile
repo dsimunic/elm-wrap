@@ -85,6 +85,10 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/fileutil.c \
           $(SRCDIR)/pgsolver/pg_core.c \
           $(SRCDIR)/pgsolver/pg_elm.c \
+          $(SRCDIR)/ast/skeleton.c \
+          $(SRCDIR)/ast/qualify.c \
+          $(SRCDIR)/ast/canonicalize.c \
+          $(SRCDIR)/ast/util.c \
           $(SRCDIR)/vendor/sha1.c \
           $(SRCDIR)/vendor/sha256.c \
           $(SRCDIR)/vendor/miniz.c
@@ -132,6 +136,10 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/fileutil.o \
           $(BUILDDIR)/pg_core.o \
           $(BUILDDIR)/pg_elm.o \
+          $(BUILDDIR)/ast_skeleton.o \
+          $(BUILDDIR)/ast_qualify.o \
+          $(BUILDDIR)/ast_canonicalize.o \
+          $(BUILDDIR)/ast_util.o \
           $(BUILDDIR)/sha1.o \
           $(BUILDDIR)/sha256.o \
           $(BUILDDIR)/miniz.o \
@@ -315,6 +323,22 @@ $(BUILDDIR)/pg_core.o: $(SRCDIR)/pgsolver/pg_core.c $(SRCDIR)/pgsolver/pg_core.h
 # Build Elm adapter object
 $(BUILDDIR)/pg_elm.o: $(SRCDIR)/pgsolver/pg_elm.c $(SRCDIR)/pgsolver/pg_elm.h $(SRCDIR)/pgsolver/pg_core.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build AST skeleton object
+$(BUILDDIR)/ast_skeleton.o: $(SRCDIR)/ast/skeleton.c $(SRCDIR)/ast/skeleton.h $(SRCDIR)/ast/util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build AST qualify object
+$(BUILDDIR)/ast_qualify.o: $(SRCDIR)/ast/qualify.c $(SRCDIR)/ast/qualify.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/ast/util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build AST canonicalize object
+$(BUILDDIR)/ast_canonicalize.o: $(SRCDIR)/ast/canonicalize.c $(SRCDIR)/ast/canonicalize.h $(SRCDIR)/ast/util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build AST util object
+$(BUILDDIR)/ast_util.o: $(SRCDIR)/ast/util.c $(SRCDIR)/ast/util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
 
 # Build pg_core test object
 $(BUILDDIR)/pg_core_test.o: test/src/pg_core_test.c $(SRCDIR)/pgsolver/pg_core.h | $(BUILDDIR)

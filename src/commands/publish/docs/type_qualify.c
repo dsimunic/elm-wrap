@@ -790,8 +790,24 @@ char *qualify_type_names(const char *type_str, const char *module_name,
                             memcpy(result + pos, start, len);
                             pos += len;
                         } else {
-                            bool should_expand = (full_module != NULL) &&
-                                                !is_directly_imported(direct_imports, typename_buf);
+                            /* Check if this is a case where an aliased submodule should use the parent module name.
+                             * Example: "import Svg" + "import Svg.Lazy as Svg"
+                             * When we see Svg.Attribute (which refers to Svg.Lazy via the alias),
+                             * we should keep it as "Svg" instead of expanding to "Svg.Lazy"
+                             * because Svg is directly imported. */
+                            bool is_aliased_submodule_of_direct_parent = false;
+                            if (full_module != NULL) {
+                                /* Check if full_module (e.g., "Svg.Lazy") is a submodule of typename_buf (e.g., "Svg")
+                                 * and typename_buf is directly imported */
+                                size_t alias_len = strlen(typename_buf);
+                                if (strncmp(full_module, typename_buf, alias_len) == 0 &&
+                                    full_module[alias_len] == '.' &&
+                                    is_directly_imported(direct_imports, typename_buf)) {
+                                    is_aliased_submodule_of_direct_parent = true;
+                                }
+                            }
+
+                            bool should_expand = (full_module != NULL) && !is_aliased_submodule_of_direct_parent;
 
                             if (should_expand) {
                                 /* Expand the alias to the full module name */
