@@ -1442,6 +1442,40 @@ static int count_implementation_params(TSNode value_decl_node, const char *sourc
 static char *remove_return_type_parens(const char *type_str) {
     if (!type_str) return arena_strdup("");
 
+    /* First, check if the entire type is wrapped in outer parentheses */
+    /* This can happen when expanding type aliases that are function types */
+    if (*type_str == '(') {
+        const char *scan = type_str + 1;
+        int depth = 1;
+        bool has_comma = false;  /* Track if there's a comma inside (indicates tuple) */
+
+        while (*scan && depth > 0) {
+            if (*scan == '(') depth++;
+            else if (*scan == ')') {
+                depth--;
+                if (depth == 0 && *(scan + 1) == '\0') {
+                    /* The parens wrap the entire type */
+                    /* Only unwrap if it's not a tuple (no comma at top level) */
+                    if (!has_comma) {
+                        /* Extract the inner type and recursively process it */
+                        size_t inner_len = scan - type_str - 1;
+                        char *inner = arena_malloc(inner_len + 1);
+                        memcpy(inner, type_str + 1, inner_len);
+                        inner[inner_len] = '\0';
+                        char *result = remove_return_type_parens(inner);
+                        arena_free(inner);
+                        return result;
+                    }
+                    break;
+                }
+            } else if (*scan == ',' && depth == 1) {
+                /* Comma at the top level inside these parens - this is a tuple */
+                has_comma = true;
+            }
+            scan++;
+        }
+    }
+
     /* Find the last top-level arrow */
     const char *last_arrow = NULL;
     const char *p = type_str;
