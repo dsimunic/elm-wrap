@@ -218,25 +218,6 @@ static void init_module_alias_map(ModuleAliasMap *map) {
     map->aliases_capacity = 16;
 }
 
-/* Remove any alias that points to the given module (used when direct import overwrites alias) */
-static void remove_alias_for_module(ModuleAliasMap *map, const char *full_module) {
-    for (int i = 0; i < map->aliases_count; i++) {
-        if (strcmp(map->aliases[i].full_module, full_module) == 0) {
-            arena_free(map->aliases[i].alias);
-            arena_free(map->aliases[i].full_module);
-            if (map->aliases[i].ambiguous_with) {
-                arena_free(map->aliases[i].ambiguous_with);
-            }
-            /* Shift remaining entries */
-            for (int j = i; j < map->aliases_count - 1; j++) {
-                map->aliases[j] = map->aliases[j + 1];
-            }
-            map->aliases_count--;
-            i--;  /* Re-check this index since we shifted */
-        }
-    }
-}
-
 static void add_module_alias(ModuleAliasMap *map, const char *alias, const char *full_module) {
     /* Check if this alias already exists */
     for (int i = 0; i < map->aliases_count; i++) {
@@ -271,10 +252,56 @@ static void add_module_alias(ModuleAliasMap *map, const char *alias, const char 
 
 /* Returns the full module name, or NULL if not found or ambiguous */
 /* Sets *is_ambiguous to true if the alias refers to multiple different modules */
-static const char *lookup_module_alias(ModuleAliasMap *map, const char *alias, bool *is_ambiguous, const char **ambiguous_module1, const char **ambiguous_module2) {
+/* Helper to check if a module exports a given type name */
+static bool module_exports_type(DependencyCache *dep_cache, const char *module_name, const char *type_name) {
+    if (!dep_cache || !module_name || !type_name) {
+        return false;
+    }
+
+    CachedModuleExports *exports = dependency_cache_get_exports(dep_cache, module_name);
+    if (!exports || !exports->parsed) {
+        return false;
+    }
+
+    for (int i = 0; i < exports->exported_types_count; i++) {
+        if (strcmp(exports->exported_types[i], type_name) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static const char *lookup_module_alias(ModuleAliasMap *map, const char *alias,
+                                       const char *referenced_type,
+                                       DependencyCache *dep_cache,
+                                       bool *is_ambiguous,
+                                       const char **ambiguous_module1,
+                                       const char **ambiguous_module2) {
     for (int i = 0; i < map->aliases_count; i++) {
         if (strcmp(map->aliases[i].alias, alias) == 0) {
             if (map->aliases[i].is_ambiguous) {
+                /* Try to resolve ambiguous alias by checking which module exports the type */
+                if (referenced_type && dep_cache) {
+                    const char *mod1 = map->aliases[i].full_module;
+                    const char *mod2 = map->aliases[i].ambiguous_with;
+
+                    bool mod1_has = module_exports_type(dep_cache, mod1, referenced_type);
+                    bool mod2_has = module_exports_type(dep_cache, mod2, referenced_type);
+
+                    if (mod1_has && !mod2_has) {
+                        /* Only mod1 exports it - resolved! */
+                        if (is_ambiguous) *is_ambiguous = false;
+                        return mod1;
+                    } else if (mod2_has && !mod1_has) {
+                        /* Only mod2 exports it - resolved! */
+                        if (is_ambiguous) *is_ambiguous = false;
+                        return mod2;
+                    }
+                    /* If both export it or neither exports it, fall through to ambiguous handling */
+                }
+
+                /* Still ambiguous or couldn't resolve */
                 if (is_ambiguous) *is_ambiguous = true;
                 if (ambiguous_module1) *ambiguous_module1 = map->aliases[i].full_module;
                 if (ambiguous_module2) *ambiguous_module2 = map->aliases[i].ambiguous_with;
@@ -503,20 +530,17 @@ static void extract_imports(TSNode root, const char *source_code, ImportMap *imp
                 }
             }
 
-            /* Handle "last import wins" semantics:
-             * - If this is a direct import (no alias), remove any existing alias for this module
-             *   and add it to direct_imports
-             * - If this is an aliased import, remove the module from direct_imports
-             *   (if present) since the alias now takes precedence */
+            /* Handle import semantics:
+             * - Aliased imports: the alias name shadows any direct import with same name
+             * - Direct imports: the module is available by its original name
+             * Note: Aliases and direct imports can coexist for the same module */
             if (module_name && direct_imports) {
                 if (!has_as_clause) {
                     /* Direct import: module is now available by its original name */
-                    /* Remove any alias that was pointing to this module */
-                    remove_alias_for_module(alias_map, module_name);
                     add_direct_import(direct_imports, module_name);
                 } else {
-                    /* Aliased import: original module name is no longer available */
-                    remove_direct_import(direct_imports, module_name);
+                    /* Aliased import: alias name shadows any direct import with same name */
+                    remove_direct_import(direct_imports, module_alias);
                 }
             }
 
@@ -738,8 +762,8 @@ static char *find_preceding_comment(TSNode node, TSNode root, const char *source
             continue;
         }
 
-        /* Skip whitespace/newline nodes */
-        if (strcmp(type, "\n") != 0) {
+        /* Skip whitespace/newline/line_comment nodes */
+        if (strcmp(type, "\n") != 0 && strcmp(type, "line_comment") != 0) {
             break;
         }
 
@@ -833,12 +857,44 @@ static char *normalize_whitespace(const char *str) {
 
     arena_free(paren_stack);
     arena_free(brace_depth_stack);
-    arena_free(paren_match);
     arena_free(has_comma);
+
+    /* Track which closing parens to skip (for removing redundant parens in record fields) */
+    bool *skip_paren = arena_malloc(pos * sizeof(bool));
+    for (size_t i = 0; i < pos; i++) {
+        skip_paren[i] = false;
+    }
+
+    /* Track brace depth for detecting record fields */
+    int current_brace_depth = 0;
 
     /* Second pass: build final string */
     for (size_t i = 0; i < pos; i++) {
-        if (result[i] == ' ' && i + 1 < pos && result[i + 1] == ',') {
+        if (result[i] == '{') {
+            current_brace_depth++;
+            final[final_pos++] = result[i];
+            /* Ensure space after opening brace unless followed by } */
+            if (i + 1 < pos && result[i + 1] != '}') {
+                /* Skip any existing space */
+                if (i + 1 < pos && result[i + 1] == ' ') {
+                    i++;
+                }
+                /* Add exactly one space */
+                final[final_pos++] = ' ';
+            }
+        } else if (result[i] == '}') {
+            current_brace_depth--;
+            /* Ensure space before closing brace in record types, except for empty records {} */
+            if (final_pos > 0 && final[final_pos - 1] != ' ' && final[final_pos - 1] != '{') {
+                final[final_pos++] = ' ';
+            }
+            final[final_pos++] = result[i];
+        } else if (result[i] == ' ' && i + 1 < pos && result[i + 1] == '}') {
+            /* Keep space before closing brace, unless it's an empty record */
+            if (final_pos > 0 && final[final_pos - 1] != '{') {
+                final[final_pos++] = result[i];
+            }
+        } else if (result[i] == ' ' && i + 1 < pos && result[i + 1] == ',') {
             /* Skip space before comma */
             continue;
         } else if (result[i] == ',') {
@@ -854,6 +910,14 @@ static char *normalize_whitespace(const char *str) {
             }
             final[final_pos++] = result[i];
         } else if (result[i] == ')') {
+            /* Skip if marked for removal (redundant paren in record field) */
+            if (skip_paren[i]) {
+                /* Skip any space before this closing paren */
+                if (final_pos > 0 && final[final_pos - 1] == ' ') {
+                    final_pos--;
+                }
+                continue;
+            }
             /* Handle closing paren */
             if (is_tuple_paren[i]) {
                 /* Ensure space before closing paren in tuples */
@@ -880,6 +944,47 @@ static char *normalize_whitespace(const char *str) {
             }
         } else if (result[i] == '(' && !is_tuple_paren[i]) {
             /* Opening paren of a non-tuple (function type, parenthesized type) */
+            /* Check if we're in a record field (after : and before }) and this paren wraps a function type */
+            if (current_brace_depth > 0 && final_pos >= 2 &&
+                final[final_pos - 1] == ' ' && final[final_pos - 2] == ':') {
+                /* Look ahead to see if this paren wraps a function type */
+                /* Find the matching closing paren */
+                int paren_depth = 1;
+                size_t j = i + 1;
+                bool has_arrow = false;
+                while (j < pos && paren_depth > 0) {
+                    if (result[j] == '(') paren_depth++;
+                    else if (result[j] == ')') paren_depth--;
+                    else if (paren_depth == 1 && result[j] == '-' && j + 1 < pos && result[j + 1] == '>') {
+                        has_arrow = true;
+                    }
+                    if (paren_depth > 0) j++;
+                }
+                /* If the paren wraps a function type, check if it's followed by an arrow */
+                if (has_arrow && paren_depth == 0) {
+                    /* Check if there's a " -> " after the closing paren */
+                    /* This indicates the function type is a parameter, not the return type */
+                    /* Example: (Int -> String) -> Bool  -- parens are necessary */
+                    /*          Int -> (String -> Bool) -- parens are redundant */
+                    bool followed_by_arrow = false;
+                    if (j + 1 < pos && result[j + 1] == ' ' &&
+                        j + 2 < pos && result[j + 2] == '-' &&
+                        j + 3 < pos && result[j + 3] == '>') {
+                        followed_by_arrow = true;
+                    } else if (j + 1 < pos && result[j + 1] == '-' &&
+                               j + 2 < pos && result[j + 2] == '>') {
+                        followed_by_arrow = true;
+                    }
+
+                    /* Only skip parens if NOT followed by an arrow */
+                    if (!followed_by_arrow) {
+                        /* Mark the closing paren at position j for skipping */
+                        skip_paren[j] = true;
+                        /* Skip this opening paren and continue */
+                        continue;
+                    }
+                }
+            }
             final[final_pos++] = result[i];
             /* Skip any space after opening paren in non-tuples */
             /* This handles the case where type substitution or other processing
@@ -915,6 +1020,8 @@ static char *normalize_whitespace(const char *str) {
     final[final_pos] = '\0';
 
     arena_free(is_tuple_paren);
+    arena_free(paren_match);
+    arena_free(skip_paren);
     arena_free(result);
 
     return final;
@@ -1186,7 +1293,8 @@ static char *expand_function_type_aliases(const char *type_str, TypeAliasMap *ty
 static char *qualify_type_names(const char *type_str, const char *module_name,
                                   ImportMap *import_map, ModuleAliasMap *alias_map,
                                   DirectModuleImports *direct_imports,
-                                  char **local_types, int local_types_count) {
+                                  char **local_types, int local_types_count,
+                                  DependencyCache *dep_cache) {
     size_t buf_size = strlen(type_str) * 3 + 1024;  /* Extra space for qualifications */
     char *result = arena_malloc(buf_size);
     size_t pos = 0;
@@ -1240,11 +1348,40 @@ static char *qualify_type_names(const char *type_str, const char *module_name,
                          * is unavailable in Elm when aliased), we expand whenever we find an alias.
                          * The is_directly_imported check handles the rare case where a module is
                          * imported both directly AND via an alias (two separate import statements). */
+
+                        /* Extract the type name after the dot for ambiguous alias resolution */
+                        const char *referenced_type = NULL;
+                        char type_after_dot[256];
+                        if (*p == '.') {
+                            const char *after_dot = p + 1;
+                            /* Skip to the next uppercase letter (handle cases like "C . Dot") */
+                            while (*after_dot && (*after_dot == ' ' || *after_dot == '\t')) {
+                                after_dot++;
+                            }
+                            if (*after_dot >= 'A' && *after_dot <= 'Z') {
+                                const char *type_start = after_dot;
+                                while ((*after_dot >= 'A' && *after_dot <= 'Z') ||
+                                       (*after_dot >= 'a' && *after_dot <= 'z') ||
+                                       (*after_dot >= '0' && *after_dot <= '9') ||
+                                       *after_dot == '_') {
+                                    after_dot++;
+                                }
+                                size_t type_len = after_dot - type_start;
+                                if (type_len > 0 && type_len < sizeof(type_after_dot)) {
+                                    memcpy(type_after_dot, type_start, type_len);
+                                    type_after_dot[type_len] = '\0';
+                                    referenced_type = type_after_dot;
+                                }
+                            }
+                        }
+
                         bool is_ambiguous = false;
                         const char *ambig_mod1 = NULL;
                         const char *ambig_mod2 = NULL;
-                        const char *full_module = lookup_module_alias(alias_map, typename, &is_ambiguous, &ambig_mod1, &ambig_mod2);
-                        
+                        const char *full_module = lookup_module_alias(alias_map, typename, referenced_type,
+                                                                      dep_cache, &is_ambiguous,
+                                                                      &ambig_mod1, &ambig_mod2);
+
                         if (is_ambiguous) {
                             /* AMBIGUOUS: Two different modules use the same alias.
                              * This matches Elm compiler behavior - it's an error to use this alias.
@@ -1459,6 +1596,10 @@ static char *remove_return_type_parens(const char *type_str) {
                     if (!has_comma) {
                         /* Extract the inner type and recursively process it */
                         size_t inner_len = scan - type_str - 1;
+                        /* Don't unwrap empty parens - that's the unit type () */
+                        if (inner_len == 0) {
+                            return arena_strdup("()");
+                        }
                         char *inner = arena_malloc(inner_len + 1);
                         memcpy(inner, type_str + 1, inner_len);
                         inner[inner_len] = '\0';
@@ -1535,11 +1676,17 @@ static char *remove_return_type_parens(const char *type_str) {
 
     /* Only remove parens if:
      * 1. They wrap the entire return type
-     * 2. They don't contain a comma (not a tuple) */
+     * 2. They don't contain a comma (not a tuple)
+     * 3. The inner content is not empty (preserve unit type ()) */
     if (return_end && *(return_end + 1) == '\0' && !has_comma) {
         /* Build the new type string without these outer parens */
         size_t prefix_len = return_start - type_str;
         size_t inner_len = return_end - return_start - 1;  /* Skip opening '(' */
+
+        /* Don't unwrap empty parens in return type - that's the unit type () */
+        if (inner_len == 0) {
+            return arena_strdup(type_str);
+        }
 
         char *result = arena_malloc(prefix_len + inner_len + 1);
         memcpy(result, type_str, prefix_len);
@@ -1557,7 +1704,8 @@ static char *extract_type_expression(TSNode type_node, const char *source_code, 
                                        ImportMap *import_map, ModuleAliasMap *alias_map,
                                        DirectModuleImports *direct_imports,
                                        char **local_types, int local_types_count,
-                                       TypeAliasMap *type_alias_map, int implementation_param_count) {
+                                       TypeAliasMap *type_alias_map, int implementation_param_count,
+                                       DependencyCache *dep_cache) {
     if (ts_node_is_null(type_node)) {
         return arena_strdup("");
     }
@@ -1574,7 +1722,7 @@ static char *extract_type_expression(TSNode type_node, const char *source_code, 
     arena_free(normalized);
 
     /* Qualify type names */
-    char *qualified = qualify_type_names(expanded, module_name, import_map, alias_map, direct_imports, local_types, local_types_count);
+    char *qualified = qualify_type_names(expanded, module_name, import_map, alias_map, direct_imports, local_types, local_types_count, dep_cache);
     arena_free(expanded);
 
     /* Remove unnecessary outer parentheses from return type */
@@ -1587,7 +1735,8 @@ static char *extract_type_expression(TSNode type_node, const char *source_code, 
 /* Extract value declaration (function/constant) */
 static bool extract_value_decl(TSNode node, const char *source_code, ElmValue *value, const char *module_name,
                                  ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
-                                 char **local_types, int local_types_count, TypeAliasMap *type_alias_map) {
+                                 char **local_types, int local_types_count, TypeAliasMap *type_alias_map,
+                                 DependencyCache *dep_cache) {
     /* Find type_annotation sibling first */
     TSNode type_annotation = ts_node_prev_named_sibling(node);
     if (ts_node_is_null(type_annotation) ||
@@ -1632,7 +1781,7 @@ static bool extract_value_decl(TSNode node, const char *source_code, ElmValue *v
         const char *child_type = ts_node_type(child);
 
         if (strcmp(child_type, "type_expression") == 0) {
-            type_str = extract_type_expression(child, source_code, module_name, import_map, alias_map, direct_imports, local_types, local_types_count, type_alias_map, impl_param_count);
+            type_str = extract_type_expression(child, source_code, module_name, import_map, alias_map, direct_imports, local_types, local_types_count, type_alias_map, impl_param_count, dep_cache);
             break;
         }
     }
@@ -1655,7 +1804,8 @@ static bool extract_value_decl(TSNode node, const char *source_code, ElmValue *v
 /* Extract type alias */
 static bool extract_type_alias(TSNode node, const char *source_code, ElmAlias *alias, const char *module_name,
                                  ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
-                                 char **local_types, int local_types_count, TypeAliasMap *type_alias_map) {
+                                 char **local_types, int local_types_count, TypeAliasMap *type_alias_map,
+                                 DependencyCache *dep_cache) {
     (void)type_alias_map;  /* Not used - avoid circular expansion when extracting alias definitions */
     char *alias_name = NULL;
     char *type_expr = NULL;
@@ -1679,7 +1829,7 @@ static bool extract_type_alias(TSNode node, const char *source_code, ElmAlias *a
             args[args_count++] = get_node_text(child, source_code);
         } else if (strcmp(child_type, "type_expression") == 0) {
             /* Don't expand aliases when extracting alias definitions to avoid circular expansion */
-            type_expr = extract_type_expression(child, source_code, module_name, import_map, alias_map, direct_imports, local_types, local_types_count, NULL, 0);
+            type_expr = extract_type_expression(child, source_code, module_name, import_map, alias_map, direct_imports, local_types, local_types_count, NULL, 0, dep_cache);
         }
     }
 
@@ -1705,7 +1855,8 @@ static bool extract_type_alias(TSNode node, const char *source_code, ElmAlias *a
 /* Extract union type */
 static bool extract_union_type(TSNode node, const char *source_code, ElmUnion *union_type, const char *module_name,
                                  ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
-                                 char **local_types, int local_types_count, TypeAliasMap *type_alias_map) {
+                                 char **local_types, int local_types_count, TypeAliasMap *type_alias_map,
+                                 DependencyCache *dep_cache) {
     char *type_name = NULL;
     char **args = NULL;
     int args_count = 0;
@@ -1781,7 +1932,7 @@ static bool extract_union_type(TSNode node, const char *source_code, ElmUnion *u
                         arg_types = arena_malloc(8 * sizeof(char*));
                     }
                     arg_types[arg_types_count++] = extract_type_expression(variant_child, source_code, module_name,
-                                                                             import_map, alias_map, direct_imports, local_types, local_types_count, type_alias_map, 0);
+                                                                             import_map, alias_map, direct_imports, local_types, local_types_count, type_alias_map, 0, dep_cache);
                 }
             }
 
@@ -1981,7 +2132,7 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
         if (strcmp(type, "value_declaration") == 0) {
             /* Found a function/value declaration */
             ElmValue value;
-            if (extract_value_decl(child, source_code, &value, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count, &type_alias_map)) {
+            if (extract_value_decl(child, source_code, &value, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count, &type_alias_map, dep_cache)) {
                 /* Only include if exported */
                 if (is_exported_value(value.name, &exports)) {
                     if (docs->values_count >= values_capacity) {
@@ -1999,7 +2150,7 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
         } else if (strcmp(type, "type_alias_declaration") == 0) {
             /* Found a type alias */
             ElmAlias alias;
-            if (extract_type_alias(child, source_code, &alias, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count, &type_alias_map)) {
+            if (extract_type_alias(child, source_code, &alias, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count, &type_alias_map, dep_cache)) {
                 /* Only include if exported */
                 if (is_exported_type(alias.name, &exports)) {
                     if (docs->aliases_count >= aliases_capacity) {
@@ -2021,7 +2172,7 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
         } else if (strcmp(type, "type_declaration") == 0) {
             /* Found a union type */
             ElmUnion union_type;
-            if (extract_union_type(child, source_code, &union_type, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count, &type_alias_map)) {
+            if (extract_union_type(child, source_code, &union_type, docs->name, &import_map, &alias_map, &direct_imports, local_types, local_types_count, &type_alias_map, dep_cache)) {
                 /* Only include if exported */
                 if (is_exported_type(union_type.name, &exports)) {
                     /* Check if constructors should be exposed */
