@@ -1,0 +1,8 @@
+#!/bin/bash
+
+while read -r line; do
+    if [[ $line =~ ^\[different\]\ (.+)$ ]]; then
+        triplet="${BASH_REMATCH[1]}"
+        ./tools/whitelist "$triplet"
+    fi
+done
