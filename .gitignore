@@ -13,3 +13,5 @@ doc/wip/
 test/example/
 test/example-lamdera/
 tools/docs-patches/
+.claude/settings.local.json
+CLAUDE.md
