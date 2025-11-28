@@ -67,6 +67,8 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/publish/docs/path_util.c \
           $(SRCDIR)/commands/code/code.c \
           $(SRCDIR)/commands/code/format.c \
+          $(SRCDIR)/commands/debug/debug.c \
+          $(SRCDIR)/commands/debug/include_tree.c \
           $(SRCDIR)/commands/cache/check/cache_check.c \
           $(SRCDIR)/commands/cache/full_scan/cache_full_scan.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter/lib.c \
@@ -119,6 +121,8 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/path_util.o \
           $(BUILDDIR)/code.o \
           $(BUILDDIR)/format.o \
+          $(BUILDDIR)/debug.o \
+          $(BUILDDIR)/include_tree.o \
           $(BUILDDIR)/cache_check.o \
           $(BUILDDIR)/cache_full_scan.o \
           $(BUILDDIR)/ts_lib.o \
@@ -276,6 +280,14 @@ $(BUILDDIR)/code.o: $(SRCDIR)/commands/code/code.c $(SRCDIR)/commands/code/code.
 
 # Build format command object
 $(BUILDDIR)/format.o: $(SRCDIR)/commands/code/format.c $(SRCDIR)/commands/code/code.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+
+# Build debug command object
+$(BUILDDIR)/debug.o: $(SRCDIR)/commands/debug/debug.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build include_tree command object
+$(BUILDDIR)/include_tree.o: $(SRCDIR)/commands/debug/include_tree.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/log.h $(SRCDIR)/dyn_array.h $(SRCDIR)/cJSON.h $(SRCDIR)/ast/skeleton.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
 
 # Build cache_check object
