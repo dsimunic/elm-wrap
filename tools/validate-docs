@@ -78,7 +78,6 @@ TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 GENERATED_COUNT=0
 GENERATE_FAIL_COUNT=0
 SUCCESS_COUNT=0
-WHITELISTED_COUNT=0
 FAIL_COUNT=0
 MISSING_ORIGINAL=0
 
@@ -220,7 +219,7 @@ process_package() {
     if diff -q "$original_file" "$output_file" > /dev/null 2>&1; then
         SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
     elif check_patch_whitelisted "$original_file" "$output_file" "$flat_name"; then
-        WHITELISTED_COUNT=$((WHITELISTED_COUNT + 1))
+        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
     else
         log_err "[different] $package_path"
         FAIL_COUNT=$((FAIL_COUNT + 1))
@@ -269,7 +268,7 @@ fi
 
 END_TIME=$(date +%s)
 TOTAL_DURATION=$((END_TIME - START_TIME))
-TOTAL_COMPARED=$((SUCCESS_COUNT + WHITELISTED_COUNT + FAIL_COUNT))
+TOTAL_COMPARED=$((SUCCESS_COUNT + FAIL_COUNT))
 
 log ""
 if [ $STOPPED_EARLY -eq 1 ]; then
@@ -281,9 +280,6 @@ log "Total packages processed: $GENERATED_COUNT"
 log "Generation failures: $GENERATE_FAIL_COUNT"
 log "Total packages compared: $TOTAL_COMPARED"
 log "Successes: $SUCCESS_COUNT"
-if [ $WHITELISTED_COUNT -gt 0 ]; then
-    log "Whitelisted: $WHITELISTED_COUNT"
-fi
 log "Failures: $FAIL_COUNT"
 if [ $MISSING_ORIGINAL -gt 0 ]; then
     log "Missing originals: $MISSING_ORIGINAL"
