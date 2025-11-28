@@ -288,57 +288,45 @@ int cache_check_package(const char *package_name, bool purge_broken, bool fix_br
     if (check_redundant && cached_count > 0) {
         printf("%s-- REDUNDANT FILE CHECK --%s\n\n", ANSI_CYAN, ANSI_RESET);
         
-        /* Get latest version from registry */
-        char *latest_version = NULL;
-        if (entry && entry->version_count > 0) {
-            latest_version = version_to_string(&entry->versions[0]);
+        int total_with_redundant = 0;
+        
+        /* Check all cached versions for redundant files */
+        for (size_t vi = 0; vi < cached_count; vi++) {
+            /* Skip broken versions */
+            PackageStatus status = get_package_status(env->cache, author, name, cached_versions[vi]);
+            if (status != PKG_STATUS_OK) continue;
+            
+            char *pkg_path = cache_get_package_path(env->cache, author, name, cached_versions[vi]);
+            if (pkg_path) {
+                ImportTreeAnalysis *analysis = import_tree_analyze(pkg_path);
+                if (analysis) {
+                    int redundant = import_tree_redundant_count(analysis);
+                    if (redundant > 0) {
+                        total_with_redundant++;
+                        printf("%s%s/%s@%s%s: %s%d redundant file(s)%s\n", 
+                               ANSI_CYAN, author, name, cached_versions[vi], ANSI_RESET,
+                               ANSI_YELLOW, redundant, ANSI_RESET);
+                        if (verbose) {
+                            for (int ri = 0; ri < analysis->redundant_count; ri++) {
+                                printf("  • %s\n", analysis->redundant_files[ri]);
+                            }
+                        }
+                    } else if (verbose) {
+                        printf("%s%s/%s@%s%s: %sNo redundant files%s\n",
+                               ANSI_CYAN, author, name, cached_versions[vi], ANSI_RESET,
+                               ANSI_GREEN, ANSI_RESET);
+                    }
+                    import_tree_free(analysis);
+                } else if (verbose) {
+                    printf("%sWarning:%s Could not analyze %s/%s@%s (missing elm.json?)\n",
+                           ANSI_YELLOW, ANSI_RESET, author, name, cached_versions[vi]);
+                }
+                arena_free(pkg_path);
+            }
         }
         
-        if (latest_version) {
-            /* Check if this version is cached */
-            bool is_cached = false;
-            for (size_t i = 0; i < cached_count; i++) {
-                if (strcmp(cached_versions[i], latest_version) == 0) {
-                    is_cached = true;
-                    break;
-                }
-            }
-            
-            if (is_cached) {
-                char *pkg_path = cache_get_package_path(env->cache, author, name, latest_version);
-                if (pkg_path) {
-                    ImportTreeAnalysis *analysis = import_tree_analyze(pkg_path);
-                    if (analysis) {
-                        int redundant = import_tree_redundant_count(analysis);
-                        if (redundant > 0) {
-                            printf("%s%s/%s@%s%s: %s%d redundant file(s)%s\n", 
-                                   ANSI_CYAN, author, name, latest_version, ANSI_RESET,
-                                   ANSI_YELLOW, redundant, ANSI_RESET);
-                            if (verbose) {
-                                for (int i = 0; i < analysis->redundant_count; i++) {
-                                    printf("  • %s\n", analysis->redundant_files[i]);
-                                }
-                            }
-                        } else {
-                            printf("%s%s/%s@%s%s: %sNo redundant files%s\n",
-                                   ANSI_CYAN, author, name, latest_version, ANSI_RESET,
-                                   ANSI_GREEN, ANSI_RESET);
-                        }
-                        import_tree_free(analysis);
-                    } else {
-                        printf("%sWarning:%s Could not analyze %s/%s@%s (missing elm.json?)\n",
-                               ANSI_YELLOW, ANSI_RESET, author, name, latest_version);
-                    }
-                    arena_free(pkg_path);
-                }
-            } else {
-                printf("%sWarning:%s Latest version %s/%s@%s is not cached\n",
-                       ANSI_YELLOW, ANSI_RESET, author, name, latest_version);
-            }
-            arena_free(latest_version);
-        } else {
-            printf("%sWarning:%s Could not determine latest version for %s/%s\n",
-                   ANSI_YELLOW, ANSI_RESET, author, name);
+        if (total_with_redundant == 0) {
+            printf("%sNo redundant files found in any version%s\n", ANSI_GREEN, ANSI_RESET);
         }
         printf("\n");
     }

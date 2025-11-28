@@ -211,40 +211,52 @@ static void scan_package(const char *packages_dir, const char *author, const cha
     }
     
     /* Check for redundant files if requested */
-    if (check_redundant) {
-        /* Find latest version to analyze */
-        RegistryEntry *entry = registry_find(registry, author, name);
-        if (entry && entry->version_count > 0) {
-            char *latest = version_to_string(&entry->versions[0]);
-            if (latest) {
-                size_t version_path_len = strlen(pkg_dir) + strlen(latest) + 2;
-                char *version_path = arena_malloc(version_path_len);
-                if (version_path) {
-                    snprintf(version_path, version_path_len, "%s/%s", pkg_dir, latest);
-                    
-                    ImportTreeAnalysis *analysis = import_tree_analyze(version_path);
-                    if (analysis) {
-                        int redundant = import_tree_redundant_count(analysis);
-                        if (redundant > 0) {
+    if (check_redundant && entry && entry->version_count > 0) {
+        bool pkg_has_redundant = false;
+        
+        /* Iterate all registry versions and check those that are cached */
+        for (size_t vi = 0; vi < entry->version_count; vi++) {
+            char *ver_str = version_to_string(&entry->versions[vi]);
+            if (!ver_str) continue;
+            
+            size_t version_path_len = strlen(pkg_dir) + strlen(ver_str) + 2;
+            char *version_path = arena_malloc(version_path_len);
+            if (!version_path) {
+                arena_free(ver_str);
+                continue;
+            }
+            
+            snprintf(version_path, version_path_len, "%s/%s", pkg_dir, ver_str);
+            
+            /* Check if version is cached */
+            struct stat st;
+            if (stat(version_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+                ImportTreeAnalysis *analysis = import_tree_analyze(version_path);
+                if (analysis) {
+                    int redundant = import_tree_redundant_count(analysis);
+                    if (redundant > 0) {
+                        if (!pkg_has_redundant) {
                             stats->packages_with_redundant++;
-                            stats->total_redundant_files += redundant;
-                            if (!quiet) {
-                                printf("%s%s/%s@%s%s: %s%d redundant file(s)%s\n",
-                                       ANSI_CYAN, author, name, latest, ANSI_RESET,
-                                       ANSI_YELLOW, redundant, ANSI_RESET);
-                                if (verbose) {
-                                    for (int i = 0; i < analysis->redundant_count; i++) {
-                                        printf("  • %s\n", analysis->redundant_files[i]);
-                                    }
+                            pkg_has_redundant = true;
+                        }
+                        stats->total_redundant_files += redundant;
+                        if (!quiet) {
+                            printf("%s%s/%s@%s%s: %s%d redundant file(s)%s\n",
+                                   ANSI_CYAN, author, name, ver_str, ANSI_RESET,
+                                   ANSI_YELLOW, redundant, ANSI_RESET);
+                            if (verbose) {
+                                for (int ri = 0; ri < analysis->redundant_count; ri++) {
+                                    printf("  • %s\n", analysis->redundant_files[ri]);
                                 }
                             }
                         }
-                        import_tree_free(analysis);
                     }
-                    arena_free(version_path);
+                    import_tree_free(analysis);
                 }
-                arena_free(latest);
             }
+            
+            arena_free(version_path);
+            arena_free(ver_str);
         }
     }
     
