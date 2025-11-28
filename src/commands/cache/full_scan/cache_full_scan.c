@@ -6,6 +6,7 @@
 #include "../../../log.h"
 #include "../../../progname.h"
 #include "../../../fileutil.h"
+#include "../../../import_tree.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +33,8 @@ typedef struct {
     size_t good_versions;
     size_t broken_versions;
     size_t packages_missing_latest;
+    size_t packages_with_redundant;
+    size_t total_redundant_files;
 } ScanStats;
 
 /* Check if a directory is empty */
@@ -119,7 +122,8 @@ static bool has_latest_version_cached(Registry *registry, const char *author,
 
 /* Scan a single package directory */
 static void scan_package(const char *packages_dir, const char *author, const char *name,
-                         Registry *registry, ScanStats *stats, bool quiet, bool verbose) {
+                         Registry *registry, ScanStats *stats, bool quiet, bool verbose,
+                         bool check_redundant) {
     /* Build path to package directory */
     size_t pkg_dir_len = strlen(packages_dir) + strlen(author) + strlen(name) + 3;
     char *pkg_dir = arena_malloc(pkg_dir_len);
@@ -127,8 +131,8 @@ static void scan_package(const char *packages_dir, const char *author, const cha
     
     snprintf(pkg_dir, pkg_dir_len, "%s/%s/%s", packages_dir, author, name);
     
-    DIR *dir = opendir(pkg_dir);
-    if (!dir) {
+    struct stat pkg_st;
+    if (stat(pkg_dir, &pkg_st) != 0 || !S_ISDIR(pkg_st.st_mode)) {
         arena_free(pkg_dir);
         return;
     }
@@ -139,19 +143,22 @@ static void scan_package(const char *packages_dir, const char *author, const cha
     char **broken_versions = NULL;
     size_t broken_capacity = 0;
     
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-        
-        /* Check if it looks like a version (starts with digit) */
-        if (entry->d_name[0] >= '0' && entry->d_name[0] <= '9') {
-            size_t version_path_len = strlen(pkg_dir) + strlen(entry->d_name) + 2;
-            char *version_path = arena_malloc(version_path_len);
-            if (!version_path) continue;
+    /* Find package in registry to iterate versions in sorted order */
+    RegistryEntry *entry = registry_find(registry, author, name);
+    if (entry && entry->version_count > 0) {
+        /* Iterate registry versions (already sorted newest first) */
+        for (size_t i = 0; i < entry->version_count; i++) {
+            char *ver_str = version_to_string(&entry->versions[i]);
+            if (!ver_str) continue;
             
-            snprintf(version_path, version_path_len, "%s/%s", pkg_dir, entry->d_name);
+            size_t version_path_len = strlen(pkg_dir) + strlen(ver_str) + 2;
+            char *version_path = arena_malloc(version_path_len);
+            if (!version_path) {
+                arena_free(ver_str);
+                continue;
+            }
+            
+            snprintf(version_path, version_path_len, "%s/%s", pkg_dir, ver_str);
             
             struct stat st;
             if (stat(version_path, &st) == 0 && S_ISDIR(st.st_mode)) {
@@ -175,17 +182,17 @@ static void scan_package(const char *packages_dir, const char *author, const cha
                             }
                         }
                         if (pkg_broken <= broken_capacity) {
-                            broken_versions[pkg_broken - 1] = arena_strdup(entry->d_name);
+                            broken_versions[pkg_broken - 1] = ver_str;
+                            ver_str = NULL; /* Don't free, stored in array */
                         }
                     }
                 }
             }
             
             arena_free(version_path);
+            if (ver_str) arena_free(ver_str);
         }
     }
-    
-    closedir(dir);
     
     /* Check if latest version is cached */
     if (!has_latest_version_cached(registry, author, name, pkg_dir)) {
@@ -203,6 +210,44 @@ static void scan_package(const char *packages_dir, const char *author, const cha
         }
     }
     
+    /* Check for redundant files if requested */
+    if (check_redundant) {
+        /* Find latest version to analyze */
+        RegistryEntry *entry = registry_find(registry, author, name);
+        if (entry && entry->version_count > 0) {
+            char *latest = version_to_string(&entry->versions[0]);
+            if (latest) {
+                size_t version_path_len = strlen(pkg_dir) + strlen(latest) + 2;
+                char *version_path = arena_malloc(version_path_len);
+                if (version_path) {
+                    snprintf(version_path, version_path_len, "%s/%s", pkg_dir, latest);
+                    
+                    ImportTreeAnalysis *analysis = import_tree_analyze(version_path);
+                    if (analysis) {
+                        int redundant = import_tree_redundant_count(analysis);
+                        if (redundant > 0) {
+                            stats->packages_with_redundant++;
+                            stats->total_redundant_files += redundant;
+                            if (!quiet) {
+                                printf("%s%s/%s@%s%s: %s%d redundant file(s)%s\n",
+                                       ANSI_CYAN, author, name, latest, ANSI_RESET,
+                                       ANSI_YELLOW, redundant, ANSI_RESET);
+                                if (verbose) {
+                                    for (int i = 0; i < analysis->redundant_count; i++) {
+                                        printf("  • %s\n", analysis->redundant_files[i]);
+                                    }
+                                }
+                            }
+                        }
+                        import_tree_free(analysis);
+                    }
+                    arena_free(version_path);
+                }
+                arena_free(latest);
+            }
+        }
+    }
+    
     /* Free broken version strings */
     if (broken_versions) {
         for (size_t i = 0; i < pkg_broken && broken_versions[i]; i++) {
@@ -216,7 +261,8 @@ static void scan_package(const char *packages_dir, const char *author, const cha
 
 /* Scan all packages under an author directory */
 static void scan_author(const char *packages_dir, const char *author,
-                        Registry *registry, ScanStats *stats, bool quiet, bool verbose) {
+                        Registry *registry, ScanStats *stats, bool quiet, bool verbose,
+                        bool check_redundant) {
     size_t author_dir_len = strlen(packages_dir) + strlen(author) + 2;
     char *author_dir = arena_malloc(author_dir_len);
     if (!author_dir) return;
@@ -244,7 +290,8 @@ static void scan_author(const char *packages_dir, const char *author,
         
         struct stat st;
         if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
-            scan_package(packages_dir, author, entry->d_name, registry, stats, quiet, verbose);
+            scan_package(packages_dir, author, entry->d_name, registry, stats, quiet, verbose,
+                        check_redundant);
         }
         
         arena_free(path);
@@ -270,16 +317,19 @@ static void print_full_scan_usage(void) {
     printf("  %s package cache full-scan           # Scan and report broken packages\n", program_name);
     printf("  %s package cache full-scan -q        # Quiet mode - only show summary\n", program_name);
     printf("  %s package cache full-scan -v        # Verbose - show all issues\n", program_name);
+    printf("  %s package cache full-scan --no-check-redundant  # Skip redundant file check\n", program_name);
     printf("\n");
     printf("Options:\n");
-    printf("  -q, --quiet           Only show summary counts\n");
-    printf("  -v, --verbose         Show all issues including missing latest\n");
+    printf("  -q, --quiet               Only show summary counts\n");
+    printf("  -v, --verbose             Show all issues including missing latest\n");
+    printf("  --no-check-redundant      Skip analyzing import trees for unused files\n");
     printf("  --help                Show this help\n");
 }
 
 int cmd_cache_full_scan(int argc, char *argv[]) {
     bool quiet = false;
     bool verbose = false;
+    bool check_redundant = true;
     
     /* Parse arguments */
     for (int i = 1; i < argc; i++) {
@@ -290,6 +340,8 @@ int cmd_cache_full_scan(int argc, char *argv[]) {
             quiet = true;
         } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
             verbose = true;
+        } else if (strcmp(argv[i], "--no-check-redundant") == 0) {
+            check_redundant = false;
         } else if (argv[i][0] == '-') {
             fprintf(stderr, "Error: Unknown option: %s\n", argv[i]);
             return 1;
@@ -344,7 +396,8 @@ int cmd_cache_full_scan(int argc, char *argv[]) {
         
         struct stat st;
         if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
-            scan_author(env->cache->packages_dir, entry->d_name, env->registry, &stats, quiet, verbose);
+            scan_author(env->cache->packages_dir, entry->d_name, env->registry, &stats, quiet, verbose,
+                       check_redundant);
         }
         
         arena_free(path);
@@ -369,6 +422,15 @@ int cmd_cache_full_scan(int argc, char *argv[]) {
     
     if (stats.packages_missing_latest > 0) {
         printf("%sMissing latest version:%s %zu package(s)\n", ANSI_YELLOW, ANSI_RESET, stats.packages_missing_latest);
+    }
+    
+    if (check_redundant) {
+        if (stats.packages_with_redundant > 0) {
+            printf("%sPackages with redundant files:%s %zu (%zu total files)\n", 
+                   ANSI_YELLOW, ANSI_RESET, stats.packages_with_redundant, stats.total_redundant_files);
+        } else {
+            printf("Packages with redundant files: 0\n");
+        }
     }
     
     install_env_free(env);

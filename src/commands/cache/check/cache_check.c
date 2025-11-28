@@ -6,6 +6,7 @@
 #include "../../../log.h"
 #include "../../../progname.h"
 #include "../../../fileutil.h"
+#include "../../../import_tree.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -114,79 +115,6 @@ static PackageStatus get_package_status(CacheConfig *cache, const char *author,
     return status;
 }
 
-/* List cached versions for a package from the cache directory */
-static char** list_cached_versions(CacheConfig *cache, const char *author, 
-                                   const char *name, size_t *count) {
-    *count = 0;
-
-    /* Build path to package directory: packages_dir/author/name */
-    size_t dir_len = strlen(cache->packages_dir) + strlen(author) + strlen(name) + 3;
-    char *pkg_dir = arena_malloc(dir_len);
-    if (!pkg_dir) return NULL;
-
-    snprintf(pkg_dir, dir_len, "%s/%s/%s", cache->packages_dir, author, name);
-
-    struct stat st;
-    if (stat(pkg_dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
-        arena_free(pkg_dir);
-        return NULL;
-    }
-
-    DIR *dir = opendir(pkg_dir);
-    if (!dir) {
-        arena_free(pkg_dir);
-        return NULL;
-    }
-
-    /* Count entries first */
-    size_t capacity = 16;
-    char **versions = arena_malloc(sizeof(char*) * capacity);
-    if (!versions) {
-        closedir(dir);
-        arena_free(pkg_dir);
-        return NULL;
-    }
-
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-        /* Skip . and .. */
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-
-        /* Check if it looks like a version (starts with digit) */
-        if (entry->d_name[0] >= '0' && entry->d_name[0] <= '9') {
-            /* Verify it's a directory */
-            size_t entry_len = strlen(pkg_dir) + strlen(entry->d_name) + 2;
-            char *entry_path = arena_malloc(entry_len);
-            if (entry_path) {
-                snprintf(entry_path, entry_len, "%s/%s", pkg_dir, entry->d_name);
-                struct stat entry_st;
-                if (stat(entry_path, &entry_st) == 0 && S_ISDIR(entry_st.st_mode)) {
-                    if (*count >= capacity) {
-                        capacity *= 2;
-                        char **new_versions = arena_realloc(versions, sizeof(char*) * capacity);
-                        if (!new_versions) {
-                            arena_free(entry_path);
-                            break;
-                        }
-                        versions = new_versions;
-                    }
-                    versions[*count] = arena_strdup(entry->d_name);
-                    if (versions[*count]) {
-                        (*count)++;
-                    }
-                }
-                arena_free(entry_path);
-            }
-        }
-    }
-
-    closedir(dir);
-    arena_free(pkg_dir);
-    return versions;
-}
-
 /* Print usage for cache check command */
 static void print_cache_check_usage(void) {
     printf("Usage: %s package cache check <PACKAGE> [OPTIONS]\n", program_name);
@@ -202,15 +130,18 @@ static void print_cache_check_usage(void) {
     printf("  %s package cache check elm/json            # Check cache status for elm/json\n", program_name);
     printf("  %s package cache check elm/html --purge-broken  # Remove broken cached versions\n", program_name);
     printf("  %s package cache check elm/html --fix-broken    # Re-download broken versions\n", program_name);
+    printf("  %s package cache check elm/html --no-check-redundant  # Skip redundant file check\n", program_name);
     printf("\n");
     printf("Options:\n");
     printf("  --purge-broken            Remove broken directories without re-downloading\n");
     printf("  --fix-broken              Try to re-download broken versions from registry\n");
+    printf("  --no-check-redundant      Skip analyzing import tree for unused files\n");
     printf("  -v, --verbose             Show detailed output\n");
     printf("  --help                    Show this help\n");
 }
 
-int cache_check_package(const char *package_name, bool purge_broken, bool fix_broken, bool verbose) {
+int cache_check_package(const char *package_name, bool purge_broken, bool fix_broken,
+                        bool check_redundant, bool verbose) {
     char *author = NULL;
     char *name = NULL;
 
@@ -257,23 +188,42 @@ int cache_check_package(const char *package_name, bool purge_broken, bool fix_br
         printf("\n");
     }
 
-    /* List cached versions */
+    /* List cached versions - iterate registry versions (already sorted newest first) */
     size_t cached_count = 0;
-    char **cached_versions = list_cached_versions(env->cache, author, name, &cached_count);
+    size_t broken_count = 0;
+    char **cached_versions = NULL;
+    char **broken_versions = NULL;
 
-    if (cached_count == 0) {
-        printf("Cached versions: %s(none)%s\n\n", ANSI_YELLOW, ANSI_RESET);
-    } else {
-        printf("Cached versions (%zu):\n", cached_count);
-
-        size_t broken_count = 0;
-        char **broken_versions = arena_malloc(sizeof(char*) * cached_count);
-        if (!broken_versions) {
+    if (entry) {
+        cached_versions = arena_malloc(sizeof(char*) * entry->version_count);
+        broken_versions = arena_malloc(sizeof(char*) * entry->version_count);
+        if (!cached_versions || !broken_versions) {
             install_env_free(env);
             arena_free(author);
             arena_free(name);
             return 1;
         }
+
+        /* Check each registry version to see if it's cached */
+        for (size_t i = 0; i < entry->version_count; i++) {
+            char *ver_str = version_to_string(&entry->versions[i]);
+            if (!ver_str) continue;
+
+            PackageStatus status = get_package_status(env->cache, author, name, ver_str);
+            if (status == PKG_STATUS_OK) {
+                cached_versions[cached_count++] = ver_str;
+            } else if (status == PKG_STATUS_BROKEN) {
+                cached_versions[cached_count++] = ver_str;
+                broken_versions[broken_count++] = ver_str;
+            }
+            /* PKG_STATUS_NOT_CACHED: not in cache, skip */
+        }
+    }
+
+    if (cached_count == 0) {
+        printf("Cached versions: %s(none)%s\n\n", ANSI_YELLOW, ANSI_RESET);
+    } else {
+        printf("Cached versions (%zu):\n", cached_count);
 
         for (size_t i = 0; i < cached_count; i++) {
             PackageStatus status = get_package_status(env->cache, author, name, cached_versions[i]);
@@ -283,7 +233,6 @@ int cache_check_package(const char *package_name, bool purge_broken, bool fix_br
             } else if (status == PKG_STATUS_BROKEN) {
                 printf("  %s%s%s %sBROKEN%s (missing or empty src/)\n", 
                        ANSI_CYAN, cached_versions[i], ANSI_RESET, ANSI_RED, ANSI_RESET);
-                broken_versions[broken_count++] = cached_versions[i];
             }
         }
         printf("\n");
@@ -335,6 +284,65 @@ int cache_check_package(const char *package_name, bool purge_broken, bool fix_br
         arena_free(broken_versions);
     }
 
+    /* Check for redundant files if requested */
+    if (check_redundant && cached_count > 0) {
+        printf("%s-- REDUNDANT FILE CHECK --%s\n\n", ANSI_CYAN, ANSI_RESET);
+        
+        /* Get latest version from registry */
+        char *latest_version = NULL;
+        if (entry && entry->version_count > 0) {
+            latest_version = version_to_string(&entry->versions[0]);
+        }
+        
+        if (latest_version) {
+            /* Check if this version is cached */
+            bool is_cached = false;
+            for (size_t i = 0; i < cached_count; i++) {
+                if (strcmp(cached_versions[i], latest_version) == 0) {
+                    is_cached = true;
+                    break;
+                }
+            }
+            
+            if (is_cached) {
+                char *pkg_path = cache_get_package_path(env->cache, author, name, latest_version);
+                if (pkg_path) {
+                    ImportTreeAnalysis *analysis = import_tree_analyze(pkg_path);
+                    if (analysis) {
+                        int redundant = import_tree_redundant_count(analysis);
+                        if (redundant > 0) {
+                            printf("%s%s/%s@%s%s: %s%d redundant file(s)%s\n", 
+                                   ANSI_CYAN, author, name, latest_version, ANSI_RESET,
+                                   ANSI_YELLOW, redundant, ANSI_RESET);
+                            if (verbose) {
+                                for (int i = 0; i < analysis->redundant_count; i++) {
+                                    printf("  • %s\n", analysis->redundant_files[i]);
+                                }
+                            }
+                        } else {
+                            printf("%s%s/%s@%s%s: %sNo redundant files%s\n",
+                                   ANSI_CYAN, author, name, latest_version, ANSI_RESET,
+                                   ANSI_GREEN, ANSI_RESET);
+                        }
+                        import_tree_free(analysis);
+                    } else {
+                        printf("%sWarning:%s Could not analyze %s/%s@%s (missing elm.json?)\n",
+                               ANSI_YELLOW, ANSI_RESET, author, name, latest_version);
+                    }
+                    arena_free(pkg_path);
+                }
+            } else {
+                printf("%sWarning:%s Latest version %s/%s@%s is not cached\n",
+                       ANSI_YELLOW, ANSI_RESET, author, name, latest_version);
+            }
+            arena_free(latest_version);
+        } else {
+            printf("%sWarning:%s Could not determine latest version for %s/%s\n",
+                   ANSI_YELLOW, ANSI_RESET, author, name);
+        }
+        printf("\n");
+    }
+
     /* Cleanup cached version strings */
     if (cached_versions) {
         for (size_t i = 0; i < cached_count; i++) {
@@ -356,6 +364,7 @@ int cmd_cache_check(int argc, char *argv[]) {
     const char *package_arg = NULL;
     bool purge_broken = false;
     bool fix_broken = false;
+    bool check_redundant = true;
     bool verbose = false;
 
     /* Parse arguments */
@@ -367,6 +376,8 @@ int cmd_cache_check(int argc, char *argv[]) {
             purge_broken = true;
         } else if (strcmp(argv[i], "--fix-broken") == 0) {
             fix_broken = true;
+        } else if (strcmp(argv[i], "--no-check-redundant") == 0) {
+            check_redundant = false;
         } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
             verbose = true;
         } else if (argv[i][0] != '-') {
@@ -393,5 +404,5 @@ int cmd_cache_check(int argc, char *argv[]) {
         return 1;
     }
 
-    return cache_check_package(package_arg, purge_broken, fix_broken, verbose);
+    return cache_check_package(package_arg, purge_broken, fix_broken, check_redundant, verbose);
 }
