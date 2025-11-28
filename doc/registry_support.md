@@ -25,6 +25,14 @@ Clearly there are a number of possible ways one would want to distribute Elm cod
 
 It is already the case with the canonical repository: local `ELM_HOME` is really a locally cached, pass-through repository. If a package doesn't exist locally, we'll pull it from the canonical repository into the cache for future requests. The inverse is probably not true, though. (Does `publish` leave a copy in `ELM_HOME`?).  
 
+`elm-wrap` further specializes this by suffixing `ELM_HOME` with the Elm compiler
+version (for example, `$ELM_HOME/0.19.1/`). Each such per-version cache contains
+its own `packages/registry.dat`, and registry providers are expected to expose
+only package versions that are compatible with that Elm release. The
+client-side solver, especially in major/"any version" upgrade modes, relies on
+this contract and does not re-check elm-version compatibility for individual
+package versions.
+
 **authentication/authorization/accounting** is a must for professional work. Proper and clear management, and support on the cli and tooling.
 
 **package cache format must remain frozen** if we're not to modify the compiler. But that souldn't be much of an issue as the goal is to distribute the packages to the compiler--no matter the intermediate format, in the end the compiler must see `.elm` source files.

@@ -98,8 +98,4 @@ SolverResult solver_upgrade_all(
     InstallPlan **out_plan
 );
 
-/* Registry operations (stubbed) */
-char** solver_get_available_versions(SolverState *state, const char *author, const char *name, int *count);
-void solver_free_versions(char **versions, int count);
-
 #endif /* SOLVER_H */

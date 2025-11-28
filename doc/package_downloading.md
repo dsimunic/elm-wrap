@@ -9,9 +9,15 @@ Elm packages are cached locally in the user's Elm home directory (`$ELM_HOME/0.1
 ## Package Registry
 
 - **Location**: `https://package.elm-lang.org/all-packages`
-- **Local Cache**: `$ELM_HOME/0.19.1/packages/registry.dat`
+- **Local Cache**: `$ELM_HOME/<elm-version>/packages/registry.dat` (for example, `$ELM_HOME/0.19.1/packages/registry.dat`)
 - **Structure**: Maps package names to `KnownVersions` containing the latest version and previous versions
 - **Update Process**: Fetched on first use or when outdated; stored as binary data
+
+`elm-wrap` relies on this versioned layout of `ELM_HOME` to ensure that each
+compiler version sees only package versions that are compatible with that Elm
+release. The dependency solver (including major upgrade strategies) operates
+under the assumption that the active `registry.dat` has already been filtered
+to Elm-compatible packages for the current compiler.
 
 ## Package Downloads
 

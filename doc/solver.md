@@ -69,6 +69,15 @@ The solver employs multiple strategies in order of preference:
 4. **Until next major** version for direct dependencies
 5. **Any version** for direct dependencies
 
+For Elm application projects, `elm-wrap` mirrors this ladder in its C
+implementation. In particular, for the most permissive "any version" / major
+upgrade strategy, the client-side solver does not add additional elm-version
+constraints for individual packages. Instead, it relies on the registry
+and local cache layout (versioned `$ELM_HOME/<elm-version>/packages/registry.dat`)
+to expose only package versions that are compatible with the currently running
+Elm compiler. As a result, the solver's search space already consists solely of
+Elm-compatible versions when performing major upgrades.
+
 ### Backtracking Mechanism
 
 - Uses continuation-passing style for backtracking

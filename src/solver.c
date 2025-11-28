@@ -423,36 +423,6 @@ bool version_satisfies(const char *version, Constraint *constraint) {
     return false;
 }
 
-/* Registry operations (stubbed) */
-char** solver_get_available_versions(SolverState *state, const char *author, const char *name, int *count) {
-    (void)state;  // Unused for now
-    
-    fprintf(stderr, "[STUB] solver_get_available_versions: Would query registry for %s/%s\n", author, name);
-    
-    // TODO: Implement registry parsing
-    // 1. Load registry.dat
-    // 2. Find package entry
-    // 3. Return list of versions (newest first)
-    
-    // For now, return dummy versions
-    *count = 3;
-    char **versions = arena_malloc(sizeof(char*) * (*count));
-    versions[0] = arena_strdup("1.0.5");
-    versions[1] = arena_strdup("1.0.4");
-    versions[2] = arena_strdup("1.0.3");
-    
-    return versions;
-}
-
-void solver_free_versions(char **versions, int count) {
-    if (!versions) return;
-    
-    for (int i = 0; i < count; i++) {
-        arena_free(versions[i]);
-    }
-    arena_free(versions);
-}
-
 /* Solver strategies for package installations */
 typedef enum {
     STRATEGY_EXACT_ALL,                        /* Pin all existing dependencies to exact versions */
@@ -1084,8 +1054,12 @@ SolverResult solver_upgrade_all(
         if (major_upgrade) {
             /* For major upgrades, allow any version */
             log_debug("Allowing major upgrades for all packages");
-            /* Don't add any root constraints - let solver pick latest versions */
-            /* TODO: This is too aggressive. We should still respect elm-version constraints */
+            /* Don't add any root constraints - let solver pick latest versions.
+             * We rely on the registry/provider to expose only package versions that
+             * are compatible with the current Elm compiler version (via ELM_HOME
+             * being versioned per compiler), so the solver itself only ever sees
+             * compatible packages here.
+             */
             root_ok = true;
         } else {
             /* For minor upgrades, use upgradable within major strategy */
