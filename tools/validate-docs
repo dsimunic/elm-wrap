@@ -248,7 +248,7 @@ if [ -n "$SINGLE_PACKAGE" ]; then
     # For single package mode, also show view-diff on failure
     if [ $GENERATE_FAIL_COUNT -gt 0 ] || [ $FAIL_COUNT -gt 0 ]; then
         "$SCRIPT_DIR/view-diff" "$REPOSITORY_DIR" "$TARGET_DIR" "$SINGLE_PACKAGE"
-        exit 100
+        exit 111
     elif [ $SUCCESS_COUNT -gt 0 ]; then
         log "SUCCESS: $SINGLE_PACKAGE"
         exit 0
