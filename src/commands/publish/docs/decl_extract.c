@@ -40,8 +40,25 @@ bool extract_value_decl(TSNode node, const char *source_code, ElmValue *value, c
                         ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
                         char **local_types, int local_types_count, TypeAliasMap *type_alias_map,
                         DependencyCache *dep_cache) {
-    /* Find type_annotation sibling first */
+    /* Find type_annotation sibling, skipping over comment nodes */
     TSNode type_annotation = ts_node_prev_named_sibling(node);
+
+    /* Skip over any comment nodes to find the type_annotation */
+    while (!ts_node_is_null(type_annotation)) {
+        const char *sibling_type = ts_node_type(type_annotation);
+        if (strcmp(sibling_type, "type_annotation") == 0) {
+            /* Found it! */
+            break;
+        } else if (strcmp(sibling_type, "line_comment") == 0 ||
+                   strcmp(sibling_type, "block_comment") == 0) {
+            /* Skip comment and continue looking */
+            type_annotation = ts_node_prev_named_sibling(type_annotation);
+        } else {
+            /* Hit a non-comment, non-type-annotation node - no type annotation found */
+            break;
+        }
+    }
+
     if (ts_node_is_null(type_annotation) ||
         strcmp(ts_node_type(type_annotation), "type_annotation") != 0) {
         /* No type annotation found - skip this value */
