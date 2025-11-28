@@ -17,6 +17,19 @@
 #include <stdio.h>
 
 /* ============================================================================
+ * Helper Functions
+ * ========================================================================== */
+
+/**
+ * Check if a node type is a comment (line_comment or block_comment).
+ * Comments should be skipped during type traversal to avoid spurious spacing.
+ */
+static inline bool is_comment_node(const char *node_type) {
+    return strcmp(node_type, "line_comment") == 0 ||
+           strcmp(node_type, "block_comment") == 0;
+}
+
+/* ============================================================================
  * Context lifecycle
  * ========================================================================== */
 
@@ -539,6 +552,10 @@ static void qualify_canonicalize_to_buffer(TSNode node, const char *source_code,
             if (strcmp(child_type, "arrow") == 0) {
                 ast_buffer_append(buffer, pos, max_len, " -> ");
             } else if (ts_node_is_named(child)) {
+                /* Skip comments - not part of type structure */
+                if (is_comment_node(child_type)) {
+                    continue;
+                }
                 /* Check if this child is a function type */
                 bool child_has_arrow = type_contains_arrow(child, source_code);
 
@@ -573,7 +590,12 @@ static void qualify_canonicalize_to_buffer(TSNode node, const char *source_code,
         for (uint32_t i = 0; i < child_count; i++) {
             TSNode child = ts_node_child(node, i);
             if (ts_node_is_named(child)) {
-                if (!found_type_name && strcmp(ts_node_type(child), "upper_case_qid") == 0) {
+                const char *ctype = ts_node_type(child);
+                /* Skip comments when counting arity */
+                if (is_comment_node(ctype)) {
+                    continue;
+                }
+                if (!found_type_name && strcmp(ctype, "upper_case_qid") == 0) {
                     found_type_name = true;
                 } else if (found_type_name) {
                     arity++;
@@ -587,6 +609,10 @@ static void qualify_canonicalize_to_buffer(TSNode node, const char *source_code,
             const char *child_type = ts_node_type(child);
 
             if (ts_node_is_named(child)) {
+                /* Skip comments - not part of type structure */
+                if (is_comment_node(child_type)) {
+                    continue;
+                }
                 if (!first) {
                     ast_buffer_append_char(buffer, pos, max_len, ' ');
                 }
@@ -834,6 +860,11 @@ static void qualify_canonicalize_to_buffer(TSNode node, const char *source_code,
             for (uint32_t i = 0; i < child_count; i++) {
                 TSNode child = ts_node_child(node, i);
                 if (ts_node_is_named(child)) {
+                    const char *ctype = ts_node_type(child);
+                    /* Skip comments - not part of type structure */
+                    if (is_comment_node(ctype)) {
+                        continue;
+                    }
                     qualify_canonicalize_to_buffer(child, source_code, ctx, buffer, pos, max_len,
                                                     in_function_arg_position);
                 }
@@ -881,6 +912,10 @@ static void qualify_type_to_buffer(TSNode node, const char *source_code,
             if (strcmp(child_type, "arrow") == 0) {
                 ast_buffer_append(buffer, pos, max_len, " -> ");
             } else if (ts_node_is_named(child)) {
+                /* Skip comments - not part of type structure */
+                if (is_comment_node(child_type)) {
+                    continue;
+                }
                 qualify_type_to_buffer(child, source_code, ctx, buffer, pos, max_len);
             }
         }
@@ -894,7 +929,12 @@ static void qualify_type_to_buffer(TSNode node, const char *source_code,
         for (uint32_t i = 0; i < child_count; i++) {
             TSNode child = ts_node_child(node, i);
             if (ts_node_is_named(child)) {
-                if (!found_type_name && strcmp(ts_node_type(child), "upper_case_qid") == 0) {
+                const char *ctype = ts_node_type(child);
+                /* Skip comments when counting arity */
+                if (is_comment_node(ctype)) {
+                    continue;
+                }
+                if (!found_type_name && strcmp(ctype, "upper_case_qid") == 0) {
                     found_type_name = true;
                 } else if (found_type_name) {
                     arity++;
@@ -908,6 +948,10 @@ static void qualify_type_to_buffer(TSNode node, const char *source_code,
             const char *child_type = ts_node_type(child);
 
             if (ts_node_is_named(child)) {
+                /* Skip comments - not part of type structure */
+                if (is_comment_node(child_type)) {
+                    continue;
+                }
                 if (!first) {
                     ast_buffer_append_char(buffer, pos, max_len, ' ');
                 }
@@ -1068,6 +1112,11 @@ static void qualify_type_to_buffer(TSNode node, const char *source_code,
             for (uint32_t i = 0; i < child_count; i++) {
                 TSNode child = ts_node_child(node, i);
                 if (ts_node_is_named(child)) {
+                    const char *ctype = ts_node_type(child);
+                    /* Skip comments - not part of type structure */
+                    if (is_comment_node(ctype)) {
+                        continue;
+                    }
                     qualify_type_to_buffer(child, source_code, ctx, buffer, pos, max_len);
                 }
             }
