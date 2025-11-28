@@ -439,13 +439,20 @@ static char *qualify_single_type_name(const char *type_name, const char *module_
         const char *full_module = qualify_lookup_alias(ctx, module_qualifier, type_name);
         if (full_module) {
             /* Alias found, but check if there's also a real module with the alias name
-             * that exports this type. If so, prefer the real module - BUT only if the
-             * arity matches!
+             * that is DIRECTLY IMPORTED and exports this type. If so, prefer the real module
+             * - BUT only if the arity matches!
              * Example: "import Parser.Advanced as Parser" creates alias Parser -> Parser.Advanced
              * - Parser.DeadEnd context problem (2 params) → Parser.Advanced.DeadEnd (arity 2)
              * - Parser.DeadEnd (0 params) → Parser.DeadEnd (arity 0)
-             * This prevents using Parser.DeadEnd when Parser.Advanced.DeadEnd is intended. */
-            if (ctx->dep_cache) {
+             * This prevents using Parser.DeadEnd when Parser.Advanced.DeadEnd is intended.
+             *
+             * IMPORTANT: We must check if the module is actually directly imported, not just
+             * whether it exists in the package. Otherwise we'll incorrectly prefer a module
+             * that happens to exist but isn't imported.
+             * Example bug: "import Mapbox.Cmd.Internal as Internal" with module "Internal" existing
+             * - Should use: Mapbox.Cmd.Internal.Supported
+             * - Bug was using: Internal.Supported (wrong - Internal not imported!) */
+            if (qualify_is_direct_import(ctx, module_qualifier) && ctx->dep_cache) {
                 CachedModuleExports *alias_as_module = dependency_cache_get_exports(ctx->dep_cache, module_qualifier);
                 if (alias_as_module && alias_as_module->parsed) {
                     for (int i = 0; i < alias_as_module->exported_types_count; i++) {
