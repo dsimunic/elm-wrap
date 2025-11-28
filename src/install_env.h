@@ -13,6 +13,7 @@ typedef struct InstallEnv {
     Registry *registry;
     CurlSession *curl_session;
     bool offline;
+    bool ignore_hash;  /* Skip SHA-1 verification of downloaded archives */
     char *registry_url;
     char *registry_etag;  /* For future conditional requests */
     size_t known_version_count;

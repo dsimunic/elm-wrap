@@ -2,6 +2,7 @@
 #include "install_env.h"
 #include "elm_compiler.h"
 #include "alloc.h"
+#include "log.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -213,12 +214,17 @@ bool cache_package_fully_downloaded(CacheConfig *config, const char *author, con
     char *pkg_path = cache_get_package_path(config, author, name, version);
     if (!pkg_path) return false;
 
+    log_debug("Checking if package is fully downloaded: %s", pkg_path);
+
     /* Check if package directory exists */
     struct stat st;
     if (stat(pkg_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        log_debug("Package directory does not exist: %s", pkg_path);
         arena_free(pkg_path);
         return false;
     }
+
+    log_debug("Package directory exists: %s", pkg_path);
 
     /* Check if src/ directory exists */
     size_t src_len = strlen(pkg_path) + strlen("/src") + 1;
@@ -230,6 +236,12 @@ bool cache_package_fully_downloaded(CacheConfig *config, const char *author, con
 
     snprintf(src_path, src_len, "%s/src", pkg_path);
     bool has_src = (stat(src_path, &st) == 0 && S_ISDIR(st.st_mode));
+
+    if (has_src) {
+        log_debug("Package src/ directory exists: %s", src_path);
+    } else {
+        log_debug("Package src/ directory MISSING: %s (package incomplete!)", src_path);
+    }
 
     arena_free(pkg_path);
     arena_free(src_path);

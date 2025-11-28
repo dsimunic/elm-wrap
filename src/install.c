@@ -1016,10 +1016,15 @@ static void cache_download_list_free(CacheDownloadList *list) {
 static bool cache_download_package_recursive(InstallEnv *env, const char *author, const char *name, const char *version, CacheDownloadList *downloaded) {
     if (!env || !author || !name || !version) return false;
 
-    // Check if already cached
-    if (cache_package_exists(env->cache, author, name, version)) {
-        log_debug("Package %s/%s@%s already cached", author, name, version);
+    // Check if already fully cached (directory exists AND has src/)
+    if (cache_package_fully_downloaded(env->cache, author, name, version)) {
+        log_debug("Package %s/%s@%s already cached (verified src/ exists)", author, name, version);
         return true;
+    }
+
+    // Check if directory exists but incomplete - log this for debugging
+    if (cache_package_exists(env->cache, author, name, version)) {
+        log_debug("Package %s/%s@%s directory exists but src/ is missing - re-downloading", author, name, version);
     }
 
     // Download the package
@@ -1106,6 +1111,7 @@ static void print_cache_usage(void) {
     printf("  --from-file <path> <package>    # Download from local file/directory to cache\n");
     printf("  --from-url <url> <package>      # Download from URL to cache\n");
     printf("  --major <package>               # Download next major version to cache\n");
+    printf("  --ignore-hash                   # Skip SHA-1 hash verification\n");
     printf("  -v, --verbose                   # Show progress reports\n");
     printf("  -q, --quiet                     # Suppress progress reports\n");
     printf("  --help                          # Show this help\n");
@@ -1136,6 +1142,7 @@ int cmd_cache(int argc, char *argv[]) {
     bool cmd_verbose = false;
     bool cmd_quiet = false;
     bool major_upgrade = false;
+    bool ignore_hash = false;
 
     // Parse arguments
     for (int i = 1; i < argc; i++) {
@@ -1146,6 +1153,8 @@ int cmd_cache(int argc, char *argv[]) {
             cmd_verbose = true;
         } else if (strcmp(argv[i], "-q") == 0 || strcmp(argv[i], "--quiet") == 0) {
             cmd_quiet = true;
+        } else if (strcmp(argv[i], "--ignore-hash") == 0) {
+            ignore_hash = true;
         } else if (strcmp(argv[i], "--from-file") == 0) {
             if (i + 2 < argc) {
                 i++;
@@ -1239,6 +1248,9 @@ int cmd_cache(int argc, char *argv[]) {
         log_set_level(original_level);
         return 1;
     }
+
+    // Set ignore_hash flag if requested
+    env->ignore_hash = ignore_hash;
 
     // Parse package name
     char *author = NULL;

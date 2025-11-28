@@ -423,14 +423,17 @@ char* fetch_package_archive(InstallEnv *env, const char *author,
 
     log_progress("  Downloaded to: %s", temp_template);
 
-    log_progress("  Verifying SHA-1 hash...");
-    if (!verify_file_sha1(temp_template, endpoint->hash)) {
-        fprintf(stderr, "Error: SHA-1 verification failed\n");
-        remove(temp_template);
-        return NULL;
+    if (env->ignore_hash) {
+        log_progress("  Skipping SHA-1 verification (--ignore-hash)");
+    } else {
+        log_progress("  Verifying SHA-1 hash...");
+        if (!verify_file_sha1(temp_template, endpoint->hash)) {
+            fprintf(stderr, "Error: SHA-1 verification failed\n");
+            remove(temp_template);
+            return NULL;
+        }
+        log_progress("  SHA-1 verification passed");
     }
-
-    log_progress("  SHA-1 verification passed");
 
     /* Return the temporary file path (caller is responsible for cleanup) */
     return arena_strdup(temp_template);
