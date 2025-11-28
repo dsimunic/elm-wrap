@@ -15,8 +15,17 @@
 #include "skeleton.h"
 #include <stdbool.h>
 
-/* Forward declaration for dependency cache */
+/* Forward declaration for dependency cache (if not already defined) */
+#ifndef DEPENDENCY_CACHE_H
 typedef struct DependencyCache DependencyCache;
+#endif
+
+/* Forward declarations for type_maps structures (if not already defined) */
+#ifndef TYPE_MAPS_H
+typedef struct ImportMap ImportMap;
+typedef struct ModuleAliasMap ModuleAliasMap;
+typedef struct DirectModuleImports DirectModuleImports;
+#endif
 
 /* ============================================================================
  * Import resolution context
@@ -81,6 +90,18 @@ typedef struct {
  * Applies implicit imports automatically.
  */
 QualifyContext *qualify_context_create(SkeletonModule *skeleton, DependencyCache *dep_cache);
+
+/**
+ * Create a qualification context from existing type_maps structures.
+ * This allows integration with existing docs pipeline code.
+ * Note: local_types is borrowed (not copied) - caller must keep it alive.
+ */
+QualifyContext *qualify_context_create_from_maps(const char *module_name,
+                                                  ImportMap *import_map,
+                                                  ModuleAliasMap *alias_map,
+                                                  DirectModuleImports *direct_imports,
+                                                  char **local_types, int local_types_count,
+                                                  DependencyCache *dep_cache);
 
 /**
  * Free a qualification context.

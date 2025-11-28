@@ -260,6 +260,7 @@ static CachedModuleExports *parse_module_exports_from_docs_json(const char *docs
         CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
         exports->module_name = arena_strdup(module_name);
         exports->exported_types = NULL;
+        exports->exported_types_arity = NULL;
         exports->exported_types_count = 0;
         exports->parsed = false;
         return exports;
@@ -273,6 +274,7 @@ static CachedModuleExports *parse_module_exports_from_docs_json(const char *docs
         CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
         exports->module_name = arena_strdup(module_name);
         exports->exported_types = NULL;
+        exports->exported_types_arity = NULL;
         exports->exported_types_count = 0;
         exports->parsed = false;
         return exports;
@@ -284,6 +286,7 @@ static CachedModuleExports *parse_module_exports_from_docs_json(const char *docs
         CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
         exports->module_name = arena_strdup(module_name);
         exports->exported_types = NULL;
+        exports->exported_types_arity = NULL;
         exports->exported_types_count = 0;
         exports->parsed = false;
         return exports;
@@ -307,6 +310,7 @@ static CachedModuleExports *parse_module_exports_from_docs_json(const char *docs
         CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
         exports->module_name = arena_strdup(module_name);
         exports->exported_types = NULL;
+        exports->exported_types_arity = NULL;
         exports->exported_types_count = 0;
         exports->parsed = false;
         return exports;
@@ -319,6 +323,7 @@ static CachedModuleExports *parse_module_exports_from_docs_json(const char *docs
 
     int capacity = 16;
     exports->exported_types = arena_malloc(capacity * sizeof(char*));
+    exports->exported_types_arity = arena_malloc(capacity * sizeof(int));
     exports->exported_types_count = 0;
 
     /* Extract type names from "unions" array */
@@ -327,12 +332,21 @@ static CachedModuleExports *parse_module_exports_from_docs_json(const char *docs
         cJSON *union_item = NULL;
         cJSON_ArrayForEach(union_item, unions) {
             cJSON *name_item = cJSON_GetObjectItem(union_item, "name");
+            cJSON *args_item = cJSON_GetObjectItem(union_item, "args");
             if (name_item && cJSON_IsString(name_item)) {
                 if (exports->exported_types_count >= capacity) {
                     capacity *= 2;
                     exports->exported_types = arena_realloc(exports->exported_types, capacity * sizeof(char*));
+                    exports->exported_types_arity = arena_realloc(exports->exported_types_arity, capacity * sizeof(int));
                 }
-                exports->exported_types[exports->exported_types_count++] = arena_strdup(name_item->valuestring);
+                exports->exported_types[exports->exported_types_count] = arena_strdup(name_item->valuestring);
+                /* Count type parameters from "args" array */
+                int arity = 0;
+                if (args_item && cJSON_IsArray(args_item)) {
+                    arity = cJSON_GetArraySize(args_item);
+                }
+                exports->exported_types_arity[exports->exported_types_count] = arity;
+                exports->exported_types_count++;
             }
         }
     }
@@ -343,12 +357,21 @@ static CachedModuleExports *parse_module_exports_from_docs_json(const char *docs
         cJSON *alias_item = NULL;
         cJSON_ArrayForEach(alias_item, aliases) {
             cJSON *name_item = cJSON_GetObjectItem(alias_item, "name");
+            cJSON *args_item = cJSON_GetObjectItem(alias_item, "args");
             if (name_item && cJSON_IsString(name_item)) {
                 if (exports->exported_types_count >= capacity) {
                     capacity *= 2;
                     exports->exported_types = arena_realloc(exports->exported_types, capacity * sizeof(char*));
+                    exports->exported_types_arity = arena_realloc(exports->exported_types_arity, capacity * sizeof(int));
                 }
-                exports->exported_types[exports->exported_types_count++] = arena_strdup(name_item->valuestring);
+                exports->exported_types[exports->exported_types_count] = arena_strdup(name_item->valuestring);
+                /* Count type parameters from "args" array */
+                int arity = 0;
+                if (args_item && cJSON_IsArray(args_item)) {
+                    arity = cJSON_GetArraySize(args_item);
+                }
+                exports->exported_types_arity[exports->exported_types_count] = arity;
+                exports->exported_types_count++;
             }
         }
     }
@@ -366,6 +389,7 @@ static CachedModuleExports *parse_module_exports(const char *module_path, const 
         CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
         exports->module_name = arena_strdup(module_name);
         exports->exported_types = NULL;
+        exports->exported_types_arity = NULL;
         exports->exported_types_count = 0;
         exports->parsed = false;
         return exports;
@@ -378,6 +402,7 @@ static CachedModuleExports *parse_module_exports(const char *module_path, const 
         CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
         exports->module_name = arena_strdup(module_name);
         exports->exported_types = NULL;
+        exports->exported_types_arity = NULL;
         exports->exported_types_count = 0;
         exports->parsed = false;
         return exports;
@@ -390,6 +415,7 @@ static CachedModuleExports *parse_module_exports(const char *module_path, const 
         CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
         exports->module_name = arena_strdup(module_name);
         exports->exported_types = NULL;
+        exports->exported_types_arity = NULL;
         exports->exported_types_count = 0;
         exports->parsed = false;
         return exports;
@@ -403,6 +429,7 @@ static CachedModuleExports *parse_module_exports(const char *module_path, const 
         CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
         exports->module_name = arena_strdup(module_name);
         exports->exported_types = NULL;
+        exports->exported_types_arity = NULL;
         exports->exported_types_count = 0;
         exports->parsed = false;
         return exports;
@@ -415,17 +442,60 @@ static CachedModuleExports *parse_module_exports(const char *module_path, const 
     CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
     exports->module_name = arena_strdup(module_name);
     exports->exported_types = NULL;
+    exports->exported_types_arity = NULL;
     exports->exported_types_count = 0;
     exports->parsed = true;
 
     /* Allocate array for exported types */
     int capacity = 16;
     exports->exported_types = arena_malloc(capacity * sizeof(char*));
-    
+    exports->exported_types_arity = arena_malloc(capacity * sizeof(int));
+
     bool expose_all = false;
+    uint32_t child_count = ts_node_child_count(root_node);
+
+    /* First pass: build a map of all type declarations to their arities */
+    typedef struct {
+        char *name;
+        int arity;
+    } TypeInfo;
+    TypeInfo *type_infos = arena_malloc(64 * sizeof(TypeInfo));
+    int type_infos_count = 0;
+    int type_infos_capacity = 64;
+
+    for (uint32_t i = 0; i < child_count; i++) {
+        TSNode child = ts_node_child(root_node, i);
+        const char *node_type = ts_node_type(child);
+
+        if (strcmp(node_type, "type_declaration") == 0 || strcmp(node_type, "type_alias_declaration") == 0) {
+            uint32_t decl_child_count = ts_node_child_count(child);
+            char *type_name = NULL;
+            int arity = 0;
+
+            for (uint32_t j = 0; j < decl_child_count; j++) {
+                TSNode decl_child = ts_node_child(child, j);
+                const char *child_type = ts_node_type(decl_child);
+
+                if (strcmp(child_type, "upper_case_identifier") == 0 && !type_name) {
+                    type_name = get_node_text(decl_child, source_code);
+                } else if (strcmp(child_type, "lower_type_name") == 0) {
+                    arity++;
+                }
+            }
+
+            if (type_name) {
+                if (type_infos_count >= type_infos_capacity) {
+                    type_infos_capacity *= 2;
+                    type_infos = arena_realloc(type_infos, type_infos_capacity * sizeof(TypeInfo));
+                }
+                type_infos[type_infos_count].name = type_name;
+                type_infos[type_infos_count].arity = arity;
+                type_infos_count++;
+            }
+        }
+    }
 
     /* Find module_declaration node */
-    uint32_t child_count = ts_node_child_count(root_node);
     for (uint32_t i = 0; i < child_count; i++) {
         TSNode child = ts_node_child(root_node, i);
         const char *type = ts_node_type(child);
@@ -460,9 +530,21 @@ static CachedModuleExports *parse_module_exports(const char *module_path, const 
                                     if (exports->exported_types_count >= capacity) {
                                         capacity *= 2;
                                         exports->exported_types = arena_realloc(exports->exported_types, capacity * sizeof(char*));
+                                        exports->exported_types_arity = arena_realloc(exports->exported_types_arity, capacity * sizeof(int));
                                     }
 
-                                    exports->exported_types[exports->exported_types_count++] = type_name;
+                                    /* Look up arity from our map */
+                                    int arity = -1;
+                                    for (int k = 0; k < type_infos_count; k++) {
+                                        if (strcmp(type_infos[k].name, type_name) == 0) {
+                                            arity = type_infos[k].arity;
+                                            break;
+                                        }
+                                    }
+
+                                    exports->exported_types[exports->exported_types_count] = type_name;
+                                    exports->exported_types_arity[exports->exported_types_count] = arity;
+                                    exports->exported_types_count++;
                                     break;
                                 }
                             }
@@ -474,31 +556,19 @@ static CachedModuleExports *parse_module_exports(const char *module_path, const 
         }
     }
     
-    /* If module exposes all, scan the file for type definitions */
+    /* If module exposes all, add all types from our map */
     if (expose_all) {
-        for (uint32_t i = 0; i < child_count; i++) {
-            TSNode child = ts_node_child(root_node, i);
-            const char *type = ts_node_type(child);
-            
-            if (strcmp(type, "type_declaration") == 0 || strcmp(type, "type_alias_declaration") == 0) {
-                /* Find the type name (upper_case_identifier) */
-                uint32_t type_child_count = ts_node_child_count(child);
-                for (uint32_t j = 0; j < type_child_count; j++) {
-                    TSNode type_child = ts_node_child(child, j);
-                    if (strcmp(ts_node_type(type_child), "upper_case_identifier") == 0) {
-                        char *type_name = get_node_text(type_child, source_code);
-                        
-                        /* Expand array if needed */
-                        if (exports->exported_types_count >= capacity) {
-                            capacity *= 2;
-                            exports->exported_types = arena_realloc(exports->exported_types, capacity * sizeof(char*));
-                        }
-                        
-                        exports->exported_types[exports->exported_types_count++] = type_name;
-                        break;
-                    }
-                }
+        for (int i = 0; i < type_infos_count; i++) {
+            /* Expand array if needed */
+            if (exports->exported_types_count >= capacity) {
+                capacity *= 2;
+                exports->exported_types = arena_realloc(exports->exported_types, capacity * sizeof(char*));
+                exports->exported_types_arity = arena_realloc(exports->exported_types_arity, capacity * sizeof(int));
             }
+
+            exports->exported_types[exports->exported_types_count] = type_infos[i].name;
+            exports->exported_types_arity[exports->exported_types_count] = type_infos[i].arity;
+            exports->exported_types_count++;
         }
     }
 
@@ -551,6 +621,7 @@ void dependency_cache_free(struct DependencyCache *cache) {
             arena_free(cache->modules[i].exported_types[j]);
         }
         arena_free(cache->modules[i].exported_types);
+        arena_free(cache->modules[i].exported_types_arity);
     }
     arena_free(cache->modules);
     arena_free(cache);
@@ -653,6 +724,7 @@ CachedModuleExports* dependency_cache_get_exports(struct DependencyCache *cache,
         exports = arena_malloc(sizeof(CachedModuleExports));
         exports->module_name = arena_strdup(module_name);
         exports->exported_types = NULL;
+        exports->exported_types_arity = NULL;
         exports->exported_types_count = 0;
         exports->parsed = false;
     }

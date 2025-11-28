@@ -3,8 +3,10 @@
 #include "type_qualify.h"
 #include "comment_extract.h"
 #include "../../../alloc.h"
+#include "../../../ast/qualify.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 /* Helper function to extract and canonicalize type expression */
 char *extract_type_expression(TSNode type_node, const char *source_code, const char *module_name,
@@ -13,34 +15,24 @@ char *extract_type_expression(TSNode type_node, const char *source_code, const c
                               char **local_types, int local_types_count,
                               TypeAliasMap *type_alias_map, int implementation_param_count,
                               DependencyCache *dep_cache) {
+    (void)type_alias_map;  /* Type alias expansion is intentionally skipped - we preserve aliases */
+    (void)implementation_param_count;  /* Not needed when preserving aliases */
+
     if (ts_node_is_null(type_node)) {
         return arena_strdup("");
     }
 
-    /* Extract the raw type text, skipping comments */
-    char *raw_text = extract_text_skip_comments(type_node, source_code);
+    /* Build a QualifyContext from the existing maps */
+    QualifyContext *ctx = qualify_context_create_from_maps(
+        module_name, import_map, alias_map, direct_imports,
+        local_types, local_types_count, dep_cache);
 
-    /* Normalize whitespace */
-    char *normalized = normalize_whitespace(raw_text);
-    arena_free(raw_text);
+    /* Use AST-based qualification + canonicalization */
+    char *result = qualify_and_canonicalize_type_node(type_node, source_code, ctx);
 
-    /* Expand function type aliases (only if we have implementation param count) */
-    char *expanded = expand_function_type_aliases(normalized, type_alias_map, implementation_param_count);
-    arena_free(normalized);
+    qualify_context_free(ctx);
 
-    /* Qualify type names */
-    char *qualified = qualify_type_names(expanded, module_name, import_map, alias_map, direct_imports, local_types, local_types_count, dep_cache);
-    arena_free(expanded);
-
-    /* Remove unnecessary outer parentheses from return type */
-    char *return_cleaned = remove_return_type_parens(qualified);
-    arena_free(qualified);
-
-    /* Remove unnecessary parentheses from function argument positions */
-    char *canonical = remove_unnecessary_arg_parens(return_cleaned);
-    arena_free(return_cleaned);
-
-    return canonical;
+    return result;
 }
 
 /* Extract value declaration (function/constant) */

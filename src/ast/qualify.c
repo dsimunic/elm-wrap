@@ -6,6 +6,9 @@
  * canonicalization for the docs pipeline.
  */
 
+/* Include type_maps.h first so its types are defined before qualify.h */
+#include "../commands/publish/docs/type_maps.h"
+
 #include "qualify.h"
 #include "canonicalize.h"
 #include "util.h"
@@ -88,6 +91,76 @@ QualifyContext *qualify_context_create(SkeletonModule *skeleton, DependencyCache
     return ctx;
 }
 
+QualifyContext *qualify_context_create_from_maps(const char *module_name,
+                                                  ImportMap *import_map,
+                                                  ModuleAliasMap *alias_map,
+                                                  DirectModuleImports *direct_imports,
+                                                  char **local_types, int local_types_count,
+                                                  DependencyCache *dep_cache) {
+    QualifyContext *ctx = arena_calloc(1, sizeof(QualifyContext));
+
+    ctx->current_module = arena_strdup(module_name ? module_name : "");
+    ctx->dep_cache = dep_cache;
+
+    /* Initialize arrays */
+    ctx->imports_capacity = 64;
+    ctx->imports = arena_malloc(ctx->imports_capacity * sizeof(QualifyImportEntry));
+
+    ctx->aliases_capacity = 16;
+    ctx->aliases = arena_malloc(ctx->aliases_capacity * sizeof(QualifyAliasEntry));
+
+    ctx->direct_modules_capacity = 32;
+    ctx->direct_modules = arena_malloc(ctx->direct_modules_capacity * sizeof(char*));
+
+    /* Borrow local types (caller keeps ownership) */
+    ctx->local_types = local_types;
+    ctx->local_types_count = local_types_count;
+
+    /* Apply implicit imports first */
+    qualify_apply_implicit_imports(ctx);
+
+    /* Copy from import_map */
+    if (import_map) {
+        for (int i = 0; i < import_map->imports_count; i++) {
+            if (ctx->imports_count >= ctx->imports_capacity) {
+                ctx->imports_capacity *= 2;
+                ctx->imports = arena_realloc(ctx->imports, ctx->imports_capacity * sizeof(QualifyImportEntry));
+            }
+            QualifyImportEntry *entry = &ctx->imports[ctx->imports_count++];
+            entry->type_name = arena_strdup(import_map->imports[i].type_name);
+            entry->module_name = arena_strdup(import_map->imports[i].module_name);
+        }
+    }
+
+    /* Copy from alias_map */
+    if (alias_map) {
+        for (int i = 0; i < alias_map->aliases_count; i++) {
+            ModuleAlias *src = &alias_map->aliases[i];
+            if (ctx->aliases_count < ctx->aliases_capacity) {
+                QualifyAliasEntry *entry = &ctx->aliases[ctx->aliases_count++];
+                entry->alias = arena_strdup(src->alias);
+                entry->full_modules_capacity = src->full_modules_count > 0 ? src->full_modules_count : 1;
+                entry->full_modules = arena_malloc(entry->full_modules_capacity * sizeof(char*));
+                entry->full_modules_count = src->full_modules_count;
+                for (int j = 0; j < src->full_modules_count; j++) {
+                    entry->full_modules[j] = arena_strdup(src->full_modules[j]);
+                }
+            }
+        }
+    }
+
+    /* Copy from direct_imports */
+    if (direct_imports) {
+        for (int i = 0; i < direct_imports->modules_count; i++) {
+            if (ctx->direct_modules_count < ctx->direct_modules_capacity) {
+                ctx->direct_modules[ctx->direct_modules_count++] = arena_strdup(direct_imports->modules[i]);
+            }
+        }
+    }
+
+    return ctx;
+}
+
 void qualify_context_free(QualifyContext *ctx) {
     if (!ctx) return;
 
@@ -113,7 +186,7 @@ void qualify_context_free(QualifyContext *ctx) {
     }
     arena_free(ctx->direct_modules);
 
-    /* Note: local_types are owned by skeleton, not freed here */
+    /* Note: local_types are owned by skeleton/caller, not freed here */
 
     arena_free(ctx);
 }
@@ -194,12 +267,20 @@ void qualify_apply_implicit_imports(QualifyContext *ctx) {
      */
 
     /* Basics exposing (..) - add common types */
+    /* Note: String and Char come from their own modules, not Basics */
     const char *basics_types[] = {
-        "Int", "Float", "Bool", "String", "Char", "Order", "Never"
+        "Int", "Float", "Bool", "Order", "Never"
     };
     for (size_t i = 0; i < sizeof(basics_types) / sizeof(basics_types[0]); i++) {
         add_import_entry(ctx, basics_types[i], "Basics");
     }
+    /* Also add Bool constructors */
+    add_import_entry(ctx, "True", "Basics");
+    add_import_entry(ctx, "False", "Basics");
+    /* And Order constructors */
+    add_import_entry(ctx, "LT", "Basics");
+    add_import_entry(ctx, "EQ", "Basics");
+    add_import_entry(ctx, "GT", "Basics");
     add_direct_module(ctx, "Basics");
 
     /* List exposing (List) */
@@ -250,7 +331,10 @@ void qualify_apply_implicit_imports(QualifyContext *ctx) {
  * ========================================================================== */
 
 const char *qualify_lookup_import(QualifyContext *ctx, const char *type_name) {
-    for (int i = 0; i < ctx->imports_count; i++) {
+    /* Search backwards to implement "last import wins" semantics:
+     * When the same type is exposed from multiple modules, the last import takes precedence.
+     * This matches Elm's behavior and the logic in type_maps.c:lookup_import */
+    for (int i = ctx->imports_count - 1; i >= 0; i--) {
         if (strcmp(ctx->imports[i].type_name, type_name) == 0) {
             return ctx->imports[i].module_name;
         }
@@ -305,17 +389,50 @@ bool qualify_is_direct_import(QualifyContext *ctx, const char *module_name) {
  * Qualification rules:
  * 1. Local types → unchanged
  * 2. Types from exposing clause → Module.Type
- * 3. Already qualified types → expand alias if present
+ * 3. Already qualified types → expand alias if present (but prefer original module if it exports the type with matching arity)
  * 4. Type variables (lowercase) → unchanged
+ *
+ * @param type_name The unqualified type name
+ * @param module_qualifier The module qualifier (if already qualified), or NULL
+ * @param ctx The qualification context
+ * @param arity The number of type parameters being applied (for disambiguation)
  */
 static char *qualify_single_type_name(const char *type_name, const char *module_qualifier,
-                                       QualifyContext *ctx) {
+                                       QualifyContext *ctx, int arity) {
     /* If there's a module qualifier, we need to expand any alias */
     if (module_qualifier && *module_qualifier) {
         /* Look up the alias */
         const char *full_module = qualify_lookup_alias(ctx, module_qualifier, type_name);
         if (full_module) {
-            /* Alias found - build fully qualified name */
+            /* Alias found, but check if there's also a real module with the alias name
+             * that exports this type. If so, prefer the real module - BUT only if the
+             * arity matches!
+             * Example: "import Parser.Advanced as Parser" creates alias Parser -> Parser.Advanced
+             * - Parser.DeadEnd context problem (2 params) → Parser.Advanced.DeadEnd (arity 2)
+             * - Parser.DeadEnd (0 params) → Parser.DeadEnd (arity 0)
+             * This prevents using Parser.DeadEnd when Parser.Advanced.DeadEnd is intended. */
+            if (ctx->dep_cache) {
+                CachedModuleExports *alias_as_module = dependency_cache_get_exports(ctx->dep_cache, module_qualifier);
+                if (alias_as_module && alias_as_module->parsed) {
+                    for (int i = 0; i < alias_as_module->exported_types_count; i++) {
+                        if (strcmp(alias_as_module->exported_types[i], type_name) == 0) {
+                            /* Found the type in the real module. Check if arity matches. */
+                            int type_arity = alias_as_module->exported_types_arity[i];
+                            if (type_arity == -1 || type_arity == arity) {
+                                /* Arity matches or unknown - prefer the real module name. */
+                                size_t len = strlen(module_qualifier) + 1 + strlen(type_name) + 1;
+                                char *result = arena_malloc(len);
+                                snprintf(result, len, "%s.%s", module_qualifier, type_name);
+                                return result;
+                            }
+                            /* Arity mismatch - fall through to use the alias expansion */
+                            break;
+                        }
+                    }
+                }
+            }
+
+            /* Use the expanded alias */
             size_t len = strlen(full_module) + 1 + strlen(type_name) + 1;
             char *result = arena_malloc(len);
             snprintf(result, len, "%s.%s", full_module, type_name);
@@ -345,9 +462,12 @@ static char *qualify_single_type_name(const char *type_name, const char *module_
         return arena_strdup(type_name);
     }
 
-    /* Check if it's a local type */
+    /* Check if it's a local type - qualify with current module */
     if (qualify_is_local_type(ctx, type_name)) {
-        return arena_strdup(type_name);
+        size_t len = strlen(ctx->current_module) + 1 + strlen(type_name) + 1;
+        char *result = arena_malloc(len);
+        snprintf(result, len, "%s.%s", ctx->current_module, type_name);
+        return result;
     }
 
     /* Look up in imports */
@@ -424,8 +544,23 @@ static void qualify_canonicalize_to_buffer(TSNode node, const char *source_code,
     } else if (strcmp(node_type, "type_ref") == 0) {
         /* type_ref = upper_case_qid type_arg* */
         uint32_t child_count = ts_node_child_count(node);
-        bool first = true;
 
+        /* Count named children to determine arity (first is type name, rest are args) */
+        int arity = 0;
+        bool found_type_name = false;
+
+        for (uint32_t i = 0; i < child_count; i++) {
+            TSNode child = ts_node_child(node, i);
+            if (ts_node_is_named(child)) {
+                if (!found_type_name && strcmp(ts_node_type(child), "upper_case_qid") == 0) {
+                    found_type_name = true;
+                } else if (found_type_name) {
+                    arity++;
+                }
+            }
+        }
+
+        bool first = true;
         for (uint32_t i = 0; i < child_count; i++) {
             TSNode child = ts_node_child(node, i);
             const char *child_type = ts_node_type(child);
@@ -435,44 +570,65 @@ static void qualify_canonicalize_to_buffer(TSNode node, const char *source_code,
                     ast_buffer_append_char(buffer, pos, max_len, ' ');
                 }
 
-                /* Check if this type argument needs parentheses */
-                bool needs_parens = false;
-                if (strcmp(child_type, "type_expression") == 0) {
-                    bool has_arrow = type_contains_arrow(child, source_code);
-                    if (has_arrow) {
-                        needs_parens = true;
+                /* For the type name, qualify it with arity information */
+                if (strcmp(child_type, "upper_case_qid") == 0 && first) {
+                    char *text = ast_get_node_text(child, source_code);
+                    char *last_dot = strrchr(text, '.');
+                    if (last_dot) {
+                        /* Already qualified: Module.Type or Alias.Type */
+                        *last_dot = '\0';
+                        const char *module_part = text;
+                        const char *type_part = last_dot + 1;
+                        char *qualified = qualify_single_type_name(type_part, module_part, ctx, arity);
+                        ast_buffer_append(buffer, pos, max_len, qualified);
+                        arena_free(qualified);
                     } else {
-                        /* Check if the inner type_ref has type arguments */
-                        uint32_t expr_child_count = ts_node_child_count(child);
-                        for (uint32_t j = 0; j < expr_child_count; j++) {
-                            TSNode expr_child = ts_node_child(child, j);
-                            const char *expr_child_type = ts_node_type(expr_child);
-                            if (strcmp(expr_child_type, "type_ref") == 0) {
-                                uint32_t ref_named_children = ts_node_named_child_count(expr_child);
-                                if (ref_named_children > 1) {
-                                    needs_parens = true;
-                                    break;
+                        /* Unqualified type name */
+                        char *qualified = qualify_single_type_name(text, NULL, ctx, arity);
+                        ast_buffer_append(buffer, pos, max_len, qualified);
+                        arena_free(qualified);
+                    }
+                    arena_free(text);
+                } else {
+                    /* Type argument - check if it needs parentheses */
+                    bool needs_parens = false;
+                    if (strcmp(child_type, "type_expression") == 0) {
+                        bool has_arrow = type_contains_arrow(child, source_code);
+                        if (has_arrow) {
+                            needs_parens = true;
+                        } else {
+                            /* Check if the inner type_ref has type arguments */
+                            uint32_t expr_child_count = ts_node_child_count(child);
+                            for (uint32_t j = 0; j < expr_child_count; j++) {
+                                TSNode expr_child = ts_node_child(child, j);
+                                const char *expr_child_type = ts_node_type(expr_child);
+                                if (strcmp(expr_child_type, "type_ref") == 0) {
+                                    uint32_t ref_named_children = ts_node_named_child_count(expr_child);
+                                    if (ref_named_children > 1) {
+                                        needs_parens = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
+                    } else if (strcmp(child_type, "type_ref") == 0) {
+                        uint32_t ref_child_count = ts_node_named_child_count(child);
+                        needs_parens = (ref_child_count > 1);
                     }
-                } else if (strcmp(child_type, "type_ref") == 0) {
-                    uint32_t ref_child_count = ts_node_named_child_count(child);
-                    needs_parens = (ref_child_count > 1);
-                }
 
-                if (needs_parens) {
-                    ast_buffer_append_char(buffer, pos, max_len, '(');
-                    qualify_canonicalize_to_buffer(child, source_code, ctx, buffer, pos, max_len, false);
-                    ast_buffer_append_char(buffer, pos, max_len, ')');
-                } else {
-                    qualify_canonicalize_to_buffer(child, source_code, ctx, buffer, pos, max_len, false);
+                    if (needs_parens) {
+                        ast_buffer_append_char(buffer, pos, max_len, '(');
+                        qualify_canonicalize_to_buffer(child, source_code, ctx, buffer, pos, max_len, false);
+                        ast_buffer_append_char(buffer, pos, max_len, ')');
+                    } else {
+                        qualify_canonicalize_to_buffer(child, source_code, ctx, buffer, pos, max_len, false);
+                    }
                 }
                 first = false;
             }
         }
     } else if (strcmp(node_type, "upper_case_qid") == 0) {
-        /* Qualified or unqualified type identifier */
+        /* Standalone qualified/unqualified type identifier (not in type_ref context, arity = 0) */
         char *text = ast_get_node_text(node, source_code);
 
         /* Find the last dot to split module.Type */
@@ -483,12 +639,12 @@ static void qualify_canonicalize_to_buffer(TSNode node, const char *source_code,
             const char *module_part = text;
             const char *type_part = last_dot + 1;
 
-            char *qualified = qualify_single_type_name(type_part, module_part, ctx);
+            char *qualified = qualify_single_type_name(type_part, module_part, ctx, 0);
             ast_buffer_append(buffer, pos, max_len, qualified);
             arena_free(qualified);
         } else {
             /* Unqualified type name */
-            char *qualified = qualify_single_type_name(text, NULL, ctx);
+            char *qualified = qualify_single_type_name(text, NULL, ctx, 0);
             ast_buffer_append(buffer, pos, max_len, qualified);
             arena_free(qualified);
         }
@@ -499,30 +655,49 @@ static void qualify_canonicalize_to_buffer(TSNode node, const char *source_code,
         /* Type variable - output as-is */
         ast_buffer_append_node_text(buffer, pos, max_len, node, source_code);
     } else if (strcmp(node_type, "record_type") == 0) {
-        /* Record type { field : type, ... } */
-        ast_buffer_append(buffer, pos, max_len, "{ ");
-
+        /* Record type { field : type, ... } or empty record {} */
         uint32_t child_count = ts_node_child_count(node);
-        bool first_field = true;
 
+        /* Count fields and check for record_base_identifier */
+        int field_count = 0;
+        bool has_base = false;
         for (uint32_t i = 0; i < child_count; i++) {
             TSNode child = ts_node_child(node, i);
             const char *child_type = ts_node_type(child);
-
             if (strcmp(child_type, "field_type") == 0) {
-                if (!first_field) {
-                    ast_buffer_append(buffer, pos, max_len, ", ");
-                }
-                qualify_canonicalize_to_buffer(child, source_code, ctx, buffer, pos, max_len, false);
-                first_field = false;
+                field_count++;
             } else if (strcmp(child_type, "record_base_identifier") == 0) {
-                /* Extensible record: { a | field : type } */
-                ast_buffer_append_node_text(buffer, pos, max_len, child, source_code);
-                ast_buffer_append(buffer, pos, max_len, " | ");
+                has_base = true;
             }
         }
 
-        ast_buffer_append(buffer, pos, max_len, " }");
+        if (field_count == 0 && !has_base) {
+            /* Empty record {} - no spaces */
+            ast_buffer_append(buffer, pos, max_len, "{}");
+        } else {
+            /* Non-empty record with spaces */
+            ast_buffer_append(buffer, pos, max_len, "{ ");
+
+            bool first_field = true;
+            for (uint32_t i = 0; i < child_count; i++) {
+                TSNode child = ts_node_child(node, i);
+                const char *child_type = ts_node_type(child);
+
+                if (strcmp(child_type, "field_type") == 0) {
+                    if (!first_field) {
+                        ast_buffer_append(buffer, pos, max_len, ", ");
+                    }
+                    qualify_canonicalize_to_buffer(child, source_code, ctx, buffer, pos, max_len, false);
+                    first_field = false;
+                } else if (strcmp(child_type, "record_base_identifier") == 0) {
+                    /* Extensible record: { a | field : type } */
+                    ast_buffer_append_node_text(buffer, pos, max_len, child, source_code);
+                    ast_buffer_append(buffer, pos, max_len, " | ");
+                }
+            }
+
+            ast_buffer_append(buffer, pos, max_len, " }");
+        }
     } else if (strcmp(node_type, "field_type") == 0) {
         /* field : type */
         uint32_t child_count = ts_node_child_count(node);
@@ -539,26 +714,42 @@ static void qualify_canonicalize_to_buffer(TSNode node, const char *source_code,
             }
         }
     } else if (strcmp(node_type, "tuple_type") == 0) {
-        /* Tuple ( type, type, ... ) */
-        ast_buffer_append(buffer, pos, max_len, "( ");
-
+        /* Tuple ( type, type, ... ) or unit type () */
         uint32_t child_count = ts_node_child_count(node);
-        bool first = true;
 
+        /* Count actual type expression children to detect unit type */
+        int type_count = 0;
         for (uint32_t i = 0; i < child_count; i++) {
             TSNode child = ts_node_child(node, i);
-
             if (ts_node_is_named(child) &&
                 strcmp(ts_node_type(child), "type_expression") == 0) {
-                if (!first) {
-                    ast_buffer_append(buffer, pos, max_len, ", ");
-                }
-                qualify_canonicalize_to_buffer(child, source_code, ctx, buffer, pos, max_len, false);
-                first = false;
+                type_count++;
             }
         }
 
-        ast_buffer_append(buffer, pos, max_len, " )");
+        if (type_count == 0) {
+            /* Unit type () - no spaces */
+            ast_buffer_append(buffer, pos, max_len, "()");
+        } else {
+            /* Regular tuple with spaces */
+            ast_buffer_append(buffer, pos, max_len, "( ");
+
+            bool first = true;
+            for (uint32_t i = 0; i < child_count; i++) {
+                TSNode child = ts_node_child(node, i);
+
+                if (ts_node_is_named(child) &&
+                    strcmp(ts_node_type(child), "type_expression") == 0) {
+                    if (!first) {
+                        ast_buffer_append(buffer, pos, max_len, ", ");
+                    }
+                    qualify_canonicalize_to_buffer(child, source_code, ctx, buffer, pos, max_len, false);
+                    first = false;
+                }
+            }
+
+            ast_buffer_append(buffer, pos, max_len, " )");
+        }
     } else if (strcmp(node_type, "unit_expr") == 0) {
         /* Unit type () */
         ast_buffer_append(buffer, pos, max_len, "()");
@@ -639,7 +830,7 @@ char *qualify_and_canonicalize_type_node(TSNode node, const char *source_code, Q
         return arena_strdup("");
     }
 
-    size_t max_len = 4096;
+    size_t max_len = 65536;  /* 64KB - large records can exceed 4KB */
     char *buffer = arena_malloc(max_len);
     size_t pos = 0;
     buffer[0] = '\0';
@@ -675,22 +866,56 @@ static void qualify_type_to_buffer(TSNode node, const char *source_code,
     } else if (strcmp(node_type, "type_ref") == 0) {
         /* type_ref = upper_case_qid type_arg* */
         uint32_t child_count = ts_node_child_count(node);
-        bool first = true;
 
+        /* Count type arguments for arity */
+        int arity = 0;
+        bool found_type_name = false;
         for (uint32_t i = 0; i < child_count; i++) {
             TSNode child = ts_node_child(node, i);
+            if (ts_node_is_named(child)) {
+                if (!found_type_name && strcmp(ts_node_type(child), "upper_case_qid") == 0) {
+                    found_type_name = true;
+                } else if (found_type_name) {
+                    arity++;
+                }
+            }
+        }
+
+        bool first = true;
+        for (uint32_t i = 0; i < child_count; i++) {
+            TSNode child = ts_node_child(node, i);
+            const char *child_type = ts_node_type(child);
 
             if (ts_node_is_named(child)) {
                 if (!first) {
                     ast_buffer_append_char(buffer, pos, max_len, ' ');
                 }
-                qualify_type_to_buffer(child, source_code, ctx, buffer, pos, max_len);
+
+                /* For the type name, qualify it with arity */
+                if (strcmp(child_type, "upper_case_qid") == 0 && first) {
+                    char *text = ast_get_node_text(child, source_code);
+                    char *last_dot = strrchr(text, '.');
+                    if (last_dot) {
+                        *last_dot = '\0';
+                        const char *module_part = text;
+                        const char *type_part = last_dot + 1;
+                        char *qualified = qualify_single_type_name(type_part, module_part, ctx, arity);
+                        ast_buffer_append(buffer, pos, max_len, qualified);
+                        arena_free(qualified);
+                    } else {
+                        char *qualified = qualify_single_type_name(text, NULL, ctx, arity);
+                        ast_buffer_append(buffer, pos, max_len, qualified);
+                        arena_free(qualified);
+                    }
+                    arena_free(text);
+                } else {
+                    qualify_type_to_buffer(child, source_code, ctx, buffer, pos, max_len);
+                }
                 first = false;
             }
         }
     } else if (strcmp(node_type, "upper_case_qid") == 0) {
-        /* Qualified or unqualified type identifier */
-        /* Need to extract module part and type name part */
+        /* Standalone qualified/unqualified type identifier (arity = 0) */
         char *text = ast_get_node_text(node, source_code);
 
         /* Find the last dot to split module.Type */
@@ -701,12 +926,12 @@ static void qualify_type_to_buffer(TSNode node, const char *source_code,
             const char *module_part = text;
             const char *type_part = last_dot + 1;
 
-            char *qualified = qualify_single_type_name(type_part, module_part, ctx);
+            char *qualified = qualify_single_type_name(type_part, module_part, ctx, 0);
             ast_buffer_append(buffer, pos, max_len, qualified);
             arena_free(qualified);
         } else {
             /* Unqualified type name */
-            char *qualified = qualify_single_type_name(text, NULL, ctx);
+            char *qualified = qualify_single_type_name(text, NULL, ctx, 0);
             ast_buffer_append(buffer, pos, max_len, qualified);
             arena_free(qualified);
         }
@@ -838,7 +1063,7 @@ char *qualify_type_node(TSNode node, const char *source_code, QualifyContext *ct
         return arena_strdup("");
     }
 
-    size_t max_len = 4096;
+    size_t max_len = 65536;  /* 64KB - large records can exceed 4KB */
     char *buffer = arena_malloc(max_len);
     size_t pos = 0;
     buffer[0] = '\0';
@@ -968,9 +1193,10 @@ char *qualify_type_string(const char *type_str, QualifyContext *ctx) {
 
             if (last_dot) {
                 *last_dot = '\0';
-                qualified = qualify_single_type_name(last_dot + 1, identifier, ctx);
+                /* Use arity 0 (unknown) for string-based qualification */
+                qualified = qualify_single_type_name(last_dot + 1, identifier, ctx, 0);
             } else {
-                qualified = qualify_single_type_name(identifier, NULL, ctx);
+                qualified = qualify_single_type_name(identifier, NULL, ctx, 0);
             }
 
             size_t qlen = strlen(qualified);

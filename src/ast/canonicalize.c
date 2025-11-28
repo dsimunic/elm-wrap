@@ -164,30 +164,49 @@ void canonicalize_type_to_buffer(TSNode node, const char *source_code,
         /* Type variable - output as-is */
         ast_buffer_append_node_text(buffer, pos, max_len, node, source_code);
     } else if (strcmp(node_type, "record_type") == 0) {
-        /* Record type { field : type, ... } */
-        ast_buffer_append(buffer, pos, max_len, "{ ");
-
+        /* Record type { field : type, ... } or empty record {} */
         uint32_t child_count = ts_node_child_count(node);
-        bool first_field = true;
 
+        /* Count fields and check for record_base_identifier */
+        int field_count = 0;
+        bool has_base = false;
         for (uint32_t i = 0; i < child_count; i++) {
             TSNode child = ts_node_child(node, i);
             const char *child_type = ts_node_type(child);
-
             if (strcmp(child_type, "field_type") == 0) {
-                if (!first_field) {
-                    ast_buffer_append(buffer, pos, max_len, ", ");
-                }
-                canonicalize_type_to_buffer(child, source_code, buffer, pos, max_len, false);
-                first_field = false;
+                field_count++;
             } else if (strcmp(child_type, "record_base_identifier") == 0) {
-                /* Extensible record: { a | field : type } */
-                ast_buffer_append_node_text(buffer, pos, max_len, child, source_code);
-                ast_buffer_append(buffer, pos, max_len, " | ");
+                has_base = true;
             }
         }
 
-        ast_buffer_append(buffer, pos, max_len, " }");
+        if (field_count == 0 && !has_base) {
+            /* Empty record {} - no spaces */
+            ast_buffer_append(buffer, pos, max_len, "{}");
+        } else {
+            /* Non-empty record with spaces */
+            ast_buffer_append(buffer, pos, max_len, "{ ");
+
+            bool first_field = true;
+            for (uint32_t i = 0; i < child_count; i++) {
+                TSNode child = ts_node_child(node, i);
+                const char *child_type = ts_node_type(child);
+
+                if (strcmp(child_type, "field_type") == 0) {
+                    if (!first_field) {
+                        ast_buffer_append(buffer, pos, max_len, ", ");
+                    }
+                    canonicalize_type_to_buffer(child, source_code, buffer, pos, max_len, false);
+                    first_field = false;
+                } else if (strcmp(child_type, "record_base_identifier") == 0) {
+                    /* Extensible record: { a | field : type } */
+                    ast_buffer_append_node_text(buffer, pos, max_len, child, source_code);
+                    ast_buffer_append(buffer, pos, max_len, " | ");
+                }
+            }
+
+            ast_buffer_append(buffer, pos, max_len, " }");
+        }
     } else if (strcmp(node_type, "field_type") == 0) {
         /* field : type */
         uint32_t child_count = ts_node_child_count(node);
@@ -204,26 +223,42 @@ void canonicalize_type_to_buffer(TSNode node, const char *source_code,
             }
         }
     } else if (strcmp(node_type, "tuple_type") == 0) {
-        /* Tuple ( type, type, ... ) */
-        ast_buffer_append(buffer, pos, max_len, "( ");
-
+        /* Tuple ( type, type, ... ) or unit type () */
         uint32_t child_count = ts_node_child_count(node);
-        bool first = true;
 
+        /* Count actual type expression children to detect unit type */
+        int type_count = 0;
         for (uint32_t i = 0; i < child_count; i++) {
             TSNode child = ts_node_child(node, i);
-
             if (ts_node_is_named(child) &&
                 strcmp(ts_node_type(child), "type_expression") == 0) {
-                if (!first) {
-                    ast_buffer_append(buffer, pos, max_len, ", ");
-                }
-                canonicalize_type_to_buffer(child, source_code, buffer, pos, max_len, false);
-                first = false;
+                type_count++;
             }
         }
 
-        ast_buffer_append(buffer, pos, max_len, " )");
+        if (type_count == 0) {
+            /* Unit type () - no spaces */
+            ast_buffer_append(buffer, pos, max_len, "()");
+        } else {
+            /* Regular tuple with spaces */
+            ast_buffer_append(buffer, pos, max_len, "( ");
+
+            bool first = true;
+            for (uint32_t i = 0; i < child_count; i++) {
+                TSNode child = ts_node_child(node, i);
+
+                if (ts_node_is_named(child) &&
+                    strcmp(ts_node_type(child), "type_expression") == 0) {
+                    if (!first) {
+                        ast_buffer_append(buffer, pos, max_len, ", ");
+                    }
+                    canonicalize_type_to_buffer(child, source_code, buffer, pos, max_len, false);
+                    first = false;
+                }
+            }
+
+            ast_buffer_append(buffer, pos, max_len, " )");
+        }
     } else {
         /* Handle parenthesized expressions */
         bool is_parenthesized = false;
@@ -276,7 +311,7 @@ void canonicalize_type_to_buffer(TSNode node, const char *source_code,
 }
 
 char *canonicalize_type_node(TSNode node, const char *source_code) {
-    size_t max_len = 4096;
+    size_t max_len = 65536;  /* 64KB - large records can exceed 4KB */
     char *buffer = arena_malloc(max_len);
     size_t pos = 0;
     buffer[0] = '\0';

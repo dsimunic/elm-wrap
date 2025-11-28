@@ -13,6 +13,7 @@ typedef struct DependencyCache DependencyCache;
 struct CachedModuleExports {
     char *module_name;           /* e.g., "Json.Decode" */
     char **exported_types;       /* e.g., ["Decoder", "Value", "Error"] */
+    int *exported_types_arity;   /* Number of type parameters for each type */
     int exported_types_count;
     bool parsed;                 /* false if lookup failed or not yet parsed */
 };
