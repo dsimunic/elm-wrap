@@ -384,10 +384,34 @@ const char *qualify_lookup_alias(QualifyContext *ctx, const char *alias,
             if (entry->full_modules_count == 1) {
                 return entry->full_modules[0];
             }
-            /* Ambiguous - would need to use dep_cache to resolve */
-            /* TODO: Implement ambiguity resolution */
-            (void)referenced_type;
-            return entry->full_modules[0];  /* Return first for now */
+
+            /* Multiple modules use this alias - try type-based resolution */
+            if (referenced_type && ctx->dep_cache) {
+                const char *resolved_module = NULL;
+                int matches = 0;
+
+                /* Check which modules export the referenced type */
+                for (int j = 0; j < entry->full_modules_count; j++) {
+                    CachedModuleExports *exports = dependency_cache_get_exports(ctx->dep_cache, entry->full_modules[j]);
+                    if (exports && exports->parsed) {
+                        for (int k = 0; k < exports->exported_types_count; k++) {
+                            if (strcmp(exports->exported_types[k], referenced_type) == 0) {
+                                resolved_module = entry->full_modules[j];
+                                matches++;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                /* If exactly one module exports it, we've resolved the ambiguity! */
+                if (matches == 1) {
+                    return resolved_module;
+                }
+            }
+
+            /* Still ambiguous or no dep_cache - return first module */
+            return entry->full_modules[0];
         }
     }
     return NULL;
