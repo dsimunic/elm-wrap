@@ -172,7 +172,8 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
         /* Build type alias map for function type aliases */
         if (strcmp(type, "type_alias_declaration") == 0) {
             char *alias_name = NULL;
-            char **type_vars = arena_malloc(8 * sizeof(char*));
+            int type_vars_capacity = 8;
+            char **type_vars = arena_malloc(type_vars_capacity * sizeof(char*));
             int type_vars_count = 0;
             char *expansion = NULL;
 
@@ -184,6 +185,10 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
                 if (strcmp(child_type, "upper_case_identifier") == 0 && !alias_name) {
                     alias_name = get_node_text(type_child, source_code);
                 } else if (strcmp(child_type, "lower_type_name") == 0) {
+                    if (type_vars_count >= type_vars_capacity) {
+                        type_vars_capacity *= 2;
+                        type_vars = arena_realloc(type_vars, type_vars_capacity * sizeof(char*));
+                    }
                     type_vars[type_vars_count++] = get_node_text(type_child, source_code);
                 } else if (strcmp(child_type, "type_expression") == 0) {
                     /* Extract raw expansion without qualification */

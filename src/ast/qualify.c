@@ -50,20 +50,26 @@ QualifyContext *qualify_context_create(SkeletonModule *skeleton, DependencyCache
         /* Add to direct modules (for qualified access) */
         if (!imp->alias) {
             /* Module is directly available (not aliased) */
-            if (ctx->direct_modules_count < ctx->direct_modules_capacity) {
-                ctx->direct_modules[ctx->direct_modules_count++] = arena_strdup(imp->module_name);
+            if (ctx->direct_modules_count >= ctx->direct_modules_capacity) {
+                ctx->direct_modules_capacity *= 2;
+                ctx->direct_modules = arena_realloc(ctx->direct_modules,
+                    ctx->direct_modules_capacity * sizeof(char*));
             }
+            ctx->direct_modules[ctx->direct_modules_count++] = arena_strdup(imp->module_name);
         } else {
             /* Add alias mapping */
             /* TODO: Handle existing alias with multiple modules */
-            if (ctx->aliases_count < ctx->aliases_capacity) {
-                QualifyAliasEntry *entry = &ctx->aliases[ctx->aliases_count++];
-                entry->alias = arena_strdup(imp->alias);
-                entry->full_modules_capacity = 4;
-                entry->full_modules = arena_malloc(entry->full_modules_capacity * sizeof(char*));
-                entry->full_modules[0] = arena_strdup(imp->module_name);
-                entry->full_modules_count = 1;
+            if (ctx->aliases_count >= ctx->aliases_capacity) {
+                ctx->aliases_capacity *= 2;
+                ctx->aliases = arena_realloc(ctx->aliases,
+                    ctx->aliases_capacity * sizeof(QualifyAliasEntry));
             }
+            QualifyAliasEntry *entry = &ctx->aliases[ctx->aliases_count++];
+            entry->alias = arena_strdup(imp->alias);
+            entry->full_modules_capacity = 4;
+            entry->full_modules = arena_malloc(entry->full_modules_capacity * sizeof(char*));
+            entry->full_modules[0] = arena_strdup(imp->module_name);
+            entry->full_modules_count = 1;
         }
 
         /* Process exposing clause */
@@ -72,18 +78,24 @@ QualifyContext *qualify_context_create(SkeletonModule *skeleton, DependencyCache
         } else {
             /* Add exposed types */
             for (int j = 0; j < imp->exposed_types_count; j++) {
-                if (ctx->imports_count < ctx->imports_capacity) {
-                    QualifyImportEntry *entry = &ctx->imports[ctx->imports_count++];
-                    entry->type_name = arena_strdup(imp->exposed_types[j]);
-                    entry->module_name = arena_strdup(imp->module_name);
+                if (ctx->imports_count >= ctx->imports_capacity) {
+                    ctx->imports_capacity *= 2;
+                    ctx->imports = arena_realloc(ctx->imports,
+                        ctx->imports_capacity * sizeof(QualifyImportEntry));
                 }
+                QualifyImportEntry *entry = &ctx->imports[ctx->imports_count++];
+                entry->type_name = arena_strdup(imp->exposed_types[j]);
+                entry->module_name = arena_strdup(imp->module_name);
             }
             for (int j = 0; j < imp->exposed_types_with_constructors_count; j++) {
-                if (ctx->imports_count < ctx->imports_capacity) {
-                    QualifyImportEntry *entry = &ctx->imports[ctx->imports_count++];
-                    entry->type_name = arena_strdup(imp->exposed_types_with_constructors[j]);
-                    entry->module_name = arena_strdup(imp->module_name);
+                if (ctx->imports_count >= ctx->imports_capacity) {
+                    ctx->imports_capacity *= 2;
+                    ctx->imports = arena_realloc(ctx->imports,
+                        ctx->imports_capacity * sizeof(QualifyImportEntry));
                 }
+                QualifyImportEntry *entry = &ctx->imports[ctx->imports_count++];
+                entry->type_name = arena_strdup(imp->exposed_types_with_constructors[j]);
+                entry->module_name = arena_strdup(imp->module_name);
             }
         }
     }
@@ -136,15 +148,18 @@ QualifyContext *qualify_context_create_from_maps(const char *module_name,
     if (alias_map) {
         for (int i = 0; i < alias_map->aliases_count; i++) {
             ModuleAlias *src = &alias_map->aliases[i];
-            if (ctx->aliases_count < ctx->aliases_capacity) {
-                QualifyAliasEntry *entry = &ctx->aliases[ctx->aliases_count++];
-                entry->alias = arena_strdup(src->alias);
-                entry->full_modules_capacity = src->full_modules_count > 0 ? src->full_modules_count : 1;
-                entry->full_modules = arena_malloc(entry->full_modules_capacity * sizeof(char*));
-                entry->full_modules_count = src->full_modules_count;
-                for (int j = 0; j < src->full_modules_count; j++) {
-                    entry->full_modules[j] = arena_strdup(src->full_modules[j]);
-                }
+            if (ctx->aliases_count >= ctx->aliases_capacity) {
+                ctx->aliases_capacity *= 2;
+                ctx->aliases = arena_realloc(ctx->aliases,
+                    ctx->aliases_capacity * sizeof(QualifyAliasEntry));
+            }
+            QualifyAliasEntry *entry = &ctx->aliases[ctx->aliases_count++];
+            entry->alias = arena_strdup(src->alias);
+            entry->full_modules_capacity = src->full_modules_count > 0 ? src->full_modules_count : 1;
+            entry->full_modules = arena_malloc(entry->full_modules_capacity * sizeof(char*));
+            entry->full_modules_count = src->full_modules_count;
+            for (int j = 0; j < src->full_modules_count; j++) {
+                entry->full_modules[j] = arena_strdup(src->full_modules[j]);
             }
         }
     }
@@ -152,9 +167,12 @@ QualifyContext *qualify_context_create_from_maps(const char *module_name,
     /* Copy from direct_imports */
     if (direct_imports) {
         for (int i = 0; i < direct_imports->modules_count; i++) {
-            if (ctx->direct_modules_count < ctx->direct_modules_capacity) {
-                ctx->direct_modules[ctx->direct_modules_count++] = arena_strdup(direct_imports->modules[i]);
+            if (ctx->direct_modules_count >= ctx->direct_modules_capacity) {
+                ctx->direct_modules_capacity *= 2;
+                ctx->direct_modules = arena_realloc(ctx->direct_modules,
+                    ctx->direct_modules_capacity * sizeof(char*));
             }
+            ctx->direct_modules[ctx->direct_modules_count++] = arena_strdup(direct_imports->modules[i]);
         }
     }
 
@@ -213,9 +231,12 @@ static void add_alias_entry(QualifyContext *ctx, const char *alias, const char *
         if (strcmp(ctx->aliases[i].alias, alias) == 0) {
             /* Add to existing alias's modules */
             QualifyAliasEntry *entry = &ctx->aliases[i];
-            if (entry->full_modules_count < entry->full_modules_capacity) {
-                entry->full_modules[entry->full_modules_count++] = arena_strdup(module_name);
+            if (entry->full_modules_count >= entry->full_modules_capacity) {
+                entry->full_modules_capacity *= 2;
+                entry->full_modules = arena_realloc(entry->full_modules,
+                    entry->full_modules_capacity * sizeof(char*));
             }
+            entry->full_modules[entry->full_modules_count++] = arena_strdup(module_name);
             return;
         }
     }

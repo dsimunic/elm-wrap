@@ -217,6 +217,7 @@ bool extract_union_type(TSNode node, const char *source_code, ElmUnion *union_ty
             char *constructor_name = NULL;
             char **arg_types = NULL;
             int arg_types_count = 0;
+            int arg_types_capacity = 0;
 
             uint32_t variant_child_count = ts_node_child_count(child);
             for (uint32_t j = 0; j < variant_child_count; j++) {
@@ -231,8 +232,9 @@ bool extract_union_type(TSNode node, const char *source_code, ElmUnion *union_ty
                            strcmp(variant_child_type, "tuple_type") == 0 ||
                            strcmp(variant_child_type, "type_variable") == 0) {
                     /* Constructor argument (type expression, ref, record, tuple, or type variable) */
-                    if (arg_types_count == 0) {
-                        arg_types = arena_malloc(8 * sizeof(char*));
+                    if (arg_types_count >= arg_types_capacity) {
+                        arg_types_capacity = arg_types_capacity == 0 ? 8 : arg_types_capacity * 2;
+                        arg_types = arena_realloc(arg_types, arg_types_capacity * sizeof(char*));
                     }
                     arg_types[arg_types_count++] = extract_type_expression(variant_child, source_code, module_name,
                                                                              import_map, alias_map, direct_imports, local_types, local_types_count, type_alias_map, 0, dep_cache);

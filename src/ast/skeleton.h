@@ -65,12 +65,15 @@ struct SkeletonImport {
 
     char **exposed_values;                /* Values from exposing clause */
     int exposed_values_count;
+    int exposed_values_capacity;
 
     char **exposed_types;                 /* Types from exposing clause */
     int exposed_types_count;
+    int exposed_types_capacity;
 
     char **exposed_types_with_constructors;  /* Types exposed with (..) */
     int exposed_types_with_constructors_count;
+    int exposed_types_with_constructors_capacity;
 };
 
 /* ============================================================================
@@ -96,6 +99,7 @@ struct SkeletonTypeAlias {
     char *name;                           /* Alias name */
     char **type_params;                   /* Type parameters (e.g., ["a", "b"]) */
     int type_params_count;
+    int type_params_capacity;
     TSNode type_node;                     /* AST node for type_expression */
     char *doc_comment;                    /* Preceding doc comment, or NULL */
 
@@ -126,6 +130,7 @@ struct SkeletonUnionType {
     char *name;                           /* Type name */
     char **type_params;                   /* Type parameters */
     int type_params_count;
+    int type_params_capacity;
     SkeletonUnionConstructor *constructors;
     int constructors_count;
     char *doc_comment;                    /* Preceding doc comment, or NULL */

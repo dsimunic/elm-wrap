@@ -451,9 +451,12 @@ static void parse_import_declaration(TSNode node, const char *source, SkeletonMo
             }
         } else if (strcmp(type, "exposing_list") == 0) {
             /* Parse exposing */
-            imp->exposed_values = arena_malloc(16 * sizeof(char*));
-            imp->exposed_types = arena_malloc(16 * sizeof(char*));
-            imp->exposed_types_with_constructors = arena_malloc(16 * sizeof(char*));
+            imp->exposed_values_capacity = 16;
+            imp->exposed_values = arena_malloc(imp->exposed_values_capacity * sizeof(char*));
+            imp->exposed_types_capacity = 16;
+            imp->exposed_types = arena_malloc(imp->exposed_types_capacity * sizeof(char*));
+            imp->exposed_types_with_constructors_capacity = 16;
+            imp->exposed_types_with_constructors = arena_malloc(imp->exposed_types_with_constructors_capacity * sizeof(char*));
 
             uint32_t exp_count = ts_node_child_count(child);
             for (uint32_t j = 0; j < exp_count; j++) {
@@ -463,6 +466,11 @@ static void parse_import_declaration(TSNode node, const char *source, SkeletonMo
                 if (strcmp(exp_type, "double_dot") == 0) {
                     imp->expose_all = true;
                 } else if (strcmp(exp_type, "exposed_value") == 0) {
+                    if (imp->exposed_values_count >= imp->exposed_values_capacity) {
+                        imp->exposed_values_capacity *= 2;
+                        imp->exposed_values = arena_realloc(imp->exposed_values,
+                            imp->exposed_values_capacity * sizeof(char*));
+                    }
                     imp->exposed_values[imp->exposed_values_count++] =
                         ast_get_node_text(exp, source);
                 } else if (strcmp(exp_type, "exposed_type") == 0) {
@@ -479,13 +487,28 @@ static void parse_import_declaration(TSNode node, const char *source, SkeletonMo
                     }
                     if (name) {
                         if (has_ctors) {
+                            if (imp->exposed_types_with_constructors_count >= imp->exposed_types_with_constructors_capacity) {
+                                imp->exposed_types_with_constructors_capacity *= 2;
+                                imp->exposed_types_with_constructors = arena_realloc(imp->exposed_types_with_constructors,
+                                    imp->exposed_types_with_constructors_capacity * sizeof(char*));
+                            }
                             imp->exposed_types_with_constructors[
                                 imp->exposed_types_with_constructors_count++] = name;
                         } else {
+                            if (imp->exposed_types_count >= imp->exposed_types_capacity) {
+                                imp->exposed_types_capacity *= 2;
+                                imp->exposed_types = arena_realloc(imp->exposed_types,
+                                    imp->exposed_types_capacity * sizeof(char*));
+                            }
                             imp->exposed_types[imp->exposed_types_count++] = name;
                         }
                     }
                 } else if (strcmp(exp_type, "exposed_operator") == 0) {
+                    if (imp->exposed_values_count >= imp->exposed_values_capacity) {
+                        imp->exposed_values_capacity *= 2;
+                        imp->exposed_values = arena_realloc(imp->exposed_values,
+                            imp->exposed_values_capacity * sizeof(char*));
+                    }
                     imp->exposed_values[imp->exposed_values_count++] =
                         ast_get_node_text(exp, source);
                 }
@@ -530,7 +553,8 @@ static void parse_type_alias_declaration(TSNode node, const char *source, Skelet
     SkeletonTypeAlias *alias = &mod->type_aliases[mod->type_aliases_count++];
     memset(alias, 0, sizeof(SkeletonTypeAlias));
 
-    alias->type_params = arena_malloc(8 * sizeof(char*));
+    alias->type_params_capacity = 8;
+    alias->type_params = arena_malloc(alias->type_params_capacity * sizeof(char*));
 
     uint32_t child_count = ts_node_child_count(node);
     for (uint32_t i = 0; i < child_count; i++) {
@@ -540,6 +564,11 @@ static void parse_type_alias_declaration(TSNode node, const char *source, Skelet
         if (strcmp(type, "upper_case_identifier") == 0 && !alias->name) {
             alias->name = ast_get_node_text(child, source);
         } else if (strcmp(type, "lower_type_name") == 0) {
+            if (alias->type_params_count >= alias->type_params_capacity) {
+                alias->type_params_capacity *= 2;
+                alias->type_params = arena_realloc(alias->type_params,
+                    alias->type_params_capacity * sizeof(char*));
+            }
             alias->type_params[alias->type_params_count++] = ast_get_node_text(child, source);
         } else if (strcmp(type, "type_expression") == 0) {
             alias->type_node = child;
@@ -559,7 +588,8 @@ static void parse_type_declaration(TSNode node, const char *source, SkeletonModu
     SkeletonUnionType *ut = &mod->union_types[mod->union_types_count++];
     memset(ut, 0, sizeof(SkeletonUnionType));
 
-    ut->type_params = arena_malloc(8 * sizeof(char*));
+    ut->type_params_capacity = 8;
+    ut->type_params = arena_malloc(ut->type_params_capacity * sizeof(char*));
 
     /* Count constructors first */
     int ctor_count = 0;
@@ -580,6 +610,11 @@ static void parse_type_declaration(TSNode node, const char *source, SkeletonModu
         if (strcmp(type, "upper_case_identifier") == 0 && !ut->name) {
             ut->name = ast_get_node_text(child, source);
         } else if (strcmp(type, "lower_type_name") == 0) {
+            if (ut->type_params_count >= ut->type_params_capacity) {
+                ut->type_params_capacity *= 2;
+                ut->type_params = arena_realloc(ut->type_params,
+                    ut->type_params_capacity * sizeof(char*));
+            }
             ut->type_params[ut->type_params_count++] = ast_get_node_text(child, source);
         } else if (strcmp(type, "union_variant") == 0) {
             SkeletonUnionConstructor *ctor = &ut->constructors[ut->constructors_count++];
