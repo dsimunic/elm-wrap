@@ -100,16 +100,23 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
     for (uint32_t i = 0; i < child_count; i++) {
         TSNode child = ts_node_child(root_node, i);
         if (strcmp(ts_node_type(child), "module_declaration") == 0) {
-            /* Look for block_comment after the module declaration */
-            /* Skip over any line comments or other nodes to find the first block_comment */
+            /* Look for doc comment (block_comment starting with {-|) after the module declaration */
+            /* Skip over regular block comments, line comments, and imports */
             for (uint32_t j = i + 1; j < child_count; j++) {
                 TSNode next = ts_node_child(root_node, j);
                 const char *next_type = ts_node_type(next);
                 if (strcmp(next_type, "block_comment") == 0) {
                     char *raw = get_node_text(next, source_code);
-                    docs->comment = clean_comment(raw);
+                    /* Only use doc comments (starting with {-|), skip regular comments */
+                    bool is_doc_comment = (raw && strlen(raw) >= 3 && strncmp(raw, "{-|", 3) == 0);
+                    if (is_doc_comment) {
+                        docs->comment = clean_comment(raw);
+                        arena_free(raw);
+                        break;
+                    }
+                    /* Not a doc comment, continue searching */
                     arena_free(raw);
-                    break;
+                    continue;
                 }
                 /* Stop searching if we hit a declaration (not a comment or import) */
                 if (strcmp(next_type, "value_declaration") == 0 ||
