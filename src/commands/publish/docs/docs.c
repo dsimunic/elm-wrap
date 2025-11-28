@@ -222,6 +222,55 @@ static void find_elm_files_recursive(const char *dir_path, FileList *files) {
     closedir(dir);
 }
 
+/* Validate that file path matches module name according to Elm convention */
+static bool validate_module_path(const char *filepath, const char *module_name, const char *src_dir) {
+    /* Convert module name to expected relative path */
+    /* e.g., "Eth.Sentry.Event" -> "Eth/Sentry/Event.elm" */
+    size_t module_len = strlen(module_name);
+    char *expected_rel_path = arena_malloc(module_len + 5); /* +5 for ".elm\0" */
+
+    /* Copy module name and replace dots with slashes */
+    const char *src = module_name;
+    char *dst = expected_rel_path;
+    while (*src) {
+        if (*src == '.') {
+            *dst = '/';
+        } else {
+            *dst = *src;
+        }
+        src++;
+        dst++;
+    }
+    strcpy(dst, ".elm");
+
+    /* Extract relative path from filepath */
+    /* filepath is like ".../src/Eth/Sentry/Event.elm" */
+    /* We need to find where src_dir ends in filepath */
+    const char *rel_path = NULL;
+
+    /* Find src_dir within filepath */
+    const char *src_pos = strstr(filepath, src_dir);
+    if (src_pos) {
+        /* Skip past src_dir and the trailing slash */
+        rel_path = src_pos + strlen(src_dir);
+        if (*rel_path == '/') {
+            rel_path++;
+        }
+    }
+
+    if (!rel_path) {
+        /* Couldn't find src_dir in filepath - shouldn't happen */
+        arena_free(expected_rel_path);
+        return false;
+    }
+
+    /* Compare the paths */
+    bool match = strcmp(rel_path, expected_rel_path) == 0;
+
+    arena_free(expected_rel_path);
+    return match;
+}
+
 /* Comparison function for sorting modules alphabetically by name */
 static int compare_modules(const void *a, const void *b) {
     const ElmModuleDocs *mod_a = (const ElmModuleDocs *)a;
@@ -285,6 +334,10 @@ static int process_files(FileList *files, const char *base_path) {
         return 1;
     }
 
+    /* Construct src directory path for validation */
+    char src_path[1024];
+    snprintf(src_path, sizeof(src_path), "%s/src", base_path);
+
     /* Parse all files */
     int doc_index = 0;
     for (int i = 0; i < files->count; i++) {
@@ -293,6 +346,19 @@ static int process_files(FileList *files, const char *base_path) {
         if (!parse_elm_file(files->paths[i], &all_docs[doc_index], dep_cache)) {
             fprintf(stderr, "Warning: Failed to parse %s\n", files->paths[i]);
         } else {
+            /* Validate that file path matches module name */
+            if (!validate_module_path(files->paths[i], all_docs[doc_index].name, src_path)) {
+                fprintf(stderr, "Error: Module name '%s' doesn't match file path: %s\n",
+                        all_docs[doc_index].name, files->paths[i]);
+                fprintf(stderr, "Elm requires module names to match file paths exactly (case-sensitive).\n");
+                free_elm_docs(&all_docs[doc_index]);
+                arena_free(all_docs);
+                dependency_cache_free(dep_cache);
+                exposed_modules_free(&exposed);
+                if (cache_config) cache_config_free(cache_config);
+                return 100;
+            }
+
             /* Check if module is exposed */
             bool is_exposed = exposed_modules_contains(&exposed, all_docs[doc_index].name);
 
