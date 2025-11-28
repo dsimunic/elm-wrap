@@ -1,4 +1,5 @@
 #include "dependency_cache.h"
+#include "path_util.h"
 #include "../../../alloc.h"
 #include "../../../elm_json.h"
 #include "../../../cache.h"
@@ -153,23 +154,6 @@ static char *resolve_version_from_filesystem(const char *elm_home, const char *a
     }
 
     return version_to_string(&highest_version);
-}
-
-/* Build a module file path from module name (e.g., "Json.Decode" -> "Json/Decode.elm") */
-static char *module_name_to_file_path(const char *module_name) {
-    size_t len = strlen(module_name);
-    char *path = arena_malloc(len + 5);  /* +4 for ".elm" + 1 for null */
-    strcpy(path, module_name);
-
-    /* Replace dots with slashes */
-    for (char *p = path; *p; p++) {
-        if (*p == '.') {
-            *p = '/';
-        }
-    }
-
-    strcat(path, ".elm");
-    return path;
 }
 
 /* Find a module file in the package's dependencies */

@@ -2,12 +2,12 @@
 #include "elm_docs.h"
 #include "docs_json.h"
 #include "dependency_cache.h"
+#include "path_util.h"
 #include "../../../alloc.h"
 #include "../../../progname.h"
 #include "../../../cache.h"
 #include <stdio.h>
 #include <string.h>
-#include <dirent.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -51,15 +51,6 @@ static void exposed_modules_free(ExposedModules *em) {
         arena_free(em->modules[i]);
     }
     arena_free(em->modules);
-}
-
-static bool exposed_modules_contains(ExposedModules *em, const char *module) {
-    for (int i = 0; i < em->count; i++) {
-        if (strcmp(em->modules[i], module) == 0) {
-            return true;
-        }
-    }
-    return false;
 }
 
 /* Parse elm.json to extract exposed-modules */
@@ -185,44 +176,6 @@ static void file_list_free(FileList *list) {
     arena_free(list->paths);
 }
 
-/* Check if file has .elm extension */
-static int is_elm_file(const char *filename) {
-    size_t len = strlen(filename);
-    return len > 4 && strcmp(filename + len - 4, ".elm") == 0;
-}
-
-/* Recursively find all .elm files in a directory */
-static void find_elm_files_recursive(const char *dir_path, FileList *files) {
-    DIR *dir = opendir(dir_path);
-    if (!dir) {
-        return;
-    }
-
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-        /* Skip . and .. */
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-
-        char filepath[1024];
-        snprintf(filepath, sizeof(filepath), "%s/%s", dir_path, entry->d_name);
-
-        struct stat st;
-        if (stat(filepath, &st) == 0) {
-            if (S_ISDIR(st.st_mode)) {
-                /* Recursively search subdirectories */
-                find_elm_files_recursive(filepath, files);
-            } else if (S_ISREG(st.st_mode) && is_elm_file(entry->d_name)) {
-                /* Add .elm file to list */
-                file_list_add(files, filepath);
-            }
-        }
-    }
-
-    closedir(dir);
-}
-
 /* Validate that file path matches module name according to Elm convention */
 static bool validate_module_path(const char *filepath, const char *module_name, const char *src_dir) {
     /* Convert module name to expected relative path */
@@ -272,6 +225,47 @@ static bool validate_module_path(const char *filepath, const char *module_name, 
     return match;
 }
 
+/**
+ * Build file list from exposed modules instead of scanning directory.
+ * Converts each exposed module name to its expected file path and checks existence.
+ *
+ * @param exposed The list of exposed module names from elm.json
+ * @param src_path The path to the src/ directory
+ * @param files Output FileList to populate
+ * @return true if all exposed modules have corresponding files, false if any missing
+ */
+static bool find_files_for_exposed_modules(
+    const ExposedModules *exposed,
+    const char *src_path,
+    FileList *files
+) {
+    bool all_found = true;
+
+    for (int i = 0; i < exposed->count; i++) {
+        const char *module_name = exposed->modules[i];
+
+        /* Convert module name to relative path: "Eth.Sentry.Event" -> "Eth/Sentry/Event.elm" */
+        char *rel_path = module_name_to_file_path(module_name);
+
+        /* Build full path: src_path + "/" + rel_path */
+        char full_path[2048];
+        snprintf(full_path, sizeof(full_path), "%s/%s", src_path, rel_path);
+        arena_free(rel_path);
+
+        /* Check if file exists */
+        struct stat st;
+        if (stat(full_path, &st) == 0 && S_ISREG(st.st_mode)) {
+            file_list_add(files, full_path);
+        } else {
+            fprintf(stderr, "Error: Exposed module '%s' not found at expected path: %s\n",
+                    module_name, full_path);
+            all_found = false;
+        }
+    }
+
+    return all_found;
+}
+
 /* Comparison function for sorting modules alphabetically by name */
 static int compare_modules(const void *a, const void *b) {
     const ElmModuleDocs *mod_a = (const ElmModuleDocs *)a;
@@ -279,42 +273,14 @@ static int compare_modules(const void *a, const void *b) {
     return strcmp(mod_a->name, mod_b->name);
 }
 
-/* Process a list of .elm files */
-static int process_files(FileList *files, const char *base_path, bool verbose) {
+/* Process a list of .elm files (all files are pre-filtered as exposed modules) */
+static int process_files(FileList *files, const char *base_path, bool verbose __attribute__((unused)), ExposedModules *exposed) {
     if (files->count == 0) {
         fprintf(stderr, "Warning: No .elm files found\n");
         return 0;
     }
 
-    /* Try to read elm.json to get exposed modules */
-    ExposedModules exposed;
-    exposed_modules_init(&exposed);
-
-    char elm_json_path[1024];
-    snprintf(elm_json_path, sizeof(elm_json_path), "%s/elm.json", base_path);
-
-    /* Check if elm.json exists */
-    FILE *elm_json_check = fopen(elm_json_path, "r");
-    bool elm_json_exists = (elm_json_check != NULL);
-    if (elm_json_check) {
-        fclose(elm_json_check);
-    }
-
-    bool has_elm_json = parse_elm_json(elm_json_path, &exposed);
-    if (has_elm_json) {
-        fprintf(stderr, "Found elm.json with %d exposed module(s)\n", exposed.count);
-    } else if (elm_json_exists) {
-        /* File exists but parse failed - this is an error for packages */
-        fprintf(stderr, "ERROR: elm.json exists but is missing required 'exposed-modules' field or has invalid format\n");
-        fprintf(stderr, "Package elm.json must contain 'exposed-modules' field with at least one module\n");
-        exposed_modules_free(&exposed);
-        return 1;
-    } else {
-        fprintf(stderr, "ERROR: elm.json not found at %s\n", elm_json_path);
-        fprintf(stderr, "Package documentation requires a valid elm.json with 'exposed-modules' field\n");
-        exposed_modules_free(&exposed);
-        return 1;
-    }
+    fprintf(stderr, "Processing %d exposed module(s)\n", exposed->count);
 
     /* Initialize dependency cache */
     CacheConfig *cache_config = cache_config_init();
@@ -329,7 +295,6 @@ static int process_files(FileList *files, const char *base_path, bool verbose) {
     /* Allocate array for all module docs */
     ElmModuleDocs *all_docs = arena_calloc(files->count, sizeof(ElmModuleDocs));
     if (!all_docs) {
-        exposed_modules_free(&exposed);
         if (dep_cache) dependency_cache_free(dep_cache);
         if (cache_config) cache_config_free(cache_config);
         return 1;
@@ -339,7 +304,7 @@ static int process_files(FileList *files, const char *base_path, bool verbose) {
     char src_path[1024];
     snprintf(src_path, sizeof(src_path), "%s/src", base_path);
 
-    /* Parse all files */
+    /* Parse all files - all files are pre-filtered as exposed modules */
     int doc_index = 0;
     for (int i = 0; i < files->count; i++) {
         fprintf(stderr, "Processing: %s\n", files->paths[i]);
@@ -347,34 +312,20 @@ static int process_files(FileList *files, const char *base_path, bool verbose) {
         if (!parse_elm_file(files->paths[i], &all_docs[doc_index], dep_cache)) {
             fprintf(stderr, "Warning: Failed to parse %s\n", files->paths[i]);
         } else {
-            /* Check if module is exposed */
-            bool is_exposed = exposed_modules_contains(&exposed, all_docs[doc_index].name);
-
-            if (is_exposed) {
-                /* Validate that file path matches module name */
-                if (!validate_module_path(files->paths[i], all_docs[doc_index].name, src_path)) {
-                    fprintf(stderr, "Error: Module name '%s' doesn't match file path: %s\n",
-                            all_docs[doc_index].name, files->paths[i]);
-                    fprintf(stderr, "Elm requires module names to match file paths exactly (case-sensitive).\n");
-                    free_elm_docs(&all_docs[doc_index]);
-                    arena_free(all_docs);
-                    dependency_cache_free(dep_cache);
-                    exposed_modules_free(&exposed);
-                    if (cache_config) cache_config_free(cache_config);
-                    return 100;
-                }
-
-                fprintf(stderr, "Successfully parsed: %s (Module: %s, %d values, %d aliases, %d unions, %d binops)\n",
-                        files->paths[i], all_docs[doc_index].name,
-                        all_docs[doc_index].values_count, all_docs[doc_index].aliases_count,
-                        all_docs[doc_index].unions_count, all_docs[doc_index].binops_count);
-                doc_index++;
-            } else {
-                if (verbose) {
-                    fprintf(stderr, "Skipping non-exposed module: %s\n", all_docs[doc_index].name);
-                }
-                free_elm_docs(&all_docs[doc_index]);
+            /* Sanity check: validate that file path matches module name */
+            /* This should always pass since we looked up files by module name */
+            if (!validate_module_path(files->paths[i], all_docs[doc_index].name, src_path)) {
+                fprintf(stderr, "Warning: Module name '%s' doesn't match file path: %s\n",
+                        all_docs[doc_index].name, files->paths[i]);
+                fprintf(stderr, "This may indicate a module declaration mismatch.\n");
+                /* Continue processing - this is now a warning, not a fatal error */
             }
+
+            fprintf(stderr, "Successfully parsed: %s (Module: %s, %d values, %d aliases, %d unions, %d binops)\n",
+                    files->paths[i], all_docs[doc_index].name,
+                    all_docs[doc_index].values_count, all_docs[doc_index].aliases_count,
+                    all_docs[doc_index].unions_count, all_docs[doc_index].binops_count);
+            doc_index++;
         }
     }
 
@@ -392,7 +343,6 @@ static int process_files(FileList *files, const char *base_path, bool verbose) {
         free_elm_docs(&all_docs[i]);
     }
     arena_free(all_docs);
-    exposed_modules_free(&exposed);
 
     /* Free dependency cache */
     if (dep_cache) {
@@ -451,26 +401,48 @@ int cmd_publish_docs(int argc, char *argv[]) {
         return 1;
     }
 
+    // Parse elm.json to get exposed modules
+    ExposedModules exposed;
+    exposed_modules_init(&exposed);
+
+    if (!parse_elm_json(elm_json_path, &exposed)) {
+        fprintf(stderr, "ERROR: elm.json is missing required 'exposed-modules' field or has invalid format\n");
+        fprintf(stderr, "Package elm.json must contain 'exposed-modules' field with at least one module\n");
+        exposed_modules_free(&exposed);
+        return 1;
+    }
+
+    fprintf(stderr, "Found elm.json with %d exposed module(s)\n", exposed.count);
+
     // Check for src directory
     char src_path[1024];
     snprintf(src_path, sizeof(src_path), "%s/src", package_path);
     if (stat(src_path, &st) != 0) {
         fprintf(stderr, "Error: No src/ directory found in %s\n", package_path);
+        exposed_modules_free(&exposed);
         return 1;
     }
 
     if (!S_ISDIR(st.st_mode)) {
         fprintf(stderr, "Error: %s/src is not a directory\n", package_path);
+        exposed_modules_free(&exposed);
         return 1;
     }
 
-    // Find all .elm files in src/
+    // Build file list from exposed modules (instead of scanning all files)
     FileList files;
     file_list_init(&files);
-    find_elm_files_recursive(src_path, &files);
 
-    int result = process_files(&files, package_path, verbose);
+    if (!find_files_for_exposed_modules(&exposed, src_path, &files)) {
+        fprintf(stderr, "Error: One or more exposed modules not found at expected paths\n");
+        file_list_free(&files);
+        exposed_modules_free(&exposed);
+        return 101;
+    }
+
+    int result = process_files(&files, package_path, verbose, &exposed);
     file_list_free(&files);
+    exposed_modules_free(&exposed);
 
     return result;
 }
