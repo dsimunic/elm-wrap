@@ -13,7 +13,7 @@
 #include <ctype.h>
 
 static void print_docs_usage(void) {
-    printf("Usage: %s publish docs <PATH>\n", program_name);
+    printf("Usage: %s publish docs [OPTIONS] <PATH>\n", program_name);
     printf("\n");
     printf("Generate documentation JSON for an Elm package.\n");
     printf("\n");
@@ -22,6 +22,7 @@ static void print_docs_usage(void) {
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help         Show this help message\n");
+    printf("  -v, --verbose      Show verbose output including skipped modules\n");
 }
 
 /* Data structure for exposed modules */
@@ -279,7 +280,7 @@ static int compare_modules(const void *a, const void *b) {
 }
 
 /* Process a list of .elm files */
-static int process_files(FileList *files, const char *base_path) {
+static int process_files(FileList *files, const char *base_path, bool verbose) {
     if (files->count == 0) {
         fprintf(stderr, "Warning: No .elm files found\n");
         return 0;
@@ -346,28 +347,32 @@ static int process_files(FileList *files, const char *base_path) {
         if (!parse_elm_file(files->paths[i], &all_docs[doc_index], dep_cache)) {
             fprintf(stderr, "Warning: Failed to parse %s\n", files->paths[i]);
         } else {
-            /* Validate that file path matches module name */
-            if (!validate_module_path(files->paths[i], all_docs[doc_index].name, src_path)) {
-                fprintf(stderr, "Error: Module name '%s' doesn't match file path: %s\n",
-                        all_docs[doc_index].name, files->paths[i]);
-                fprintf(stderr, "Elm requires module names to match file paths exactly (case-sensitive).\n");
-                free_elm_docs(&all_docs[doc_index]);
-                arena_free(all_docs);
-                dependency_cache_free(dep_cache);
-                exposed_modules_free(&exposed);
-                if (cache_config) cache_config_free(cache_config);
-                return 100;
-            }
-
             /* Check if module is exposed */
             bool is_exposed = exposed_modules_contains(&exposed, all_docs[doc_index].name);
 
             if (is_exposed) {
-                fprintf(stderr, "Successfully parsed: %s (Module: %s)\n",
-                        files->paths[i], all_docs[doc_index].name);
+                /* Validate that file path matches module name */
+                if (!validate_module_path(files->paths[i], all_docs[doc_index].name, src_path)) {
+                    fprintf(stderr, "Error: Module name '%s' doesn't match file path: %s\n",
+                            all_docs[doc_index].name, files->paths[i]);
+                    fprintf(stderr, "Elm requires module names to match file paths exactly (case-sensitive).\n");
+                    free_elm_docs(&all_docs[doc_index]);
+                    arena_free(all_docs);
+                    dependency_cache_free(dep_cache);
+                    exposed_modules_free(&exposed);
+                    if (cache_config) cache_config_free(cache_config);
+                    return 100;
+                }
+
+                fprintf(stderr, "Successfully parsed: %s (Module: %s, %d values, %d aliases, %d unions, %d binops)\n",
+                        files->paths[i], all_docs[doc_index].name,
+                        all_docs[doc_index].values_count, all_docs[doc_index].aliases_count,
+                        all_docs[doc_index].unions_count, all_docs[doc_index].binops_count);
                 doc_index++;
             } else {
-                fprintf(stderr, "Skipping non-exposed module: %s\n", all_docs[doc_index].name);
+                if (verbose) {
+                    fprintf(stderr, "Skipping non-exposed module: %s\n", all_docs[doc_index].name);
+                }
                 free_elm_docs(&all_docs[doc_index]);
             }
         }
@@ -401,21 +406,30 @@ static int process_files(FileList *files, const char *base_path) {
 }
 
 int cmd_publish_docs(int argc, char *argv[]) {
-    // Check for help flag
+    bool verbose = false;
+    const char *package_path = NULL;
+
+    // Parse arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_docs_usage();
             return 0;
+        } else if (strcmp(argv[i], "--verbose") == 0 || strcmp(argv[i], "-v") == 0) {
+            verbose = true;
+        } else if (package_path == NULL) {
+            package_path = argv[i];
+        } else {
+            fprintf(stderr, "Error: Unexpected argument: %s\n\n", argv[i]);
+            print_docs_usage();
+            return 1;
         }
     }
 
-    if (argc < 2) {
+    if (package_path == NULL) {
         fprintf(stderr, "Error: Missing required argument <PATH>\n\n");
         print_docs_usage();
         return 1;
     }
-
-    const char *package_path = argv[1];
 
     // Check if the path exists
     struct stat st;
@@ -455,7 +469,7 @@ int cmd_publish_docs(int argc, char *argv[]) {
     file_list_init(&files);
     find_elm_files_recursive(src_path, &files);
 
-    int result = process_files(&files, package_path);
+    int result = process_files(&files, package_path, verbose);
     file_list_free(&files);
 
     return result;

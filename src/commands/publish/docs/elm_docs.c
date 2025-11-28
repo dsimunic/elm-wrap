@@ -381,9 +381,6 @@ bool parse_elm_file(const char *filepath, ElmModuleDocs *docs, DependencyCache *
         }
     }
 
-    fprintf(stderr, "Successfully parsed: %s (Module: %s, %d values, %d aliases, %d unions, %d binops)\n",
-            filepath, docs->name, docs->values_count, docs->aliases_count, docs->unions_count, docs->binops_count);
-
     /* Clean up export list */
     free_export_list(&exports);
 
