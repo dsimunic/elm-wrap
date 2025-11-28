@@ -255,50 +255,6 @@ bool cache_ensure_directories(CacheConfig *config) {
     return true;
 }
 
-/* Download package from registry */
-bool cache_download_package(CacheConfig *config, const char *author, const char *name, const char *version) {
-    /* Note: This function is called from multiple places:
-     * 1. install.c - when downloading packages not in cache
-     * 2. solver.c - when the solver needs a package for dependency resolution
-     * 3. pgsolver/pg_elm.c - when PubGrub solver needs package metadata
-     *
-     * It should be safe to call even if the package already exists, as we
-     * check for existence first. However, callers typically check via
-     * cache_package_exists() before calling this function.
-     */
-
-    if (!config || !author || !name || !version) return false;
-
-    /* For now, we rely on external curl_session being passed in.
-     * This is a stub that will be replaced with actual implementation
-     * using the InstallEnv curl session.
-     *
-     * The proper implementation requires:
-     * 1. Access to CurlSession (from InstallEnv)
-     * 2. Download endpoint.json to get archive URL and hash
-     * 3. Download the ZIP archive
-     * 4. Verify hash
-     * 5. Extract to package directory
-     *
-     * This requires refactoring to pass InstallEnv or CurlSession through
-     * the call chain, which affects multiple files.
-     */
-
-    fprintf(stderr, "[STUB] cache_download_package: Would download %s/%s@%s\n", author, name, version);
-    fprintf(stderr, "  URL: https://package.elm-lang.org/packages/%s/%s/%s/endpoint.json\n", author, name, version);
-
-    char *path = cache_get_package_path(config, author, name, version);
-    if (path) {
-        fprintf(stderr, "  Local path: %s\n", path);
-        arena_free(path);
-    }
-
-    fprintf(stderr, "  Note: cache_download_package needs CurlSession from InstallEnv\n");
-    fprintf(stderr, "        Current architecture doesn't pass session through solver\n");
-
-    return true;  // Stub returns success for now
-}
-
 /* Download package using InstallEnv (actual implementation) */
 bool cache_download_package_with_env(struct InstallEnv *env, const char *author, const char *name, const char *version) {
     if (!env) {
@@ -308,21 +264,6 @@ bool cache_download_package_with_env(struct InstallEnv *env, const char *author,
 
     /* Delegate to install_env_download_package which has the real implementation */
     return install_env_download_package(env, author, name, version);
-}
-
-bool cache_download_registry(CacheConfig *config) {
-    if (!config) return false;
-    
-    fprintf(stderr, "[STUB] cache_download_registry: Would download registry\n");
-    fprintf(stderr, "  URL: https://package.elm-lang.org/all-packages\n");
-    fprintf(stderr, "  Local path: %s\n", config->registry_path);
-    
-    // TODO: Implement with libcurl
-    // 1. Fetch all-packages endpoint
-    // 2. Parse JSON to binary format
-    // 3. Save to registry.dat
-    
-    return true;  // Stub returns success
 }
 
 bool cache_package_any_version_exists(CacheConfig *config, const char *author, const char *name) {

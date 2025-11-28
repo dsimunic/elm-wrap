@@ -25,10 +25,8 @@ bool cache_registry_exists(CacheConfig *config);
 /* Forward declaration */
 struct InstallEnv;
 
-/* Download stubs (to be implemented with libcurl) */
-bool cache_download_package(CacheConfig *config, const char *author, const char *name, const char *version);
+/* Download using InstallEnv (implemented in install_env.c) */
 bool cache_download_package_with_env(struct InstallEnv *env, const char *author, const char *name, const char *version);
-bool cache_download_registry(CacheConfig *config);
 
 /* Ensure cache directories exist */
 bool cache_ensure_directories(CacheConfig *config);

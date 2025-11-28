@@ -823,13 +823,11 @@ SolverResult solver_add_package(
         return SOLVER_NO_OFFLINE_SOLUTION;
     }
 
-    // Ensure registry is available
+    // Ensure registry is available (install_env_init already fetched/updated it)
     if (!cache_registry_exists(state->cache)) {
-        log_debug("Downloading registry");
-        if (!cache_download_registry(state->cache)) {
-            package_map_free(current_packages);
-            return SOLVER_NETWORK_ERROR;
-        }
+        log_error("Registry not available in cache after initialization");
+        package_map_free(current_packages);
+        return SOLVER_NETWORK_ERROR;
     }
 
     /* Strategy ladder: choose strategies based on major_upgrade flag */
@@ -1015,13 +1013,11 @@ SolverResult solver_upgrade_all(
         return SOLVER_NO_OFFLINE_SOLUTION;
     }
 
-    // Ensure registry is available
+    // Ensure registry is available (install_env_init already fetched/updated it)
     if (!cache_registry_exists(state->cache)) {
-        log_debug("Downloading registry");
-        if (!cache_download_registry(state->cache)) {
-            package_map_free(current_packages);
-            return SOLVER_NETWORK_ERROR;
-        }
+        log_error("Registry not available in cache after initialization");
+        package_map_free(current_packages);
+        return SOLVER_NETWORK_ERROR;
     }
 
     /* Build Elm-specific context and PubGrub provider */

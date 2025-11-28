@@ -532,7 +532,7 @@ Minimal changes:
 
 No interface changes to:
 
-- `cache_config_init`, `cache_download_registry`, `cache_download_package`, `cache_package_exists`.
+- `cache_config_init`, `cache_package_exists`.
 - `elm_json_read`, `elm_json_write`, `elm_json_find_package`, `elm_json_promote_package`, `package_map_add`.
 
 We only add:

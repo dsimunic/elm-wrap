@@ -110,7 +110,7 @@ Following Section 5 of `pubgrub_plan.md`, with a few simplifications:
     - Ignores root package (root dependencies modeled separately).
     - For other packages:
       - Uses `cache_get_package_path` and appends `/elm.json`.
-      - Reads `elm.json` via `elm_json_read`; if missing and `online`, calls `cache_download_package` and retries.
+      - Reads `elm.json` via `elm_json_read`; if missing and `online`, calls `install_env_download_package` (or `cache_download_package_with_env`) and retries.
       - For Elm packages (`ELM_PROJECT_PACKAGE`) with `package_dependencies`:
         - For each dependency:
           - Parses constraint strings like `"1.0.0 <= v < 2.0.0"` into `PgVersionRange` using `pg_elm_parse_constraint_range`.
@@ -152,7 +152,7 @@ Following Section 5 of `pubgrub_plan.md`, with a few simplifications:
   - Runs `pg_solver_solve(pg_solver)`.
   - Checks `pg_solver_get_selected_version(pg_solver, new_pkg_id, &chosen)`.
   - Formats `chosen` into `"major.minor.patch"`.
-  - Ensures that package is cached via `cache_package_exists` / `cache_download_package`.
+  - Ensures that package is cached via `cache_package_exists` / `install_env_download_package`.
   - Adds it to the appropriate dependency map:
     - For apps: `dependencies_direct` or `dependencies_test_direct` depending on `is_test_dependency`.
     - For packages: `package_dependencies` or `package_test_dependencies` (currently treated as exact versions, not ranges).
