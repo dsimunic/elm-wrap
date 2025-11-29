@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 // ANSI color codes for terminal output
 #define ANSI_GREEN "\033[1;32m"
@@ -20,6 +21,130 @@ typedef struct {
     bool has_minor_upgrade;
     bool has_major_upgrade;
 } PackageUpgrade;
+
+/* Check for duplicate exposed modules in a package elm.json file.
+ * Returns the number of duplicates found (0 if none).
+ */
+static int check_duplicate_exposed_modules(const char *elm_json_path) {
+    FILE *f = fopen(elm_json_path, "r");
+    if (!f) {
+        return 0;
+    }
+
+    /* Read entire file */
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    char *content = arena_malloc(fsize + 1);
+    if (!content) {
+        fclose(f);
+        return 0;
+    }
+
+    size_t read_size = fread(content, 1, fsize, f);
+    content[read_size] = 0;
+    fclose(f);
+
+    /* Find "exposed-modules" key */
+    char *exposed = strstr(content, "\"exposed-modules\"");
+    if (!exposed) {
+        arena_free(content);
+        return 0;
+    }
+
+    /* Skip past the key to find the value */
+    char *value_start = exposed + strlen("\"exposed-modules\"");
+    while (*value_start && (*value_start == ':' || isspace((unsigned char)*value_start))) {
+        value_start++;
+    }
+
+    /* Check if it's an object (categorized) or array (simple) */
+    bool is_categorized = (*value_start == '{');
+
+    /* Find the opening bracket of first array */
+    char *bracket = strchr(value_start, '[');
+    if (!bracket) {
+        arena_free(content);
+        return 0;
+    }
+
+    /* Collect all module names */
+    int modules_count = 0;
+    int modules_capacity = 16;
+    char **modules = arena_malloc(modules_capacity * sizeof(char*));
+
+    /* Parse all arrays (for categorized format, there may be multiple) */
+    char *search_pos = bracket;
+    char *end_marker = is_categorized ? strchr(value_start, '}') : strchr(bracket, ']');
+
+    while (search_pos && search_pos < end_marker) {
+        /* Parse module names within this array */
+        char *p = search_pos + 1;
+        while (*p) {
+            /* Skip whitespace */
+            while (*p && isspace((unsigned char)*p)) p++;
+
+            /* Check for end of this array */
+            if (*p == ']') break;
+
+            /* Find opening quote */
+            if (*p == '"') {
+                p++;
+                char *start = p;
+                /* Find closing quote */
+                while (*p && *p != '"') p++;
+                if (*p == '"') {
+                    /* Extract module name */
+                    int len = p - start;
+                    char *module = arena_malloc(len + 1);
+                    strncpy(module, start, len);
+                    module[len] = 0;
+
+                    /* Add to list */
+                    if (modules_count >= modules_capacity) {
+                        modules_capacity *= 2;
+                        modules = arena_realloc(modules, modules_capacity * sizeof(char*));
+                    }
+                    modules[modules_count++] = module;
+                    p++;
+                }
+            }
+
+            /* Skip to next element or end */
+            while (*p && *p != ',' && *p != ']') p++;
+            if (*p == ',') p++;
+        }
+
+        /* For categorized format, find next array if any */
+        if (is_categorized) {
+            search_pos = strchr(p, '[');
+        } else {
+            break;
+        }
+    }
+
+    /* Check for duplicates */
+    int duplicates = 0;
+    for (int i = 0; i < modules_count; i++) {
+        for (int j = i + 1; j < modules_count; j++) {
+            if (strcmp(modules[i], modules[j]) == 0) {
+                fprintf(stderr, "Warning: Duplicate exposed module '%s' in elm.json\n", modules[i]);
+                duplicates++;
+                break;  /* Only report each duplicate once */
+            }
+        }
+    }
+
+    /* Cleanup */
+    for (int i = 0; i < modules_count; i++) {
+        arena_free(modules[i]);
+    }
+    arena_free(modules);
+    arena_free(content);
+
+    return duplicates;
+}
 
 /* Parse semantic version into major, minor, patch components */
 static bool parse_version(const char *version, int *major, int *minor, int *patch) {
@@ -179,6 +304,11 @@ int check_all_upgrades(const char *elm_json_path, Registry *registry) {
     if (!elm_json) {
         fprintf(stderr, "Error: Could not read %s\n", elm_json_path);
         return 1;
+    }
+
+    // Check for duplicate exposed modules in package elm.json
+    if (elm_json->type == ELM_PROJECT_PACKAGE) {
+        check_duplicate_exposed_modules(elm_json_path);
     }
     
     // Collect all upgrades

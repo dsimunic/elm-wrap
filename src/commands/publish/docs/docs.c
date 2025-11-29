@@ -38,7 +38,23 @@ static void exposed_modules_init(ExposedModules *em) {
     em->capacity = 0;
 }
 
+/* Check if module already exists in the list */
+static bool exposed_modules_contains(const ExposedModules *em, const char *module) {
+    for (int i = 0; i < em->count; i++) {
+        if (strcmp(em->modules[i], module) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void exposed_modules_add(ExposedModules *em, const char *module) {
+    /* Skip duplicates */
+    if (exposed_modules_contains(em, module)) {
+        fprintf(stderr, "Warning: Duplicate exposed module '%s' in elm.json (ignoring)\n", module);
+        return;
+    }
+
     if (em->count >= em->capacity) {
         em->capacity = em->capacity == 0 ? 16 : em->capacity * 2;
         em->modules = arena_realloc(em->modules, em->capacity * sizeof(char*));
