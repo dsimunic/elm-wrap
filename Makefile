@@ -1,4 +1,5 @@
 CC = gcc
+AR = ar
 CFLAGS = -Wall -Wextra -Werror -std=c99 -D_POSIX_C_SOURCE=200809L -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -O2 -flto
 
 # Detect operating system
@@ -39,6 +40,22 @@ endif
 SRCDIR = src
 BUILDDIR = build
 BINDIR = bin
+
+# Rulr (Mini Datalog) library
+RULR_SRCDIR = $(SRCDIR)/rulr
+RULR_LIB = $(BINDIR)/librulr.a
+RULR_SOURCES = $(RULR_SRCDIR)/rulr.c \
+               $(RULR_SRCDIR)/rulr_dl.c \
+               $(RULR_SRCDIR)/frontend/lexer.c \
+               $(RULR_SRCDIR)/frontend/parser.c \
+               $(RULR_SRCDIR)/ir/ir_builder.c \
+               $(RULR_SRCDIR)/runtime/runtime.c \
+               $(RULR_SRCDIR)/engine/engine.c
+RULR_OBJECTS = $(patsubst $(SRCDIR)/rulr/%.c,$(BUILDDIR)/rulr/%.o,$(RULR_SOURCES))
+RULR_DRIVER = $(BINDIR)/rulr-demo
+RULR_DRIVER_SRC = $(RULR_SRCDIR)/driver_main.c
+RULR_DRIVER_OBJ = $(BUILDDIR)/rulr/driver_main.o
+RULR_CFLAGS = $(CFLAGS) -Isrc -Isrc/rulr
 
 # Files
 TARGET_FILE = elm-wrap
@@ -409,6 +426,19 @@ $(BUILDDIR)/sha256.o: $(SRCDIR)/vendor/sha256.c $(SRCDIR)/vendor/sha256.h | $(BU
 $(BUILDDIR)/miniz.o: $(SRCDIR)/vendor/miniz.c $(SRCDIR)/vendor/miniz.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Build librulr objects
+$(BUILDDIR)/rulr/%.o: $(SRCDIR)/rulr/%.c | $(BUILDDIR)
+	@mkdir -p $(dir $@)
+	$(CC) $(RULR_CFLAGS) -c $< -o $@
+
+# Build librulr archive
+$(RULR_LIB): $(RULR_OBJECTS) | $(BINDIR)
+	$(AR) rcs $@ $(RULR_OBJECTS)
+
+# Build rulr demo driver (optional helper for development)
+$(RULR_DRIVER): $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o | $(BINDIR)
+	$(CC) $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o -o $@
+
 # Link final binary
 $(TARGET): $(OBJECTS) | $(BINDIR)
 	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
@@ -447,6 +477,11 @@ version:
 
 # Alias for test target - GitHub Actions compatibility
 check: test
+
+.PHONY: librulr rulr-demo
+librulr: $(RULR_LIB)
+
+rulr-demo: $(RULR_DRIVER)
 
 # Create distribution tarball
 dist:

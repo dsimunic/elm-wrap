@@ -15,3 +15,4 @@ test/example-lamdera/
 tools/docs-patches/
 .claude/settings.local.json
 CLAUDE.md
+.github/copilot-instructions.md
