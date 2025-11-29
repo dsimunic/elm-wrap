@@ -251,6 +251,7 @@
   {
     "type": "block_comment",
     "named": true,
+    "extra": true,
     "fields": {}
   },
   {
@@ -1088,6 +1089,10 @@
           },
           {
             "type": "lower_pattern",
+            "named": true
+          },
+          {
+            "type": "nullary_constructor_argument_pattern",
             "named": true
           },
           {
@@ -3003,7 +3008,8 @@
   },
   {
     "type": "line_comment",
-    "named": true
+    "named": true,
+    "extra": true
   },
   {
     "type": "lower_case_identifier",

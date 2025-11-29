@@ -32,7 +32,7 @@ const char *STDLIB_SYMBOLS[] = {
   #include "./stdlib-symbols.txt"
 };
 
-// The contents of the `dylink.0` custom section of a Wasm module,
+// The contents of the `dylink.0` custom section of a wasm module,
 // as specified by the current WebAssembly dynamic linking ABI proposal.
 typedef struct {
   uint32_t memory_size;
@@ -43,15 +43,15 @@ typedef struct {
 
 // WasmLanguageId - A pointer used to identify a language. This language id is
 // reference-counted, so that its ownership can be shared between the language
-// itself and the instances of the language that are held in Wasm stores.
+// itself and the instances of the language that are held in wasm stores.
 typedef struct {
   volatile uint32_t ref_count;
   volatile uint32_t is_language_deleted;
 } WasmLanguageId;
 
-// LanguageWasmModule - Additional data associated with a Wasm-backed
+// LanguageWasmModule - Additional data associated with a wasm-backed
 // `TSLanguage`. This data is read-only and does not reference a particular
-// Wasm store, so it can be shared by all users of a `TSLanguage`. A pointer to
+// wasm store, so it can be shared by all users of a `TSLanguage`. A pointer to
 // this is stored on the language itself.
 typedef struct {
   volatile uint32_t ref_count;
@@ -64,7 +64,7 @@ typedef struct {
 } LanguageWasmModule;
 
 // LanguageWasmInstance - Additional data associated with an instantiation of
-// a `TSLanguage` in a particular Wasm store. The Wasm store holds one of
+// a `TSLanguage` in a particular wasm store. The wasm store holds one of
 // these structs for each language that it has instantiated.
 typedef struct {
   WasmLanguageId *language_id;
@@ -91,7 +91,7 @@ typedef struct {
   uint32_t args_sizes_get;
 } BuiltinFunctionIndices;
 
-// TSWasmStore - A struct that allows a given `Parser` to use Wasm-backed
+// TSWasmStore - A struct that allows a given `Parser` to use wasm-backed
 // languages. This struct is mutable, and can only be used by one parser at a
 // time.
 struct TSWasmStore {
@@ -115,7 +115,7 @@ struct TSWasmStore {
 typedef Array(char) StringData;
 
 // LanguageInWasmMemory - The memory layout of a `TSLanguage` when compiled to
-// wasm32. This is used to copy static language data out of the Wasm memory.
+// wasm32. This is used to copy static language data out of the wasm memory.
 typedef struct {
   uint32_t abi_version;
   uint32_t symbol_count;
@@ -164,7 +164,7 @@ typedef struct {
 } LanguageInWasmMemory;
 
 // LexerInWasmMemory - The memory layout of a `TSLexer` when compiled to wasm32.
-// This is used to copy mutable lexing state in and out of the Wasm memory.
+// This is used to copy mutable lexing state in and out of the wasm memory.
 typedef struct {
   int32_t lookahead;
   TSSymbol result_symbol;
@@ -252,7 +252,7 @@ static bool wasm_dylink_info__parse(
 }
 
 /*******************************************
- * Native callbacks exposed to Wasm modules
+ * Native callbacks exposed to wasm modules
  *******************************************/
 
  static wasm_trap_t *callback__abort(
@@ -261,7 +261,7 @@ static bool wasm_dylink_info__parse(
   wasmtime_val_raw_t *args_and_results,
   size_t args_and_results_len
 ) {
-  return wasmtime_trap_new("Wasm module called abort", 24);
+  return wasmtime_trap_new("wasm module called abort", 24);
 }
 
 static wasm_trap_t *callback__debug_message(
@@ -654,7 +654,7 @@ TSWasmStore *ts_wasm_store_new(TSWasmEngine *engine, TSWasmError *wasm_error) {
     },
   };
 
-  // Create all of the Wasm functions.
+  // Create all of the wasm functions.
   unsigned builtin_definitions_len = array_len(builtin_definitions);
   unsigned lexer_definitions_len = array_len(lexer_definitions);
   for (unsigned i = 0; i < builtin_definitions_len; i++) {
@@ -679,7 +679,7 @@ TSWasmStore *ts_wasm_store_new(TSWasmEngine *engine, TSWasmError *wasm_error) {
     wasm_error->kind = TSWasmErrorKindCompile;
     format(
       &wasm_error->message,
-      "failed to compile Wasm stdlib: %.*s",
+      "failed to compile wasm stdlib: %.*s",
       (int)message.size, message.data
     );
     goto error;
@@ -702,7 +702,7 @@ TSWasmStore *ts_wasm_store_new(TSWasmEngine *engine, TSWasmError *wasm_error) {
     wasm_error->kind = TSWasmErrorKindCompile;
     format(
       &wasm_error->message,
-      "Wasm stdlib is missing the 'memory' import"
+      "wasm stdlib is missing the 'memory' import"
     );
     goto error;
   }
@@ -718,7 +718,7 @@ TSWasmStore *ts_wasm_store_new(TSWasmEngine *engine, TSWasmError *wasm_error) {
     wasm_error->kind = TSWasmErrorKindAllocate;
     format(
       &wasm_error->message,
-      "failed to allocate Wasm memory: %.*s",
+      "failed to allocate wasm memory: %.*s",
       (int)message.size, message.data
     );
     goto error;
@@ -737,7 +737,7 @@ TSWasmStore *ts_wasm_store_new(TSWasmEngine *engine, TSWasmError *wasm_error) {
     wasm_error->kind = TSWasmErrorKindAllocate;
     format(
       &wasm_error->message,
-      "failed to allocate Wasm table: %.*s",
+      "failed to allocate wasm table: %.*s",
       (int)message.size, message.data
     );
     goto error;
@@ -780,7 +780,7 @@ TSWasmStore *ts_wasm_store_new(TSWasmEngine *engine, TSWasmError *wasm_error) {
       wasm_error->kind = TSWasmErrorKindInstantiate;
       format(
         &wasm_error->message,
-        "unexpected import in Wasm stdlib: %.*s\n",
+        "unexpected import in wasm stdlib: %.*s\n",
         (int)import_name->size, import_name->data
       );
       goto error;
@@ -797,7 +797,7 @@ TSWasmStore *ts_wasm_store_new(TSWasmEngine *engine, TSWasmError *wasm_error) {
     wasm_error->kind = TSWasmErrorKindInstantiate;
     format(
       &wasm_error->message,
-      "failed to instantiate Wasm stdlib module: %.*s",
+      "failed to instantiate wasm stdlib module: %.*s",
       (int)message.size, message.data
     );
     goto error;
@@ -807,7 +807,7 @@ TSWasmStore *ts_wasm_store_new(TSWasmEngine *engine, TSWasmError *wasm_error) {
     wasm_error->kind = TSWasmErrorKindInstantiate;
     format(
       &wasm_error->message,
-      "trapped when instantiating Wasm stdlib module: %.*s",
+      "trapped when instantiating wasm stdlib module: %.*s",
       (int)message.size, message.data
     );
     goto error;
@@ -868,7 +868,7 @@ TSWasmStore *ts_wasm_store_new(TSWasmEngine *engine, TSWasmError *wasm_error) {
     wasm_error->kind = TSWasmErrorKindInstantiate;
     format(
       &wasm_error->message,
-      "missing malloc reset function in Wasm stdlib"
+      "missing malloc reset function in wasm stdlib"
     );
     goto error;
   }
@@ -878,7 +878,7 @@ TSWasmStore *ts_wasm_store_new(TSWasmEngine *engine, TSWasmError *wasm_error) {
       wasm_error->kind = TSWasmErrorKindInstantiate;
       format(
         &wasm_error->message,
-        "missing exported symbol in Wasm stdlib: %s",
+        "missing exported symbol in wasm stdlib: %s",
         STDLIB_SYMBOLS[i]
       );
       goto error;
@@ -897,7 +897,7 @@ TSWasmStore *ts_wasm_store_new(TSWasmEngine *engine, TSWasmError *wasm_error) {
     wasm_error->kind = TSWasmErrorKindAllocate;
     format(
       &wasm_error->message,
-      "failed to grow Wasm table to initial size: %.*s",
+      "failed to grow wasm table to initial size: %.*s",
       (int)message.size, message.data
     );
     goto error;
@@ -1064,7 +1064,7 @@ static bool ts_wasm_store__instantiate(
     wasmtime_error_message(error, &message);
     format(
       error_message,
-      "error instantiating Wasm module: %.*s\n",
+      "error instantiating wasm module: %.*s\n",
       (int)message.size, message.data
     );
     goto error;
@@ -1073,7 +1073,7 @@ static bool ts_wasm_store__instantiate(
     wasm_trap_message(trap, &message);
     format(
       error_message,
-      "trap when instantiating Wasm module: %.*s\n",
+      "trap when instantiating wasm module: %.*s\n",
       (int)message.size, message.data
     );
     goto error;
@@ -1183,17 +1183,17 @@ const TSLanguage *ts_wasm_store_load_language(
 
   if (!wasm_dylink_info__parse((const unsigned char *)wasm, wasm_len, &dylink_info)) {
     wasm_error->kind = TSWasmErrorKindParse;
-    format(&wasm_error->message, "failed to parse dylink section of Wasm module");
+    format(&wasm_error->message, "failed to parse dylink section of wasm module");
     goto error;
   }
 
-  // Compile the Wasm code.
+  // Compile the wasm code.
   error = wasmtime_module_new(self->engine, (const uint8_t *)wasm, wasm_len, &module);
   if (error) {
     wasm_message_t message;
     wasmtime_error_message(error, &message);
     wasm_error->kind = TSWasmErrorKindCompile;
-    format(&wasm_error->message, "error compiling Wasm module: %.*s", (int)message.size, message.data);
+    format(&wasm_error->message, "error compiling wasm module: %.*s", (int)message.size, message.data);
     wasm_byte_vec_delete(&message);
     goto error;
   }
@@ -1214,7 +1214,7 @@ const TSLanguage *ts_wasm_store_load_language(
     goto error;
   }
 
-  // Copy all of the static data out of the language object in Wasm memory,
+  // Copy all of the static data out of the language object in wasm memory,
   // constructing a native language object.
   LanguageInWasmMemory wasm_language;
   wasmtime_context_t *context = wasmtime_store_context(self->store);
@@ -1444,9 +1444,9 @@ const TSLanguage *ts_wasm_store_load_language(
     .ref_count = 1,
   };
 
-  // The lex functions are not used for Wasm languages. Use those two fields
-  // to mark this language as Wasm-based and to store the language's
-  // Wasm-specific data.
+  // The lex functions are not used for wasm languages. Use those two fields
+  // to mark this language as WASM-based and to store the language's
+  // WASM-specific data.
   language->lex_fn = ts_wasm_store__sentinel_lex_fn;
   language->keyword_lex_fn = (bool (*)(TSLexer *, TSStateId))language_module;
 
@@ -1597,7 +1597,7 @@ static void ts_wasm_store__call(
     // wasmtime_error_message(error, &message);
     // fprintf(
     //   stderr,
-    //   "error in Wasm module: %.*s\n",
+    //   "error in wasm module: %.*s\n",
     //   (int)message.size, message.data
     // );
     wasmtime_error_delete(error);
@@ -1607,7 +1607,7 @@ static void ts_wasm_store__call(
     // wasm_trap_message(trap, &message);
     // fprintf(
     //   stderr,
-    //   "trap in Wasm module: %.*s\n",
+    //   "trap in wasm module: %.*s\n",
     //   (int)message.size, message.data
     // );
     wasm_trap_delete(trap);
@@ -1618,7 +1618,7 @@ static void ts_wasm_store__call(
 // The data fields of TSLexer, without the function pointers.
 //
 // This portion of the struct needs to be copied in and out
-// of Wasm memory before and after calling a scan function.
+// of wasm memory before and after calling a scan function.
 typedef struct {
   int32_t lookahead;
   TSSymbol result_symbol;
@@ -1792,8 +1792,8 @@ void ts_wasm_language_release(const TSLanguage *self) {
   LanguageWasmModule *module = ts_language__wasm_module(self);
   ts_assert(module->ref_count > 0);
   if (atomic_dec(&module->ref_count) == 0) {
-    // Update the language id to reflect that the language is deleted. This allows any Wasm stores
-    // that hold Wasm instances for this language to delete those instances.
+    // Update the language id to reflect that the language is deleted. This allows any wasm stores
+    // that hold wasm instances for this language to delete those instances.
     atomic_inc(&module->language_id->is_language_deleted);
     language_id_delete(module->language_id);
 
@@ -1835,8 +1835,8 @@ void ts_wasm_language_release(const TSLanguage *self) {
 
 #else
 
-// If the Wasm feature is not enabled, define dummy versions of all of the
-// Wasm-related functions.
+// If the WASM feature is not enabled, define dummy versions of all of the
+// wasm-related functions.
 
 void ts_wasm_store_delete(TSWasmStore *self) {
   (void)self;
