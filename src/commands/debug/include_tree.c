@@ -17,7 +17,7 @@
 static int print_file_include_tree(const char *file_path);
 static int print_package_include_tree(const char *dir_path);
 static void collect_imports_recursive(const char *file_path, const char *src_dir,
-                                       char **visited, int *visited_count, int *visited_capacity,
+                                       char ***visited, int *visited_count, int *visited_capacity,
                                        const char *prefix);
 static char *module_name_to_path(const char *module_name, const char *src_dir);
 static void collect_all_elm_files(const char *dir_path, char ***files, int *count, int *capacity);
@@ -213,7 +213,7 @@ static int print_file_include_tree(const char *file_path) {
     printf("%s\n", abs_path);
 
     /* Recursively print imports */
-    collect_imports_recursive(abs_path, src_dir, visited, &visited_count, &visited_capacity, "");
+    collect_imports_recursive(abs_path, src_dir, &visited, &visited_count, &visited_capacity, "");
 
     printf("\n");
     free(abs_path);
@@ -380,7 +380,7 @@ static int print_package_include_tree(const char *dir_path) {
                                  arena_strdup(abs_path), char*);
 
                     /* Print tree and collect all imports */
-                    collect_imports_recursive(abs_path, src_dir, visited, &visited_count, 
+                    collect_imports_recursive(abs_path, src_dir, &visited, &visited_count, 
                                             &visited_capacity, "");
 
                     /* Add all visited files to included list */
@@ -440,7 +440,7 @@ static int print_package_include_tree(const char *dir_path) {
  * prefix: the string to print before the branch character (accumulates "│   " or "    ")
  */
 static void collect_imports_recursive(const char *file_path, const char *src_dir,
-                                       char **visited, int *visited_count, int *visited_capacity,
+                                       char ***visited, int *visited_count, int *visited_capacity,
                                        const char *prefix) {
     /* Get absolute path for consistent comparison */
     char *abs_path = realpath(file_path, NULL);
@@ -448,7 +448,7 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
 
     /* Check if already visited (cycle detection) */
     for (int i = 0; i < *visited_count; i++) {
-        if (strcmp(visited[i], abs_path) == 0) {
+        if (strcmp((*visited)[i], abs_path) == 0) {
             free(abs_path);
             return; /* Already processed */
         }
@@ -456,7 +456,7 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
 
     /* Add to visited */
     char *current_file_abs = arena_strdup(abs_path);
-    DYNARRAY_PUSH(visited, *visited_count, *visited_capacity, current_file_abs, char*);
+    DYNARRAY_PUSH(*visited, *visited_count, *visited_capacity, current_file_abs, char*);
     free(abs_path);
 
     /* Parse the Elm file using skeleton parser (tree-sitter based) */
@@ -464,10 +464,11 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
     if (!mod) return;
 
     /* Separate imports into local (in src dir) and external (from packages) */
-    int local_imports_capacity = 16;
+    int local_names_capacity = 16;
+    int local_paths_capacity = 16;
     int local_imports_count = 0;
-    char **local_import_names = arena_malloc(local_imports_capacity * sizeof(char*));
-    char **local_import_paths = arena_malloc(local_imports_capacity * sizeof(char*));
+    char **local_import_names = arena_malloc(local_names_capacity * sizeof(char*));
+    char **local_import_paths = arena_malloc(local_paths_capacity * sizeof(char*));
     
     int external_imports_capacity = 16;
     int external_imports_count = 0;
@@ -488,11 +489,12 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
                     continue;
                 }
                 
-                DYNARRAY_PUSH(local_import_names, local_imports_count, local_imports_capacity, 
-                             arena_strdup(module_name), char*);
-                local_imports_count--; /* Undo the count increment from name push */
-                DYNARRAY_PUSH(local_import_paths, local_imports_count, local_imports_capacity,
-                             arena_strdup(mod_abs_path), char*);
+                /* Add to both parallel arrays - each with its own capacity */
+                DYNARRAY_ENSURE_CAPACITY(local_import_names, local_imports_count, local_names_capacity, char*);
+                DYNARRAY_ENSURE_CAPACITY(local_import_paths, local_imports_count, local_paths_capacity, char*);
+                local_import_names[local_imports_count] = arena_strdup(module_name);
+                local_import_paths[local_imports_count] = arena_strdup(mod_abs_path);
+                local_imports_count++;
                 free(mod_abs_path);
             }
         } else {
@@ -516,7 +518,7 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
         /* Check if already visited before printing */
         int already_visited = 0;
         for (int j = 0; j < *visited_count; j++) {
-            if (strcmp(visited[j], mod_abs_path) == 0) {
+            if (strcmp((*visited)[j], mod_abs_path) == 0) {
                 already_visited = 1;
                 break;
             }
