@@ -535,7 +535,7 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
             
             /* Build new prefix for children */
             int prefix_len = strlen(prefix);
-            char *child_prefix = arena_malloc(prefix_len + 5); /* +4 for "│   " or "    ", +1 for null */
+            char *child_prefix = arena_malloc(prefix_len + 7); /* +6 for "│   " or "    ", +1 for null */
             strcpy(child_prefix, prefix);
             strcat(child_prefix, is_last ? TREE_SPACE : TREE_VERT);
             
