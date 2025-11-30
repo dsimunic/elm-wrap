@@ -84,6 +84,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/publish/docs/path_util.c \
           $(SRCDIR)/commands/code/code.c \
           $(SRCDIR)/commands/code/format.c \
+          $(SRCDIR)/commands/review/review.c \
           $(SRCDIR)/commands/debug/debug.c \
           $(SRCDIR)/commands/debug/include_tree.c \
           $(SRCDIR)/import_tree.c \
@@ -139,6 +140,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/path_util.o \
           $(BUILDDIR)/code.o \
           $(BUILDDIR)/format.o \
+          $(BUILDDIR)/review.o \
           $(BUILDDIR)/debug.o \
           $(BUILDDIR)/include_tree.o \
           $(BUILDDIR)/import_tree.o \
@@ -301,6 +303,10 @@ $(BUILDDIR)/code.o: $(SRCDIR)/commands/code/code.c $(SRCDIR)/commands/code/code.
 $(BUILDDIR)/format.o: $(SRCDIR)/commands/code/format.c $(SRCDIR)/commands/code/code.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
 
+# Build review command object
+$(BUILDDIR)/review.o: $(SRCDIR)/commands/review/review.c $(SRCDIR)/commands/review/review.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/rulr/rulr.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -I$(SRCDIR)/rulr -c $< -o $@
+
 # Build debug command object
 $(BUILDDIR)/debug.o: $(SRCDIR)/commands/debug/debug.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -440,8 +446,8 @@ $(RULR_DRIVER): $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o | $(BINDIR)
 	$(CC) $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o -o $@
 
 # Link final binary
-$(TARGET): $(OBJECTS) | $(BINDIR)
-	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
+$(TARGET): $(OBJECTS) $(RULR_LIB) | $(BINDIR)
+	$(CC) $(OBJECTS) $(RULR_LIB) $(LDFLAGS) -o $@
 
 # Create directories
 $(BUILDDIR):

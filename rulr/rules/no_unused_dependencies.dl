@@ -1,0 +1,23 @@
+.pred import(module: symbol).
+.pred dependency(author: symbol, package: symbol, version: symbol).
+.pred package_module(author: symbol, package: symbol, module: symbol).
+.pred used_dependency(author: symbol, package: symbol).
+.pred unused_dependency(author: symbol, package: symbol, version: symbol).
+.pred implicitly_used(author: symbol, package: symbol).
+.pred error(author: symbol, package: symbol, version: symbol).
+
+implicitly_used("elm", "core").
+
+used_dependency(Author, Package) :-
+    import(Module),
+    package_module(Author, Package, Module).
+
+used_dependency(Author, Package) :-
+    implicitly_used(Author, Package).
+
+unused_dependency(Author, Package, Version) :-
+    dependency(Author, Package, Version),
+    not used_dependency(Author, Package).
+
+error(Author, Package, Version) :-
+    unused_dependency(Author, Package, Version).

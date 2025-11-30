@@ -1,0 +1,21 @@
+.pred exported_value(name: symbol).
+.pred exported_type(name: symbol).
+.pred union_type(name: symbol).
+.pred type_alias(name: symbol).
+.pred sig_uses_type(func: symbol, type: symbol).
+
+.pred local_type(name: symbol).
+.pred exposed_func_uses_private_type(func: symbol, type: symbol).
+.pred error(msg: symbol, func: symbol, type: symbol).
+
+local_type(T) :- union_type(T).
+local_type(T) :- type_alias(T).
+
+exposed_func_uses_private_type(Func, Type) :-
+    exported_value(Func),
+    sig_uses_type(Func, Type),
+    local_type(Type),
+    not exported_type(Type).
+
+error("Private type used in exposed function signature", Func, Type) :-
+    exposed_func_uses_private_type(Func, Type).

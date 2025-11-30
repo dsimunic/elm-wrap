@@ -1,0 +1,31 @@
+.pred projectModule(m: symbol).
+.pred exposedModule(m: symbol).
+.pred declaredType(m: symbol, t: symbol).
+.pred exposedType(m: symbol, t: symbol).
+.pred sigUsesType(mUse: symbol, mDecl: symbol, t: symbol, r: range).
+.pred error(mUse: symbol, mDecl: symbol, t: symbol, r: range).
+
+projectModule("Happiness").
+projectModule("Helpers").
+exposedModule("Happiness").
+
+declaredType("Happiness", "Happiness").
+declaredType("Helpers", "Secret").
+
+exposedType("Happiness", "Happiness").
+
+sigUsesType("Happiness", "Happiness", "Happiness", 101).
+sigUsesType("Happiness", "Helpers", "Secret", 202).
+
+error(MUse, MDecl, T, R) :-
+    exposedModule(MUse),
+    sigUsesType(MUse, MDecl, T, R),
+    MUse = MDecl,
+    declaredType(MDecl, T),
+    not exposedType(MDecl, T).
+
+error(MUse, MDecl, T, R) :-
+    exposedModule(MUse),
+    sigUsesType(MUse, MDecl, T, R),
+    projectModule(MDecl),
+    not exposedModule(MDecl).
