@@ -41,6 +41,12 @@ int engine_insert_fact(Engine *e, int pred_id, int arity, const Value *values);
 EngineError engine_load_rules_from_string(Engine *e, const char *source);
 EngineError engine_load_rules_from_file(Engine *e, const char *path);
 
+/**
+ * Clear all derived (IDB) facts from the engine while keeping base (EDB) facts.
+ * This allows reloading new rules and re-evaluating with the same injected facts.
+ */
+void engine_clear_derived_facts(Engine *e);
+
 EngineError engine_evaluate(Engine *e);
 
 typedef struct {

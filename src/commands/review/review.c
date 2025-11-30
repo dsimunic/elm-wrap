@@ -995,6 +995,125 @@ static void pkg_collect_all_files(const char *dir_path, char ***files, int *coun
 }
 
 /**
+ * Find any available version of a package in a package repository.
+ * Returns the path to the package directory, or NULL if not found.
+ * 
+ * Package repository structure:
+ *   <repo_base>/packages/<author>/<name>/<version>/
+ */
+static char *pkg_find_any_version_in_repo(const char *repo_packages_dir, const char *author, const char *name) {
+    /* Build path to author/name directory */
+    size_t dir_len = strlen(repo_packages_dir) + strlen(author) + strlen(name) + 3;
+    char *pkg_dir = arena_malloc(dir_len);
+    if (!pkg_dir) return NULL;
+    snprintf(pkg_dir, dir_len, "%s/%s/%s", repo_packages_dir, author, name);
+    
+    /* Open directory and find first version */
+    DIR *dir = opendir(pkg_dir);
+    if (!dir) {
+        arena_free(pkg_dir);
+        return NULL;
+    }
+    
+    struct dirent *entry;
+    char *result = NULL;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        
+        /* Build full path to this version */
+        size_t version_path_len = strlen(pkg_dir) + strlen(entry->d_name) + 2;
+        char *version_path = arena_malloc(version_path_len);
+        snprintf(version_path, version_path_len, "%s/%s", pkg_dir, entry->d_name);
+        
+        /* Check if it's a directory with an elm.json */
+        struct stat st;
+        if (stat(version_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+            size_t elm_json_len = strlen(version_path) + 12;
+            char *elm_json_path = arena_malloc(elm_json_len);
+            snprintf(elm_json_path, elm_json_len, "%s/elm.json", version_path);
+            
+            if (pkg_file_exists(elm_json_path)) {
+                arena_free(elm_json_path);
+                result = version_path;
+                break;
+            }
+            arena_free(elm_json_path);
+        }
+        arena_free(version_path);
+    }
+    
+    closedir(dir);
+    arena_free(pkg_dir);
+    return result;
+}
+
+/**
+ * Extract package_module facts from dependencies in a package repository.
+ * This is for reviewing packages, where dependencies have version ranges
+ * and we need to find actual versions in the repository.
+ */
+static void pkg_extract_package_module_facts(Rulr *r, const ElmJson *ej, const char *repo_packages_dir) {
+    if (!ej || !repo_packages_dir) return;
+    
+    PackageMap *deps = ej->package_dependencies;
+    if (!deps) return;
+    
+    for (int i = 0; i < deps->count; i++) {
+        Package *pkg = &deps->packages[i];
+        
+        /* Find any version of this package in the repository */
+        char *pkg_path = pkg_find_any_version_in_repo(repo_packages_dir, pkg->author, pkg->name);
+        if (!pkg_path) continue;
+        
+        /* Build path to elm.json */
+        size_t elm_json_len = strlen(pkg_path) + 12;
+        char *elm_json_path = arena_malloc(elm_json_len);
+        snprintf(elm_json_path, elm_json_len, "%s/elm.json", pkg_path);
+        
+        /* Parse exposed modules */
+        int module_count = 0;
+        char **modules = parse_package_exposed_modules(elm_json_path, &module_count);
+        
+        if (modules) {
+            for (int m = 0; m < module_count; m++) {
+                if (modules[m]) {
+                    insert_fact_3s(r, "package_module", pkg->author, pkg->name, modules[m]);
+                }
+            }
+        }
+        
+        arena_free(elm_json_path);
+        arena_free(pkg_path);
+    }
+}
+
+/**
+ * Extract the "packages" directory path from a package path.
+ * E.g., from "/repo/0.19.1/packages/author/name/1.0.0"
+ *       returns "/repo/0.19.1/packages"
+ */
+static char *pkg_extract_repo_packages_dir(const char *pkg_path) {
+    if (!pkg_path) return NULL;
+    
+    /* Look for "/packages/" in the path */
+    const char *packages_marker = strstr(pkg_path, "/packages/");
+    if (!packages_marker) return NULL;
+    
+    /* Calculate the length up to and including "/packages" */
+    size_t len = (packages_marker - pkg_path) + 9; /* strlen("/packages") = 9 */
+    
+    char *result = arena_malloc(len + 1);
+    if (!result) return NULL;
+    
+    strncpy(result, pkg_path, len);
+    result[len] = '\0';
+    
+    return result;
+}
+
+/**
  * Extract module name and imports from an Elm file and insert facts
  */
 static void pkg_extract_file_facts(Rulr *r, const char *file_path, const char *src_dir) {
@@ -1006,10 +1125,14 @@ static void pkg_extract_file_facts(Rulr *r, const char *file_path, const char *s
         insert_fact_2s(r, "file_module", file_path, mod->module_name);
     }
 
-    /* Insert file_import(file, imported_module) facts */
+    /* Insert file_import(file, imported_module) facts for LOCAL imports
+     * and import(module) facts for ALL imports */
     for (int i = 0; i < mod->imports_count; i++) {
         const char *module_name = mod->imports[i].module_name;
         if (!module_name) continue;
+        
+        /* Insert import(module) for ALL imports (used by no_unused_dependencies) */
+        insert_fact_1s(r, "import", module_name);
         
         /* Check if this is a local import (file exists in src/) */
         char *module_path = pkg_module_name_to_path(module_name, src_dir);
@@ -1097,6 +1220,18 @@ int cmd_review_package(int argc, char *argv[]) {
         return 1;
     }
 
+    /* Parse full elm.json for dependency facts */
+    ElmJson *elm_json = elm_json_read(elm_json_path);
+    if (!elm_json) {
+        fprintf(stderr, "Warning: Failed to parse elm.json for dependencies\n");
+    }
+
+    /* Initialize cache for package module fact extraction */
+    CacheConfig *cache = NULL;
+    if (elm_json) {
+        cache = cache_config_init();
+    }
+
     /* Collect all .elm files in src */
     int all_elm_files_capacity = 256;
     int all_elm_files_count = 0;
@@ -1124,63 +1259,88 @@ int cmd_review_package(int argc, char *argv[]) {
     printf("Exposed modules: %d\n", exposed_count);
     printf("Source files: %d\n", all_elm_files_count);
     printf("Total package files: %d\n", all_pkg_files_count);
+    printf("Rule files: %d\n", rule_files_count);
     printf("\n");
 
-    /* Run each rule file */
+    /* Initialize rulr engine ONCE */
+    Rulr rulr;
+    RulrError err = rulr_init(&rulr);
+    if (err.is_error) {
+        fprintf(stderr, "Error: Failed to initialize rulr engine: %s\n", err.message);
+        if (abs_license) free(abs_license);
+        if (abs_readme) free(abs_readme);
+        if (abs_elm_json) free(abs_elm_json);
+        return 1;
+    }
+
+    /* Insert all facts ONCE (they will be reused across rule files) */
+    
+    /* Insert exposed_module(module) facts */
+    for (int i = 0; i < exposed_count; i++) {
+        insert_fact_1s(&rulr, "exposed_module", exposed_modules[i]);
+    }
+
+    /* Insert source_file(file) facts and extract file info from .elm files */
+    for (int i = 0; i < all_elm_files_count; i++) {
+        insert_fact_1s(&rulr, "source_file", all_elm_files[i]);
+        pkg_extract_file_facts(&rulr, all_elm_files[i], src_dir);
+    }
+
+    /* Insert package_file(file) facts for ALL files in the package */
+    for (int i = 0; i < all_pkg_files_count; i++) {
+        insert_fact_1s(&rulr, "package_file", all_pkg_files[i]);
+    }
+
+    /* Insert allowed_root_file facts for LICENSE, README.md, elm.json */
+    if (abs_license) {
+        insert_fact_1s(&rulr, "allowed_root_file", abs_license);
+    }
+    if (abs_readme) {
+        insert_fact_1s(&rulr, "allowed_root_file", abs_readme);
+    }
+    if (abs_elm_json) {
+        insert_fact_1s(&rulr, "allowed_root_file", abs_elm_json);
+    }
+
+    /* Insert elm.json facts (including dependency facts) */
+    if (elm_json) {
+        extract_elm_json_facts(&rulr, elm_json);
+        
+        /* Extract package_module facts from package repository
+         * (for packages, dependencies are in the same repository) */
+        char *repo_packages_dir = pkg_extract_repo_packages_dir(clean_path);
+        if (repo_packages_dir) {
+            pkg_extract_package_module_facts(&rulr, elm_json, repo_packages_dir);
+            arena_free(repo_packages_dir);
+        } else if (cache) {
+            /* Fall back to ELM_HOME cache if not in a package repository */
+            extract_package_module_facts(&rulr, elm_json, cache);
+        }
+    }
+
+    /* Run each rule file, reusing the injected facts */
     int total_errors = 0;
     for (int r = 0; r < rule_files_count; r++) {
         const char *rule_path = rule_files[r];
 
         printf("=== Rule file: %s ===\n", rule_path);
 
-        /* Initialize rulr engine */
-        Rulr rulr;
-        RulrError err = rulr_init(&rulr);
-        if (err.is_error) {
-            fprintf(stderr, "Error: Failed to initialize rulr engine: %s\n", err.message);
-            continue;
+        /* Clear derived facts from previous rule, keeping base facts */
+        if (r > 0) {
+            rulr_clear_derived(&rulr);
         }
 
         /* Load the rule file */
         err = rulr_load_dl_file(&rulr, rule_path);
         if (err.is_error) {
             fprintf(stderr, "Error: Failed to load rule file: %s\n", err.message);
-            rulr_deinit(&rulr);
             continue;
-        }
-
-        /* Insert exposed_module(module) facts */
-        for (int i = 0; i < exposed_count; i++) {
-            insert_fact_1s(&rulr, "exposed_module", exposed_modules[i]);
-        }
-
-        /* Insert source_file(file) facts and extract file info from .elm files */
-        for (int i = 0; i < all_elm_files_count; i++) {
-            insert_fact_1s(&rulr, "source_file", all_elm_files[i]);
-            pkg_extract_file_facts(&rulr, all_elm_files[i], src_dir);
-        }
-
-        /* Insert package_file(file) facts for ALL files in the package */
-        for (int i = 0; i < all_pkg_files_count; i++) {
-            insert_fact_1s(&rulr, "package_file", all_pkg_files[i]);
-        }
-
-        /* Insert allowed_root_file facts for LICENSE, README.md, elm.json */
-        if (abs_license) {
-            insert_fact_1s(&rulr, "allowed_root_file", abs_license);
-        }
-        if (abs_readme) {
-            insert_fact_1s(&rulr, "allowed_root_file", abs_readme);
-        }
-        if (abs_elm_json) {
-            insert_fact_1s(&rulr, "allowed_root_file", abs_elm_json);
         }
 
         /* Evaluate the rules */
         err = rulr_evaluate(&rulr);
         if (err.is_error) {
             fprintf(stderr, "Error: Rule evaluation failed: %s\n", err.message);
-            rulr_deinit(&rulr);
             continue;
         }
 
@@ -1220,10 +1380,16 @@ int cmd_review_package(int argc, char *argv[]) {
         }
 
         printf("\n");
-        rulr_deinit(&rulr);
     }
 
-    /* Clean up realpath allocations */
+    /* Cleanup */
+    rulr_deinit(&rulr);
+    if (elm_json) {
+        elm_json_free(elm_json);
+    }
+    if (cache) {
+        cache_config_free(cache);
+    }
     if (abs_license) free(abs_license);
     if (abs_readme) free(abs_readme);
     if (abs_elm_json) free(abs_elm_json);

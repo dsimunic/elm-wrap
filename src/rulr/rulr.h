@@ -32,6 +32,12 @@ const char *rulr_lookup_symbol(const Rulr *r, int sym_id);
 RulrError rulr_load_program(Rulr *r, const char *source);
 RulrError rulr_evaluate(Rulr *r);
 
+/**
+ * Clear derived facts and rules, keeping only the base (injected) facts.
+ * This allows loading a new rule file and re-evaluating with the same facts.
+ */
+void rulr_clear_derived(Rulr *r);
+
 EngineRelationView rulr_get_relation(Rulr *r, const char *pred_name);
 
 #endif /* RULR_H */

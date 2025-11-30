@@ -108,6 +108,11 @@ RulrError rulr_evaluate(Rulr *r) {
     return from_engine_error(err);
 }
 
+void rulr_clear_derived(Rulr *r) {
+    if (!r) return;
+    engine_clear_derived_facts(r->engine);
+}
+
 EngineRelationView rulr_get_relation(Rulr *r, const char *pred_name) {
     EngineRelationView view;
     view.pred_id = -1;

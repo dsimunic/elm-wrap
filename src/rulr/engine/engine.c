@@ -101,8 +101,12 @@ static PredRuntime *engine_prepare_pred_runtime(Engine *e, PredId pid) {
     PredRuntime *pr = &e->preds[pid];
     if (pr->rel.base.items == NULL && pd->arity >= 0) {
         relation_init(pr, pd->arity);
-    } else if (pd->arity >= 0 && pr->arity != pd->arity) {
+    } else if (pd->arity >= 0 && pr->arity >= 0 && pr->arity != pd->arity) {
+        /* Arity mismatch - but if pr->arity is -1, we can reinitialize */
         return NULL;
+    } else if (pd->arity >= 0 && pr->arity < 0) {
+        /* Runtime was reset, reinitialize with new arity */
+        relation_init(pr, pd->arity);
     }
     pr->stratum = pd->stratum;
     return pr;
@@ -288,6 +292,47 @@ EngineError engine_load_rules_from_file(Engine *e, const char *path) {
         return err;
     }
     return engine_load_rules_from_string(e, buffer);
+}
+
+void engine_clear_derived_facts(Engine *e) {
+    if (!e) return;
+    
+    for (int i = 0; i < e->num_preds; ++i) {
+        PredDef *pd = &e->prog.pred_table.preds[i];
+        PredRuntime *pr = &e->preds[i];
+        
+        /* Clear delta and next buffers for all predicates */
+        tuple_buffer_clear(&pr->rel.delta);
+        tuple_buffer_clear(&pr->rel.next);
+        
+        /* Clear base facts only for IDB predicates (derived by rules) */
+        if (pd->is_idb) {
+            tuple_buffer_clear(&pr->rel.base);
+            hash_index_clear(&pr->idx_on_arg0);
+        }
+        
+        /* For pure IDB predicates with no base facts (like 'error'),
+         * reset the predicate definition so next rule can define it differently.
+         * Check if this predicate has NO base facts (purely rule-derived). */
+        if (pd->is_idb && pr->rel.base.size == 0) {
+            /* Reset predicate definition - allows redefinition with different arity */
+            pd->arity = -1;  /* Mark as undefined */
+            pd->declared = 0;
+            for (int j = 0; j < MAX_ARITY; ++j) {
+                pd->arg_types[j] = ARG_TYPE_UNKNOWN;
+            }
+            /* Also reset the runtime arity so prepare_pred_runtime works */
+            pr->arity = -1;
+        }
+        
+        /* Reset IDB flag and stratum info */
+        pd->is_idb = 0;
+        pd->stratum = 0;
+    }
+    
+    /* Reset program state */
+    e->prog.num_rules = 0;
+    e->prog.max_stratum = 0;
 }
 
 typedef struct {
