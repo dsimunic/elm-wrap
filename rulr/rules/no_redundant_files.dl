@@ -1,0 +1,36 @@
+.pred exposed_module(module: symbol).
+.pred file_module(file: symbol, module: symbol).
+.pred file_import(file: symbol, module: symbol).
+.pred source_file(file: symbol).
+.pred package_file(file: symbol).
+.pred allowed_root_file(file: symbol).
+
+.pred reachable_module(module: symbol).
+.pred reachable_file(file: symbol).
+.pred allowed_file(file: symbol).
+.pred redundant_file(file: symbol).
+.pred error(file: symbol).
+
+reachable_module(Module) :-
+    exposed_module(Module).
+
+reachable_module(Module) :-
+    reachable_file(File),
+    file_import(File, Module).
+
+reachable_file(File) :-
+    file_module(File, Module),
+    reachable_module(Module).
+
+allowed_file(File) :-
+    allowed_root_file(File).
+
+allowed_file(File) :-
+    reachable_file(File).
+
+redundant_file(File) :-
+    package_file(File),
+    not allowed_file(File).
+
+error(File) :-
+    redundant_file(File).

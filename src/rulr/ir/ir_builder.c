@@ -57,6 +57,7 @@ static EngineError add_predicate(
     pd->arity = arity;
     pd->declared = declared;
     pd->stratum = 0;
+    pd->is_idb = 0;  /* Will be set to 1 if any rule has this as head */
     for (int i = 0; i < MAX_ARITY; ++i) {
         pd->arg_types[i] = ARG_TYPE_UNKNOWN;
     }
@@ -222,6 +223,7 @@ static EngineError translate_rule(
         return err;
     }
     PredDef *head_pd = &pt->preds[head_id];
+    head_pd->is_idb = 1;  /* Mark as IDB since a rule derives it */
     if (head_pd->arity != rule->head_arity) {
         return make_error("Rule head arity mismatch");
     }

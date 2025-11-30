@@ -11,6 +11,7 @@ typedef struct {
     EngineArgType  arg_types[MAX_ARITY];
     int            declared;
     int            stratum;
+    int            is_idb;      /* 1 if this predicate appears as a rule head */
 } PredDef;
 
 typedef struct {

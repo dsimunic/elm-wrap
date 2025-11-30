@@ -491,9 +491,13 @@ static int evaluate_rule(Engine *e, const IrRule *rule) {
 
     const IrLiteral *driver = &rule->body[driver_idx];
     PredRuntime *driver_pr = &e->preds[driver->pred];
+    PredDef *driver_pd = &e->prog.pred_table.preds[driver->pred];
     int head_stratum = e->prog.pred_table.preds[rule->head_pred].stratum;
     TupleBuffer *driver_buf = &driver_pr->rel.delta;
-    if (driver_pr->stratum < head_stratum) {
+    /* Use base instead of delta for:
+     * - Lower stratum predicates (they're already fully computed)
+     * - EDB predicates (they have no rules deriving them, so delta gets empty after first iteration) */
+    if (driver_pr->stratum < head_stratum || !driver_pd->is_idb) {
         driver_buf = &driver_pr->rel.base;
     }
 

@@ -85,6 +85,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/code/code.c \
           $(SRCDIR)/commands/code/format.c \
           $(SRCDIR)/commands/review/review.c \
+          $(SRCDIR)/commands/review/reporter.c \
           $(SRCDIR)/commands/debug/debug.c \
           $(SRCDIR)/commands/debug/include_tree.c \
           $(SRCDIR)/import_tree.c \
@@ -141,6 +142,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/code.o \
           $(BUILDDIR)/format.o \
           $(BUILDDIR)/review.o \
+          $(BUILDDIR)/reporter.o \
           $(BUILDDIR)/debug.o \
           $(BUILDDIR)/include_tree.o \
           $(BUILDDIR)/import_tree.o \
@@ -304,8 +306,12 @@ $(BUILDDIR)/format.o: $(SRCDIR)/commands/code/format.c $(SRCDIR)/commands/code/c
 	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
 
 # Build review command object
-$(BUILDDIR)/review.o: $(SRCDIR)/commands/review/review.c $(SRCDIR)/commands/review/review.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/rulr/rulr.h | $(BUILDDIR)
+$(BUILDDIR)/review.o: $(SRCDIR)/commands/review/review.c $(SRCDIR)/commands/review/review.h $(SRCDIR)/commands/review/reporter.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/rulr/rulr.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -I$(SRCDIR)/rulr -c $< -o $@
+
+# Build reporter object for review command
+$(BUILDDIR)/reporter.o: $(SRCDIR)/commands/review/reporter.c $(SRCDIR)/commands/review/reporter.h $(SRCDIR)/alloc.h $(SRCDIR)/rulr/rulr.h $(SRCDIR)/rulr/runtime/runtime.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
 
 # Build debug command object
 $(BUILDDIR)/debug.o: $(SRCDIR)/commands/debug/debug.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
