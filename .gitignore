@@ -16,3 +16,4 @@ tools/docs-patches/
 .claude/settings.local.json
 CLAUDE.md
 .github/copilot-instructions.md
+rulr/doc/
