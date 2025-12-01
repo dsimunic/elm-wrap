@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 
 #include "alloc.h"
+#include "builtin_rules.h"
 #include "frontend/ast.h"
 #include "frontend/ast_serialize.h"
 
@@ -57,6 +58,38 @@ static int has_extension(const char *path, const char *ext) {
     size_t ext_len = strlen(ext);
     if (ext_len > path_len) return 0;
     return strcmp(path + path_len - ext_len, ext) == 0;
+}
+
+/**
+ * Check if a name contains a path separator (/ or \).
+ * Simple names without separators may be built-in rules.
+ */
+static int has_path_separator(const char *name) {
+    for (const char *p = name; *p; p++) {
+        if (*p == '/' || *p == '\\') {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/**
+ * Load a compiled rule from memory buffer.
+ */
+static RulrError load_compiled_from_memory(Rulr *r, const void *data, size_t size) {
+    if (!r || !data || size == 0) {
+        return rulr_error("Invalid input to load_compiled_from_memory");
+    }
+    
+    AstProgram ast;
+    ast_program_init(&ast);
+    
+    AstSerializeError serr = ast_deserialize_from_memory(data, size, &ast);
+    if (serr.is_error) {
+        return rulr_error(serr.message);
+    }
+    
+    return rulr_load_program_ast(r, &ast);
 }
 
 RulrError rulr_load_dl_file(Rulr *r, const char *path) {
@@ -122,6 +155,20 @@ RulrError rulr_load_rule_file(Rulr *r, const char *name) {
     }
     if (has_extension(name, RULR_COMPILED_EXT)) {
         return rulr_load_compiled_file(r, name);
+    }
+    
+    /*
+     * For simple names (no path separators), first check built-in rules.
+     * Built-in rules are pre-compiled .dlc files embedded in the binary.
+     */
+    if (!has_path_separator(name) && builtin_rules_available()) {
+        void *data = NULL;
+        size_t size = 0;
+        if (builtin_rules_extract(name, &data, &size)) {
+            RulrError err = load_compiled_from_memory(r, data, size);
+            arena_free(data);
+            return err;
+        }
     }
     
     /* Build paths with extensions */

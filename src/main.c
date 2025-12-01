@@ -2,6 +2,9 @@
 #include <string.h>
 #include <stdbool.h>
 #include <libgen.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include "buildinfo.h"
 #include "install.h"
 #include "make.h"
@@ -20,6 +23,11 @@
 #include "alloc.h"
 #include "log.h"
 #include "progname.h"
+#include "rulr/builtin_rules.h"
+
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 void print_usage(const char *prog) {
     printf("Usage: %s COMMAND [OPTIONS]\n", prog);
@@ -126,6 +134,38 @@ int main(int argc, char *argv[]) {
 
     // Set global program name (extract basename from path)
     program_name = basename(argv[0]);
+
+    /* 
+     * Initialize built-in rules subsystem.
+     * Get the full path to the executable to find the embedded zip archive.
+     */
+    {
+        char exe_path[PATH_MAX];
+        bool got_exe_path = false;
+        
+#ifdef __APPLE__
+        uint32_t size = sizeof(exe_path);
+        if (_NSGetExecutablePath(exe_path, &size) == 0) {
+            char *resolved = realpath(exe_path, NULL);
+            if (resolved) {
+                strncpy(exe_path, resolved, sizeof(exe_path) - 1);
+                exe_path[sizeof(exe_path) - 1] = '\0';
+                free(resolved);
+                got_exe_path = true;
+            }
+        }
+#elif defined(__linux__)
+        ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+        if (len > 0) {
+            exe_path[len] = '\0';
+            got_exe_path = true;
+        }
+#endif
+        
+        if (got_exe_path) {
+            builtin_rules_init(exe_path);
+        }
+    }
 
     // Parse global flags
     bool verbose = false;

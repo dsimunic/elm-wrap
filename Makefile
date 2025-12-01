@@ -46,6 +46,7 @@ RULR_SRCDIR = $(SRCDIR)/rulr
 RULR_LIB = $(BINDIR)/librulr.a
 RULR_SOURCES = $(RULR_SRCDIR)/rulr.c \
                $(RULR_SRCDIR)/rulr_dl.c \
+               $(RULR_SRCDIR)/builtin_rules.c \
                $(RULR_SRCDIR)/host_helpers.c \
                $(RULR_SRCDIR)/frontend/lexer.c \
                $(RULR_SRCDIR)/frontend/parser.c \
@@ -58,6 +59,11 @@ RULR_DRIVER = $(BINDIR)/rulr-demo
 RULR_DRIVER_SRC = $(RULR_SRCDIR)/driver_main.c
 RULR_DRIVER_OBJ = $(BUILDDIR)/rulr/driver_main.o
 RULR_CFLAGS = $(CFLAGS) -Isrc -Isrc/rulr
+
+# Built-in rules
+BUILTIN_RULES_DIR = rulr/rules
+BUILTIN_RULES_ZIP = $(BUILDDIR)/builtin_rules.zip
+BUILTIN_RULES_DLC = $(BUILDDIR)/builtin_rules
 
 # Rulr compiler (rulrc)
 RULRC = $(BINDIR)/rulrc
@@ -205,11 +211,32 @@ BINDIR_INSTALL = $(PREFIX)/bin
 USER_PREFIX = $(HOME)/.local
 USER_BINDIR = $(USER_PREFIX)/bin
 
-.PHONY: all clean pg_core_test pg_file_test test check dist distcheck install install-user uninstall uninstall-user rulrc
+.PHONY: all clean pg_core_test pg_file_test test check dist distcheck install install-user uninstall uninstall-user rulrc compile-builtin-rules
 
-all: $(TARGET)
+all: $(TARGET) append-builtin-rules
 
 rulrc: $(RULRC)
+
+# Compile all .dl files in rulr/rules to .dlc format
+compile-builtin-rules: $(RULRC)
+	@echo "Compiling built-in rules..."
+	@mkdir -p $(BUILTIN_RULES_DLC)
+	@for f in $(BUILTIN_RULES_DIR)/*.dl; do \
+		if [ -f "$$f" ]; then \
+			base=$$(basename "$$f" .dl); \
+			$(RULRC) compile "$$f" -o $(BUILTIN_RULES_DLC)/"$$base".dlc; \
+		fi; \
+	done
+
+# Create zip file from compiled rules and append to binary
+append-builtin-rules: $(TARGET) compile-builtin-rules
+	@echo "Creating built-in rules archive..."
+	@rm -f $(BUILTIN_RULES_ZIP)
+	@cd $(BUILTIN_RULES_DLC) && zip -q ../builtin_rules.zip *.dlc 2>/dev/null || true
+	@if [ -f $(BUILTIN_RULES_ZIP) ]; then \
+		echo "Appending rules to binary..."; \
+		cat $(BUILTIN_RULES_ZIP) >> $(TARGET); \
+	fi
 
 # Generate buildinfo.c before compiling
 $(BUILDINFO_SRC): buildinfo.mk $(VERSION_FILE)

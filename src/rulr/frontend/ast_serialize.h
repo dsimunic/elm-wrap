@@ -54,6 +54,20 @@ AstSerializeError ast_serialize_to_file(const AstProgram *prog, const char *path
 AstSerializeError ast_deserialize_from_file(const char *path, AstProgram *prog);
 
 /**
+ * Deserialize AST from a memory buffer.
+ * This is an alias for ast_deserialize for API consistency.
+ *
+ * @param data The compressed binary data
+ * @param size Size of the input data
+ * @param prog Pointer to AstProgram to populate (must be initialized)
+ * @return Error structure indicating success or failure
+ */
+static inline AstSerializeError ast_deserialize_from_memory(
+    const void *data, size_t size, AstProgram *prog) {
+    return ast_deserialize((const unsigned char *)data, size, prog);
+}
+
+/**
  * Pretty-print an AstProgram to stdout in canonical format.
  *
  * @param prog The AST program to print
