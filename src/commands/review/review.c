@@ -61,13 +61,14 @@ static void print_file_usage(void) {
     printf("\n");
     printf("Options:\n");
     printf("  --config <PATH>    Path to elm.json (default: auto-detect in parent dirs)\n");
-    printf("  --rule <PATH>      Path to a rulr rule file (.dl) - can be repeated\n");
+    printf("  --rule <NAME>      Rule name or path (without extension) - can be repeated\n");
+    printf("                     Tries .dlc (compiled) first, falls back to .dl (source)\n");
     printf("  -q, --quiet        Quiet mode: no output, exit 100 on first error, 0 if OK\n");
     printf("  -h, --help         Show this help message\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s review file src/Main.elm --rule rules/no-debug.dl\n", program_name);
-    printf("  %s review file src/Main.elm --config elm.json --rule a.dl --rule b.dl\n", program_name);
+    printf("  %s review file src/Main.elm --rule rules/no-debug\n", program_name);
+    printf("  %s review file src/Main.elm --config elm.json --rule a --rule b\n", program_name);
     printf("\n");
     printf("Host-generated facts available in rules:\n");
     printf("  module(name)                   - Module name\n");
@@ -97,12 +98,13 @@ static void print_package_usage(void) {
     printf("  <PATH>             Path to package directory (must contain elm.json, src/)\n");
     printf("\n");
     printf("Options:\n");
-    printf("  --rule <PATH>      Path to a rulr rule file (.dl) - can be repeated\n");
+    printf("  --rule <NAME>      Rule name or path (without extension) - can be repeated\n");
+    printf("                     Tries .dlc (compiled) first, falls back to .dl (source)\n");
     printf("  -q, --quiet        Quiet mode: no output, exit 100 on first error, 0 if OK\n");
     printf("  -h, --help         Show this help message\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s review package /path/to/package --rule rules/no_redundant_files.dl\n", program_name);
+    printf("  %s review package /path/to/package --rule rules/no_redundant_files\n", program_name);
     printf("\n");
     printf("Host-generated facts available in rules:\n");
     printf("  exposed_module(module)         - Modules from exposed-modules in elm.json\n");
@@ -758,8 +760,8 @@ int cmd_review_file(int argc, char *argv[]) {
             continue;
         }
 
-        /* Load the rule file */
-        err = rulr_load_dl_file(&rulr, rule_path);
+        /* Load the rule file (tries compiled .dlc first, then source .dl) */
+        err = rulr_load_rule_file(&rulr, rule_path);
         if (err.is_error) {
             if (!quiet_mode) {
                 fprintf(stderr, "Error: Failed to load rule file: %s\n", err.message);
@@ -1398,8 +1400,8 @@ int cmd_review_package(int argc, char *argv[]) {
             printf("=== Rule file: %s ===\n", rule_path);
         }
 
-        /* Load the rule file */
-        err = rulr_load_dl_file(&rulr, rule_path);
+        /* Load the rule file (tries compiled .dlc first, then source .dl) */
+        err = rulr_load_rule_file(&rulr, rule_path);
         if (err.is_error) {
             if (!quiet_mode) {
                 fprintf(stderr, "Error: Failed to load rule file: %s\n", err.message);

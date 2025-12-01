@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include "common/types.h"
+#include "frontend/ast.h"
 
 typedef struct Engine Engine;
 
@@ -40,6 +41,11 @@ int engine_insert_fact(Engine *e, int pred_id, int arity, const Value *values);
 
 EngineError engine_load_rules_from_string(Engine *e, const char *source);
 EngineError engine_load_rules_from_file(Engine *e, const char *path);
+
+/**
+ * Load rules from a pre-parsed AST (used for compiled rule files).
+ */
+EngineError engine_load_rules_from_ast(Engine *e, const AstProgram *ast);
 
 /**
  * Clear all derived (IDB) facts from the engine while keeping base (EDB) facts.

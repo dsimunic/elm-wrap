@@ -255,6 +255,35 @@ static EngineError insert_ast_facts(Engine *e, const AstProgram *ast) {
     return engine_ok();
 }
 
+EngineError engine_load_rules_from_ast(Engine *e, const AstProgram *ast) {
+    if (!e || !ast) {
+        return engine_err("Invalid engine or AST");
+    }
+
+    /* Copy current program state - rules will be accumulated, not replaced */
+    IrProgram new_prog = e->prog;
+    new_prog.max_stratum = 0;
+    new_prog.clear_derived_requested = 0;
+
+    EngineError err = ir_build_from_ast(ast, &new_prog, e->intern, e->sym_user);
+    if (err.is_error) {
+        return err;
+    }
+
+    /* If .clear_derived() directive was found, clear derived facts before loading new rules */
+    if (new_prog.clear_derived_requested) {
+        engine_clear_derived_facts(e);
+    }
+
+    e->prog = new_prog;
+    EngineError sync_err = sync_runtime(e);
+    if (sync_err.is_error) {
+        return sync_err;
+    }
+
+    return insert_ast_facts(e, ast);
+}
+
 EngineError engine_load_rules_from_string(Engine *e, const char *source) {
     if (!e || !source) {
         return engine_err("Invalid engine or source");

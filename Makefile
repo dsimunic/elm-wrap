@@ -48,6 +48,7 @@ RULR_SOURCES = $(RULR_SRCDIR)/rulr.c \
                $(RULR_SRCDIR)/rulr_dl.c \
                $(RULR_SRCDIR)/frontend/lexer.c \
                $(RULR_SRCDIR)/frontend/parser.c \
+               $(RULR_SRCDIR)/frontend/ast_serialize.c \
                $(RULR_SRCDIR)/ir/ir_builder.c \
                $(RULR_SRCDIR)/runtime/runtime.c \
                $(RULR_SRCDIR)/engine/engine.c
@@ -61,8 +62,6 @@ RULR_CFLAGS = $(CFLAGS) -Isrc -Isrc/rulr
 RULRC = $(BINDIR)/rulrc
 RULRC_SRC = $(RULR_SRCDIR)/rulrc_main.c
 RULRC_OBJ = $(BUILDDIR)/rulr/rulrc_main.o
-RULR_AST_SERIALIZE_SRC = $(RULR_SRCDIR)/frontend/ast_serialize.c
-RULR_AST_SERIALIZE_OBJ = $(BUILDDIR)/rulr/frontend/ast_serialize.o
 
 # Files
 TARGET_FILE = elm-wrap
@@ -463,20 +462,16 @@ $(RULR_LIB): $(RULR_OBJECTS) | $(BINDIR)
 	$(AR) rcs $@ $(RULR_OBJECTS)
 
 # Build rulr demo driver (optional helper for development)
-$(RULR_DRIVER): $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o | $(BINDIR)
-	$(CC) $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o -o $@
+$(RULR_DRIVER): $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o | $(BINDIR)
+	$(CC) $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o -o $@
 
 # Build rulrc compiler
-$(RULR_AST_SERIALIZE_OBJ): $(RULR_AST_SERIALIZE_SRC) | $(BUILDDIR)
-	@mkdir -p $(dir $@)
-	$(CC) $(RULR_CFLAGS) -c $< -o $@
-
 $(RULRC_OBJ): $(RULRC_SRC) | $(BUILDDIR)
 	@mkdir -p $(dir $@)
 	$(CC) $(RULR_CFLAGS) -c $< -o $@
 
-$(RULRC): $(RULRC_OBJ) $(RULR_AST_SERIALIZE_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o | $(BINDIR)
-	$(CC) $(RULRC_OBJ) $(RULR_AST_SERIALIZE_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o -o $@
+$(RULRC): $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o | $(BINDIR)
+	$(CC) $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o -o $@
 
 # Link final binary
 $(TARGET): $(OBJECTS) $(RULR_LIB) | $(BINDIR)

@@ -7,9 +7,10 @@
 #include "runtime/runtime.h"
 
 static void print_usage(const char *prog) {
-    printf("Usage: %s --rules <rules.dl> [--facts <facts.dl>]\n", prog);
+    printf("Usage: %s --rules <rules> [--facts <facts.dl>]\n", prog);
     printf("\nOptions:\n");
-    printf("  --rules, -r        Path to rule file (.dl)\n");
+    printf("  --rules, -r        Rule name or path (without extension)\n");
+    printf("                     Tries .dlc (compiled) first, then .dl (source)\n");
     printf("  --facts, -f        Path to fact file (.dl)\n");
     printf("  -h, --help         Show this help message\n");
     printf("\nIf only one positional argument is provided, it is treated as the rule file.\n");
@@ -100,12 +101,24 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    err = rulr_load_dl_files(&rulr, rule_path, fact_path);
+    /* Load rule file (tries .dlc first, then .dl) */
+    err = rulr_load_rule_file(&rulr, rule_path);
     if (err.is_error) {
-        fprintf(stderr, "Failed to load program: %s\n", err.message);
+        fprintf(stderr, "Failed to load rules: %s\n", err.message);
         rulr_deinit(&rulr);
         alloc_shutdown();
         return 1;
+    }
+
+    /* Load facts file if provided (always .dl format) */
+    if (fact_path) {
+        err = rulr_load_dl_file(&rulr, fact_path);
+        if (err.is_error) {
+            fprintf(stderr, "Failed to load facts: %s\n", err.message);
+            rulr_deinit(&rulr);
+            alloc_shutdown();
+            return 1;
+        }
     }
 
     err = rulr_evaluate(&rulr);

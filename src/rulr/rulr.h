@@ -3,6 +3,7 @@
 
 #include "engine/engine.h"
 #include "runtime/runtime.h"
+#include "frontend/ast.h"
 
 typedef struct {
     char **names;
@@ -31,6 +32,11 @@ const char *rulr_lookup_symbol(const Rulr *r, int sym_id);
 
 RulrError rulr_load_program(Rulr *r, const char *source);
 RulrError rulr_evaluate(Rulr *r);
+
+/**
+ * Load rules from a pre-parsed AST (used for compiled rule files).
+ */
+RulrError rulr_load_program_ast(Rulr *r, const AstProgram *ast);
 
 /**
  * Clear derived facts and rules, keeping only the base (injected) facts.

@@ -100,6 +100,14 @@ RulrError rulr_load_program(Rulr *r, const char *source) {
     return from_engine_error(err);
 }
 
+RulrError rulr_load_program_ast(Rulr *r, const AstProgram *ast) {
+    if (!r || !ast) {
+        return rulr_error("Invalid input to rulr_load_program_ast");
+    }
+    EngineError err = engine_load_rules_from_ast(r->engine, ast);
+    return from_engine_error(err);
+}
+
 RulrError rulr_evaluate(Rulr *r) {
     if (!r) {
         return rulr_error("Invalid Rulr pointer");

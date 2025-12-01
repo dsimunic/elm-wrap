@@ -41,8 +41,9 @@ static void print_usage(void) {
     printf("Options:\n");
     printf("  -h, --help         Show this help message\n");
     printf("\n");
-    printf("This command uses Datalog rules (core_package_files.dl, publish_files.dl)\n");
+    printf("This command uses Datalog rules (core_package_files, publish_files)\n");
     printf("to determine which files are part of the package and should be published.\n");
+    printf("Compiled rules (.dlc) are preferred over source rules (.dl) if available.\n");
 }
 
 /* ============================================================================
@@ -439,15 +440,16 @@ int cmd_package_publish(int argc, char *argv[]) {
         insert_fact_1s(&rulr, "allowed_root_file", abs_elm_json);
     }
 
-    /* Load rule files: use separate rule files that share derived predicates */
+    /* Load rule files: use separate rule files that share derived predicates.
+     * Uses rulr_load_rule_file which tries .dlc first, then .dl */
     const char *rule_paths[] = {
-        "rulr/rules/core_package_files.dl",
-        "rulr/rules/publish_files.dl",
+        "rulr/rules/core_package_files",
+        "rulr/rules/publish_files",
         NULL
     };
 
     for (int i = 0; rule_paths[i] != NULL; i++) {
-        err = rulr_load_dl_file(&rulr, rule_paths[i]);
+        err = rulr_load_rule_file(&rulr, rule_paths[i]);
         if (err.is_error) {
             fprintf(stderr, "Error: Failed to load rule file '%s': %s\n", rule_paths[i], err.message);
             rulr_deinit(&rulr);
