@@ -1,0 +1,75 @@
+% Input predicates (populated by the review tool)
+.pred package_file_info(abs: symbol, rel: symbol, name: symbol).
+.pred exposed_module(module: symbol).
+.pred project_type(type: symbol).
+.pred package_name(name: symbol).
+
+% Derived predicates for validation
+.pred has_license_file().
+.pred has_elm_json_file().
+.pred has_readme_file().
+.pred has_src_folder().
+.pred has_elm_source_file().
+.pred has_exposed_module().
+.pred has_valid_name().
+.pred is_package_type().
+
+% Single error predicate with message
+.pred error(msg: symbol).
+
+% Check for required files
+has_license_file() :-
+    package_file_info(_, "LICENSE", _).
+
+has_elm_json_file() :-
+    package_file_info(_, "elm.json", _).
+
+has_readme_file() :-
+    package_file_info(_, "README.md", _).
+
+% Check for src/ folder (any file starting with "src/")
+has_src_folder() :-
+    package_file_info(_, Rel, _),
+    match("^src/", Rel).
+
+% Check for .elm files anywhere in src/
+has_elm_source_file() :-
+    package_file_info(_, Rel, _),
+    match("^src/.*\\.elm$", Rel).
+
+% Check elm.json properties
+has_exposed_module() :-
+    exposed_module(_).
+
+has_valid_name() :-
+    package_name(Name),
+    Name != "".
+
+is_package_type() :-
+    project_type("package").
+
+% Generate error messages
+error("Missing LICENSE file") :-
+    not has_license_file().
+
+error("Missing elm.json file") :-
+    not has_elm_json_file().
+
+error("Missing README.md file") :-
+    not has_readme_file().
+
+error("Missing src/ folder") :-
+    not has_src_folder().
+
+error("No .elm files found in src/ folder") :-
+    has_src_folder(),
+    not has_elm_source_file().
+
+error("No exposed modules in elm.json") :-
+    not has_exposed_module().
+
+error("Missing or empty 'name' in elm.json") :-
+    not has_valid_name().
+
+error("elm.json 'type' must be 'package'") :-
+    not is_package_type().

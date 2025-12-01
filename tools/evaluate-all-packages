@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+#
+# evaluate-all-packages - Run review rules against all packages in the repository
+#
+# This script iterates over all packages (like validate-docs) and runs
+# `review package` with no_unused_dependencies and no_redundant_files rules.
+#
+
+set -euo pipefail
+
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ELM_WRAP_BIN="$PROJECT_ROOT/bin/elm-wrap"
+
+# Default paths
+DEFAULT_REPOSITORY_DIR="/Volumes/Devel/var/elm-wrap/package_repository/0.19.1/packages"
+
+# Rule files
+RULES_DIR="$PROJECT_ROOT/rulr/rules"
+RULE_NO_UNUSED_DEPS="$RULES_DIR/no_unused_dependencies.dl"
+RULE_NO_REDUNDANT_FILES="$RULES_DIR/no_redundant_files.dl"
+
+# Usage message
+usage() {
+    echo "Usage: $(basename "$0") [<repository-path>]"
+    echo ""
+    echo "Runs review rules (no_unused_dependencies, no_redundant_files) against"
+    echo "all packages in the repository and reports failures."
+    echo ""
+    echo "Default repository: $DEFAULT_REPOSITORY_DIR"
+    exit 1
+}
+
+# Parse arguments
+if [ $# -eq 0 ]; then
+    REPOSITORY_DIR="$DEFAULT_REPOSITORY_DIR"
+elif [ $# -eq 1 ]; then
+    REPOSITORY_DIR="$1"
+else
+    usage
+fi
+
+# Check if repository directory exists
+if [ ! -d "$REPOSITORY_DIR" ]; then
+    echo "Error: Repository directory not found at $REPOSITORY_DIR" >&2
+    exit 1
+fi
+
+# Check if elm-wrap binary exists
+if [ ! -x "$ELM_WRAP_BIN" ]; then
+    echo "Error: elm-wrap binary not found at $ELM_WRAP_BIN" >&2
+    exit 1
+fi
+
+# Check if rule files exist
+if [ ! -f "$RULE_NO_UNUSED_DEPS" ]; then
+    echo "Error: Rule file not found at $RULE_NO_UNUSED_DEPS" >&2
+    exit 1
+fi
+
+if [ ! -f "$RULE_NO_REDUNDANT_FILES" ]; then
+    echo "Error: Rule file not found at $RULE_NO_REDUNDANT_FILES" >&2
+    exit 1
+fi
+
+# Convert to absolute path
+REPOSITORY_DIR="$(cd "$REPOSITORY_DIR" && pwd)"
+
+# Initialize counters
+TOTAL_COUNT=0
+PASS_COUNT=0
+FAIL_COUNT=0
+SKIP_COUNT=0
+
+# Track timing
+START_TIME=$(date +%s)
+TOTAL_RULE_TIME_MS=0
+
+# Check if we have millisecond precision available
+# macOS date doesn't support %N, so we need to check if gdate is available
+get_time_ms() {
+    if command -v gdate >/dev/null 2>&1; then
+        gdate +%s%3N
+    else
+        # Fallback: use seconds * 1000
+        echo "$(($(date +%s) * 1000))"
+    fi
+}
+
+echo "Evaluating packages with review rules"
+echo "Repository: $REPOSITORY_DIR"
+echo "Rules:"
+echo "  - $RULE_NO_UNUSED_DEPS"
+echo "  - $RULE_NO_REDUNDANT_FILES"
+echo ""
+
+# Find all elm.json files and process each package
+while IFS= read -r -d '' elm_json_path; do
+    package_dir="$(dirname "$elm_json_path")"
+    
+    # Skip if no src directory
+    if [ ! -d "$package_dir/src" ]; then
+        SKIP_COUNT=$((SKIP_COUNT + 1))
+        continue
+    fi
+    
+    TOTAL_COUNT=$((TOTAL_COUNT + 1))
+    
+    # Calculate relative path for display
+    relative_path="${package_dir#"$REPOSITORY_DIR/"}"
+    
+    # Time the rule execution
+    pkg_start_time=$(get_time_ms)
+    
+    # Run each rule separately to identify which one fails
+    failed_rules=""
+    
+    # Check no_unused_dependencies rule
+    "$ELM_WRAP_BIN" review package "$package_dir" \
+        --rule "$RULE_NO_UNUSED_DEPS" \
+        -q >/dev/null 2>&1 || failed_rules="no_unused_dependencies"
+    
+    # Check no_redundant_files rule
+    "$ELM_WRAP_BIN" review package "$package_dir" \
+        --rule "$RULE_NO_REDUNDANT_FILES" \
+        -q >/dev/null 2>&1 || {
+            if [ -n "$failed_rules" ]; then
+                failed_rules="$failed_rules, no_redundant_files"
+            else
+                failed_rules="no_redundant_files"
+            fi
+        }
+    
+    pkg_end_time=$(get_time_ms)
+    
+    # Calculate elapsed time in milliseconds
+    pkg_elapsed_ms=$((pkg_end_time - pkg_start_time))
+    TOTAL_RULE_TIME_MS=$((TOTAL_RULE_TIME_MS + pkg_elapsed_ms))
+    
+    if [ -z "$failed_rules" ]; then
+        PASS_COUNT=$((PASS_COUNT + 1))
+    else
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        echo "[fails rule check] $relative_path (failed rule: $failed_rules)"
+    fi
+done < <(find "$REPOSITORY_DIR" -name "elm.json" -type f -print0 | sort -z)
+
+END_TIME=$(date +%s)
+TOTAL_DURATION=$((END_TIME - START_TIME))
+
+# Calculate average time per package
+if [ "$TOTAL_COUNT" -gt 0 ]; then
+    AVG_TIME_MS=$((TOTAL_RULE_TIME_MS / TOTAL_COUNT))
+    # Use awk for floating point division
+    AVG_TIME_S=$(awk "BEGIN {printf \"%.3f\", $AVG_TIME_MS / 1000}")
+else
+    AVG_TIME_MS=0
+    AVG_TIME_S="0.000"
+fi
+
+echo ""
+echo "=== Summary ==="
+echo "Total packages processed: $TOTAL_COUNT"
+echo "Passed: $PASS_COUNT"
+echo "Failed: $FAIL_COUNT"
+if [ "$SKIP_COUNT" -gt 0 ]; then
+    echo "Skipped (no src/): $SKIP_COUNT"
+fi
+echo ""
+echo "Total time: ${TOTAL_DURATION}s"
+echo "Total rule evaluation time: ${TOTAL_RULE_TIME_MS}ms"
+echo "Average time per package: ${AVG_TIME_MS}ms (~${AVG_TIME_S}s)"
+
+# Exit with failure if any packages failed
+if [ "$FAIL_COUNT" -gt 0 ]; then
+    exit 1
+else
+    exit 0
+fi

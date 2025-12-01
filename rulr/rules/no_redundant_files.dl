@@ -3,11 +3,15 @@
 .pred file_import(file: symbol, module: symbol).
 .pred source_file(file: symbol).
 .pred package_file(file: symbol).
+.pred package_file_rel(path: symbol).
+.pred package_file_name(name: symbol).
+.pred package_file_info(abs: symbol, rel: symbol, name: symbol).
 .pred allowed_root_file(file: symbol).
 
 .pred reachable_module(module: symbol).
 .pred reachable_file(file: symbol).
 .pred allowed_file(file: symbol).
+.pred allowed_filename(name: symbol).
 .pred redundant_file(file: symbol).
 .pred error(file: symbol).
 
@@ -27,6 +31,14 @@ allowed_file(File) :-
 
 allowed_file(File) :-
     reachable_file(File).
+
+% Allow files by filename (anywhere in package)
+allowed_filename("docs.json").
+allowed_filename("endpoint.json").
+
+allowed_file(File) :-
+    package_file_info(File, _, Name),
+    allowed_filename(Name).
 
 redundant_file(File) :-
     package_file(File),
