@@ -17,3 +17,4 @@ tools/docs-patches/
 CLAUDE.md
 .github/copilot-instructions.md
 rulr/doc/
+*.dlc

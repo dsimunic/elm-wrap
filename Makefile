@@ -57,6 +57,13 @@ RULR_DRIVER_SRC = $(RULR_SRCDIR)/driver_main.c
 RULR_DRIVER_OBJ = $(BUILDDIR)/rulr/driver_main.o
 RULR_CFLAGS = $(CFLAGS) -Isrc -Isrc/rulr
 
+# Rulr compiler (rulrc)
+RULRC = $(BINDIR)/rulrc
+RULRC_SRC = $(RULR_SRCDIR)/rulrc_main.c
+RULRC_OBJ = $(BUILDDIR)/rulr/rulrc_main.o
+RULR_AST_SERIALIZE_SRC = $(RULR_SRCDIR)/frontend/ast_serialize.c
+RULR_AST_SERIALIZE_OBJ = $(BUILDDIR)/rulr/frontend/ast_serialize.o
+
 # Files
 TARGET_FILE = elm-wrap
 SOURCES = $(SRCDIR)/main.c \
@@ -192,9 +199,11 @@ BINDIR_INSTALL = $(PREFIX)/bin
 USER_PREFIX = $(HOME)/.local
 USER_BINDIR = $(USER_PREFIX)/bin
 
-.PHONY: all clean pg_core_test pg_file_test test check dist distcheck install install-user uninstall uninstall-user
+.PHONY: all clean pg_core_test pg_file_test test check dist distcheck install install-user uninstall uninstall-user rulrc
 
 all: $(TARGET)
+
+rulrc: $(RULRC)
 
 # Generate buildinfo.c before compiling
 $(BUILDINFO_SRC): buildinfo.mk $(VERSION_FILE)
@@ -456,6 +465,18 @@ $(RULR_LIB): $(RULR_OBJECTS) | $(BINDIR)
 # Build rulr demo driver (optional helper for development)
 $(RULR_DRIVER): $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o | $(BINDIR)
 	$(CC) $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o -o $@
+
+# Build rulrc compiler
+$(RULR_AST_SERIALIZE_OBJ): $(RULR_AST_SERIALIZE_SRC) | $(BUILDDIR)
+	@mkdir -p $(dir $@)
+	$(CC) $(RULR_CFLAGS) -c $< -o $@
+
+$(RULRC_OBJ): $(RULRC_SRC) | $(BUILDDIR)
+	@mkdir -p $(dir $@)
+	$(CC) $(RULR_CFLAGS) -c $< -o $@
+
+$(RULRC): $(RULRC_OBJ) $(RULR_AST_SERIALIZE_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o | $(BINDIR)
+	$(CC) $(RULRC_OBJ) $(RULR_AST_SERIALIZE_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o -o $@
 
 # Link final binary
 $(TARGET): $(OBJECTS) $(RULR_LIB) | $(BINDIR)
