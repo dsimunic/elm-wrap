@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 
 /* Package operations */
 Package* package_create(const char *author, const char *name, const char *version) {
@@ -134,7 +135,20 @@ void package_map_print(PackageMap *map) {
 ElmJson* elm_json_read(const char *filepath) {
     FILE *file = fopen(filepath, "rb");
     if (!file) {
-        log_debug("Could not open %s", filepath);
+        // In verbose mode, show both the path and the resolved absolute path
+        char *abs_path = realpath(filepath, NULL);
+        if (abs_path) {
+            log_debug("Could not open '%s' (resolved: %s)", filepath, abs_path);
+            free(abs_path);
+        } else {
+            // realpath failed, show cwd for context
+            char cwd[1024];
+            if (getcwd(cwd, sizeof(cwd))) {
+                log_debug("Could not open '%s' (cwd: %s)", filepath, cwd);
+            } else {
+                log_debug("Could not open '%s'", filepath);
+            }
+        }
         return NULL;
     }
     
