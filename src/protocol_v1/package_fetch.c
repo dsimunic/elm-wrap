@@ -13,6 +13,11 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <limits.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 /* ========================================================================
  * Progress Callback State
@@ -398,8 +403,7 @@ char* fetch_package_archive(InstallEnv *env, const char *author,
     log_progress("  Expected SHA-1: %s", endpoint->hash);
 
     /* Create unique temporary file for download */
-    //REVIEW: Magic number. Shouldn't this be PATH_MAX?
-    char temp_template[256];
+    char temp_template[PATH_MAX];
     snprintf(temp_template, sizeof(temp_template),
              "%s/elm-package-XXXXXX.zip", env->cache->elm_home);
 

@@ -63,8 +63,7 @@ bool extract_zip(const char *zip_path, const char *dest_dir) {
             break;
         }
 
-        //REVIEW: magic number.
-        char output_path[4096];
+        char output_path[PATH_MAX];
         snprintf(output_path, sizeof(output_path), "%s/%s", dest_dir, file_stat.m_filename);
 
         if (mz_zip_reader_is_file_a_directory(&zip, i)) {
@@ -150,8 +149,7 @@ bool extract_zip_selective(const char *zip_path, const char *dest_dir) {
         const char *base = strchr(file_stat.m_filename, '/');
         const char *rel_path = base ? base + 1 : file_stat.m_filename;
 
-        //REVIEW: magic number.
-        char output_path[4096];
+        char output_path[PATH_MAX];
         snprintf(output_path, sizeof(output_path), "%s/%s", dest_dir, rel_path);
 
         if (mz_zip_reader_is_file_a_directory(&zip, i)) {
@@ -209,8 +207,7 @@ char* find_first_subdirectory(const char *dir_path) {
             continue;
         }
 
-        //REVIEW: magic number.
-        char full_path[4096];
+        char full_path[PATH_MAX];
         snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, entry->d_name);
 
         struct stat st;
@@ -288,9 +285,8 @@ bool move_directory_contents(const char *src_dir, const char *dest_dir) {
             continue;
         }
 
-        //REVIEW: magic number.
-        char src_path[4096];
-        char dest_path[4096];
+        char src_path[PATH_MAX];
+        char dest_path[PATH_MAX];
         snprintf(src_path, sizeof(src_path), "%s/%s", src_dir, entry->d_name);
         snprintf(dest_path, sizeof(dest_path), "%s/%s", dest_dir, entry->d_name);
 
@@ -402,9 +398,8 @@ bool copy_directory_recursive(const char *src_path, const char *dest_path) {
             continue;
         }
 
-        //REVIEW: magic number.
-        char src_entry[4096];
-        char dest_entry[4096];
+        char src_entry[PATH_MAX];
+        char dest_entry[PATH_MAX];
         snprintf(src_entry, sizeof(src_entry), "%s/%s", src_path, entry->d_name);
         snprintf(dest_entry, sizeof(dest_entry), "%s/%s", dest_path, entry->d_name);
 

@@ -11,6 +11,14 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <ctype.h>
+#include <limits.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
+/* Maximum URL length - should be sufficient for registry URLs */
+#define URL_MAX 512
 
 #define DEFAULT_REGISTRY_URL "https://package.elm-lang.org"
 
@@ -196,8 +204,7 @@ bool install_env_init(InstallEnv *env) {
         env->known_version_count = 0;
     }
 
-    //REVIEW: magic number.
-    char health_check_url[512];
+    char health_check_url[URL_MAX];
     snprintf(health_check_url, sizeof(health_check_url), "%s/all-packages", env->registry_url);
 
     log_progress("Testing connectivity to %s...", env->registry_url);
@@ -234,8 +241,7 @@ bool install_env_init(InstallEnv *env) {
 bool install_env_fetch_registry(InstallEnv *env) {
     if (!env || !env->curl_session || !env->registry_url) return false;
 
-    //REVIEW: magic number.
-    char url[512];
+    char url[URL_MAX];
     snprintf(url, sizeof(url), "%s/all-packages", env->registry_url);
 
     printf("Fetching package registry from %s...\n", url);
@@ -285,8 +291,7 @@ bool install_env_fetch_registry(InstallEnv *env) {
 bool install_env_update_registry(InstallEnv *env) {
     if (!env || !env->curl_session || !env->registry_url) return false;
 
-    //REVIEW: magic number.
-    char url[512];
+    char url[URL_MAX];
     snprintf(url, sizeof(url), "%s/all-packages/since/%zu",
              env->registry_url, env->known_version_count);
 

@@ -18,6 +18,11 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <limits.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 #include <unistd.h>
 
 #define ELM_JSON_PATH "elm.json"
@@ -276,8 +281,7 @@ static bool install_from_file(const char *source_path, InstallEnv *env, const ch
     //   1. A direct package directory (elm.json at root)
     //   2. An extracted zip with package in subdirectory
     // We handle both cases by checking for elm.json location
-    //REVIEW: magic number.
-    char elm_json_check[4096];
+    char elm_json_check[PATH_MAX];
     snprintf(elm_json_check, sizeof(elm_json_check), "%s/elm.json", source_path);
 
     bool result;
@@ -305,8 +309,7 @@ static bool install_from_file(const char *source_path, InstallEnv *env, const ch
         return false;
     }
 
-    //REVIEW: magic number.
-    char src_path[4096];
+    char src_path[PATH_MAX];
     snprintf(src_path, sizeof(src_path), "%s/src", dest_path);
     if (stat(src_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
         fprintf(stderr, "Error: Package installation failed - no src directory found at %s\n", src_path);

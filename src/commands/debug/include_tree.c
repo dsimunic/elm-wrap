@@ -12,6 +12,11 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <ctype.h>
+#include <limits.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 /* Forward declarations */
 static int print_file_include_tree(const char *file_path);
@@ -318,8 +323,7 @@ static int print_package_include_tree(const char *dir_path) {
     char *clean_dir_path = strip_trailing_slash(dir_path);
     
     /* Check for elm.json */
-    //REVIEW: magic number.
-    char elm_json_path[2048];
+    char elm_json_path[PATH_MAX];
     snprintf(elm_json_path, sizeof(elm_json_path), "%s/elm.json", clean_dir_path);
 
     if (!file_exists(elm_json_path)) {
@@ -340,8 +344,7 @@ static int print_package_include_tree(const char *dir_path) {
     char **source_dirs = parse_source_directories(elm_json_path, &source_dir_count);
     
     /* Default to src if no source directories specified */
-    //REVIEW: magic number.
-    char src_dir[2048];
+    char src_dir[PATH_MAX];
     if (source_dir_count > 0) {
         snprintf(src_dir, sizeof(src_dir), "%s/%s", clean_dir_path, source_dirs[0]);
     } else {
