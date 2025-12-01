@@ -7,6 +7,7 @@
  */
 
 #include "package_publish.h"
+#include "../../review/reporter.h"
 #include "../../../alloc.h"
 #include "../../../progname.h"
 #include "../../../elm_json.h"
@@ -313,47 +314,6 @@ static void extract_file_facts(Rulr *r, const char *file_path, const char *src_d
 }
 
 /* ============================================================================
- * Tree printing for publish files
- * ========================================================================== */
-
-typedef struct {
-    char *rel_path;
-    char *abs_path;
-} PublishFile;
-
-static int compare_publish_files(const void *a, const void *b) {
-    const PublishFile *fa = (const PublishFile *)a;
-    const PublishFile *fb = (const PublishFile *)b;
-    return strcmp(fa->rel_path, fb->rel_path);
-}
-
-static void print_file_tree(PublishFile *files, int count, const char *pkg_path) {
-    if (count == 0) {
-        printf("  (no files)\n");
-        return;
-    }
-
-    /* Sort files by relative path */
-    qsort(files, count, sizeof(PublishFile), compare_publish_files);
-
-    printf("  %s/\n", pkg_path);
-
-    for (int i = 0; i < count; i++) {
-        const char *rel = files[i].rel_path;
-        
-        /* Determine tree characters */
-        int is_last = (i == count - 1);
-
-        /* Simple tree printing */
-        if (is_last) {
-            printf("  └── %s\n", rel);
-        } else {
-            printf("  ├── %s\n", rel);
-        }
-    }
-}
-
-/* ============================================================================
  * Main command implementation
  * ========================================================================== */
 
@@ -521,37 +481,27 @@ int cmd_package_publish(int argc, char *argv[]) {
         return 0;
     }
 
-    /* Collect publish files from the relation */
-    int publish_files_count = 0;
-    int publish_files_capacity = publish_view.num_tuples;
-    PublishFile *publish_files = arena_malloc(publish_files_capacity * sizeof(PublishFile));
+    /* Collect absolute paths from the publish_file relation */
+    int paths_count = 0;
+    int paths_capacity = publish_view.num_tuples;
+    const char **paths = arena_malloc(paths_capacity * sizeof(char*));
 
     const Tuple *tuples = (const Tuple *)publish_view.tuples;
     for (int i = 0; i < publish_view.num_tuples; i++) {
         const Tuple *t = &tuples[i];
-        if (t->arity >= 2) {
-            const char *abs = NULL;
-            const char *rel = NULL;
-            
-            if (t->fields[0].kind == VAL_SYM) {
-                abs = rulr_lookup_symbol(&rulr, t->fields[0].u.sym);
-            }
-            if (t->fields[1].kind == VAL_SYM) {
-                rel = rulr_lookup_symbol(&rulr, t->fields[1].u.sym);
-            }
-            
-            if (abs && rel) {
-                PublishFile pf;
-                pf.abs_path = arena_strdup(abs);
-                pf.rel_path = arena_strdup(rel);
-                DYNARRAY_PUSH(publish_files, publish_files_count, publish_files_capacity, pf, PublishFile);
+        if (t->arity >= 1 && t->fields[0].kind == VAL_SYM) {
+            const char *abs = rulr_lookup_symbol(&rulr, t->fields[0].u.sym);
+            if (abs) {
+                DYNARRAY_PUSH(paths, paths_count, paths_capacity, arena_strdup(abs), const char*);
             }
         }
     }
 
-    /* Print the report */
-    printf("Will publish the following files (%d):\n", publish_files_count);
-    print_file_tree(publish_files, publish_files_count, clean_path);
+    /* Print the report using common tree printer */
+    printf("Will publish the following files (%d):\n", paths_count);
+    ReporterConfig cfg = reporter_default_config();
+    cfg.base_path = clean_path;
+    reporter_print_file_tree(&cfg, paths, paths_count);
 
     /* Cleanup */
     rulr_deinit(&rulr);
