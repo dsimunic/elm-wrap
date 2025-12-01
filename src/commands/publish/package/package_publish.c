@@ -11,11 +11,13 @@
 #include "../../../alloc.h"
 #include "../../../progname.h"
 #include "../../../elm_json.h"
+#include "../../../fileutil.h"
 #include "../../../ast/skeleton.h"
 #include "../../../dyn_array.h"
 #include "../../../cJSON.h"
 #include "../../../rulr/rulr.h"
 #include "../../../rulr/rulr_dl.h"
+#include "../../../rulr/host_helpers.h"
 #include "../../../rulr/engine/engine.h"
 #include "../../../rulr/runtime/runtime.h"
 #include "../../../rulr/common/types.h"
@@ -47,114 +49,11 @@ static void print_usage(void) {
 }
 
 /* ============================================================================
- * Helper functions (adapted from review.c)
- * ========================================================================== */
-
-static char *read_file_content(const char *filepath) {
-    FILE *f = fopen(filepath, "r");
-    if (!f) return NULL;
-
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    char *content = arena_malloc(fsize + 1);
-    if (!content) {
-        fclose(f);
-        return NULL;
-    }
-
-    size_t read_size = fread(content, 1, fsize, f);
-    content[read_size] = '\0';
-    fclose(f);
-
-    return content;
-}
-
-static int file_exists(const char *path) {
-    struct stat st;
-    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
-}
-
-static char *strip_trailing_slash(const char *path) {
-    if (!path) return NULL;
-    
-    int len = strlen(path);
-    while (len > 1 && path[len - 1] == '/') {
-        len--;
-    }
-    
-    char *result = arena_malloc(len + 1);
-    strncpy(result, path, len);
-    result[len] = '\0';
-    
-    return result;
-}
-
-/* ============================================================================
- * Fact insertion helpers
- * ========================================================================== */
-
-static int insert_fact_1s(Rulr *r, const char *pred, const char *s1) {
-    int pid = engine_get_predicate_id(r->engine, pred);
-    if (pid < 0) {
-        EngineArgType types[] = {ARG_TYPE_SYMBOL};
-        pid = engine_register_predicate(r->engine, pred, 1, types);
-    }
-    if (pid < 0) return -1;
-
-    int sym1 = rulr_intern_symbol(r, s1);
-    if (sym1 < 0) return -1;
-
-    Value vals[1];
-    vals[0] = make_sym_value(sym1);
-    return engine_insert_fact(r->engine, pid, 1, vals);
-}
-
-static int insert_fact_2s(Rulr *r, const char *pred, const char *s1, const char *s2) {
-    int pid = engine_get_predicate_id(r->engine, pred);
-    if (pid < 0) {
-        EngineArgType types[] = {ARG_TYPE_SYMBOL, ARG_TYPE_SYMBOL};
-        pid = engine_register_predicate(r->engine, pred, 2, types);
-    }
-    if (pid < 0) return -1;
-
-    int sym1 = rulr_intern_symbol(r, s1);
-    int sym2 = rulr_intern_symbol(r, s2);
-    if (sym1 < 0 || sym2 < 0) return -1;
-
-    Value vals[2];
-    vals[0] = make_sym_value(sym1);
-    vals[1] = make_sym_value(sym2);
-    return engine_insert_fact(r->engine, pid, 2, vals);
-}
-
-static int insert_fact_3s(Rulr *r, const char *pred, const char *s1, const char *s2, const char *s3) {
-    int pid = engine_get_predicate_id(r->engine, pred);
-    if (pid < 0) {
-        EngineArgType types[] = {ARG_TYPE_SYMBOL, ARG_TYPE_SYMBOL, ARG_TYPE_SYMBOL};
-        pid = engine_register_predicate(r->engine, pred, 3, types);
-    }
-    if (pid < 0) return -1;
-
-    int sym1 = rulr_intern_symbol(r, s1);
-    int sym2 = rulr_intern_symbol(r, s2);
-    int sym3 = rulr_intern_symbol(r, s3);
-    if (sym1 < 0 || sym2 < 0 || sym3 < 0) return -1;
-
-    Value vals[3];
-    vals[0] = make_sym_value(sym1);
-    vals[1] = make_sym_value(sym2);
-    vals[2] = make_sym_value(sym3);
-    return engine_insert_fact(r->engine, pid, 3, vals);
-}
-
-/* ============================================================================
  * File collection helpers
  * ========================================================================== */
 
 static char **parse_exposed_modules(const char *elm_json_path, int *count) {
-    char *content = read_file_content(elm_json_path);
+    char *content = file_read_contents(elm_json_path);
     if (!content) return NULL;
 
     cJSON *root = cJSON_Parse(content);
@@ -298,7 +197,7 @@ static void extract_file_facts(Rulr *r, const char *file_path, const char *src_d
     if (!mod) return;
 
     if (mod->module_name) {
-        insert_fact_2s(r, "file_module", file_path, mod->module_name);
+        rulr_insert_fact_2s(r, "file_module", file_path, mod->module_name);
     }
 
     for (int i = 0; i < mod->imports_count; i++) {
@@ -307,7 +206,7 @@ static void extract_file_facts(Rulr *r, const char *file_path, const char *src_d
         
         char *module_path = module_name_to_path(module_name, src_dir);
         if (module_path && file_exists(module_path)) {
-            insert_fact_2s(r, "file_import", file_path, module_name);
+            rulr_insert_fact_2s(r, "file_import", file_path, module_name);
         }
     }
 
@@ -403,12 +302,12 @@ int cmd_package_publish(int argc, char *argv[]) {
 
     /* Insert exposed_module facts */
     for (int i = 0; i < exposed_count; i++) {
-        insert_fact_1s(&rulr, "exposed_module", exposed_modules[i]);
+        rulr_insert_fact_1s(&rulr, "exposed_module", exposed_modules[i]);
     }
 
     /* Insert source_file facts and extract file_module/file_import */
     for (int i = 0; i < all_elm_files_count; i++) {
-        insert_fact_1s(&rulr, "source_file", all_elm_files[i]);
+        rulr_insert_fact_1s(&rulr, "source_file", all_elm_files[i]);
         extract_file_facts(&rulr, all_elm_files[i], src_dir);
     }
 
@@ -426,18 +325,18 @@ int cmd_package_publish(int argc, char *argv[]) {
         const char *filename = strrchr(abs_path, '/');
         filename = filename ? filename + 1 : abs_path;
         
-        insert_fact_3s(&rulr, "package_file_info", abs_path, rel_path, filename);
+        rulr_insert_fact_3s(&rulr, "package_file_info", abs_path, rel_path, filename);
     }
 
     /* Insert allowed_root_file facts */
     if (abs_license) {
-        insert_fact_1s(&rulr, "allowed_root_file", abs_license);
+        rulr_insert_fact_1s(&rulr, "allowed_root_file", abs_license);
     }
     if (abs_readme) {
-        insert_fact_1s(&rulr, "allowed_root_file", abs_readme);
+        rulr_insert_fact_1s(&rulr, "allowed_root_file", abs_readme);
     }
     if (abs_elm_json) {
-        insert_fact_1s(&rulr, "allowed_root_file", abs_elm_json);
+        rulr_insert_fact_1s(&rulr, "allowed_root_file", abs_elm_json);
     }
 
     /* Load rule files: use separate rule files that share derived predicates.

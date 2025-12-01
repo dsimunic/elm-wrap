@@ -504,3 +504,44 @@ bool copy_directory_selective(const char *src_path, const char *dest_path) {
 
     return success;
 }
+
+bool file_exists(const char *path) {
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
+}
+
+char *file_read_contents(const char *filepath) {
+    FILE *f = fopen(filepath, "r");
+    if (!f) return NULL;
+
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    char *content = arena_malloc(fsize + 1);
+    if (!content) {
+        fclose(f);
+        return NULL;
+    }
+
+    size_t read_size = fread(content, 1, fsize, f);
+    content[read_size] = '\0';
+    fclose(f);
+
+    return content;
+}
+
+char *strip_trailing_slash(const char *path) {
+    if (!path) return NULL;
+    
+    int len = strlen(path);
+    while (len > 1 && path[len - 1] == '/') {
+        len--;
+    }
+    
+    char *result = arena_malloc(len + 1);
+    strncpy(result, path, len);
+    result[len] = '\0';
+    
+    return result;
+}

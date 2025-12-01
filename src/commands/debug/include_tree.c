@@ -2,6 +2,7 @@
 #include "../../alloc.h"
 #include "../../progname.h"
 #include "../../log.h"
+#include "../../fileutil.h"
 #include "../../dyn_array.h"
 #include "../../cJSON.h"
 #include "../../ast/skeleton.h"
@@ -27,9 +28,7 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
 static char *module_name_to_path(const char *module_name, const char *src_dir);
 static void collect_all_elm_files(const char *dir_path, char ***files, int *count, int *capacity);
 static int is_file_in_list(const char *file, char **list, int count);
-static int file_exists(const char *path);
 static char *find_src_dir_for_file(const char *file_path);
-static char *strip_trailing_slash(const char *path);
 static char *read_file_content(const char *filepath);
 
 /* Tree drawing characters (UTF-8) */
@@ -86,14 +85,6 @@ int cmd_debug_include_tree(int argc, char *argv[]) {
 }
 
 /**
- * Check if file exists
- */
-static int file_exists(const char *path) {
-    struct stat st;
-    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
-}
-
-/**
  * Read entire file content into allocated buffer
  */
 static char *read_file_content(const char *filepath) {
@@ -115,27 +106,6 @@ static char *read_file_content(const char *filepath) {
     fclose(f);
 
     return content;
-}
-
-/**
- * Strip trailing slashes from a path
- * Returns a newly allocated string
- */
-static char *strip_trailing_slash(const char *path) {
-    if (!path) return NULL;
-    
-    int len = strlen(path);
-    
-    /* Remove trailing slashes */
-    while (len > 1 && path[len - 1] == '/') {
-        len--;
-    }
-    
-    char *result = arena_malloc(len + 1);
-    strncpy(result, path, len);
-    result[len] = '\0';
-    
-    return result;
 }
 
 /**

@@ -1,5 +1,15 @@
 # Agent Guidelines for Memory Management
 
+## Mandatory Reading
+
+Before writing or modifying C code, you **MUST** also read:
+
+- `doc/shared_code_functionality.md` — Shared modules and functions to use when implementing commands
+
+This document describes common utilities (`elm_cmd_common.h`, `elm_project.h`, `fileutil.h`, `rulr/host_helpers.h`) that prevent code duplication and ensure consistency.
+
+---
+
 ## Memory Allocation Rules
 
 This codebase uses a custom arena allocator (`larena.h`) for all memory management. **All application code must use the wrapper functions** defined in `alloc.h`.

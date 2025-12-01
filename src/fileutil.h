@@ -43,4 +43,21 @@ bool copy_directory_recursive(const char *src_path, const char *dest_path);
  */
 bool copy_directory_selective(const char *src_path, const char *dest_path);
 
+/* Check if a regular file exists at the given path
+ * Returns true if file exists and is a regular file, false otherwise
+ */
+bool file_exists(const char *path);
+
+/* Read entire file contents into an arena-allocated buffer
+ * Returns NULL on failure (file not found, read error, or allocation failure)
+ * The returned string is null-terminated
+ */
+char *file_read_contents(const char *filepath);
+
+/* Strip trailing slashes from a path
+ * Returns an arena-allocated copy with trailing slashes removed
+ * Returns NULL if path is NULL
+ */
+char *strip_trailing_slash(const char *path);
+
 #endif /* FILEUTIL_H */

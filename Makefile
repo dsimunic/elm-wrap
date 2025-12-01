@@ -46,6 +46,7 @@ RULR_SRCDIR = $(SRCDIR)/rulr
 RULR_LIB = $(BINDIR)/librulr.a
 RULR_SOURCES = $(RULR_SRCDIR)/rulr.c \
                $(RULR_SRCDIR)/rulr_dl.c \
+               $(RULR_SRCDIR)/host_helpers.c \
                $(RULR_SRCDIR)/frontend/lexer.c \
                $(RULR_SRCDIR)/frontend/parser.c \
                $(RULR_SRCDIR)/frontend/ast_serialize.c \
@@ -114,6 +115,8 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/protocol_v1/package_fetch.c \
           $(SRCDIR)/install_env.c \
           $(SRCDIR)/fileutil.c \
+          $(SRCDIR)/elm_cmd_common.c \
+          $(SRCDIR)/elm_project.c \
           $(SRCDIR)/pgsolver/pg_core.c \
           $(SRCDIR)/pgsolver/pg_elm.c \
           $(SRCDIR)/ast/skeleton.c \
@@ -173,6 +176,8 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/package_fetch.o \
           $(BUILDDIR)/install_env.o \
           $(BUILDDIR)/fileutil.o \
+          $(BUILDDIR)/elm_cmd_common.o \
+          $(BUILDDIR)/elm_project.o \
           $(BUILDDIR)/pg_core.o \
           $(BUILDDIR)/pg_elm.o \
           $(BUILDDIR)/ast_skeleton.o \
@@ -444,6 +449,14 @@ $(BUILDDIR)/install_env.o: $(SRCDIR)/install_env.c $(SRCDIR)/install_env.h $(SRC
 
 # Build fileutil object
 $(BUILDDIR)/fileutil.o: $(SRCDIR)/fileutil.c $(SRCDIR)/fileutil.h $(SRCDIR)/vendor/miniz.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build elm_cmd_common object
+$(BUILDDIR)/elm_cmd_common.o: $(SRCDIR)/elm_cmd_common.c $(SRCDIR)/elm_cmd_common.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/install_env.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build elm_project object
+$(BUILDDIR)/elm_project.o: $(SRCDIR)/elm_project.c $(SRCDIR)/elm_project.h $(SRCDIR)/fileutil.h $(SRCDIR)/cJSON.h $(SRCDIR)/dyn_array.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build sha1 object

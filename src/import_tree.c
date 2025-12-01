@@ -7,6 +7,7 @@
 
 #include "import_tree.h"
 #include "alloc.h"
+#include "fileutil.h"
 #include "dyn_array.h"
 #include "cJSON.h"
 #include "ast/skeleton.h"
@@ -25,8 +26,6 @@
 
 /* Forward declarations */
 static char *read_file_content(const char *filepath);
-static int file_exists(const char *path);
-static char *strip_trailing_slash(const char *path);
 static char *module_name_to_path(const char *module_name, const char *src_dir);
 static void collect_all_elm_files(const char *dir_path, char ***files, int *count, int *capacity);
 static int is_file_in_list(const char *file, char **list, int count);
@@ -35,14 +34,6 @@ static void collect_reachable_files(const char *file_path, const char *src_dir,
 static void print_tree_recursive(const char *file_path, const char *src_dir,
                                   char ***visited, int *visited_count, int *visited_capacity,
                                   const char *prefix, bool show_external);
-
-/**
- * Check if file exists
- */
-static int file_exists(const char *path) {
-    struct stat st;
-    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
-}
 
 /**
  * Read entire file content into allocated buffer
@@ -66,24 +57,6 @@ static char *read_file_content(const char *filepath) {
     fclose(f);
 
     return content;
-}
-
-/**
- * Strip trailing slashes from a path
- */
-static char *strip_trailing_slash(const char *path) {
-    if (!path) return NULL;
-    
-    int len = strlen(path);
-    while (len > 1 && path[len - 1] == '/') {
-        len--;
-    }
-    
-    char *result = arena_malloc(len + 1);
-    strncpy(result, path, len);
-    result[len] = '\0';
-    
-    return result;
 }
 
 /**

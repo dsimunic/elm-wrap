@@ -8,6 +8,7 @@
 #include "policy.h"
 #include "../../alloc.h"
 #include "../../progname.h"
+#include "../../fileutil.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/frontend/ast.h"
 #include "../../rulr/frontend/ast_serialize.h"
@@ -53,11 +54,6 @@ static void print_view_usage(void) {
 /* ============================================================================
  * Utility functions
  * ========================================================================== */
-
-static int file_exists(const char *path) {
-    struct stat st;
-    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
-}
 
 static int has_extension(const char *path, const char *ext) {
     size_t path_len = strlen(path);

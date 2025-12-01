@@ -16,6 +16,7 @@
 #include "../../alloc.h"
 #include "../../progname.h"
 #include "../../elm_json.h"
+#include "../../fileutil.h"
 #include "../../ast/skeleton.h"
 #include "../../ast/util.h"
 #include "../../dyn_array.h"
@@ -23,6 +24,7 @@
 #include "../../cJSON.h"
 #include "../../rulr/rulr.h"
 #include "../../rulr/rulr_dl.h"
+#include "../../rulr/host_helpers.h"
 #include "../../rulr/engine/engine.h"
 #include "../../rulr/runtime/runtime.h"
 #include "../../rulr/common/types.h"
@@ -147,70 +149,6 @@ static char *read_file_content(const char *filepath) {
 }
 
 /**
- * Insert a fact with a single symbol argument.
- */
-static int insert_fact_1s(Rulr *r, const char *pred, const char *s1) {
-    int pid = engine_get_predicate_id(r->engine, pred);
-    if (pid < 0) {
-        /* Register predicate if not found */
-        EngineArgType types[] = {ARG_TYPE_SYMBOL};
-        pid = engine_register_predicate(r->engine, pred, 1, types);
-    }
-    if (pid < 0) return -1;
-
-    int sym1 = rulr_intern_symbol(r, s1);
-    if (sym1 < 0) return -1;
-
-    Value vals[1];
-    vals[0] = make_sym_value(sym1);
-    return engine_insert_fact(r->engine, pid, 1, vals);
-}
-
-/**
- * Insert a fact with two symbol arguments.
- */
-static int insert_fact_2s(Rulr *r, const char *pred, const char *s1, const char *s2) {
-    int pid = engine_get_predicate_id(r->engine, pred);
-    if (pid < 0) {
-        EngineArgType types[] = {ARG_TYPE_SYMBOL, ARG_TYPE_SYMBOL};
-        pid = engine_register_predicate(r->engine, pred, 2, types);
-    }
-    if (pid < 0) return -1;
-
-    int sym1 = rulr_intern_symbol(r, s1);
-    int sym2 = rulr_intern_symbol(r, s2);
-    if (sym1 < 0 || sym2 < 0) return -1;
-
-    Value vals[2];
-    vals[0] = make_sym_value(sym1);
-    vals[1] = make_sym_value(sym2);
-    return engine_insert_fact(r->engine, pid, 2, vals);
-}
-
-/**
- * Insert a fact with three symbol arguments.
- */
-static int insert_fact_3s(Rulr *r, const char *pred, const char *s1, const char *s2, const char *s3) {
-    int pid = engine_get_predicate_id(r->engine, pred);
-    if (pid < 0) {
-        EngineArgType types[] = {ARG_TYPE_SYMBOL, ARG_TYPE_SYMBOL, ARG_TYPE_SYMBOL};
-        pid = engine_register_predicate(r->engine, pred, 3, types);
-    }
-    if (pid < 0) return -1;
-
-    int sym1 = rulr_intern_symbol(r, s1);
-    int sym2 = rulr_intern_symbol(r, s2);
-    int sym3 = rulr_intern_symbol(r, s3);
-    if (sym1 < 0 || sym2 < 0 || sym3 < 0) return -1;
-
-    Value vals[3];
-    vals[0] = make_sym_value(sym1);
-    vals[1] = make_sym_value(sym2);
-    vals[2] = make_sym_value(sym3);
-    return engine_insert_fact(r->engine, pid, 3, vals);
-}
-
-/**
  * Extract type references from a type string and insert sig_uses_type facts.
  * This scans the type string for uppercase identifiers (type names).
  * 
@@ -249,7 +187,7 @@ static void extract_type_references(Rulr *r, const char *func_name, const char *
                 }
                 
                 /* Insert sig_uses_type(func_name, type_name) fact */
-                insert_fact_2s(r, "sig_uses_type", func_name, type_name);
+                rulr_insert_fact_2s(r, "sig_uses_type", func_name, type_name);
                 
                 arena_free(type_name);
             }
@@ -264,48 +202,48 @@ static void extract_type_references(Rulr *r, const char *func_name, const char *
 static void extract_module_facts(Rulr *r, const SkeletonModule *mod) {
     /* File path fact */
     if (mod->filepath) {
-        insert_fact_1s(r, "file_path", mod->filepath);
+        rulr_insert_fact_1s(r, "file_path", mod->filepath);
     }
 
     /* Module name fact */
     if (mod->module_name) {
-        insert_fact_1s(r, "module", mod->module_name);
+        rulr_insert_fact_1s(r, "module", mod->module_name);
     }
 
     /* Exported values */
     if (mod->exports.expose_all) {
         /* All values are exported - mark with special symbol */
-        insert_fact_1s(r, "export_all", "true");
+        rulr_insert_fact_1s(r, "export_all", "true");
     }
     for (int i = 0; i < mod->exports.values_count; i++) {
-        insert_fact_1s(r, "exported_value", mod->exports.values[i]);
+        rulr_insert_fact_1s(r, "exported_value", mod->exports.values[i]);
     }
     for (int i = 0; i < mod->exports.types_count; i++) {
-        insert_fact_1s(r, "exported_type", mod->exports.types[i]);
+        rulr_insert_fact_1s(r, "exported_type", mod->exports.types[i]);
     }
     for (int i = 0; i < mod->exports.types_with_constructors_count; i++) {
-        insert_fact_1s(r, "exported_type_with_constructors", mod->exports.types_with_constructors[i]);
+        rulr_insert_fact_1s(r, "exported_type_with_constructors", mod->exports.types_with_constructors[i]);
     }
 
     /* Imports */
     for (int i = 0; i < mod->imports_count; i++) {
         const SkeletonImport *imp = &mod->imports[i];
         if (imp->module_name) {
-            insert_fact_1s(r, "import", imp->module_name);
+            rulr_insert_fact_1s(r, "import", imp->module_name);
 
             if (imp->alias) {
-                insert_fact_2s(r, "import_alias", imp->module_name, imp->alias);
+                rulr_insert_fact_2s(r, "import_alias", imp->module_name, imp->alias);
             }
 
             if (imp->expose_all) {
-                insert_fact_2s(r, "import_expose_all", imp->module_name, "true");
+                rulr_insert_fact_2s(r, "import_expose_all", imp->module_name, "true");
             }
 
             for (int j = 0; j < imp->exposed_values_count; j++) {
-                insert_fact_2s(r, "import_exposing", imp->module_name, imp->exposed_values[j]);
+                rulr_insert_fact_2s(r, "import_exposing", imp->module_name, imp->exposed_values[j]);
             }
             for (int j = 0; j < imp->exposed_types_count; j++) {
-                insert_fact_2s(r, "import_exposing_type", imp->module_name, imp->exposed_types[j]);
+                rulr_insert_fact_2s(r, "import_exposing_type", imp->module_name, imp->exposed_types[j]);
             }
         }
     }
@@ -330,7 +268,7 @@ static void extract_module_facts(Rulr *r, const SkeletonModule *mod) {
                 type_str = "(unknown)";
             }
             
-            insert_fact_2s(r, "type_annotation", ann->name, type_str);
+            rulr_insert_fact_2s(r, "type_annotation", ann->name, type_str);
             
             /* Extract type references for sig_uses_type facts */
             if (type_str && strcmp(type_str, "(unknown)") != 0) {
@@ -343,7 +281,7 @@ static void extract_module_facts(Rulr *r, const SkeletonModule *mod) {
     for (int i = 0; i < mod->type_aliases_count; i++) {
         const SkeletonTypeAlias *alias = &mod->type_aliases[i];
         if (alias->name) {
-            insert_fact_1s(r, "type_alias", alias->name);
+            rulr_insert_fact_1s(r, "type_alias", alias->name);
         }
     }
 
@@ -351,12 +289,12 @@ static void extract_module_facts(Rulr *r, const SkeletonModule *mod) {
     for (int i = 0; i < mod->union_types_count; i++) {
         const SkeletonUnionType *ut = &mod->union_types[i];
         if (ut->name) {
-            insert_fact_1s(r, "union_type", ut->name);
+            rulr_insert_fact_1s(r, "union_type", ut->name);
 
             for (int j = 0; j < ut->constructors_count; j++) {
                 const SkeletonUnionConstructor *ctor = &ut->constructors[j];
                 if (ctor->name) {
-                    insert_fact_2s(r, "constructor", ut->name, ctor->name);
+                    rulr_insert_fact_2s(r, "constructor", ut->name, ctor->name);
                 }
             }
         }
@@ -366,7 +304,7 @@ static void extract_module_facts(Rulr *r, const SkeletonModule *mod) {
     for (int i = 0; i < mod->infixes_count; i++) {
         const SkeletonInfix *infix = &mod->infixes[i];
         if (infix->operator && infix->function_name) {
-            insert_fact_2s(r, "infix", infix->operator, infix->function_name);
+            rulr_insert_fact_2s(r, "infix", infix->operator, infix->function_name);
         }
     }
 }
@@ -378,26 +316,26 @@ static void extract_module_facts(Rulr *r, const SkeletonModule *mod) {
 static void extract_elm_json_facts(Rulr *r, const ElmJson *ej) {
     /* Project type */
     const char *project_type = (ej->type == ELM_PROJECT_APPLICATION) ? "application" : "package";
-    insert_fact_1s(r, "project_type", project_type);
+    rulr_insert_fact_1s(r, "project_type", project_type);
 
     /* Elm version */
     if (ej->elm_version) {
-        insert_fact_1s(r, "elm_version", ej->elm_version);
+        rulr_insert_fact_1s(r, "elm_version", ej->elm_version);
     }
 
     /* Package name (for packages) */
     if (ej->package_name) {
-        insert_fact_1s(r, "package_name", ej->package_name);
+        rulr_insert_fact_1s(r, "package_name", ej->package_name);
     }
     if (ej->package_version) {
-        insert_fact_1s(r, "package_version", ej->package_version);
+        rulr_insert_fact_1s(r, "package_version", ej->package_version);
     }
 
     /* Direct dependencies */
     if (ej->dependencies_direct) {
         for (int i = 0; i < ej->dependencies_direct->count; i++) {
             Package *pkg = &ej->dependencies_direct->packages[i];
-            insert_fact_3s(r, "dependency", pkg->author, pkg->name, pkg->version);
+            rulr_insert_fact_3s(r, "dependency", pkg->author, pkg->name, pkg->version);
         }
     }
 
@@ -405,7 +343,7 @@ static void extract_elm_json_facts(Rulr *r, const ElmJson *ej) {
     if (ej->package_dependencies) {
         for (int i = 0; i < ej->package_dependencies->count; i++) {
             Package *pkg = &ej->package_dependencies->packages[i];
-            insert_fact_3s(r, "dependency", pkg->author, pkg->name, pkg->version);
+            rulr_insert_fact_3s(r, "dependency", pkg->author, pkg->name, pkg->version);
         }
     }
 
@@ -413,7 +351,7 @@ static void extract_elm_json_facts(Rulr *r, const ElmJson *ej) {
     if (ej->dependencies_indirect) {
         for (int i = 0; i < ej->dependencies_indirect->count; i++) {
             Package *pkg = &ej->dependencies_indirect->packages[i];
-            insert_fact_3s(r, "indirect_dependency", pkg->author, pkg->name, pkg->version);
+            rulr_insert_fact_3s(r, "indirect_dependency", pkg->author, pkg->name, pkg->version);
         }
     }
 
@@ -421,7 +359,7 @@ static void extract_elm_json_facts(Rulr *r, const ElmJson *ej) {
     if (ej->dependencies_test_direct) {
         for (int i = 0; i < ej->dependencies_test_direct->count; i++) {
             Package *pkg = &ej->dependencies_test_direct->packages[i];
-            insert_fact_3s(r, "test_dependency", pkg->author, pkg->name, pkg->version);
+            rulr_insert_fact_3s(r, "test_dependency", pkg->author, pkg->name, pkg->version);
         }
     }
 }
@@ -517,7 +455,7 @@ static void process_package_map_for_modules(Rulr *r, PackageMap *pkg_map, CacheC
         if (modules) {
             for (int m = 0; m < module_count; m++) {
                 if (modules[m]) {
-                    insert_fact_3s(r, "package_module", pkg->author, pkg->name, modules[m]);
+                    rulr_insert_fact_3s(r, "package_module", pkg->author, pkg->name, modules[m]);
                 }
             }
         }
@@ -850,32 +788,6 @@ int cmd_review_file(int argc, char *argv[]) {
  * ========================================================================== */
 
 /**
- * Check if file exists
- */
-static int pkg_file_exists(const char *path) {
-    struct stat st;
-    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
-}
-
-/**
- * Strip trailing slashes from a path
- */
-static char *strip_trailing_slash(const char *path) {
-    if (!path) return NULL;
-    
-    int len = strlen(path);
-    while (len > 1 && path[len - 1] == '/') {
-        len--;
-    }
-    
-    char *result = arena_malloc(len + 1);
-    strncpy(result, path, len);
-    result[len] = '\0';
-    
-    return result;
-}
-
-/**
  * Parse elm.json exposed-modules for packages
  */
 static char **pkg_parse_exposed_modules(const char *elm_json_path, int *count) {
@@ -1069,7 +981,7 @@ static char *pkg_find_any_version_in_repo(const char *repo_packages_dir, const c
             char *elm_json_path = arena_malloc(elm_json_len);
             snprintf(elm_json_path, elm_json_len, "%s/elm.json", version_path);
             
-            if (pkg_file_exists(elm_json_path)) {
+            if (file_exists(elm_json_path)) {
                 arena_free(elm_json_path);
                 result = version_path;
                 break;
@@ -1114,7 +1026,7 @@ static void pkg_extract_package_module_facts(Rulr *r, const ElmJson *ej, const c
         if (modules) {
             for (int m = 0; m < module_count; m++) {
                 if (modules[m]) {
-                    insert_fact_3s(r, "package_module", pkg->author, pkg->name, modules[m]);
+                    rulr_insert_fact_3s(r, "package_module", pkg->author, pkg->name, modules[m]);
                 }
             }
         }
@@ -1157,7 +1069,7 @@ static void pkg_extract_file_facts(Rulr *r, const char *file_path, const char *s
 
     /* Insert file_module(file, module) fact */
     if (mod->module_name) {
-        insert_fact_2s(r, "file_module", file_path, mod->module_name);
+        rulr_insert_fact_2s(r, "file_module", file_path, mod->module_name);
     }
 
     /* Insert file_import(file, imported_module) facts for LOCAL imports
@@ -1167,12 +1079,12 @@ static void pkg_extract_file_facts(Rulr *r, const char *file_path, const char *s
         if (!module_name) continue;
         
         /* Insert import(module) for ALL imports (used by no_unused_dependencies) */
-        insert_fact_1s(r, "import", module_name);
+        rulr_insert_fact_1s(r, "import", module_name);
         
         /* Check if this is a local import (file exists in src/) */
         char *module_path = pkg_module_name_to_path(module_name, src_dir);
-        if (module_path && pkg_file_exists(module_path)) {
-            insert_fact_2s(r, "file_import", file_path, module_name);
+        if (module_path && file_exists(module_path)) {
+            rulr_insert_fact_2s(r, "file_import", file_path, module_name);
         }
     }
 
@@ -1241,7 +1153,7 @@ int cmd_review_package(int argc, char *argv[]) {
     /* Check for elm.json */
     char elm_json_path[2048];
     snprintf(elm_json_path, sizeof(elm_json_path), "%s/elm.json", clean_path);
-    if (!pkg_file_exists(elm_json_path)) {
+    if (!file_exists(elm_json_path)) {
         if (!quiet_mode) {
             fprintf(stderr, "Error: elm.json not found at '%s'\n", elm_json_path);
         }
@@ -1323,12 +1235,12 @@ int cmd_review_package(int argc, char *argv[]) {
     
     /* Insert exposed_module(module) facts */
     for (int i = 0; i < exposed_count; i++) {
-        insert_fact_1s(&rulr, "exposed_module", exposed_modules[i]);
+        rulr_insert_fact_1s(&rulr, "exposed_module", exposed_modules[i]);
     }
 
     /* Insert source_file(file) facts and extract file info from .elm files */
     for (int i = 0; i < all_elm_files_count; i++) {
-        insert_fact_1s(&rulr, "source_file", all_elm_files[i]);
+        rulr_insert_fact_1s(&rulr, "source_file", all_elm_files[i]);
         pkg_extract_file_facts(&rulr, all_elm_files[i], src_dir);
     }
 
@@ -1342,7 +1254,7 @@ int cmd_review_package(int argc, char *argv[]) {
     size_t clean_path_len = strlen(clean_path);
     for (int i = 0; i < all_pkg_files_count; i++) {
         const char *abs_path = all_pkg_files[i];
-        insert_fact_1s(&rulr, "package_file", abs_path);
+        rulr_insert_fact_1s(&rulr, "package_file", abs_path);
         
         /* Calculate relative path */
         const char *rel_path = abs_path;
@@ -1350,26 +1262,26 @@ int cmd_review_package(int argc, char *argv[]) {
             abs_path[clean_path_len] == '/') {
             rel_path = abs_path + clean_path_len + 1;
         }
-        insert_fact_1s(&rulr, "package_file_rel", rel_path);
+        rulr_insert_fact_1s(&rulr, "package_file_rel", rel_path);
         
         /* Extract filename */
         const char *filename = strrchr(abs_path, '/');
         filename = filename ? filename + 1 : abs_path;
-        insert_fact_1s(&rulr, "package_file_name", filename);
+        rulr_insert_fact_1s(&rulr, "package_file_name", filename);
         
         /* Insert combined fact for joins */
-        insert_fact_3s(&rulr, "package_file_info", abs_path, rel_path, filename);
+        rulr_insert_fact_3s(&rulr, "package_file_info", abs_path, rel_path, filename);
     }
 
     /* Insert allowed_root_file facts for LICENSE, README.md, elm.json */
     if (abs_license) {
-        insert_fact_1s(&rulr, "allowed_root_file", abs_license);
+        rulr_insert_fact_1s(&rulr, "allowed_root_file", abs_license);
     }
     if (abs_readme) {
-        insert_fact_1s(&rulr, "allowed_root_file", abs_readme);
+        rulr_insert_fact_1s(&rulr, "allowed_root_file", abs_readme);
     }
     if (abs_elm_json) {
-        insert_fact_1s(&rulr, "allowed_root_file", abs_elm_json);
+        rulr_insert_fact_1s(&rulr, "allowed_root_file", abs_elm_json);
     }
 
     /* Insert elm.json facts (including dependency facts) */
