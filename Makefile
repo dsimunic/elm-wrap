@@ -91,6 +91,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/publish/package/package_publish.c \
           $(SRCDIR)/commands/code/code.c \
           $(SRCDIR)/commands/code/format.c \
+          $(SRCDIR)/commands/policy/policy.c \
           $(SRCDIR)/commands/review/review.c \
           $(SRCDIR)/commands/review/reporter.c \
           $(SRCDIR)/commands/debug/debug.c \
@@ -149,6 +150,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/package_publish.o \
           $(BUILDDIR)/code.o \
           $(BUILDDIR)/format.o \
+          $(BUILDDIR)/policy.o \
           $(BUILDDIR)/review.o \
           $(BUILDDIR)/reporter.o \
           $(BUILDDIR)/debug.o \
@@ -330,6 +332,10 @@ $(BUILDDIR)/reporter.o: $(SRCDIR)/commands/review/reporter.c $(SRCDIR)/commands/
 # Build debug command object
 $(BUILDDIR)/debug.o: $(SRCDIR)/commands/debug/debug.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build policy command object
+$(BUILDDIR)/policy.o: $(SRCDIR)/commands/policy/policy.c $(SRCDIR)/commands/policy/policy.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/rulr/rulr_dl.h $(SRCDIR)/rulr/frontend/ast.h $(SRCDIR)/rulr/frontend/ast_serialize.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
 
 # Build include_tree command object
 $(BUILDDIR)/include_tree.o: $(SRCDIR)/commands/debug/include_tree.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/log.h $(SRCDIR)/dyn_array.h $(SRCDIR)/cJSON.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/import_tree.h | $(BUILDDIR)
