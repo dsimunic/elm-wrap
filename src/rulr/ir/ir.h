@@ -79,6 +79,7 @@ typedef struct {
     int       num_rules;
     int       max_stratum;
     IrRule    rules[MAX_RULES];
+    int       clear_derived_requested;  /* 1 if .clear_derived() directive was found */
 } IrProgram;
 
 #endif /* MINI_DATALOG_IR_H */

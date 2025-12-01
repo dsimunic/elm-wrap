@@ -15,6 +15,7 @@
 #include "commands/code/code.h"
 #include "commands/debug/debug.h"
 #include "commands/review/review.h"
+#include "commands/publish/package/package_publish.h"
 #include "alloc.h"
 #include "log.h"
 #include "progname.h"
@@ -53,6 +54,7 @@ void print_package_usage(const char *prog) {
     printf("  check [elm.json]     Check for available package upgrades\n");
     printf("  info                 Display package management information\n");
     printf("  deps <PACKAGE>       Display dependencies for a specific package\n");
+    printf("  publish <PATH>       Show files that would be published from a package\n");
     printf("\nOptions:\n");
     printf("  -y, --yes            Automatically confirm changes\n");
     printf("  -v, --verbose        Show detailed logging output\n");
@@ -105,6 +107,11 @@ int cmd_package(int argc, char *argv[], const char *prog) {
     if (strcmp(subcmd, "deps") == 0) {
         // Pass remaining args to deps command
         return cmd_deps(argc - 1, argv + 1);
+    }
+
+    if (strcmp(subcmd, "publish") == 0) {
+        // Pass remaining args to package publish command
+        return cmd_package_publish(argc - 1, argv + 1);
     }
 
     fprintf(stderr, "Error: Unknown package subcommand '%s'\n", subcmd);

@@ -15,6 +15,7 @@ void ir_program_init(IrProgram *prog) {
     prog->pred_table.count = 0;
     prog->num_rules = 0;
     prog->max_stratum = 0;
+    prog->clear_derived_requested = 0;
 }
 
 int ir_find_predicate(const PredTable *pt, const char *name) {
@@ -446,8 +447,10 @@ static EngineError compute_strata(IrProgram *prog) {
 }
 
 EngineError ir_build_from_ast(const AstProgram *ast, IrProgram *prog, InternSymbolFn intern, void *user_data) {
-    prog->num_rules = 0;
+    /* NOTE: We do NOT reset num_rules here - we accumulate rules across multiple file loads.
+     * This allows derived predicates from earlier files to be available to later files. */
     prog->max_stratum = 0;
+    prog->clear_derived_requested = ast->clear_derived;
 
     for (int i = 0; i < prog->pred_table.count; ++i) {
         prog->pred_table.preds[i].stratum = 0;

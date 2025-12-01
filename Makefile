@@ -82,6 +82,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/publish/docs/docs_json.c \
           $(SRCDIR)/commands/publish/docs/dependency_cache.c \
           $(SRCDIR)/commands/publish/docs/path_util.c \
+          $(SRCDIR)/commands/publish/package/package_publish.c \
           $(SRCDIR)/commands/code/code.c \
           $(SRCDIR)/commands/code/format.c \
           $(SRCDIR)/commands/review/review.c \
@@ -139,6 +140,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/docs_json.o \
           $(BUILDDIR)/dependency_cache.o \
           $(BUILDDIR)/path_util.o \
+          $(BUILDDIR)/package_publish.o \
           $(BUILDDIR)/code.o \
           $(BUILDDIR)/format.o \
           $(BUILDDIR)/review.o \
@@ -296,6 +298,10 @@ $(BUILDDIR)/dependency_cache.o: $(SRCDIR)/commands/publish/docs/dependency_cache
 # Build path_util object
 $(BUILDDIR)/path_util.o: $(SRCDIR)/commands/publish/docs/path_util.c $(SRCDIR)/commands/publish/docs/path_util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build package_publish command object
+$(BUILDDIR)/package_publish.o: $(SRCDIR)/commands/publish/package/package_publish.c $(SRCDIR)/commands/publish/package/package_publish.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/dyn_array.h $(SRCDIR)/cJSON.h $(SRCDIR)/rulr/rulr.h $(SRCDIR)/rulr/rulr_dl.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -I$(SRCDIR)/rulr -c $< -o $@
 
 # Build code command object
 $(BUILDDIR)/code.o: $(SRCDIR)/commands/code/code.c $(SRCDIR)/commands/code/code.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)

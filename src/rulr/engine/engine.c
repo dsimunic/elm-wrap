@@ -268,13 +268,19 @@ EngineError engine_load_rules_from_string(Engine *e, const char *source) {
         return err;
     }
 
+    /* Copy current program state - rules will be accumulated, not replaced */
     IrProgram new_prog = e->prog;
-    new_prog.num_rules = 0;
     new_prog.max_stratum = 0;
+    new_prog.clear_derived_requested = 0;
 
     EngineError err = ir_build_from_ast(&ast, &new_prog, e->intern, e->sym_user);
     if (err.is_error) {
         return err;
+    }
+
+    /* If .clear_derived() directive was found, clear derived facts before loading new rules */
+    if (new_prog.clear_derived_requested) {
+        engine_clear_derived_facts(e);
     }
 
     e->prog = new_prog;

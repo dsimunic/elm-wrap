@@ -1386,18 +1386,16 @@ int cmd_review_package(int argc, char *argv[]) {
         }
     }
 
-    /* Run each rule file, reusing the injected facts */
+    /* Run each rule file, reusing the injected facts AND derived predicates.
+     * Derived predicates from earlier rule files are preserved for use by
+     * later rule files. Use clear_derived() in a rule file if you need
+     * to reset derived predicates between files. */
     int total_errors = 0;
     for (int r = 0; r < rule_files_count; r++) {
         const char *rule_path = rule_files[r];
 
         if (!quiet_mode) {
             printf("=== Rule file: %s ===\n", rule_path);
-        }
-
-        /* Clear derived facts from previous rule, keeping base facts */
-        if (r > 0) {
-            rulr_clear_derived(&rulr);
         }
 
         /* Load the rule file */

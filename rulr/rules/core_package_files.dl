@@ -1,0 +1,52 @@
+% Shared core: which files are considered package content
+%
+% This module defines the canonical "core_package_file" predicate,
+% which is used by:
+%   - no_redundant_files.dl (to identify files NOT in core)
+%   - publish_files.dl (to identify files to publish)
+
+% Input predicates (populated by the host)
+.pred package_file_info(abs: symbol, rel: symbol, name: symbol).
+.pred exposed_module(module: symbol).
+.pred file_module(file: symbol, module: symbol).
+.pred file_import(file: symbol, module: symbol).
+.pred allowed_root_file(file: symbol).
+
+% Derived predicates for reachability analysis
+.pred reachable_module(module: symbol).
+.pred reachable_file(file: symbol).
+
+% Core package file predicate
+.pred core_package_file(abs: symbol, rel: symbol).
+
+% A module is reachable if it is exposed
+reachable_module(Module) :-
+    exposed_module(Module).
+
+% A module is reachable if it is imported by a reachable file
+reachable_module(Module) :-
+    reachable_file(File),
+    file_import(File, Module).
+
+% A file is reachable if it defines a reachable module
+reachable_file(File) :-
+    file_module(File, Module),
+    reachable_module(Module).
+
+% Core package files: reachable .elm files in src/
+core_package_file(Abs, Rel) :-
+    package_file_info(Abs, Rel, _),
+    reachable_file(Abs).
+
+% Core package files: allowed root files (LICENSE, README.md, elm.json)
+core_package_file(Abs, Rel) :-
+    package_file_info(Abs, Rel, _),
+    allowed_root_file(Abs).
+
+% Core package files: special allowed filenames (docs.json, endpoint.json)
+% These are artifacts of the v1 package system. Should not be uploaded to shared repositories.
+core_package_file(Abs, Rel) :-
+    package_file_info(Abs, Rel, "docs.json").
+
+core_package_file(Abs, Rel) :-
+    package_file_info(Abs, Rel, "endpoint.json").

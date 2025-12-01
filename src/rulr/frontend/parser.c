@@ -66,12 +66,14 @@ void ast_program_init(AstProgram *prog) {
     prog->rules = NULL;
     prog->num_rules = 0;
     prog->rules_capacity = 0;
+    prog->clear_derived = 0;
 }
 
 void ast_program_reset(AstProgram *prog) {
     prog->num_decls = 0;
     prog->num_facts = 0;
     prog->num_rules = 0;
+    prog->clear_derived = 0;
 }
 
 static int parse_arg_decl_list(Parser *p, AstDecl *decl) {
@@ -440,6 +442,16 @@ ParseError parse_program(const char *source, AstProgram *prog) {
     while (p.current.kind != TOK_EOF && !p.err.is_error) {
         if (p.current.kind == TOK_PRED) {
             parse_decl(&p);
+        } else if (p.current.kind == TOK_CLEAR_DERIVED) {
+            /* .clear_derived() directive */
+            parser_advance(&p);
+            if (expect(&p, TOK_LPAREN, "'('") < 0) {
+                break;
+            }
+            if (expect(&p, TOK_RPAREN, "')'") < 0) {
+                break;
+            }
+            prog->clear_derived = 1;
         } else if (p.current.kind == TOK_IDENT) {
             parse_fact_or_rule(&p);
         } else {

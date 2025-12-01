@@ -180,6 +180,14 @@ Token lexer_next(Lexer *lx) {
 
     switch (ch) {
     case '.':
+        if (lx->pos + 12 < lx->length) {
+            const char *p = lx->input + lx->pos;
+            if (strncmp(p, "clear_derived", 13) == 0) {
+                lx->pos += 13;
+                lx->column += 13;
+                return make_token(lx, TOK_CLEAR_DERIVED, lx->input + lx->pos - 14, 14);
+            }
+        }
         if (lx->pos + 3 < lx->length) {
             const char *p = lx->input + lx->pos;
             if (p[0] == 'p' && p[1] == 'r' && p[2] == 'e' && p[3] == 'd') {

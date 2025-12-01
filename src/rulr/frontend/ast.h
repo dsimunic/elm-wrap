@@ -110,6 +110,8 @@ typedef struct {
     AstRule  *rules;
     int       num_rules;
     int       rules_capacity;
+
+    int       clear_derived;  /* 1 if .clear_derived() directive was found */
 } AstProgram;
 
 void ast_program_init(AstProgram *prog);

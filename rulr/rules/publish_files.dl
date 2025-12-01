@@ -1,0 +1,27 @@
+% Files to include when publishing a package
+%
+% This file should be loaded AFTER core_package_files.dl
+% which derives the core_package_file predicate.
+%
+% import core_package_files.dl
+
+.pred package_file_info(abs: symbol, rel: symbol, name: symbol).
+.pred publish_file(abs: symbol, rel: symbol).
+
+% All core package files should be published
+% core_package_file is derived by core_package_files.dl, not declared here
+publish_file(Abs, Rel) :-
+    core_package_file(Abs, Rel).
+
+% Always-include root metadata files if they exist
+publish_file(Abs, Rel) :-
+    package_file_info(Abs, Rel, _),
+    Rel = "elm.json".
+
+publish_file(Abs, Rel) :-
+    package_file_info(Abs, Rel, _),
+    Rel = "LICENSE".
+
+publish_file(Abs, Rel) :-
+    package_file_info(Abs, Rel, _),
+    Rel = "README.md".

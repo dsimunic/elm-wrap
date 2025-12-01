@@ -11,6 +11,7 @@ typedef enum {
     TOK_RPAREN,
     TOK_COLON,
     TOK_PRED,
+    TOK_CLEAR_DERIVED,
     TOK_NOT,
     TOK_ARROW,
     TOK_EQ,

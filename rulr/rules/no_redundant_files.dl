@@ -1,48 +1,20 @@
-.pred exposed_module(module: symbol).
-.pred file_module(file: symbol, module: symbol).
-.pred file_import(file: symbol, module: symbol).
-.pred source_file(file: symbol).
-.pred package_file(file: symbol).
-.pred package_file_rel(path: symbol).
-.pred package_file_name(name: symbol).
+% Redundant files validation
+%
+% NOTE: This file requires core_package_file to be derived.
+% import core_package_files.dl
+
+% Input predicates
 .pred package_file_info(abs: symbol, rel: symbol, name: symbol).
-.pred allowed_root_file(file: symbol).
+.pred core_package_file(abs: symbol, rel: symbol).
 
-.pred reachable_module(module: symbol).
-.pred reachable_file(file: symbol).
-.pred allowed_file(file: symbol).
-.pred allowed_filename(name: symbol).
-.pred redundant_file(file: symbol).
-.pred error(file: symbol).
+% A file is redundant if it is present in the package
+% but not part of the core package content.
+.pred redundant_file(abs: symbol, rel: symbol).
+.pred error(abs: symbol, rel: symbol).
 
-reachable_module(Module) :-
-    exposed_module(Module).
+redundant_file(Abs, Rel) :-
+    package_file_info(Abs, Rel, _),
+    not core_package_file(Abs, Rel).
 
-reachable_module(Module) :-
-    reachable_file(File),
-    file_import(File, Module).
-
-reachable_file(File) :-
-    file_module(File, Module),
-    reachable_module(Module).
-
-allowed_file(File) :-
-    allowed_root_file(File).
-
-allowed_file(File) :-
-    reachable_file(File).
-
-% Allow files by filename (anywhere in package)
-allowed_filename("docs.json").
-allowed_filename("endpoint.json").
-
-allowed_file(File) :-
-    package_file_info(File, _, Name),
-    allowed_filename(Name).
-
-redundant_file(File) :-
-    package_file(File),
-    not allowed_file(File).
-
-error(File) :-
-    redundant_file(File).
+error(Abs, Rel) :-
+    redundant_file(Abs, Rel).
