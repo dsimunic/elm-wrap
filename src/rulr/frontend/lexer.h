@@ -14,9 +14,15 @@ typedef enum {
     TOK_NOT,
     TOK_ARROW,
     TOK_EQ,
+    TOK_NE,         /* != or <> */
+    TOK_LT,         /* < */
+    TOK_LE,         /* <= */
+    TOK_GT,         /* > */
+    TOK_GE,         /* >= */
     TOK_IDENT,
     TOK_STRING,
     TOK_INT,
+    TOK_WILDCARD,
     TOK_EOF
 } TokenKind;
 

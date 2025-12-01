@@ -27,10 +27,19 @@ static int lexer_advance(Lexer *lx) {
 }
 
 static void lexer_skip_ws(Lexer *lx) {
-    int ch = lexer_peek(lx);
-    while (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') {
-        lexer_advance(lx);
-        ch = lexer_peek(lx);
+    while (1) {
+        int ch = lexer_peek(lx);
+        if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') {
+            lexer_advance(lx);
+        } else if (ch == '%') {
+            /* Skip line comment until end of line or EOF */
+            lexer_advance(lx);
+            while ((ch = lexer_peek(lx)) >= 0 && ch != '\n') {
+                lexer_advance(lx);
+            }
+        } else {
+            break;
+        }
     }
 }
 
@@ -77,6 +86,12 @@ static Token lex_ident(Lexer *lx, const char *start) {
         lexer_advance(lx);
     }
     int len = (int)(lx->pos - begin_pos);
+    
+    /* Check for wildcard: single underscore */
+    if (len == 1 && start[0] == '_') {
+        return make_token(lx, TOK_WILDCARD, start, len);
+    }
+    
     Token t = make_token(lx, TOK_IDENT, start, len);
 
     if (len == 3 && strncmp(start, "not", 3) == 0) {
@@ -188,6 +203,28 @@ Token lexer_next(Lexer *lx) {
         return make_token(lx, TOK_COLON, lx->input + lx->pos - 1, 1);
     case '=':
         return make_token(lx, TOK_EQ, lx->input + lx->pos - 1, 1);
+    case '!':
+        if (lexer_peek(lx) == '=') {
+            lexer_advance(lx);
+            return make_token(lx, TOK_NE, lx->input + lx->pos - 2, 2);
+        }
+        return make_token(lx, TOK_INVALID, lx->input + lx->pos - 1, 1);
+    case '<':
+        if (lexer_peek(lx) == '=') {
+            lexer_advance(lx);
+            return make_token(lx, TOK_LE, lx->input + lx->pos - 2, 2);
+        }
+        if (lexer_peek(lx) == '>') {
+            lexer_advance(lx);
+            return make_token(lx, TOK_NE, lx->input + lx->pos - 2, 2);
+        }
+        return make_token(lx, TOK_LT, lx->input + lx->pos - 1, 1);
+    case '>':
+        if (lexer_peek(lx) == '=') {
+            lexer_advance(lx);
+            return make_token(lx, TOK_GE, lx->input + lx->pos - 2, 2);
+        }
+        return make_token(lx, TOK_GT, lx->input + lx->pos - 1, 1);
     case '"':
         return lex_string(lx);
     default:

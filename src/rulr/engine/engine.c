@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <regex.h>
 #include "engine/engine.h"
 #include "frontend/ast.h"
 #include "ir/ir_builder.h"
@@ -367,10 +368,18 @@ static int eval_term_value(const IrTerm *term, const Env *env, Value *out) {
         *out = env->values[term->var];
         return 1;
     }
+    if (term->kind == IR_TERM_WILDCARD) {
+        /* Wildcards cannot be evaluated - they only match */
+        return 0;
+    }
     return 0;
 }
 
 static int bind_term_to_value(const IrTerm *term, const Value *val, Env *env) {
+    if (term->kind == IR_TERM_WILDCARD) {
+        /* Wildcards always match any value without binding */
+        return 1;
+    }
     if (term->kind == IR_TERM_VAR) {
         if (term->var < 0 || term->var >= env->num_vars) {
             return 0;
@@ -409,6 +418,77 @@ static int eval_eq_literal(const IrLiteral *lit, Env *env) {
         return 0;
     }
     return value_equal(lhs, rhs);
+}
+
+static int compare_values(Value lhs, Value rhs) {
+    /* Compare two values. Returns <0, 0, or >0 like strcmp.
+     * For symbols, compare as integers (symbol IDs).
+     * For integers, compare numerically. */
+    if (lhs.kind == VAL_INT && rhs.kind == VAL_INT) {
+        if (lhs.u.i < rhs.u.i) return -1;
+        if (lhs.u.i > rhs.u.i) return 1;
+        return 0;
+    }
+    if (lhs.kind == VAL_SYM && rhs.kind == VAL_SYM) {
+        if (lhs.u.sym < rhs.u.sym) return -1;
+        if (lhs.u.sym > rhs.u.sym) return 1;
+        return 0;
+    }
+    /* Mixed types: INT < SYM for consistent ordering */
+    if (lhs.kind == VAL_INT && rhs.kind == VAL_SYM) return -1;
+    if (lhs.kind == VAL_SYM && rhs.kind == VAL_INT) return 1;
+    return 0;
+}
+
+static int eval_cmp_literal(const IrLiteral *lit, Env *env) {
+    Value lhs, rhs;
+    if (!eval_term_value(&lit->lhs, env, &lhs)) {
+        return 0;
+    }
+    if (!eval_term_value(&lit->rhs, env, &rhs)) {
+        return 0;
+    }
+    int cmp = compare_values(lhs, rhs);
+    switch (lit->cmp_op) {
+        case IR_CMP_EQ: return cmp == 0;
+        case IR_CMP_NE: return cmp != 0;
+        case IR_CMP_LT: return cmp < 0;
+        case IR_CMP_LE: return cmp <= 0;
+        case IR_CMP_GT: return cmp > 0;
+        case IR_CMP_GE: return cmp >= 0;
+        default: return 0;
+    }
+}
+
+static int eval_builtin_literal(Engine *e, const IrLiteral *lit, Env *env) {
+    if (lit->builtin == IR_BUILTIN_MATCH) {
+        /* match(pattern, string): regex match */
+        Value pattern_val, string_val;
+        if (!eval_term_value(&lit->lhs, env, &pattern_val)) {
+            return 0;
+        }
+        if (!eval_term_value(&lit->rhs, env, &string_val)) {
+            return 0;
+        }
+        /* Both must be symbols */
+        if (pattern_val.kind != VAL_SYM || string_val.kind != VAL_SYM) {
+            return 0;
+        }
+        const char *pattern = e->lookup(e->sym_user, pattern_val.u.sym);
+        const char *str = e->lookup(e->sym_user, string_val.u.sym);
+        if (!pattern || !str) {
+            return 0;
+        }
+        regex_t regex;
+        int ret = regcomp(&regex, pattern, REG_EXTENDED | REG_NOSUB);
+        if (ret != 0) {
+            return 0;  /* Invalid pattern */
+        }
+        ret = regexec(&regex, str, 0, NULL, 0);
+        regfree(&regex);
+        return ret == 0;
+    }
+    return 0;
 }
 
 static int exists_matching_tuple(PredRuntime *pr, const IrLiteral *lit, Env *env) {
@@ -478,6 +558,18 @@ static int match_body_lit(Engine *e, const IrRule *rule, int lit_idx, int driver
     }
     if (lit->kind == IR_LIT_EQ) {
         if (eval_eq_literal(lit, env)) {
+            return match_body_lit(e, rule, lit_idx + 1, driver_idx, env);
+        }
+        return 0;
+    }
+    if (lit->kind == IR_LIT_CMP) {
+        if (eval_cmp_literal(lit, env)) {
+            return match_body_lit(e, rule, lit_idx + 1, driver_idx, env);
+        }
+        return 0;
+    }
+    if (lit->kind == IR_LIT_BUILTIN) {
+        if (eval_builtin_literal(e, lit, env)) {
             return match_body_lit(e, rule, lit_idx + 1, driver_idx, env);
         }
         return 0;

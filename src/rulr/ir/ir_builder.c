@@ -155,7 +155,7 @@ static EngineError validate_fact(const AstFact *fact, PredTable *pt) {
 
 static int find_var(const char *name, char **vars, int count) {
     for (int i = 0; i < count; ++i) {
-        if (strcmp(vars[i], name) == 0) {
+        if (vars[i] && strcmp(vars[i], name) == 0) {
             return i;
         }
     }
@@ -202,7 +202,31 @@ static EngineError translate_term(
         out->var = idx;
         return ok;
     }
+    if (term->kind == TERM_WILDCARD) {
+        /* Each wildcard gets a fresh variable that won't be used elsewhere */
+        if (*var_count >= MAX_VARS) {
+            return make_error("Too many variables in rule");
+        }
+        int idx = *var_count;
+        vars[idx] = NULL; /* Anonymous variable */
+        *var_count += 1;
+        out->kind = IR_TERM_WILDCARD;
+        out->var = idx;
+        return ok;
+    }
     return make_error("Unknown term kind");
+}
+
+static IrCmpOp translate_cmp_op(AstCmpOp op) {
+    switch (op) {
+        case CMP_EQ: return IR_CMP_EQ;
+        case CMP_NE: return IR_CMP_NE;
+        case CMP_LT: return IR_CMP_LT;
+        case CMP_LE: return IR_CMP_LE;
+        case CMP_GT: return IR_CMP_GT;
+        case CMP_GE: return IR_CMP_GE;
+        default: return IR_CMP_EQ;
+    }
 }
 
 static EngineError translate_rule(
@@ -262,6 +286,48 @@ static EngineError translate_rule(
 
         if (lit->kind == LIT_EQ) {
             dest.kind = IR_LIT_EQ;
+            err = translate_term(&lit->lhs, &dest.lhs, vars, &var_count, intern, user_data);
+            if (err.is_error) {
+                return err;
+            }
+            err = translate_term(&lit->rhs, &dest.rhs, vars, &var_count, intern, user_data);
+            if (err.is_error) {
+                return err;
+            }
+            if (dest.lhs.kind == IR_TERM_VAR) {
+                var_seen[dest.lhs.var] = 1;
+            }
+            if (dest.rhs.kind == IR_TERM_VAR) {
+                var_seen[dest.rhs.var] = 1;
+            }
+            out->body[out->num_body++] = dest;
+            continue;
+        }
+
+        if (lit->kind == LIT_CMP) {
+            dest.kind = IR_LIT_CMP;
+            dest.cmp_op = translate_cmp_op(lit->cmp_op);
+            err = translate_term(&lit->lhs, &dest.lhs, vars, &var_count, intern, user_data);
+            if (err.is_error) {
+                return err;
+            }
+            err = translate_term(&lit->rhs, &dest.rhs, vars, &var_count, intern, user_data);
+            if (err.is_error) {
+                return err;
+            }
+            if (dest.lhs.kind == IR_TERM_VAR) {
+                var_seen[dest.lhs.var] = 1;
+            }
+            if (dest.rhs.kind == IR_TERM_VAR) {
+                var_seen[dest.rhs.var] = 1;
+            }
+            out->body[out->num_body++] = dest;
+            continue;
+        }
+
+        if (lit->kind == LIT_BUILTIN) {
+            dest.kind = IR_LIT_BUILTIN;
+            dest.builtin = (lit->builtin == BUILTIN_MATCH) ? IR_BUILTIN_MATCH : IR_BUILTIN_MATCH;
             err = translate_term(&lit->lhs, &dest.lhs, vars, &var_count, intern, user_data);
             if (err.is_error) {
                 return err;

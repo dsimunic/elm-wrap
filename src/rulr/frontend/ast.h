@@ -39,7 +39,8 @@ typedef struct {
 typedef enum {
     TERM_VAR,
     TERM_STRING,
-    TERM_INT
+    TERM_INT,
+    TERM_WILDCARD
 } AstTermKind;
 
 typedef struct {
@@ -54,8 +55,23 @@ typedef struct {
 typedef enum {
     LIT_POS,
     LIT_NEG,
-    LIT_EQ
+    LIT_EQ,
+    LIT_CMP,      /* Comparison: <, <=, >, >=, != */
+    LIT_BUILTIN   /* Builtin call: match(pattern, string) */
 } AstLitKind;
+
+typedef enum {
+    CMP_EQ,       /* = (same as LIT_EQ but for uniformity) */
+    CMP_NE,       /* != or <> */
+    CMP_LT,       /* < */
+    CMP_LE,       /* <= */
+    CMP_GT,       /* > */
+    CMP_GE        /* >= */
+} AstCmpOp;
+
+typedef enum {
+    BUILTIN_MATCH /* match(pattern, string) - regex match */
+} AstBuiltinKind;
 
 typedef struct {
     AstLitKind kind;
@@ -64,6 +80,8 @@ typedef struct {
     AstTerm    args[MAX_ARITY];
     AstTerm    lhs;
     AstTerm    rhs;
+    AstCmpOp   cmp_op;         /* For LIT_CMP */
+    AstBuiltinKind builtin;    /* For LIT_BUILTIN */
 } AstLiteral;
 
 typedef struct {

@@ -173,6 +173,11 @@ static AstTerm parse_term(Parser *p) {
         parser_advance(p);
         return term;
     }
+    if (p->current.kind == TOK_WILDCARD) {
+        term.kind = TERM_WILDCARD;
+        parser_advance(p);
+        return term;
+    }
     if (p->current.kind == TOK_IDENT) {
         if (!token_is_upper_ident(p->current)) {
             parser_error(p, "Expected variable (capitalized) or literal");
@@ -186,6 +191,23 @@ static AstTerm parse_term(Parser *p) {
 
     parser_error(p, "Expected term");
     return term;
+}
+
+static int is_comparison_token(TokenKind kind) {
+    return kind == TOK_EQ || kind == TOK_NE || kind == TOK_LT || 
+           kind == TOK_LE || kind == TOK_GT || kind == TOK_GE;
+}
+
+static AstCmpOp token_to_cmp_op(TokenKind kind) {
+    switch (kind) {
+        case TOK_EQ: return CMP_EQ;
+        case TOK_NE: return CMP_NE;
+        case TOK_LT: return CMP_LT;
+        case TOK_LE: return CMP_LE;
+        case TOK_GT: return CMP_GT;
+        case TOK_GE: return CMP_GE;
+        default: return CMP_EQ;
+    }
 }
 
 static int parse_rule_body(Parser *p, AstRule *rule) {
@@ -204,50 +226,90 @@ static int parse_rule_body(Parser *p, AstRule *rule) {
         }
 
         if (p->current.kind == TOK_IDENT && token_is_lower_ident(p->current)) {
-            lit.pred = copy_token_text(p->current);
-            lit.kind = is_not ? LIT_NEG : LIT_POS;
-            parser_advance(p);
-            if (expect(p, TOK_LPAREN, "'('") < 0) {
-                return -1;
-            }
-            int arg_idx = 0;
-            if (p->current.kind != TOK_RPAREN) {
-                while (1) {
-                    if (arg_idx >= MAX_ARITY) {
-                        parser_error(p, "Too many arguments in literal");
-                        return -1;
-                    }
-                    lit.args[arg_idx] = parse_term(p);
-                    if (p->err.is_error) {
-                        return -1;
-                    }
-                    arg_idx += 1;
-                    if (p->current.kind == TOK_COMMA) {
-                        parser_advance(p);
-                        continue;
-                    }
-                    if (p->current.kind == TOK_RPAREN) {
-                        break;
-                    }
-                    parser_error(p, "Expected ',' or ')' in literal");
+            char *pred_name = copy_token_text(p->current);
+            
+            /* Check for 'match' builtin */
+            if (strcmp(pred_name, "match") == 0) {
+                if (is_not) {
+                    parser_error(p, "'not' cannot be used with match builtin");
                     return -1;
                 }
+                parser_advance(p);
+                if (expect(p, TOK_LPAREN, "'('") < 0) {
+                    return -1;
+                }
+                /* match(pattern, string) */
+                lit.lhs = parse_term(p);  /* pattern */
+                if (p->err.is_error) {
+                    return -1;
+                }
+                if (expect(p, TOK_COMMA, "','") < 0) {
+                    return -1;
+                }
+                lit.rhs = parse_term(p);  /* string to match */
+                if (p->err.is_error) {
+                    return -1;
+                }
+                if (expect(p, TOK_RPAREN, "')'") < 0) {
+                    return -1;
+                }
+                lit.kind = LIT_BUILTIN;
+                lit.builtin = BUILTIN_MATCH;
+                lit.arity = 0;
+            } else {
+                lit.pred = pred_name;
+                lit.kind = is_not ? LIT_NEG : LIT_POS;
+                parser_advance(p);
+                if (expect(p, TOK_LPAREN, "'('") < 0) {
+                    return -1;
+                }
+                int arg_idx = 0;
+                if (p->current.kind != TOK_RPAREN) {
+                    while (1) {
+                        if (arg_idx >= MAX_ARITY) {
+                            parser_error(p, "Too many arguments in literal");
+                            return -1;
+                        }
+                        lit.args[arg_idx] = parse_term(p);
+                        if (p->err.is_error) {
+                            return -1;
+                        }
+                        arg_idx += 1;
+                        if (p->current.kind == TOK_COMMA) {
+                            parser_advance(p);
+                            continue;
+                        }
+                        if (p->current.kind == TOK_RPAREN) {
+                            break;
+                        }
+                        parser_error(p, "Expected ',' or ')' in literal");
+                        return -1;
+                    }
+                }
+                lit.arity = arg_idx;
+                parser_advance(p); /* consume ) */
             }
-            lit.arity = arg_idx;
-            parser_advance(p); /* consume ) */
         } else {
             AstTerm lhs = parse_term(p);
             if (p->err.is_error) {
                 return -1;
             }
-            if (expect(p, TOK_EQ, "'='") < 0) {
+            if (!is_comparison_token(p->current.kind)) {
+                parser_error(p, "Expected comparison operator (=, !=, <, <=, >, >=)");
                 return -1;
             }
+            TokenKind cmp_tok = p->current.kind;
+            parser_advance(p);
             AstTerm rhs = parse_term(p);
             if (p->err.is_error) {
                 return -1;
             }
-            lit.kind = LIT_EQ;
+            if (cmp_tok == TOK_EQ) {
+                lit.kind = LIT_EQ;
+            } else {
+                lit.kind = LIT_CMP;
+                lit.cmp_op = token_to_cmp_op(cmp_tok);
+            }
             lit.lhs = lhs;
             lit.rhs = rhs;
             lit.arity = 0;

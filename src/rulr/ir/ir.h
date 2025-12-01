@@ -22,7 +22,8 @@ typedef struct {
 typedef enum {
     IR_TERM_VAR,
     IR_TERM_SYM,
-    IR_TERM_INT
+    IR_TERM_INT,
+    IR_TERM_WILDCARD
 } IrTermKind;
 
 typedef struct {
@@ -35,8 +36,23 @@ typedef struct {
 typedef enum {
     IR_LIT_POS,
     IR_LIT_NEG,
-    IR_LIT_EQ
+    IR_LIT_EQ,
+    IR_LIT_CMP,     /* Comparison: <, <=, >, >=, != */
+    IR_LIT_BUILTIN  /* Builtin call */
 } IrLitKind;
+
+typedef enum {
+    IR_CMP_EQ,
+    IR_CMP_NE,
+    IR_CMP_LT,
+    IR_CMP_LE,
+    IR_CMP_GT,
+    IR_CMP_GE
+} IrCmpOp;
+
+typedef enum {
+    IR_BUILTIN_MATCH  /* match(pattern, string) */
+} IrBuiltinKind;
 
 typedef struct {
     IrLitKind kind;
@@ -45,6 +61,8 @@ typedef struct {
     IrTerm    args[MAX_ARITY];
     IrTerm    lhs;
     IrTerm    rhs;
+    IrCmpOp   cmp_op;       /* For IR_LIT_CMP */
+    IrBuiltinKind builtin;  /* For IR_LIT_BUILTIN */
 } IrLiteral;
 
 typedef struct {
