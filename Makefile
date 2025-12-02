@@ -103,6 +103,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/review/reporter.c \
           $(SRCDIR)/commands/debug/debug.c \
           $(SRCDIR)/commands/debug/include_tree.c \
+          $(SRCDIR)/commands/repository/repository.c \
           $(SRCDIR)/import_tree.c \
           $(SRCDIR)/commands/cache/check/cache_check.c \
           $(SRCDIR)/commands/cache/full_scan/cache_full_scan.c \
@@ -123,6 +124,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/fileutil.c \
           $(SRCDIR)/elm_cmd_common.c \
           $(SRCDIR)/elm_project.c \
+          $(SRCDIR)/env_defaults.c \
           $(SRCDIR)/pgsolver/pg_core.c \
           $(SRCDIR)/pgsolver/pg_elm.c \
           $(SRCDIR)/ast/skeleton.c \
@@ -164,6 +166,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/reporter.o \
           $(BUILDDIR)/debug.o \
           $(BUILDDIR)/include_tree.o \
+          $(BUILDDIR)/repository.o \
           $(BUILDDIR)/import_tree.o \
           $(BUILDDIR)/cache_check.o \
           $(BUILDDIR)/cache_full_scan.o \
@@ -184,6 +187,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/fileutil.o \
           $(BUILDDIR)/elm_cmd_common.o \
           $(BUILDDIR)/elm_project.o \
+          $(BUILDDIR)/env_defaults.o \
           $(BUILDDIR)/pg_core.o \
           $(BUILDDIR)/pg_elm.o \
           $(BUILDDIR)/ast_skeleton.o \
@@ -484,6 +488,14 @@ $(BUILDDIR)/elm_cmd_common.o: $(SRCDIR)/elm_cmd_common.c $(SRCDIR)/elm_cmd_commo
 
 # Build elm_project object
 $(BUILDDIR)/elm_project.o: $(SRCDIR)/elm_project.c $(SRCDIR)/elm_project.h $(SRCDIR)/fileutil.h $(SRCDIR)/cJSON.h $(SRCDIR)/dyn_array.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build env_defaults object
+$(BUILDDIR)/env_defaults.o: $(SRCDIR)/env_defaults.c $(SRCDIR)/env_defaults.h $(SRCDIR)/buildinfo.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build repository object
+$(BUILDDIR)/repository.o: $(SRCDIR)/commands/repository/repository.c $(SRCDIR)/commands/repository/repository.h $(SRCDIR)/env_defaults.h $(SRCDIR)/elm_compiler.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build sha1 object

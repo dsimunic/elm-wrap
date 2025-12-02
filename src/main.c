@@ -20,6 +20,7 @@
 #include "commands/policy/policy.h"
 #include "commands/review/review.h"
 #include "commands/publish/package/package_publish.h"
+#include "commands/repository/repository.h"
 #include "alloc.h"
 #include "log.h"
 #include "progname.h"
@@ -43,6 +44,7 @@ void print_usage(const char *prog) {
     printf("  config             Display current configuration\n");
     printf("  publish SUBCOMMAND Publishing commands\n");
     printf("  package SUBCOMMAND Package management commands\n");
+    printf("  repository SUBCOMMAND Repository management commands\n");
     printf("  code SUBCOMMAND    Code analysis and transformation commands\n");
     printf("  policy SUBCOMMAND  View and manage rulr policy rules\n");
     printf("  review SUBCOMMAND  Run rulr rules against Elm files\n");
@@ -257,6 +259,10 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "review") == 0) {
             return cmd_review(argc - 1, argv + 1);
+        }
+
+        if (strcmp(argv[1], "repository") == 0) {
+            return cmd_repository(argc - 1, argv + 1);
         }
 
         if (strcmp(argv[1], "debug") == 0) {

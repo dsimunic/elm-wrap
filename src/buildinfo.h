@@ -33,4 +33,8 @@ extern const char sbom_metadata[];
 /* Helper function to print SBOM info */
 void print_sbom_info(void);
 
+/* Environment variable defaults (from ENV_DEFAULTS file at build time) */
+extern const char *env_default_registry_v2_full_index_url;
+extern const char *env_default_repository_local_path;
+
 #endif /* BUILDINFO_H */
