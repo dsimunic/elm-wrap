@@ -209,5 +209,4 @@ The incremental update endpoint `https://package.elm-lang.org/all-packages/since
 ]
 ```
 
-This example shows the response for `all-packages/since/16400`, containing 46 new package versions published after the given count.</content>
-<parameter name="filePath">/Volumes/Devel/Projects/Elm-Compiler/wrap/doc/file_formats.md
+This example shows the response for `all-packages/since/16400`, containing 46 new package versions published after the given count.
