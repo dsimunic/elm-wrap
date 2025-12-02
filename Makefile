@@ -120,6 +120,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/http_client.c \
           $(SRCDIR)/registry.c \
           $(SRCDIR)/protocol_v1/package_fetch.c \
+          $(SRCDIR)/protocol_v2/index_fetch.c \
           $(SRCDIR)/install_env.c \
           $(SRCDIR)/fileutil.c \
           $(SRCDIR)/elm_cmd_common.c \
@@ -183,6 +184,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/http_client.o \
           $(BUILDDIR)/registry.o \
           $(BUILDDIR)/package_fetch.o \
+          $(BUILDDIR)/index_fetch.o \
           $(BUILDDIR)/install_env.o \
           $(BUILDDIR)/fileutil.o \
           $(BUILDDIR)/elm_cmd_common.o \
@@ -472,6 +474,10 @@ $(BUILDDIR)/registry.o: $(SRCDIR)/registry.c $(SRCDIR)/registry.h | $(BUILDDIR)
 
 # Build package_fetch object
 $(BUILDDIR)/package_fetch.o: $(SRCDIR)/protocol_v1/package_fetch.c $(SRCDIR)/protocol_v1/package_fetch.h $(SRCDIR)/install_env.h $(SRCDIR)/cache.h $(SRCDIR)/http_client.h $(SRCDIR)/cJSON.h $(SRCDIR)/vendor/sha1.h $(SRCDIR)/log.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build index_fetch object (protocol v2)
+$(BUILDDIR)/index_fetch.o: $(SRCDIR)/protocol_v2/index_fetch.c $(SRCDIR)/protocol_v2/index_fetch.h $(SRCDIR)/env_defaults.h $(SRCDIR)/http_client.h $(SRCDIR)/log.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build install_env object

@@ -11,6 +11,7 @@
 #include "../../env_defaults.h"
 #include "../../elm_compiler.h"
 #include "../../log.h"
+#include "../../protocol_v2/index_fetch.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -258,6 +259,13 @@ int cmd_repository_new(int argc, char *argv[]) {
     }
 
     printf("Created repository: %s\n", repo_path);
+
+    /* Download the registry index */
+    if (!v2_index_fetch(repo_path, effective_compiler, effective_version)) {
+        fprintf(stderr, "Warning: Failed to download registry index\n");
+        /* Continue anyway - the directory was created successfully */
+    }
+
     return 0;
 }
 
