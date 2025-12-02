@@ -1,11 +1,11 @@
-#include "bump.h"
-#include "elm_json.h"
-#include "elm_cmd_common.h"
-#include "install_env.h"
-#include "elm_compiler.h"
-#include "alloc.h"
-#include "log.h"
-#include "progname.h"
+#include "repl.h"
+#include "../elm_json.h"
+#include "../elm_cmd_common.h"
+#include "../install_env.h"
+#include "../elm_compiler.h"
+#include "../alloc.h"
+#include "../log.h"
+#include "../progname.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,22 +15,22 @@
 
 #define ELM_JSON_PATH "elm.json"
 
-static void print_bump_usage(void) {
-    printf("Usage: %s bump\n", program_name);
+static void print_repl_usage(void) {
+    printf("Usage: %s repl\n", program_name);
     printf("\n");
-    printf("Bump version numbers in elm.json based on API changes.\n");
+    printf("Start an interactive Elm REPL (Read-Eval-Print Loop).\n");
     printf("\n");
     printf("This command ensures all package dependencies are downloaded and cached\n");
-    printf("before calling 'elm bump'.\n");
+    printf("before calling 'elm repl'.\n");
     printf("\n");
-    printf("All options are passed through to 'elm bump'.\n");
+    printf("All options are passed through to 'elm repl'.\n");
 }
 
-int cmd_bump(int argc, char *argv[]) {
+int cmd_repl(int argc, char *argv[]) {
     // Check for help flag
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            print_bump_usage();
+            print_repl_usage();
             return 0;
         }
     }
@@ -72,8 +72,8 @@ int cmd_bump(int argc, char *argv[]) {
         return result;
     }
 
-    // Now call elm bump with all the arguments
-    printf("\nAll dependencies cached. Running elm bump...\n\n");
+    // Now call elm repl with all the arguments
+    printf("\nAll dependencies cached. Running elm repl...\n\n");
 
     // Get elm compiler path
     char *elm_path = elm_compiler_get_path();
@@ -92,11 +92,11 @@ int cmd_bump(int argc, char *argv[]) {
         return 1;
     }
 
-    // Build elm bump command
-    // We need to pass all arguments except "bump" to elm
+    // Build elm repl command
+    // We need to pass all arguments except "repl" to elm
     char **elm_args = arena_malloc(sizeof(char*) * (argc + 2));
     elm_args[0] = "elm";
-    elm_args[1] = "bump";
+    elm_args[1] = "repl";
 
     // Copy remaining arguments
     for (int i = 1; i < argc; i++) {
@@ -104,7 +104,7 @@ int cmd_bump(int argc, char *argv[]) {
     }
     elm_args[argc + 1] = NULL;
 
-    // Execute elm bump with custom environment
+    // Execute elm repl with custom environment
     execve(elm_path, elm_args, elm_env);
 
     // If execve returns, it failed

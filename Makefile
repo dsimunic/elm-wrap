@@ -76,13 +76,14 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/alloc.c \
           $(SRCDIR)/log.c \
           $(SRCDIR)/progname.c \
-          $(SRCDIR)/init.c \
-          $(SRCDIR)/make.c \
-          $(SRCDIR)/repl.c \
-          $(SRCDIR)/reactor.c \
-          $(SRCDIR)/bump.c \
-          $(SRCDIR)/diff.c \
-          $(SRCDIR)/publish.c \
+          $(SRCDIR)/wrapper/init.c \
+          $(SRCDIR)/wrapper/make.c \
+          $(SRCDIR)/wrapper/repl.c \
+          $(SRCDIR)/wrapper/reactor.c \
+          $(SRCDIR)/wrapper/bump.c \
+          $(SRCDIR)/wrapper/diff.c \
+          $(SRCDIR)/wrapper/publish.c \
+          $(SRCDIR)/wrapper/live.c \
           $(SRCDIR)/config.c \
           $(SRCDIR)/commands/publish/docs/docs.c \
           $(SRCDIR)/commands/publish/docs/elm_docs.c \
@@ -152,6 +153,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/bump.o \
           $(BUILDDIR)/diff.o \
           $(BUILDDIR)/publish.o \
+          $(BUILDDIR)/live.o \
           $(BUILDDIR)/config.o \
           $(BUILDDIR)/docs.o \
           $(BUILDDIR)/elm_docs.o \
@@ -266,7 +268,7 @@ $(BUILDDIR)/buildinfo.o: $(BUILDINFO_SRC)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build main object
-$(BUILDDIR)/main.o: $(SRCDIR)/main.c $(SRCDIR)/buildinfo.h $(SRCDIR)/install.h $(SRCDIR)/make.h $(SRCDIR)/init.h $(SRCDIR)/repl.h $(SRCDIR)/reactor.h $(SRCDIR)/bump.h $(SRCDIR)/diff.h $(SRCDIR)/publish.h $(SRCDIR)/config.h | $(BUILDDIR)
+$(BUILDDIR)/main.o: $(SRCDIR)/main.c $(SRCDIR)/buildinfo.h $(SRCDIR)/install.h $(SRCDIR)/wrapper/make.h $(SRCDIR)/wrapper/init.h $(SRCDIR)/wrapper/repl.h $(SRCDIR)/wrapper/reactor.h $(SRCDIR)/wrapper/bump.h $(SRCDIR)/wrapper/diff.h $(SRCDIR)/wrapper/publish.h $(SRCDIR)/wrapper/live.h $(SRCDIR)/config.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build alloc object
@@ -282,31 +284,35 @@ $(BUILDDIR)/progname.o: $(SRCDIR)/progname.c $(SRCDIR)/progname.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build init object
-$(BUILDDIR)/init.o: $(SRCDIR)/init.c $(SRCDIR)/init.h $(SRCDIR)/install_env.h | $(BUILDDIR)
+$(BUILDDIR)/init.o: $(SRCDIR)/wrapper/init.c $(SRCDIR)/wrapper/init.h $(SRCDIR)/install_env.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build make object
-$(BUILDDIR)/make.o: $(SRCDIR)/make.c $(SRCDIR)/make.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
+$(BUILDDIR)/make.o: $(SRCDIR)/wrapper/make.c $(SRCDIR)/wrapper/make.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build repl object
-$(BUILDDIR)/repl.o: $(SRCDIR)/repl.c $(SRCDIR)/repl.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
+$(BUILDDIR)/repl.o: $(SRCDIR)/wrapper/repl.c $(SRCDIR)/wrapper/repl.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build reactor object
-$(BUILDDIR)/reactor.o: $(SRCDIR)/reactor.c $(SRCDIR)/reactor.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
+$(BUILDDIR)/reactor.o: $(SRCDIR)/wrapper/reactor.c $(SRCDIR)/wrapper/reactor.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build bump object
-$(BUILDDIR)/bump.o: $(SRCDIR)/bump.c $(SRCDIR)/bump.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
+$(BUILDDIR)/bump.o: $(SRCDIR)/wrapper/bump.c $(SRCDIR)/wrapper/bump.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build diff object
-$(BUILDDIR)/diff.o: $(SRCDIR)/diff.c $(SRCDIR)/diff.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
+$(BUILDDIR)/diff.o: $(SRCDIR)/wrapper/diff.c $(SRCDIR)/wrapper/diff.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build publish object
-$(BUILDDIR)/publish.o: $(SRCDIR)/publish.c $(SRCDIR)/publish.h $(SRCDIR)/commands/publish/docs/docs.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
+$(BUILDDIR)/publish.o: $(SRCDIR)/wrapper/publish.c $(SRCDIR)/wrapper/publish.h $(SRCDIR)/progname.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build live object
+$(BUILDDIR)/live.o: $(SRCDIR)/wrapper/live.c $(SRCDIR)/wrapper/live.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h $(SRCDIR)/global_context.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build config object

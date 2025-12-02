@@ -1,9 +1,9 @@
-#ifndef INIT_H
-#define INIT_H
+#ifndef WRAPPER_INIT_H
+#define WRAPPER_INIT_H
 
 #include <stdbool.h>
 
 /* Init command entry point */
 int cmd_init(int argc, char *argv[]);
 
-#endif /* INIT_H */
+#endif /* WRAPPER_INIT_H */

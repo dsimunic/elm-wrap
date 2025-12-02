@@ -7,19 +7,21 @@
 #include <unistd.h>
 #include "buildinfo.h"
 #include "install.h"
-#include "make.h"
-#include "init.h"
-#include "repl.h"
-#include "reactor.h"
-#include "bump.h"
-#include "diff.h"
-#include "publish.h"
+#include "wrapper/make.h"
+#include "wrapper/init.h"
+#include "wrapper/repl.h"
+#include "wrapper/reactor.h"
+#include "wrapper/bump.h"
+#include "wrapper/diff.h"
+#include "wrapper/publish.h"
+#include "wrapper/live.h"
 #include "config.h"
 #include "commands/code/code.h"
 #include "commands/debug/debug.h"
 #include "commands/policy/policy.h"
 #include "commands/review/review.h"
 #include "commands/publish/package/package_publish.h"
+#include "commands/publish/docs/docs.h"
 #include "commands/repository/repository.h"
 #include "alloc.h"
 #include "log.h"
@@ -32,6 +34,9 @@
 #endif
 
 void print_usage(const char *prog) {
+    GlobalContext *ctx = global_context_get();
+    bool is_lamdera = ctx && ctx->compiler_name && strcmp(ctx->compiler_name, "lamdera") == 0;
+
     printf("Usage: %s COMMAND [OPTIONS]\n", prog);
     printf("\nCommands:\n");
     printf("  repl               Open an interactive Elm REPL\n");
@@ -41,9 +46,11 @@ void print_usage(const char *prog) {
     printf("  install <PACKAGE>  Install packages for your Elm project\n");
     printf("  bump               Bump version based on API changes\n");
     printf("  diff [VERSION]     Show API differences between versions\n");
+    if (is_lamdera) {
+        printf("  live               Start the Lamdera live development server\n");
+    }
     printf("\n");
     printf("  config             Display current configuration\n");
-    printf("  publish SUBCOMMAND Publishing commands\n");
     printf("  package SUBCOMMAND Package management commands\n");
     printf("  repository SUBCOMMAND Repository management commands\n");
     printf("  code SUBCOMMAND    Code analysis and transformation commands\n");
@@ -68,6 +75,7 @@ void print_package_usage(const char *prog) {
     printf("  info                 Display package management information\n");
     printf("  deps <PACKAGE>       Display dependencies for a specific package\n");
     printf("  publish <PATH>       Show files that would be published from a package\n");
+    printf("  docs <PATH>          Generate documentation JSON for a package\n");
     printf("\nOptions:\n");
     printf("  -y, --yes            Automatically confirm changes\n");
     printf("  -v, --verbose        Show detailed logging output\n");
@@ -125,6 +133,11 @@ int cmd_package(int argc, char *argv[], const char *prog) {
     if (strcmp(subcmd, "publish") == 0) {
         // Pass remaining args to package publish command
         return cmd_package_publish(argc - 1, argv + 1);
+    }
+
+    if (strcmp(subcmd, "docs") == 0) {
+        // Pass remaining args to docs command
+        return cmd_publish_docs(argc - 1, argv + 1);
     }
 
     fprintf(stderr, "Error: Unknown package subcommand '%s'\n", subcmd);
@@ -243,6 +256,10 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "diff") == 0) {
             return cmd_diff(argc - 1, argv + 1);
+        }
+
+        if (strcmp(argv[1], "live") == 0) {
+            return cmd_live(argc - 1, argv + 1);
         }
 
         if (strcmp(argv[1], "publish") == 0) {

@@ -1,9 +1,9 @@
-#ifndef MAKE_H
-#define MAKE_H
+#ifndef WRAPPER_MAKE_H
+#define WRAPPER_MAKE_H
 
 #include <stdbool.h>
 
 /* Make command entry point */
 int cmd_make(int argc, char *argv[]);
 
-#endif /* MAKE_H */
+#endif /* WRAPPER_MAKE_H */

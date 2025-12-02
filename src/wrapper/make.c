@@ -1,12 +1,11 @@
-#include "publish.h"
-#include "commands/publish/docs/docs.h"
-#include "elm_json.h"
-#include "elm_cmd_common.h"
-#include "install_env.h"
-#include "elm_compiler.h"
-#include "alloc.h"
-#include "log.h"
-#include "progname.h"
+#include "make.h"
+#include "../elm_json.h"
+#include "../elm_cmd_common.h"
+#include "../install_env.h"
+#include "../elm_compiler.h"
+#include "../alloc.h"
+#include "../log.h"
+#include "../progname.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,33 +15,27 @@
 
 #define ELM_JSON_PATH "elm.json"
 
-static void print_publish_usage(void) {
-    printf("Usage: %s publish SUBCOMMAND [OPTIONS]\n", program_name);
+static void print_make_usage(void) {
+    printf("Usage: %s make [ELM_FILE] [OPTIONS]\n", program_name);
     printf("\n");
-    printf("Subcommands:\n");
-    printf("  package            Publish a package to the Elm package registry\n");
-    printf("  docs <PATH>        Generate documentation JSON for a package\n");
-    printf("\n");
-    printf("Options:\n");
-    printf("  -h, --help         Show this help message\n");
-}
-
-static void print_publish_package_usage(void) {
-    printf("Usage: %s publish package\n", program_name);
-    printf("\n");
-    printf("Publish a package to the Elm package registry.\n");
+    printf("Compile Elm code to JavaScript or HTML.\n");
     printf("\n");
     printf("This command ensures all package dependencies are downloaded and cached\n");
-    printf("before calling 'elm publish'.\n");
+    printf("before calling 'elm make' to perform the actual compilation.\n");
     printf("\n");
-    printf("All options are passed through to 'elm publish'.\n");
+    printf("Examples:\n");
+    printf("  %s make src/Main.elm                 # Compile Main.elm\n", program_name);
+    printf("  %s make src/Main.elm --output=main.js\n", program_name);
+    printf("  %s make src/Main.elm --optimize\n", program_name);
+    printf("\n");
+    printf("All options are passed through to 'elm make'.\n");
 }
 
-static int cmd_publish_package(int argc, char *argv[]) {
+int cmd_make(int argc, char *argv[]) {
     // Check for help flag
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            print_publish_package_usage();
+            print_make_usage();
             return 0;
         }
     }
@@ -84,8 +77,8 @@ static int cmd_publish_package(int argc, char *argv[]) {
         return result;
     }
 
-    // Now call elm publish with all the arguments
-    printf("\nAll dependencies cached. Running elm publish...\n\n");
+    // Now call elm make with all the arguments
+    printf("\nAll dependencies cached. Running elm make...\n\n");
 
     // Get elm compiler path
     char *elm_path = elm_compiler_get_path();
@@ -104,11 +97,11 @@ static int cmd_publish_package(int argc, char *argv[]) {
         return 1;
     }
 
-    // Build elm publish command
-    // We need to pass all arguments except "publish" to elm
+    // Build elm make command
+    // We need to pass all arguments except "make" to elm
     char **elm_args = arena_malloc(sizeof(char*) * (argc + 2));
     elm_args[0] = "elm";
-    elm_args[1] = "publish";
+    elm_args[1] = "make";
 
     // Copy remaining arguments
     for (int i = 1; i < argc; i++) {
@@ -116,7 +109,7 @@ static int cmd_publish_package(int argc, char *argv[]) {
     }
     elm_args[argc + 1] = NULL;
 
-    // Execute elm publish with custom environment
+    // Execute elm make with custom environment
     execve(elm_path, elm_args, elm_env);
 
     // If execve returns, it failed
@@ -127,31 +120,4 @@ static int cmd_publish_package(int argc, char *argv[]) {
     perror("execve");
     arena_free(elm_args);
     return 1;
-}
-
-int cmd_publish(int argc, char *argv[]) {
-    if (argc < 2) {
-        // No subcommand specified - for backward compatibility, default to package
-        return cmd_publish_package(argc, argv);
-    }
-
-    const char *subcmd = argv[1];
-
-    if (strcmp(subcmd, "-h") == 0 || strcmp(subcmd, "--help") == 0) {
-        print_publish_usage();
-        return 0;
-    }
-
-    if (strcmp(subcmd, "package") == 0) {
-        // Pass remaining args to package command
-        return cmd_publish_package(argc - 1, argv + 1);
-    }
-
-    if (strcmp(subcmd, "docs") == 0) {
-        // Pass remaining args to docs command
-        return cmd_publish_docs(argc - 1, argv + 1);
-    }
-
-    // Unknown subcommand - for backward compatibility, treat as publish package
-    return cmd_publish_package(argc, argv);
 }
