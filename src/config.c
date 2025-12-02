@@ -1,6 +1,7 @@
 #include "config.h"
 #include "cache.h"
 #include "elm_compiler.h"
+#include "global_context.h"
 #include "alloc.h"
 #include "log.h"
 #include "progname.h"
@@ -14,6 +15,7 @@ static void print_config_usage(void) {
     printf("Display current elm-wrap configuration.\n");
     printf("\n");
     printf("Shows:\n");
+    printf("  - Protocol mode (V1 or V2)\n");
     printf("  - ELM_HOME directory\n");
     printf("  - Elm compiler version\n");
     printf("  - Elm compiler binary path\n");
@@ -48,7 +50,14 @@ int cmd_config(int argc, char *argv[]) {
     // Get compiler version
     char *compiler_version = elm_compiler_get_version();
 
+    // Get global context for protocol mode
+    GlobalContext *ctx = global_context_get();
+
     // Print configuration
+    printf("Protocol mode: %s\n", global_context_mode_string());
+    if (ctx && ctx->protocol_mode == PROTOCOL_V2 && ctx->repository_path) {
+        printf("Repository path: %s\n", ctx->repository_path);
+    }
     printf("ELM_HOME: %s\n", cache->elm_home);
     if (compiler_version) {
         printf("Elm compiler version: %s\n", compiler_version);

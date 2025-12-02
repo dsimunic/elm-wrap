@@ -25,6 +25,7 @@
 #include "log.h"
 #include "progname.h"
 #include "rulr/builtin_rules.h"
+#include "global_context.h"
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
@@ -191,6 +192,9 @@ int main(int argc, char *argv[]) {
 
     // Initialize logging
     log_init(verbose);
+
+    // Initialize global context (determines V1 vs V2 mode)
+    global_context_init();
 
     if (argc > 1) {
         if (strcmp(argv[1], "-V") == 0) {

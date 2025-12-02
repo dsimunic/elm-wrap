@@ -1,0 +1,71 @@
+#ifndef GLOBAL_CONTEXT_H
+#define GLOBAL_CONTEXT_H
+
+#include <stdbool.h>
+
+/**
+ * Global context for elm-wrap.
+ * 
+ * This struct holds global state that is determined at program startup
+ * and influences how commands operate throughout the program's lifetime.
+ */
+
+/* Protocol mode for package management */
+typedef enum {
+    PROTOCOL_V1,  /* Emulates existing Elm registry (package.elm-lang.org) */
+    PROTOCOL_V2   /* New elm-wrap repository protocol */
+} ProtocolMode;
+
+typedef struct {
+    /* Protocol mode: V1 (legacy Elm) or V2 (elm-wrap repositories) */
+    ProtocolMode protocol_mode;
+    
+    /* Compiler information (populated when V2 mode is detected) */
+    char *compiler_name;     /* e.g., "elm", "lamdera" */
+    char *compiler_version;  /* e.g., "0.19.1" */
+    
+    /* V2 repository path (only set when protocol_mode == PROTOCOL_V2) */
+    char *repository_path;   /* Full path to active repository */
+} GlobalContext;
+
+/**
+ * Initialize the global context.
+ * 
+ * This function determines the protocol mode by checking for V2 repositories.
+ * V2 mode is active when a repository exists for the current compiler and version
+ * at the configured repository local path.
+ * 
+ * Detection logic:
+ * 1. Get repository root path (ELM_WRAP_REPOSITORY_LOCAL_PATH or default)
+ * 2. Determine compiler name (from ELM_WRAP_ELM_COMPILER_PATH basename, or "elm")
+ * 3. Determine compiler version (by running compiler --version)
+ * 4. Check if <root>/<compiler>/<version>/ exists as a directory
+ *    - If yes: V2 mode (repository created via `repository new`)
+ *    - If no: V1 mode (use traditional Elm package management)
+ * 
+ * @return Pointer to arena-allocated GlobalContext, or NULL on failure
+ */
+GlobalContext *global_context_init(void);
+
+/**
+ * Get the current global context.
+ * 
+ * @return Pointer to the global context, or NULL if not initialized
+ */
+GlobalContext *global_context_get(void);
+
+/**
+ * Check if V2 protocol mode is active.
+ * 
+ * @return true if V2 mode, false if V1 mode or context not initialized
+ */
+bool global_context_is_v2(void);
+
+/**
+ * Get a human-readable string for the current protocol mode.
+ * 
+ * @return "V1" or "V2"
+ */
+const char *global_context_mode_string(void);
+
+#endif /* GLOBAL_CONTEXT_H */

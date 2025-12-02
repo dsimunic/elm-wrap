@@ -126,6 +126,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/elm_cmd_common.c \
           $(SRCDIR)/elm_project.c \
           $(SRCDIR)/env_defaults.c \
+          $(SRCDIR)/global_context.c \
           $(SRCDIR)/pgsolver/pg_core.c \
           $(SRCDIR)/pgsolver/pg_elm.c \
           $(SRCDIR)/ast/skeleton.c \
@@ -190,6 +191,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/elm_cmd_common.o \
           $(BUILDDIR)/elm_project.o \
           $(BUILDDIR)/env_defaults.o \
+          $(BUILDDIR)/global_context.o \
           $(BUILDDIR)/pg_core.o \
           $(BUILDDIR)/pg_elm.o \
           $(BUILDDIR)/ast_skeleton.o \
@@ -498,6 +500,10 @@ $(BUILDDIR)/elm_project.o: $(SRCDIR)/elm_project.c $(SRCDIR)/elm_project.h $(SRC
 
 # Build env_defaults object
 $(BUILDDIR)/env_defaults.o: $(SRCDIR)/env_defaults.c $(SRCDIR)/env_defaults.h $(SRCDIR)/buildinfo.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build global_context object
+$(BUILDDIR)/global_context.o: $(SRCDIR)/global_context.c $(SRCDIR)/global_context.h $(SRCDIR)/env_defaults.h $(SRCDIR)/elm_compiler.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build repository object
