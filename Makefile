@@ -231,6 +231,8 @@ USER_BINDIR = $(USER_PREFIX)/bin
 
 .PHONY: all clean pg_core_test pg_file_test test check dist distcheck install install-user uninstall uninstall-user rulrc compile-builtin-rules
 
+.DEFAULT_GOAL := all
+
 all: $(TARGET) append-builtin-rules
 
 rulrc: $(RULRC)

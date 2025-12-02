@@ -36,8 +36,7 @@ static void print_live_usage(void) {
 
 int cmd_live(int argc, char *argv[]) {
     // Check if compiler is lamdera
-    GlobalContext *ctx = global_context_get();
-    if (!ctx || !ctx->compiler_name || strcmp(ctx->compiler_name, "lamdera") != 0) {
+    if (!global_context_is_lamdera()) {
         fprintf(stderr, "Error: The 'live' command is only available when using the Lamdera compiler.\n");
         fprintf(stderr, "Set ELM_WRAP_ELM_COMPILER_PATH to point to your lamdera binary.\n");
         return 1;

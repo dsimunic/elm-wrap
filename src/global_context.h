@@ -16,13 +16,22 @@ typedef enum {
     PROTOCOL_V2   /* New elm-wrap repository protocol */
 } ProtocolMode;
 
+/* Known compiler types */
+typedef enum {
+    COMPILER_ELM,     /* Standard Elm compiler */
+    COMPILER_LAMDERA, /* Lamdera compiler (extended command set) */
+    COMPILER_WRAPC,   /* wrapc compiler (minimal command set, make only) */
+    COMPILER_UNKNOWN  /* Unknown compiler (treated like Elm) */
+} CompilerType;
+
 typedef struct {
     /* Protocol mode: V1 (legacy Elm) or V2 (elm-wrap repositories) */
     ProtocolMode protocol_mode;
     
     /* Compiler information (populated when V2 mode is detected) */
-    char *compiler_name;     /* e.g., "elm", "lamdera" */
+    char *compiler_name;     /* e.g., "elm", "lamdera", "wrapc" */
     char *compiler_version;  /* e.g., "0.19.1" */
+    CompilerType compiler_type; /* Detected compiler type */
     
     /* V2 repository path (only set when protocol_mode == PROTOCOL_V2) */
     char *repository_path;   /* Full path to active repository */
@@ -67,5 +76,33 @@ bool global_context_is_v2(void);
  * @return "V1" or "V2"
  */
 const char *global_context_mode_string(void);
+
+/**
+ * Get the detected compiler type.
+ * 
+ * @return CompilerType enum value
+ */
+CompilerType global_context_compiler_type(void);
+
+/**
+ * Check if the current compiler is Elm.
+ * 
+ * @return true if compiler is elm or unknown
+ */
+bool global_context_is_elm(void);
+
+/**
+ * Check if the current compiler is Lamdera.
+ * 
+ * @return true if compiler is lamdera
+ */
+bool global_context_is_lamdera(void);
+
+/**
+ * Check if the current compiler is wrapc.
+ * 
+ * @return true if compiler is wrapc
+ */
+bool global_context_is_wrapc(void);
 
 #endif /* GLOBAL_CONTEXT_H */

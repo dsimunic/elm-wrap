@@ -34,21 +34,55 @@
 #endif
 
 void print_usage(const char *prog) {
-    GlobalContext *ctx = global_context_get();
-    bool is_lamdera = ctx && ctx->compiler_name && strcmp(ctx->compiler_name, "lamdera") == 0;
+    CompilerType compiler_type = global_context_compiler_type();
 
     printf("Usage: %s COMMAND [OPTIONS]\n", prog);
     printf("\nCommands:\n");
-    printf("  repl               Open an interactive Elm REPL\n");
-    printf("  init               Initialize a new Elm project\n");
-    printf("  reactor            Start the Elm Reactor development server\n");
-    printf("  make <ELM_FILE>    Compile Elm code to JavaScript or HTML\n");
-    printf("  install <PACKAGE>  Install packages for your Elm project\n");
-    printf("  bump               Bump version based on API changes\n");
-    printf("  diff [VERSION]     Show API differences between versions\n");
-    if (is_lamdera) {
-        printf("  live               Start the Lamdera live development server\n");
+
+    /*
+     * Compiler command sets:
+     * 
+     * elm:     repl, init, reactor, make, install, bump, diff, publish
+     * lamdera: live, login, check, deploy, init, repl, reset, update,
+     *          annotate, eval
+     * wrapc:   make
+     */
+    switch (compiler_type) {
+        case COMPILER_WRAPC:
+            /* wrapc only supports make */
+            printf("  make <ELM_FILE>    Compile Elm code to JavaScript or HTML\n");
+            break;
+
+        case COMPILER_LAMDERA:
+            /* Lamdera commands - ordered as in lamdera --help */
+            printf("  live               Local development with live reload\n");
+            printf("  login              Log in to the Lamdera CLI\n");
+            printf("  check              Compile and type-check against deployed app\n");
+            printf("  deploy             Deploy Lamdera app after a successful check\n");
+            printf("  init               Start a Lamdera Elm project\n");
+            printf("  install <PACKAGE>  Install packages for your Elm project\n");
+            printf("  make <ELM_FILE>    Compile Elm code to JavaScript or HTML\n");
+            printf("  repl               Open an interactive programming session\n");
+            printf("  reset              Delete all compiler caches\n");
+            printf("  update             Update the Lamdera compiler to latest version\n");
+            printf("  annotate <FILE> <EXPR>  Print the type annotation for expression\n");
+            printf("  eval <FILE> <EXPR>      Evaluate an expression\n");
+            break;
+
+        case COMPILER_ELM:
+        case COMPILER_UNKNOWN:
+        default:
+            /* Standard Elm commands */
+            printf("  repl               Open an interactive Elm REPL\n");
+            printf("  init               Initialize a new Elm project\n");
+            printf("  reactor            Start the Elm Reactor development server\n");
+            printf("  make <ELM_FILE>    Compile Elm code to JavaScript or HTML\n");
+            printf("  install <PACKAGE>  Install packages for your Elm project\n");
+            printf("  bump               Bump version based on API changes\n");
+            printf("  diff [VERSION]     Show API differences between versions\n");
+            break;
     }
+
     printf("\n");
     printf("  config             Display current configuration\n");
     printf("  package SUBCOMMAND Package management commands\n");
@@ -149,7 +183,9 @@ int main(int argc, char *argv[]) {
     alloc_init();
 
     // Set global program name (extract basename from path)
-    program_name = basename(argv[0]);
+    // NOTE: Must use arena_strdup because basename() on macOS uses a static buffer
+    // that gets overwritten by subsequent basename() calls (e.g., in global_context_init)
+    program_name = arena_strdup(basename(argv[0]));
 
     /* 
      * Initialize built-in rules subsystem.

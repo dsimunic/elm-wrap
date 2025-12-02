@@ -27,6 +27,25 @@
 static GlobalContext *g_context = NULL;
 
 /**
+ * Determine the compiler type from the compiler name.
+ */
+static CompilerType determine_compiler_type(const char *compiler_name) {
+    if (!compiler_name) {
+        return COMPILER_UNKNOWN;
+    }
+    if (strcmp(compiler_name, "elm") == 0) {
+        return COMPILER_ELM;
+    }
+    if (strcmp(compiler_name, "lamdera") == 0) {
+        return COMPILER_LAMDERA;
+    }
+    if (strcmp(compiler_name, "wrapc") == 0) {
+        return COMPILER_WRAPC;
+    }
+    return COMPILER_UNKNOWN;
+}
+
+/**
  * Get the compiler name from the compiler path.
  * Extracts the basename of the compiler path.
  * Returns "elm" if no custom path is set.
@@ -99,6 +118,7 @@ GlobalContext *global_context_init(void) {
     g_context->protocol_mode = PROTOCOL_V1;
     g_context->compiler_name = NULL;
     g_context->compiler_version = NULL;
+    g_context->compiler_type = COMPILER_UNKNOWN;
     g_context->repository_path = NULL;
     
     /* Get repository root path */
@@ -114,6 +134,9 @@ GlobalContext *global_context_init(void) {
         log_debug("Could not determine compiler name, using V1 mode");
         return g_context;
     }
+    
+    /* Determine compiler type */
+    g_context->compiler_type = determine_compiler_type(g_context->compiler_name);
     
     /* Get compiler version */
     g_context->compiler_version = elm_compiler_get_version();
@@ -156,4 +179,33 @@ const char *global_context_mode_string(void) {
         return "V1";
     }
     return g_context->protocol_mode == PROTOCOL_V2 ? "V2" : "V1";
+}
+
+CompilerType global_context_compiler_type(void) {
+    if (!g_context) {
+        return COMPILER_UNKNOWN;
+    }
+    return g_context->compiler_type;
+}
+
+bool global_context_is_elm(void) {
+    if (!g_context) {
+        return true; /* Default to elm behavior */
+    }
+    return g_context->compiler_type == COMPILER_ELM || 
+           g_context->compiler_type == COMPILER_UNKNOWN;
+}
+
+bool global_context_is_lamdera(void) {
+    if (!g_context) {
+        return false;
+    }
+    return g_context->compiler_type == COMPILER_LAMDERA;
+}
+
+bool global_context_is_wrapc(void) {
+    if (!g_context) {
+        return false;
+    }
+    return g_context->compiler_type == COMPILER_WRAPC;
 }
