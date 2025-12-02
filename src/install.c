@@ -10,6 +10,10 @@
 #include "log.h"
 #include "progname.h"
 #include "fileutil.h"
+#include "global_context.h"
+#include "protocol_v1/install.h"
+#include "protocol_v2/install.h"
+#include "protocol_v2/solver/v2_registry.h"
 #include "commands/cache/check/cache_check.h"
 #include "commands/cache/full_scan/cache_full_scan.h"
 #include <stdio.h>
@@ -1749,6 +1753,40 @@ int cmd_check(int argc, char *argv[]) {
         elm_json_path = ELM_JSON_PATH;
     }
 
+    /* Check if we're in V2 mode */
+    if (global_context_is_v2()) {
+        GlobalContext *ctx = global_context_get();
+        
+        /* Build path to index.dat in V2 repository */
+        size_t index_path_len = strlen(ctx->repository_path) + strlen("/index.dat") + 1;
+        char *index_path = arena_malloc(index_path_len);
+        if (!index_path) {
+            log_error("Failed to allocate memory for index path");
+            return 1;
+        }
+        snprintf(index_path, index_path_len, "%s/index.dat", ctx->repository_path);
+        
+        log_debug("Using V2 registry from: %s", index_path);
+        
+        /* Load V2 registry from zip file */
+        V2Registry *v2_registry = v2_registry_load_from_zip(index_path);
+        if (!v2_registry) {
+            log_error("Failed to load V2 registry from %s", index_path);
+            arena_free(index_path);
+            return 1;
+        }
+        
+        log_debug("Loaded V2 registry with %zu packages", v2_registry->entry_count);
+        
+        int result = check_all_upgrades_v2(elm_json_path, v2_registry);
+        
+        v2_registry_free(v2_registry);
+        arena_free(index_path);
+        
+        return result;
+    }
+
+    /* V1 mode: use traditional install environment */
     InstallEnv *env = install_env_create();
     if (!env) {
         log_error("Failed to create install environment");
@@ -1860,261 +1898,6 @@ static void print_info_usage(void) {
     printf("  --help                             # Show this help\n");
 }
 
-static bool package_depends_on(const char *pkg_author, const char *pkg_name, const char *pkg_version,
-                               const char *target_author, const char *target_name,
-                               InstallEnv *env) {
-    char *pkg_path = cache_get_package_path(env->cache, pkg_author, pkg_name, pkg_version);
-    if (!pkg_path) {
-        return false;
-    }
-
-    char *elm_json_path = find_package_elm_json(pkg_path);
-    ElmJson *pkg_elm_json = NULL;
-
-    if (elm_json_path) {
-        pkg_elm_json = elm_json_read(elm_json_path);
-        arena_free(elm_json_path);
-    }
-
-    if (!pkg_elm_json) {
-        if (cache_download_package_with_env(env, pkg_author, pkg_name, pkg_version)) {
-            elm_json_path = find_package_elm_json(pkg_path);
-            if (elm_json_path) {
-                pkg_elm_json = elm_json_read(elm_json_path);
-                arena_free(elm_json_path);
-            }
-        }
-    }
-
-    arena_free(pkg_path);
-
-    if (!pkg_elm_json) {
-        return false;
-    }
-
-    bool depends = false;
-
-    if (pkg_elm_json->package_dependencies) {
-        Package *dep = package_map_find(pkg_elm_json->package_dependencies, target_author, target_name);
-        if (dep) {
-            depends = true;
-        }
-    }
-
-    if (!depends && pkg_elm_json->package_test_dependencies) {
-        Package *dep = package_map_find(pkg_elm_json->package_test_dependencies, target_author, target_name);
-        if (dep) {
-            depends = true;
-        }
-    }
-
-    elm_json_free(pkg_elm_json);
-    return depends;
-}
-
-static int show_package_dependencies(const char *author, const char *name, const char *version, InstallEnv *env) {
-    char *pkg_path = cache_get_package_path(env->cache, author, name, version);
-    if (!pkg_path) {
-        log_error("Failed to get package path");
-        return 1;
-    }
-
-    char *elm_json_path = find_package_elm_json(pkg_path);
-
-    ElmJson *elm_json = NULL;
-    if (elm_json_path) {
-        elm_json = elm_json_read(elm_json_path);
-    }
-
-    if (!elm_json) {
-        log_debug("Package not in cache, attempting download");
-        if (!cache_download_package_with_env(env, author, name, version)) {
-            log_error("Failed to download package %s/%s@%s", author, name, version);
-            if (elm_json_path) arena_free(elm_json_path);
-            arena_free(pkg_path);
-            return 1;
-        }
-
-        if (elm_json_path) arena_free(elm_json_path);
-        elm_json_path = find_package_elm_json(pkg_path);
-
-        if (elm_json_path) {
-            elm_json = elm_json_read(elm_json_path);
-        }
-
-        if (!elm_json) {
-            log_error("Failed to read elm.json for %s/%s@%s", author, name, version);
-            if (elm_json_path) arena_free(elm_json_path);
-            arena_free(pkg_path);
-            return 1;
-        }
-    }
-
-    if (elm_json_path) arena_free(elm_json_path);
-    arena_free(pkg_path);
-
-    printf("\n");
-    printf("Package: %s/%s @ %s\n", author, name, version);
-    printf("========================================\n\n");
-
-    if (elm_json->type == ELM_PROJECT_PACKAGE && elm_json->package_dependencies) {
-        PackageMap *deps = elm_json->package_dependencies;
-
-        if (deps->count == 0) {
-            printf("No dependencies\n");
-        } else {
-            int max_width = 0;
-            for (int i = 0; i < deps->count; i++) {
-                Package *pkg = &deps->packages[i];
-                int pkg_len = strlen(pkg->author) + 1 + strlen(pkg->name);
-                if (pkg_len > max_width) max_width = pkg_len;
-            }
-
-            if (elm_json->package_test_dependencies && elm_json->package_test_dependencies->count > 0) {
-                PackageMap *test_deps = elm_json->package_test_dependencies;
-                for (int i = 0; i < test_deps->count; i++) {
-                    Package *pkg = &test_deps->packages[i];
-                    int pkg_len = strlen(pkg->author) + 1 + strlen(pkg->name);
-                    if (pkg_len > max_width) max_width = pkg_len;
-                }
-            }
-
-            printf("Dependencies (%d):\n", deps->count);
-            for (int i = 0; i < deps->count; i++) {
-                Package *pkg = &deps->packages[i];
-                char pkg_name[256];
-                snprintf(pkg_name, sizeof(pkg_name), "%s/%s", pkg->author, pkg->name);
-                printf("  %-*s    %s\n", max_width, pkg_name, pkg->version);
-            }
-        }
-
-        if (elm_json->package_test_dependencies && elm_json->package_test_dependencies->count > 0) {
-            PackageMap *test_deps = elm_json->package_test_dependencies;
-
-            int max_width = 0;
-            for (int i = 0; i < test_deps->count; i++) {
-                Package *pkg = &test_deps->packages[i];
-                int pkg_len = strlen(pkg->author) + 1 + strlen(pkg->name);
-                if (pkg_len > max_width) max_width = pkg_len;
-            }
-
-            if (elm_json->package_dependencies) {
-                for (int i = 0; i < elm_json->package_dependencies->count; i++) {
-                    Package *pkg = &elm_json->package_dependencies->packages[i];
-                    int pkg_len = strlen(pkg->author) + 1 + strlen(pkg->name);
-                    if (pkg_len > max_width) max_width = pkg_len;
-                }
-            }
-
-            printf("\nTest Dependencies (%d):\n", test_deps->count);
-            for (int i = 0; i < test_deps->count; i++) {
-                Package *pkg = &test_deps->packages[i];
-                char pkg_name[256];
-                snprintf(pkg_name, sizeof(pkg_name), "%s/%s", pkg->author, pkg->name);
-                printf("  %-*s    %s\n", max_width, pkg_name, pkg->version);
-            }
-        }
-    } else {
-        printf("(Not a package - this is an application)\n");
-    }
-
-    ElmJson *current_elm_json = elm_json_read(ELM_JSON_PATH);
-    if (current_elm_json) {
-        PackageMap *all_deps = package_map_create();
-
-        if (current_elm_json->dependencies_direct) {
-            for (int i = 0; i < current_elm_json->dependencies_direct->count; i++) {
-                Package *pkg = &current_elm_json->dependencies_direct->packages[i];
-                package_map_add(all_deps, pkg->author, pkg->name, pkg->version);
-            }
-        }
-
-        if (current_elm_json->dependencies_indirect) {
-            for (int i = 0; i < current_elm_json->dependencies_indirect->count; i++) {
-                Package *pkg = &current_elm_json->dependencies_indirect->packages[i];
-                if (!package_map_find(all_deps, pkg->author, pkg->name)) {
-                    package_map_add(all_deps, pkg->author, pkg->name, pkg->version);
-                }
-            }
-        }
-
-        if (current_elm_json->dependencies_test_direct) {
-            for (int i = 0; i < current_elm_json->dependencies_test_direct->count; i++) {
-                Package *pkg = &current_elm_json->dependencies_test_direct->packages[i];
-                if (!package_map_find(all_deps, pkg->author, pkg->name)) {
-                    package_map_add(all_deps, pkg->author, pkg->name, pkg->version);
-                }
-            }
-        }
-
-        if (current_elm_json->dependencies_test_indirect) {
-            for (int i = 0; i < current_elm_json->dependencies_test_indirect->count; i++) {
-                Package *pkg = &current_elm_json->dependencies_test_indirect->packages[i];
-                if (!package_map_find(all_deps, pkg->author, pkg->name)) {
-                    package_map_add(all_deps, pkg->author, pkg->name, pkg->version);
-                }
-            }
-        }
-
-        if (current_elm_json->package_dependencies) {
-            for (int i = 0; i < current_elm_json->package_dependencies->count; i++) {
-                Package *pkg = &current_elm_json->package_dependencies->packages[i];
-                package_map_add(all_deps, pkg->author, pkg->name, pkg->version);
-            }
-        }
-
-        if (current_elm_json->package_test_dependencies) {
-            for (int i = 0; i < current_elm_json->package_test_dependencies->count; i++) {
-                Package *pkg = &current_elm_json->package_test_dependencies->packages[i];
-                if (!package_map_find(all_deps, pkg->author, pkg->name)) {
-                    package_map_add(all_deps, pkg->author, pkg->name, pkg->version);
-                }
-            }
-        }
-
-        PackageMap *reverse_deps = package_map_create();
-
-        for (int i = 0; i < all_deps->count; i++) {
-            Package *pkg = &all_deps->packages[i];
-
-            // Skip the target package itself
-            if (strcmp(pkg->author, author) == 0 && strcmp(pkg->name, name) == 0) {
-                continue;
-            }
-
-            if (package_depends_on(pkg->author, pkg->name, pkg->version, author, name, env)) {
-                package_map_add(reverse_deps, pkg->author, pkg->name, pkg->version);
-            }
-        }
-
-        if (reverse_deps->count > 0) {
-            // Calculate max width for aligned output
-            int max_width = 0;
-            for (int i = 0; i < reverse_deps->count; i++) {
-                Package *pkg = &reverse_deps->packages[i];
-                int pkg_len = strlen(pkg->author) + 1 + strlen(pkg->name);
-                if (pkg_len > max_width) max_width = pkg_len;
-            }
-
-            printf("\nPackages in elm.json that depend on %s/%s (%d):\n", author, name, reverse_deps->count);
-            for (int i = 0; i < reverse_deps->count; i++) {
-                Package *pkg = &reverse_deps->packages[i];
-                char pkg_name[256];
-                snprintf(pkg_name, sizeof(pkg_name), "%s/%s", pkg->author, pkg->name);
-                printf("  %-*s    %s\n", max_width, pkg_name, pkg->version);
-            }
-        }
-
-        package_map_free(reverse_deps);
-        package_map_free(all_deps);
-        elm_json_free(current_elm_json);
-    }
-
-    printf("\n");
-    elm_json_free(elm_json);
-    return 0;
-}
-
 int cmd_deps(int argc, char *argv[]) {
     const char *package_arg = NULL;
     const char *version_arg = NULL;
@@ -2146,6 +1929,12 @@ int cmd_deps(int argc, char *argv[]) {
         return 1;
     }
 
+    /* Check if we're in V2 mode - use V2 registry directly */
+    if (global_context_is_v2()) {
+        return v2_cmd_deps(package_arg, version_arg);
+    }
+
+    /* V1 mode: use traditional install environment */
     InstallEnv *env = install_env_create();
     if (!env) {
         log_error("Failed to create install environment");
@@ -2240,7 +2029,7 @@ int cmd_deps(int argc, char *argv[]) {
         return 1;
     }
 
-    int result = show_package_dependencies(author, name, version_to_use, env);
+    int result = v1_show_package_dependencies(author, name, version_to_use, env);
 
     if (version_to_use != version_arg && version_found && !version_arg) {
         ElmJson *elm_json = elm_json_read(ELM_JSON_PATH);
@@ -2501,7 +2290,7 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
                     continue;
                 }
 
-                if (package_depends_on(pkg->author, pkg->name, pkg->version, author, name, env)) {
+                if (v1_package_depends_on(pkg->author, pkg->name, pkg->version, author, name, env)) {
                     bool is_test_dep = false;
                     if (elm_json->dependencies_test_direct && package_map_find(elm_json->dependencies_test_direct, pkg->author, pkg->name)) {
                         is_test_dep = true;

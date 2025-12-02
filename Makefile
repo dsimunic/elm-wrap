@@ -120,7 +120,11 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/http_client.c \
           $(SRCDIR)/registry.c \
           $(SRCDIR)/protocol_v1/package_fetch.c \
+          $(SRCDIR)/protocol_v1/install.c \
           $(SRCDIR)/protocol_v2/index_fetch.c \
+          $(SRCDIR)/protocol_v2/install.c \
+          $(SRCDIR)/protocol_v2/solver/v2_registry.c \
+          $(SRCDIR)/protocol_v2/solver/pg_elm_v2.c \
           $(SRCDIR)/install_env.c \
           $(SRCDIR)/fileutil.c \
           $(SRCDIR)/elm_cmd_common.c \
@@ -185,7 +189,11 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/http_client.o \
           $(BUILDDIR)/registry.o \
           $(BUILDDIR)/package_fetch.o \
+          $(BUILDDIR)/v1_install.o \
           $(BUILDDIR)/index_fetch.o \
+          $(BUILDDIR)/v2_install.o \
+          $(BUILDDIR)/v2_registry.o \
+          $(BUILDDIR)/pg_elm_v2.o \
           $(BUILDDIR)/install_env.o \
           $(BUILDDIR)/fileutil.o \
           $(BUILDDIR)/elm_cmd_common.o \
@@ -478,8 +486,24 @@ $(BUILDDIR)/registry.o: $(SRCDIR)/registry.c $(SRCDIR)/registry.h | $(BUILDDIR)
 $(BUILDDIR)/package_fetch.o: $(SRCDIR)/protocol_v1/package_fetch.c $(SRCDIR)/protocol_v1/package_fetch.h $(SRCDIR)/install_env.h $(SRCDIR)/cache.h $(SRCDIR)/http_client.h $(SRCDIR)/cJSON.h $(SRCDIR)/vendor/sha1.h $(SRCDIR)/log.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Build v1_install object (protocol v1 install functions)
+$(BUILDDIR)/v1_install.o: $(SRCDIR)/protocol_v1/install.c $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/log.h $(SRCDIR)/alloc.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # Build index_fetch object (protocol v2)
 $(BUILDDIR)/index_fetch.o: $(SRCDIR)/protocol_v2/index_fetch.c $(SRCDIR)/protocol_v2/index_fetch.h $(SRCDIR)/env_defaults.h $(SRCDIR)/http_client.h $(SRCDIR)/log.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build v2_install object (protocol v2 install functions)
+$(BUILDDIR)/v2_install.o: $(SRCDIR)/protocol_v2/install.c $(SRCDIR)/protocol_v2/install.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/elm_json.h $(SRCDIR)/global_context.h $(SRCDIR)/log.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build v2_registry object (protocol v2 solver)
+$(BUILDDIR)/v2_registry.o: $(SRCDIR)/protocol_v2/solver/v2_registry.c $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/vendor/miniz.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build pg_elm_v2 object (protocol v2 solver)
+$(BUILDDIR)/pg_elm_v2.o: $(SRCDIR)/protocol_v2/solver/pg_elm_v2.c $(SRCDIR)/protocol_v2/solver/pg_elm_v2.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/pgsolver/pg_core.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build install_env object
@@ -626,12 +650,13 @@ distcheck: dist
 		exit 1; \
 	fi
 
-# Install to system directories (requires root/sudo on most systems)
+# Install to user's ~/.local/bin directory
 install: $(TARGET)
-	@echo "Installing $(TARGET_FILE) to $(BINDIR_INSTALL)..."
-	@install -d $(BINDIR_INSTALL)
-	@install -m 755 $(TARGET) $(BINDIR_INSTALL)/$(TARGET_FILE)
-	@echo "Installation complete. $(TARGET_FILE) installed to $(BINDIR_INSTALL)/$(TARGET_FILE)"
+	@echo "Installing wrap to $(USER_BINDIR)..."
+	@install -d $(USER_BINDIR)
+	@install -m 755 $(TARGET) $(USER_BINDIR)/wrap
+	@echo "Installation complete. wrap installed to $(USER_BINDIR)/wrap"
+	@echo "Make sure $(USER_BINDIR) is in your PATH"
 
 # Install to user's local directory
 install-user: $(TARGET)
