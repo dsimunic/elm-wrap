@@ -30,8 +30,11 @@ extern const char *sbom_dependencies;
 /* SBOM metadata in custom ELF/Mach-O section */
 extern const char sbom_metadata[];
 
-/* Helper function to print SBOM info */
+/* Helper function to print SBOM info (summary) */
 void print_sbom_info(void);
+
+/* Helper function to print full SBOM document */
+void print_sbom_full(void);
 
 /* Environment variable defaults (from ENV_DEFAULTS file at build time) */
 extern const char *env_default_registry_v2_full_index_url;

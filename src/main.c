@@ -95,6 +95,7 @@ void print_usage(const char *prog) {
     printf("  -v, --verbose      Show detailed logging output\n");
     printf("  -V                 Show version number\n");
     printf("  --version          Show detailed version information\n");
+    printf("  --sbom, --spdx     Show Software Bill of Materials (SBOM)\n");
     printf("  -h, --help         Show this help message\n");
 }
 
@@ -253,6 +254,11 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "--version") == 0) {
             print_version_info();
+            return 0;
+        }
+
+        if (strcmp(argv[1], "--sbom") == 0 || strcmp(argv[1], "--spdx") == 0) {
+            print_sbom_full();
             return 0;
         }
 

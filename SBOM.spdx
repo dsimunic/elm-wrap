@@ -1,0 +1,133 @@
+SPDXVersion: SPDX-2.3
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: elm-wrap-sbom
+DocumentNamespace: https://elm-wrap.dev/sbom-1.0.0
+Creator: Tool: elm-wrap-buildinfo-1.0
+Created: 2025-12-03T00:00:00Z
+
+##### Main Package
+
+PackageName: elm-wrap
+SPDXID: SPDXRef-Package
+PackageVersion: 1.0.0
+PackageSupplier: Person: Damir Simunic (damir@oomm.dev)
+PackageDownloadLocation: https://github.com/dsimunic/elm-wrap
+FilesAnalyzed: false
+PackageLicenseConcluded: BSD-3-Clause
+PackageLicenseDeclared: BSD-3-Clause
+PackageCopyrightText: Copyright (c) 2025 Damir Simunic
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-Package
+
+##### Vendored Dependencies
+
+# Vendored Dependency: miniz
+PackageName: miniz
+SPDXID: SPDXRef-Package-miniz
+PackageVersion: 3.0.0
+PackageSupplier: Person: Rich Geldreich (richgel99@gmail.com)
+PackageDownloadLocation: https://github.com/richgel999/miniz
+FilesAnalyzed: false
+PackageLicenseConcluded: MIT AND Unlicense
+PackageLicenseDeclared: MIT AND Unlicense
+PackageCopyrightText: Copyright 2013-2014 RAD Game Tools and Valve Software, Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
+PackageLicenseComments: Dual-licensed under MIT and Unlicense (public domain)
+ExternalRef: PACKAGE-MANAGER purl pkg:github/richgel999/miniz@3.0.0
+Relationship: SPDXRef-Package CONTAINS SPDXRef-Package-miniz
+Relationship: SPDXRef-Package-miniz STATIC_LINK SPDXRef-Package
+
+# Vendored Dependency: cJSON
+PackageName: cJSON
+SPDXID: SPDXRef-Package-cJSON
+PackageVersion: 1.7.19
+PackageSupplier: Person: Dave Gamble
+PackageDownloadLocation: https://github.com/DaveGamble/cJSON
+FilesAnalyzed: false
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: Copyright (c) 2009-2017 Dave Gamble and cJSON contributors
+ExternalRef: PACKAGE-MANAGER purl pkg:github/DaveGamble/cJSON@1.7.19
+Relationship: SPDXRef-Package CONTAINS SPDXRef-Package-cJSON
+Relationship: SPDXRef-Package-cJSON STATIC_LINK SPDXRef-Package
+
+# Vendored Dependency: crypto-algorithms (sha1/sha256)
+PackageName: crypto-algorithms
+SPDXID: SPDXRef-Package-crypto-algorithms
+PackageVersion: unknown
+PackageSupplier: Person: Brad Conte (brad@bradconte.com)
+PackageDownloadLocation: https://github.com/B-Con/crypto-algorithms
+FilesAnalyzed: false
+PackageLicenseConcluded: LicenseRef-PublicDomain
+PackageLicenseDeclared: LicenseRef-PublicDomain
+PackageCopyrightText: Public Domain - Brad Conte
+PackageLicenseComments: Presented "as is" without any guarantees
+ExternalRef: PACKAGE-MANAGER purl pkg:github/B-Con/crypto-algorithms
+Relationship: SPDXRef-Package CONTAINS SPDXRef-Package-crypto-algorithms
+Relationship: SPDXRef-Package-crypto-algorithms STATIC_LINK SPDXRef-Package
+
+# Vendored Dependency: tree-sitter
+PackageName: tree-sitter
+SPDXID: SPDXRef-Package-tree-sitter
+PackageVersion: 0.20.x
+PackageSupplier: Organization: tree-sitter
+PackageDownloadLocation: https://github.com/tree-sitter/tree-sitter
+FilesAnalyzed: false
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: Copyright (c) 2018-2023 Max Brunsfeld
+PackageLicenseComments: Language ABI version 15
+ExternalRef: PACKAGE-MANAGER purl pkg:github/tree-sitter/tree-sitter@0.20
+Relationship: SPDXRef-Package CONTAINS SPDXRef-Package-tree-sitter
+Relationship: SPDXRef-Package-tree-sitter STATIC_LINK SPDXRef-Package
+
+# Vendored Dependency: tree-sitter-elm
+PackageName: tree-sitter-elm
+SPDXID: SPDXRef-Package-tree-sitter-elm
+PackageVersion: 5.x
+PackageSupplier: Organization: elm-tooling
+PackageDownloadLocation: https://github.com/elm-tooling/tree-sitter-elm
+FilesAnalyzed: false
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: Copyright (c) 2019-2023 elm-tooling
+PackageLicenseComments: Language ABI version 15
+ExternalRef: PACKAGE-MANAGER purl pkg:github/elm-tooling/tree-sitter-elm@5
+Relationship: SPDXRef-Package CONTAINS SPDXRef-Package-tree-sitter-elm
+Relationship: SPDXRef-Package-tree-sitter-elm STATIC_LINK SPDXRef-Package
+
+# Vendored Dependency: ICU Unicode (subset from tree-sitter)
+PackageName: icu-unicode
+SPDXID: SPDXRef-Package-icu-unicode
+PackageVersion: 58+
+PackageSupplier: Organization: Unicode Consortium
+PackageDownloadLocation: https://github.com/unicode-org/icu
+FilesAnalyzed: false
+PackageLicenseConcluded: Unicode-DFS-2016
+PackageLicenseDeclared: Unicode-DFS-2016
+PackageCopyrightText: Copyright 1991-2019 Unicode, Inc.
+PackageLicenseComments: Subset included with tree-sitter for Unicode processing
+ExternalRef: PACKAGE-MANAGER purl pkg:github/unicode-org/icu
+Relationship: SPDXRef-Package CONTAINS SPDXRef-Package-icu-unicode
+Relationship: SPDXRef-Package-icu-unicode STATIC_LINK SPDXRef-Package
+Relationship: SPDXRef-Package-tree-sitter CONTAINS SPDXRef-Package-icu-unicode
+
+# Vendored Dependency: larena
+PackageName: larena
+SPDXID: SPDXRef-Package-larena
+PackageVersion: 1.0.0
+PackageSupplier: Person: David Delassus (david.jose.delassus@gmail.com)
+PackageDownloadLocation: https://github.com/linkdd/larena
+FilesAnalyzed: false
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: Copyright (c) 2024 David Delassus
+PackageLicenseComments: Simple arena allocator library
+ExternalRef: PACKAGE-MANAGER purl pkg:github/linkdd/larena@1.0.0
+Relationship: SPDXRef-Package CONTAINS SPDXRef-Package-larena
+Relationship: SPDXRef-Package-larena STATIC_LINK SPDXRef-Package
+
+##### License Definitions
+
+LicenseID: LicenseRef-PublicDomain
+ExtractedText: This software is in the public domain and provided "as is" without any guarantees.
+LicenseName: Public Domain

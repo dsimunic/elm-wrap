@@ -67,18 +67,14 @@ BUILD_ARCH := $(shell uname -m)
 
 # SBOM (Software Bill of Materials) Configuration
 # These can be overridden in the parent Makefile
-SBOM_FILE ?= SBOM
+SBOM_FILE ?= SBOM.spdx
 SBOM_PACKAGE_NAME ?= $(shell basename $(PWD))
 SBOM_SPDX_LICENSE ?= NOASSERTION
 SBOM_SUPPLIER ?= NOASSERTION
 SBOM_HOMEPAGE ?= NOASSERTION
 
-# Read dependencies from SBOM file if it exists, otherwise "none"
-ifneq ($(wildcard $(SBOM_FILE)),)
-  SBOM_DEPENDENCIES := $(shell cat $(SBOM_FILE) | tr '\n' ',' | sed 's/,$//')
-else
-  SBOM_DEPENDENCIES := none
-endif
+# Check if SBOM file exists
+SBOM_EXISTS := $(shell test -f $(SBOM_FILE) && echo yes || echo no)
 
 .PHONY: print-version
 print-version:
@@ -110,7 +106,6 @@ generate-buildinfo:
 	@echo "const char *sbom_spdx_license = \"$(SBOM_SPDX_LICENSE)\";" >> $(BUILDDIR)/buildinfo.c
 	@echo "const char *sbom_supplier = \"$(SBOM_SUPPLIER)\";" >> $(BUILDDIR)/buildinfo.c
 	@echo "const char *sbom_homepage = \"$(SBOM_HOMEPAGE)\";" >> $(BUILDDIR)/buildinfo.c
-	@echo "const char *sbom_dependencies = \"$(SBOM_DEPENDENCIES)\";" >> $(BUILDDIR)/buildinfo.c
 	@echo "" >> $(BUILDDIR)/buildinfo.c
 	@echo "/* Structured metadata in custom ELF/Mach-O section */" >> $(BUILDDIR)/buildinfo.c
 	@printf "#ifdef __APPLE__\n" >> $(BUILDDIR)/buildinfo.c
@@ -140,18 +135,29 @@ generate-buildinfo:
 	@printf "#endif\n" >> $(BUILDDIR)/buildinfo.c
 	@echo "__attribute__((used))" >> $(BUILDDIR)/buildinfo.c
 	@echo "const char sbom_metadata[] =" >> $(BUILDDIR)/buildinfo.c
-	@printf "    \"SPDXVersion: SPDX-2.3\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    \"DataLicense: CC0-1.0\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    \"SPDXID: SPDXRef-DOCUMENT\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    \"DocumentName: $(SBOM_PACKAGE_NAME)-sbom\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    \"DocumentNamespace: https://example.org/sbom/$(SBOM_PACKAGE_NAME)-$(BASE_VERSION)\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    \"Creator: Tool: buildinfo\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    \"Created: $(BUILD_DATE)\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    \"PackageName: $(SBOM_PACKAGE_NAME)\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    \"SPDXID: SPDXRef-Package\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    \"PackageVersion: $(BASE_VERSION)\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    \"PackageSupplier: $(SBOM_SUPPLIER)\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    \"PackageLicenseDeclared: $(SBOM_SPDX_LICENSE)\\\\n\";\n" >> $(BUILDDIR)/buildinfo.c
+	@if [ -f $(SBOM_FILE) ]; then \
+		awk '{ \
+			gsub(/\\/, "\\\\"); \
+			gsub(/"/, "\\\""); \
+			printf "    \"%s\\n\"\n", $$0; \
+		} END { \
+			printf "    \"\";\n"; \
+		}' $(SBOM_FILE) >> $(BUILDDIR)/buildinfo.c; \
+	else \
+		printf "    \"SPDXVersion: SPDX-2.3\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c; \
+		printf "    \"DataLicense: CC0-1.0\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c; \
+		printf "    \"SPDXID: SPDXRef-DOCUMENT\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c; \
+		printf "    \"DocumentName: $(SBOM_PACKAGE_NAME)-sbom\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c; \
+		printf "    \"DocumentNamespace: https://example.org/sbom/$(SBOM_PACKAGE_NAME)-$(BASE_VERSION)\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c; \
+		printf "    \"Creator: Tool: buildinfo\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c; \
+		printf "    \"Created: $(BUILD_DATE)\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c; \
+		printf "    \"PackageName: $(SBOM_PACKAGE_NAME)\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c; \
+		printf "    \"SPDXID: SPDXRef-Package\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c; \
+		printf "    \"PackageVersion: $(BASE_VERSION)\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c; \
+		printf "    \"PackageSupplier: $(SBOM_SUPPLIER)\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c; \
+		printf "    \"PackageLicenseDeclared: $(SBOM_SPDX_LICENSE)\\\\n\"\n" >> $(BUILDDIR)/buildinfo.c; \
+		printf "    \"\";\n" >> $(BUILDDIR)/buildinfo.c; \
+	fi
 	@echo "" >> $(BUILDDIR)/buildinfo.c
 	@echo "void print_version_info(void) {" >> $(BUILDDIR)/buildinfo.c
 	@printf "    printf(\"Version: %%s\\\\n\", build_full_version);\n" >> $(BUILDDIR)/buildinfo.c
@@ -170,4 +176,8 @@ generate-buildinfo:
 	@printf "    printf(\"  Version: %%s\\\\n\", build_base_version);\n" >> $(BUILDDIR)/buildinfo.c
 	@printf "    printf(\"  License: %%s\\\\n\", sbom_spdx_license);\n" >> $(BUILDDIR)/buildinfo.c
 	@printf "    printf(\"  Supplier: %%s\\\\n\", sbom_supplier);\n" >> $(BUILDDIR)/buildinfo.c
+	@printf "}\n" >> $(BUILDDIR)/buildinfo.c
+	@echo "" >> $(BUILDDIR)/buildinfo.c
+	@echo "void print_sbom_full(void) {" >> $(BUILDDIR)/buildinfo.c
+	@printf "    printf(\"%%s\\\\n\", sbom_metadata);\n" >> $(BUILDDIR)/buildinfo.c
 	@printf "}\n" >> $(BUILDDIR)/buildinfo.c

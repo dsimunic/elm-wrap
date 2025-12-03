@@ -229,6 +229,13 @@ ifneq ($(wildcard $(ENV_DEFAULTS_FILE)),)
   ENV_DEFAULT_REPOSITORY_LOCAL_PATH := $(shell grep '^ELM_WRAP_REPOSITORY_LOCAL_PATH=' $(ENV_DEFAULTS_FILE) 2>/dev/null | cut -d= -f2-)
 endif
 
+# SBOM Configuration (override buildinfo.mk defaults)
+SBOM_FILE = SBOM.spdx
+SBOM_PACKAGE_NAME = elm-wrap
+SBOM_SPDX_LICENSE = BSD-3-Clause
+SBOM_SUPPLIER = Person: Damir Simunic (damir@oomm.dev)
+SBOM_HOMEPAGE = https://github.com/dsimunic/elm-wrap
+
 # Include buildinfo.mk for version generation
 include buildinfo.mk
 
