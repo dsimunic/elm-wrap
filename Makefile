@@ -658,13 +658,12 @@ distcheck: dist
 		exit 1; \
 	fi
 
-# Install to user's ~/.local/bin directory
+# Install to system directory (default: /usr/local/bin)
 install: $(TARGET)
-	@echo "Installing wrap to $(USER_BINDIR)..."
-	@install -d $(USER_BINDIR)
-	@install -m 755 $(TARGET) $(USER_BINDIR)/wrap
-	@echo "Installation complete. wrap installed to $(USER_BINDIR)/wrap"
-	@echo "Make sure $(USER_BINDIR) is in your PATH"
+	@echo "Installing $(TARGET_FILE) to $(BINDIR_INSTALL)..."
+	@install -d $(BINDIR_INSTALL)
+	@install -m 755 $(TARGET) $(BINDIR_INSTALL)/$(TARGET_FILE)
+	@echo "Installation complete. $(TARGET_FILE) installed to $(BINDIR_INSTALL)/$(TARGET_FILE)"
 
 # Install to user's local directory
 install-user: $(TARGET)
