@@ -1,10 +1,10 @@
 # buildinfo.mk - Build metadata generation
 # Include this file in your Makefile and call 'generate-buildinfo' target
 
-# New version format:
+# Version format:
 # Without git: VERSION@TIMESTAMP
-# With git: VERSION@branch-revision-timestamp
-# With git, dirty tree: VERSION@branch-HEAD-timestamp (or 'detached' if no branch)
+# With git, clean tree: VERSION@branch-revision-commit_timestamp (no Built line)
+# With git, dirty tree: VERSION@branch-HEAD (Built line shows current time)
 # If -DRELEASE_VERSION specified: VERSION only
 
 FALLBACK_NAME ?= unknown
@@ -46,15 +46,16 @@ else ifeq ($(INSIDE_WT),true)
   REV_FULL := $(shell git rev-parse HEAD)
   DIRTY_FLAG := $(shell test -n "$$(git status --porcelain 2>/dev/null)" && echo "true" || echo "false")
   TIMESTAMP := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+  COMMIT_TIMESTAMP := $(shell TZ=UTC git log -1 --format="%cd" --date=format-local:"%Y-%m-%dT%H:%M:%SZ" HEAD)
 
   ifeq ($(DIRTY_FLAG),true)
-    # Dirty tree: VERSION@branch-HEAD-timestamp
+    # Dirty tree: VERSION@branch-HEAD (no timestamp - it's in Built line)
     REV := HEAD
-    GITVER := $(BASE_VERSION)@$(BRANCH_NAME)-HEAD-$(TIMESTAMP)
+    GITVER := $(BASE_VERSION)@$(BRANCH_NAME)-HEAD
   else
-    # Clean tree: VERSION@branch-revision-timestamp
+    # Clean tree: VERSION@branch-revision-commit_timestamp
     REV := $(shell git rev-parse --short=8 HEAD)
-    GITVER := $(BASE_VERSION)@$(BRANCH_NAME)-$(REV)-$(TIMESTAMP)
+    GITVER := $(BASE_VERSION)@$(BRANCH_NAME)-$(REV)-$(COMMIT_TIMESTAMP)
   endif
 else
   # Not in git repository: VERSION@TIMESTAMP
@@ -172,12 +173,11 @@ generate-buildinfo:
 	@printf "    printf(\"Version: %%s\\\\n\", build_full_version);\n" >> $(BUILDDIR)/buildinfo.c
 	@printf "    printf(\"  Base version: %%s\\\\n\", build_base_version);\n" >> $(BUILDDIR)/buildinfo.c
 	@printf "    printf(\"  Commit: %%s\\\\n\", build_commit_full);\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    printf(\"  Built: %%s\\\\n\", build_timestamp);\n" >> $(BUILDDIR)/buildinfo.c
+	@printf "    if (strcmp(build_dirty, \"true\") == 0) {\n" >> $(BUILDDIR)/buildinfo.c
+	@printf "        printf(\"  Built: %%s\\\\n\", build_timestamp);\n" >> $(BUILDDIR)/buildinfo.c
+	@printf "    }\n" >> $(BUILDDIR)/buildinfo.c
 	@printf "    printf(\"  Compiler: %%s\\\\n\", build_compiler);\n" >> $(BUILDDIR)/buildinfo.c
 	@printf "    printf(\"  Platform: %%s/%%s\\\\n\", build_os, build_arch);\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    if (strcmp(build_dirty, \"true\") == 0) {\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "        printf(\"  (built from dirty working tree)\\\\n\");\n" >> $(BUILDDIR)/buildinfo.c
-	@printf "    }\n" >> $(BUILDDIR)/buildinfo.c
 	@printf "}\n" >> $(BUILDDIR)/buildinfo.c
 	@echo "" >> $(BUILDDIR)/buildinfo.c
 	@echo "void print_sbom_info(void) {" >> $(BUILDDIR)/buildinfo.c
