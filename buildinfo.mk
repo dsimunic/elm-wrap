@@ -10,18 +10,6 @@
 FALLBACK_NAME ?= unknown
 FALLBACK_REV  ?= unknown
 VERSION_FILE ?= VERSION
-ENV_DEFAULTS_FILE ?= ENV_DEFAULTS
-
-# Parse ENV_DEFAULTS file (format: KEY=VALUE, one per line)
-# Default values if file doesn't exist
-ENV_DEFAULT_REGISTRY_V2_FULL_INDEX_URL ?= 
-ENV_DEFAULT_REPOSITORY_LOCAL_PATH ?= ~/.elm-wrap/repository
-
-ifneq ($(wildcard $(ENV_DEFAULTS_FILE)),)
-  # Read each line from ENV_DEFAULTS and set corresponding make variables
-  ENV_DEFAULT_REGISTRY_V2_FULL_INDEX_URL := $(shell grep '^ELM_WRAP_REGISTRY_V2_FULL_INDEX_URL=' $(ENV_DEFAULTS_FILE) 2>/dev/null | cut -d= -f2-)
-  ENV_DEFAULT_REPOSITORY_LOCAL_PATH := $(shell grep '^ELM_WRAP_REPOSITORY_LOCAL_PATH=' $(ENV_DEFAULTS_FILE) 2>/dev/null | cut -d= -f2-)
-endif
 
 INSIDE_WT := $(shell command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree 2>/dev/null || echo false)
 
@@ -123,10 +111,6 @@ generate-buildinfo:
 	@echo "const char *sbom_supplier = \"$(SBOM_SUPPLIER)\";" >> $(BUILDDIR)/buildinfo.c
 	@echo "const char *sbom_homepage = \"$(SBOM_HOMEPAGE)\";" >> $(BUILDDIR)/buildinfo.c
 	@echo "const char *sbom_dependencies = \"$(SBOM_DEPENDENCIES)\";" >> $(BUILDDIR)/buildinfo.c
-	@echo "" >> $(BUILDDIR)/buildinfo.c
-	@echo "/* Environment variable defaults */" >> $(BUILDDIR)/buildinfo.c
-	@echo "const char *env_default_registry_v2_full_index_url = \"$(ENV_DEFAULT_REGISTRY_V2_FULL_INDEX_URL)\";" >> $(BUILDDIR)/buildinfo.c
-	@echo "const char *env_default_repository_local_path = \"$(ENV_DEFAULT_REPOSITORY_LOCAL_PATH)\";" >> $(BUILDDIR)/buildinfo.c
 	@echo "" >> $(BUILDDIR)/buildinfo.c
 	@echo "/* Structured metadata in custom ELF/Mach-O section */" >> $(BUILDDIR)/buildinfo.c
 	@printf "#ifdef __APPLE__\n" >> $(BUILDDIR)/buildinfo.c

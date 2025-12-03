@@ -184,4 +184,4 @@ char **types = arena_malloc(types_capacity * sizeof(char*));
 
 **No commits**: NEVER commit to Git yourself.
 
-**Building the project**: `make clean all install`
+**Building the project**: `make clean all install-user`

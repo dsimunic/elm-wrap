@@ -216,6 +216,18 @@ TARGET = $(BINDIR)/$(TARGET_FILE)
 PG_CORE_TEST = $(BINDIR)/pg_core_test
 PG_FILE_TEST = $(BINDIR)/pg_file_test
 VERSION_FILE = VERSION
+ENV_DEFAULTS_FILE = ENV_DEFAULTS
+
+# Parse ENV_DEFAULTS file (format: KEY=VALUE, one per line)
+# Default values if file doesn't exist
+ENV_DEFAULT_REGISTRY_V2_FULL_INDEX_URL ?= 
+ENV_DEFAULT_REPOSITORY_LOCAL_PATH ?= ~/.elm-wrap/repository
+
+ifneq ($(wildcard $(ENV_DEFAULTS_FILE)),)
+  # Read each line from ENV_DEFAULTS and set corresponding make variables
+  ENV_DEFAULT_REGISTRY_V2_FULL_INDEX_URL := $(shell grep '^ELM_WRAP_REGISTRY_V2_FULL_INDEX_URL=' $(ENV_DEFAULTS_FILE) 2>/dev/null | cut -d= -f2-)
+  ENV_DEFAULT_REPOSITORY_LOCAL_PATH := $(shell grep '^ELM_WRAP_REPOSITORY_LOCAL_PATH=' $(ENV_DEFAULTS_FILE) 2>/dev/null | cut -d= -f2-)
+endif
 
 # Include buildinfo.mk for version generation
 include buildinfo.mk
@@ -259,11 +271,14 @@ append-builtin-rules: $(TARGET) compile-builtin-rules
 	fi
 
 # Generate buildinfo.c before compiling
-$(BUILDINFO_SRC): buildinfo.mk $(VERSION_FILE)
+$(BUILDINFO_SRC): buildinfo.mk $(VERSION_FILE) $(wildcard $(ENV_DEFAULTS_FILE))
 	@$(MAKE) -f buildinfo.mk generate-buildinfo \
 		BUILDDIR=$(BUILDDIR) \
 		VERSION_FILE=$(VERSION_FILE) \
 		CC=$(CC)
+	@echo "/* Environment variable defaults (project-specific) */" >> $(BUILDDIR)/buildinfo.c
+	@echo "const char *env_default_registry_v2_full_index_url = \"$(ENV_DEFAULT_REGISTRY_V2_FULL_INDEX_URL)\";" >> $(BUILDDIR)/buildinfo.c
+	@echo "const char *env_default_repository_local_path = \"$(ENV_DEFAULT_REPOSITORY_LOCAL_PATH)\";" >> $(BUILDDIR)/buildinfo.c
 
 # Build buildinfo object
 $(BUILDDIR)/buildinfo.o: $(BUILDINFO_SRC)
