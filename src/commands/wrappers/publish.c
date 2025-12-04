@@ -6,7 +6,7 @@
  */
 
 #include "publish.h"
-#include "../progname.h"
+#include "../../progname.h"
 #include <stdio.h>
 
 int cmd_publish(int argc, char *argv[]) {

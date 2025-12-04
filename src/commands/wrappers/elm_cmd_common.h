@@ -8,8 +8,8 @@
 #ifndef ELM_CMD_COMMON_H
 #define ELM_CMD_COMMON_H
 
-#include "elm_json.h"
-#include "install_env.h"
+#include "../../elm_json.h"
+#include "../../install_env.h"
 
 /**
  * Build an environment array for running elm commands.

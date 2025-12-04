@@ -3,10 +3,10 @@
  */
 
 #include "elm_cmd_common.h"
-#include "cache.h"
-#include "registry.h"
-#include "alloc.h"
-#include "log.h"
+#include "../../cache.h"
+#include "../../registry.h"
+#include "../../alloc.h"
+#include "../../log.h"
 #include <stdlib.h>
 #include <stdio.h>
 

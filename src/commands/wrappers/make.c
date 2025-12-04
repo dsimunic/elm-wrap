@@ -1,11 +1,11 @@
-#include "repl.h"
-#include "../elm_json.h"
-#include "../elm_cmd_common.h"
-#include "../install_env.h"
-#include "../elm_compiler.h"
-#include "../alloc.h"
-#include "../log.h"
-#include "../progname.h"
+#include "make.h"
+#include "../../elm_json.h"
+#include "elm_cmd_common.h"
+#include "../../install_env.h"
+#include "../../elm_compiler.h"
+#include "../../alloc.h"
+#include "../../log.h"
+#include "../../progname.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,22 +15,27 @@
 
 #define ELM_JSON_PATH "elm.json"
 
-static void print_repl_usage(void) {
-    printf("Usage: %s repl\n", program_name);
+static void print_make_usage(void) {
+    printf("Usage: %s make [ELM_FILE] [OPTIONS]\n", program_name);
     printf("\n");
-    printf("Start an interactive Elm REPL (Read-Eval-Print Loop).\n");
+    printf("Compile Elm code to JavaScript or HTML.\n");
     printf("\n");
     printf("This command ensures all package dependencies are downloaded and cached\n");
-    printf("before calling 'elm repl'.\n");
+    printf("before calling 'elm make' to perform the actual compilation.\n");
     printf("\n");
-    printf("All options are passed through to 'elm repl'.\n");
+    printf("Examples:\n");
+    printf("  %s make src/Main.elm                 # Compile Main.elm\n", program_name);
+    printf("  %s make src/Main.elm --output=main.js\n", program_name);
+    printf("  %s make src/Main.elm --optimize\n", program_name);
+    printf("\n");
+    printf("All options are passed through to 'elm make'.\n");
 }
 
-int cmd_repl(int argc, char *argv[]) {
+int cmd_make(int argc, char *argv[]) {
     // Check for help flag
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            print_repl_usage();
+            print_make_usage();
             return 0;
         }
     }
@@ -72,8 +77,8 @@ int cmd_repl(int argc, char *argv[]) {
         return result;
     }
 
-    // Now call elm repl with all the arguments
-    printf("\nAll dependencies cached. Running elm repl...\n\n");
+    // Now call elm make with all the arguments
+    printf("\nAll dependencies cached. Running elm make...\n\n");
 
     // Get elm compiler path
     char *elm_path = elm_compiler_get_path();
@@ -92,11 +97,11 @@ int cmd_repl(int argc, char *argv[]) {
         return 1;
     }
 
-    // Build elm repl command
-    // We need to pass all arguments except "repl" to elm
+    // Build elm make command
+    // We need to pass all arguments except "make" to elm
     char **elm_args = arena_malloc(sizeof(char*) * (argc + 2));
     elm_args[0] = "elm";
-    elm_args[1] = "repl";
+    elm_args[1] = "make";
 
     // Copy remaining arguments
     for (int i = 1; i < argc; i++) {
@@ -104,7 +109,7 @@ int cmd_repl(int argc, char *argv[]) {
     }
     elm_args[argc + 1] = NULL;
 
-    // Execute elm repl with custom environment
+    // Execute elm make with custom environment
     execve(elm_path, elm_args, elm_env);
 
     // If execve returns, it failed
