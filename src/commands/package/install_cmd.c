@@ -5,6 +5,7 @@
 #include "../../solver.h"
 #include "../../install_env.h"
 #include "../../registry.h"
+#include "../../protocol_v2/solver/v2_registry.h"
 #include "../../http_client.h"
 #include "../../alloc.h"
 #include "../../log.h"
@@ -20,6 +21,63 @@
 #define ANSI_DULL_CYAN "\033[36m"
 #define ANSI_DULL_YELLOW "\033[33m"
 #define ANSI_RESET "\033[0m"
+
+/* Helper functions for placing package changes into the correct dependency map */
+static PackageMap* find_existing_app_map(ElmJson *elm_json, const char *author, const char *name) {
+    if (!elm_json || elm_json->type != ELM_PROJECT_APPLICATION) {
+        return NULL;
+    }
+
+    if (package_map_find(elm_json->dependencies_direct, author, name)) {
+        return elm_json->dependencies_direct;
+    }
+    if (package_map_find(elm_json->dependencies_indirect, author, name)) {
+        return elm_json->dependencies_indirect;
+    }
+    if (package_map_find(elm_json->dependencies_test_direct, author, name)) {
+        return elm_json->dependencies_test_direct;
+    }
+    if (package_map_find(elm_json->dependencies_test_indirect, author, name)) {
+        return elm_json->dependencies_test_indirect;
+    }
+
+    return NULL;
+}
+
+static void remove_from_all_app_maps(ElmJson *elm_json, const char *author, const char *name) {
+    if (!elm_json || elm_json->type != ELM_PROJECT_APPLICATION) {
+        return;
+    }
+
+    package_map_remove(elm_json->dependencies_direct, author, name);
+    package_map_remove(elm_json->dependencies_indirect, author, name);
+    package_map_remove(elm_json->dependencies_test_direct, author, name);
+    package_map_remove(elm_json->dependencies_test_indirect, author, name);
+}
+
+static PackageMap* find_existing_package_map(ElmJson *elm_json, const char *author, const char *name) {
+    if (!elm_json || elm_json->type != ELM_PROJECT_PACKAGE) {
+        return NULL;
+    }
+
+    if (package_map_find(elm_json->package_dependencies, author, name)) {
+        return elm_json->package_dependencies;
+    }
+    if (package_map_find(elm_json->package_test_dependencies, author, name)) {
+        return elm_json->package_test_dependencies;
+    }
+
+    return NULL;
+}
+
+static void remove_from_all_package_maps(ElmJson *elm_json, const char *author, const char *name) {
+    if (!elm_json || elm_json->type != ELM_PROJECT_PACKAGE) {
+        return;
+    }
+
+    package_map_remove(elm_json->package_dependencies, author, name);
+    package_map_remove(elm_json->package_test_dependencies, author, name);
+}
 
 static void print_install_what(const char *elm_home) {
     fprintf(stderr, "%s-- INSTALL WHAT? ---------------------------------------------------------------%s\n\n",
@@ -133,18 +191,55 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
                   author, name, existing_pkg->version);
     }
 
-    RegistryEntry *registry_entry = registry_find(env->registry, author, name);
+    size_t available_versions = 0;
 
-    if (!registry_entry) {
-        log_error("I cannot find package '%s/%s'", author, name);
-        log_error("Make sure the package name is correct");
+    if (env->protocol_mode == PROTOCOL_V2) {
+        if (!env->v2_registry) {
+            log_error("V2 protocol active but registry is not loaded");
+            arena_free(author);
+            arena_free(name);
+            return 1;
+        }
 
-        arena_free(author);
-        arena_free(name);
-        return 1;
+        V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
+        if (!entry) {
+            log_error("I cannot find package '%s/%s' in V2 registry", author, name);
+            log_error("Make sure the package name is correct");
+            arena_free(author);
+            arena_free(name);
+            return 1;
+        }
+
+        for (size_t i = 0; i < entry->version_count; i++) {
+            if (entry->versions[i].status == V2_STATUS_VALID) {
+                available_versions++;
+            }
+        }
+
+        if (available_versions == 0) {
+            log_error("Package '%s/%s' has no valid versions in V2 registry", author, name);
+            arena_free(author);
+            arena_free(name);
+            return 1;
+        }
+
+        log_debug("Found package in V2 registry with %zu valid version(s) (%zu total)", 
+                  available_versions, entry->version_count);
+    } else {
+        RegistryEntry *registry_entry = registry_find(env->registry, author, name);
+
+        if (!registry_entry) {
+            log_error("I cannot find package '%s/%s'", author, name);
+            log_error("Make sure the package name is correct");
+
+            arena_free(author);
+            arena_free(name);
+            return 1;
+        }
+
+        available_versions = registry_entry->version_count;
+        log_debug("Found package in registry with %zu version(s)", registry_entry->version_count);
     }
-
-    log_debug("Found package in registry with %zu version(s)", registry_entry->version_count);
 
     SolverState *solver = solver_init(env, true);
     if (!solver) {
@@ -272,23 +367,46 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
         PackageMap *target_map = NULL;
+        bool added = false;
         
         if (elm_json->type == ELM_PROJECT_APPLICATION) {
-            if (strcmp(change->author, author) == 0 && strcmp(change->name, name) == 0) {
+            PackageMap *existing_map = find_existing_app_map(elm_json, change->author, change->name);
+
+            if (existing_map) {
+                target_map = existing_map;
+            } else if (strcmp(change->author, author) == 0 && strcmp(change->name, name) == 0) {
                 target_map = is_test ? elm_json->dependencies_test_direct : elm_json->dependencies_direct;
             } else {
                 target_map = is_test ? elm_json->dependencies_test_indirect : elm_json->dependencies_indirect;
             }
+
+            /* Ensure stale entries do not linger in other maps */
+            remove_from_all_app_maps(elm_json, change->author, change->name);
         } else {
-            if (strcmp(change->author, author) == 0 && strcmp(change->name, name) == 0) {
-                target_map = is_test ? elm_json->package_test_dependencies : elm_json->package_dependencies;
+            PackageMap *existing_map = find_existing_package_map(elm_json, change->author, change->name);
+
+            if (existing_map) {
+                target_map = existing_map;
             } else {
                 target_map = is_test ? elm_json->package_test_dependencies : elm_json->package_dependencies;
             }
+
+            remove_from_all_package_maps(elm_json, change->author, change->name);
         }
         
         if (target_map) {
-            package_map_add(target_map, change->author, change->name, change->new_version);
+            added = package_map_add(target_map, change->author, change->name, change->new_version);
+        }
+
+        if (!target_map || !added) {
+            log_error("Failed to record dependency %s/%s %s in elm.json",
+                      change->author,
+                      change->name,
+                      change->new_version ? change->new_version : "(null)");
+            install_plan_free(out_plan);
+            arena_free(author);
+            arena_free(name);
+            return 1;
         }
     }
     

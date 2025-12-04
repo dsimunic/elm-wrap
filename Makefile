@@ -122,15 +122,18 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/elm_compiler.c \
           $(SRCDIR)/cache.c \
           $(SRCDIR)/solver.c \
+          $(SRCDIR)/pgsolver/solver_common.c \
           $(SRCDIR)/cJSON.c \
           $(SRCDIR)/http_client.c \
           $(SRCDIR)/registry.c \
           $(SRCDIR)/protocol_v1/package_fetch.c \
           $(SRCDIR)/protocol_v1/install.c \
+          $(SRCDIR)/protocol_v1/solver/solver.c \
           $(SRCDIR)/protocol_v2/index_fetch.c \
           $(SRCDIR)/protocol_v2/install.c \
           $(SRCDIR)/protocol_v2/solver/v2_registry.c \
           $(SRCDIR)/protocol_v2/solver/pg_elm_v2.c \
+          $(SRCDIR)/protocol_v2/solver/solver.c \
           $(SRCDIR)/install_env.c \
           $(SRCDIR)/fileutil.c \
           $(SRCDIR)/commands/wrappers/elm_cmd_common.c \
@@ -197,15 +200,18 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/elm_compiler.o \
           $(BUILDDIR)/cache.o \
           $(BUILDDIR)/solver.o \
+          $(BUILDDIR)/solver_common.o \
           $(BUILDDIR)/cJSON.o \
           $(BUILDDIR)/http_client.o \
           $(BUILDDIR)/registry.o \
           $(BUILDDIR)/package_fetch.o \
           $(BUILDDIR)/v1_install.o \
+          $(BUILDDIR)/v1_solver.o \
           $(BUILDDIR)/index_fetch.o \
           $(BUILDDIR)/v2_install.o \
           $(BUILDDIR)/v2_registry.o \
           $(BUILDDIR)/pg_elm_v2.o \
+          $(BUILDDIR)/v2_solver.o \
           $(BUILDDIR)/install_env.o \
           $(BUILDDIR)/fileutil.o \
           $(BUILDDIR)/elm_cmd_common.o \
@@ -493,6 +499,10 @@ $(BUILDDIR)/cache.o: $(SRCDIR)/cache.c $(SRCDIR)/cache.h $(SRCDIR)/elm_compiler.
 $(BUILDDIR)/solver.o: $(SRCDIR)/solver.c $(SRCDIR)/solver.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Build solver_common object
+$(BUILDDIR)/solver_common.o: $(SRCDIR)/pgsolver/solver_common.c $(SRCDIR)/pgsolver/solver_common.h $(SRCDIR)/solver.h $(SRCDIR)/elm_json.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # Build PubGrub core object
 $(BUILDDIR)/pg_core.o: $(SRCDIR)/pgsolver/pg_core.c $(SRCDIR)/pgsolver/pg_core.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -545,6 +555,10 @@ $(BUILDDIR)/package_fetch.o: $(SRCDIR)/protocol_v1/package_fetch.c $(SRCDIR)/pro
 $(BUILDDIR)/v1_install.o: $(SRCDIR)/protocol_v1/install.c $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/log.h $(SRCDIR)/alloc.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Build v1_solver object (protocol v1 solver functions)
+$(BUILDDIR)/v1_solver.o: $(SRCDIR)/protocol_v1/solver/solver.c $(SRCDIR)/protocol_v1/solver/solver.h $(SRCDIR)/solver.h $(SRCDIR)/elm_json.h $(SRCDIR)/pgsolver/solver_common.h $(SRCDIR)/pgsolver/pg_elm.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # Build index_fetch object (protocol v2)
 $(BUILDDIR)/index_fetch.o: $(SRCDIR)/protocol_v2/index_fetch.c $(SRCDIR)/protocol_v2/index_fetch.h $(SRCDIR)/env_defaults.h $(SRCDIR)/http_client.h $(SRCDIR)/log.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -559,6 +573,10 @@ $(BUILDDIR)/v2_registry.o: $(SRCDIR)/protocol_v2/solver/v2_registry.c $(SRCDIR)/
 
 # Build pg_elm_v2 object (protocol v2 solver)
 $(BUILDDIR)/pg_elm_v2.o: $(SRCDIR)/protocol_v2/solver/pg_elm_v2.c $(SRCDIR)/protocol_v2/solver/pg_elm_v2.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/pgsolver/pg_core.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build v2_solver object (protocol v2 solver functions)
+$(BUILDDIR)/v2_solver.o: $(SRCDIR)/protocol_v2/solver/solver.c $(SRCDIR)/protocol_v2/solver/solver.h $(SRCDIR)/solver.h $(SRCDIR)/elm_json.h $(SRCDIR)/pgsolver/solver_common.h $(SRCDIR)/protocol_v2/solver/pg_elm_v2.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build install_env object

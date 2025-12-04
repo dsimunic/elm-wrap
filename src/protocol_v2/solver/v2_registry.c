@@ -486,31 +486,9 @@ V2Registry *v2_registry_parse(const char *data, size_t size) {
             char *pkg_name = NULL;
             char *constraint = NULL;
             
-            /* Debug output for dillonkearns/elm-pages */
-            if (current_entry && strcmp(current_entry->author, "dillonkearns") == 0 && 
-                strcmp(current_entry->name, "elm-pages") == 0) {
-                log_debug("DEBUG: Parsing dependency line: '%s'", line);
-            }
-            
             if (parse_dependency_line(line, &pkg_name, &constraint)) {
-                /* Debug output for dillonkearns/elm-pages */
-                if (current_entry && strcmp(current_entry->author, "dillonkearns") == 0 && 
-                    strcmp(current_entry->name, "elm-pages") == 0) {
-                    log_debug("DEBUG: Adding dependency %zu: %s -> %s", 
-                              current_version->dependency_count, pkg_name, constraint);
-                }
-                
                 if (!v2_version_add_dependency(current_version, pkg_name, constraint)) {
                     log_error("v2_registry_parse: failed to add dependency at line %d", line_number);
-                }
-                
-                /* Debug output for dillonkearns/elm-pages */
-                if (current_entry && strcmp(current_entry->author, "dillonkearns") == 0 && 
-                    strcmp(current_entry->name, "elm-pages") == 0) {
-                    log_debug("DEBUG: After adding, dependency_count=%zu, last dep: %s -> %s", 
-                              current_version->dependency_count,
-                              current_version->dependencies[current_version->dependency_count-1].package_name,
-                              current_version->dependencies[current_version->dependency_count-1].constraint);
                 }
                 
                 arena_free(pkg_name);

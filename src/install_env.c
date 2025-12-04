@@ -396,6 +396,59 @@ bool install_env_update_registry(InstallEnv *env) {
 bool install_env_download_package(InstallEnv *env, const char *author, const char *name, const char *version) {
     if (!env || !author || !name || !version) return false;
 
+    if (env->protocol_mode == PROTOCOL_V2) {
+        GlobalContext *ctx = global_context_get();
+        if (!ctx || !ctx->repository_path) {
+            fprintf(stderr, "Error: V2 repository path is not configured\n");
+            return false;
+        }
+
+        size_t src_path_len = strlen(ctx->repository_path) + strlen("/packages/") +
+                              strlen(author) + 1 + strlen(name) + 1 + strlen(version) + 1;
+        char *src_path = arena_malloc(src_path_len);
+        if (!src_path) {
+            fprintf(stderr, "Error: Failed to allocate repository package path\n");
+            return false;
+        }
+        snprintf(src_path, src_path_len, "%s/packages/%s/%s/%s", ctx->repository_path, author, name, version);
+
+        struct stat st;
+        if (stat(src_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+            fprintf(stderr, "Error: Package %s/%s %s not found in repository at %s\n",
+                    author, name, version, src_path);
+            arena_free(src_path);
+            return false;
+        }
+
+        char *pkg_dir = build_package_dir_path(env->cache->packages_dir, author, name, version);
+        if (!pkg_dir) {
+            fprintf(stderr, "Error: Failed to allocate package directory path\n");
+            arena_free(src_path);
+            return false;
+        }
+
+        if (strcmp(src_path, pkg_dir) == 0) {
+            log_progress("Package %s/%s %s already present in repository cache", author, name, version);
+            arena_free(src_path);
+            arena_free(pkg_dir);
+            return true;
+        }
+
+        log_progress("Installing %s/%s %s from repository...", author, name, version);
+        bool copy_ok = copy_directory_selective(src_path, pkg_dir);
+
+        if (!copy_ok) {
+            fprintf(stderr, "Error: Failed to copy package from repository (%s -> %s)\n",
+                    src_path, pkg_dir);
+        } else {
+            log_progress("  Copied package from repository");
+        }
+
+        arena_free(src_path);
+        arena_free(pkg_dir);
+        return copy_ok;
+    }
+
     if (env->offline) {
         fprintf(stderr, "Error: Cannot download package in offline mode\n");
         return false;

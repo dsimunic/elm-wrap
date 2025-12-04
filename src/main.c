@@ -211,13 +211,22 @@ int main(int argc, char *argv[]) {
     }
 
     // Parse global flags
-    bool verbose = false;
+    int verbosity = 0;
     int cmd_start = 1;
 
     // Check for global verbose flag before command
+    // -v enables debug, -vv (or -v -v) enables trace
     for (int i = 1; i < argc && cmd_start == 1; i++) {
-        if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
-            verbose = true;
+        if (strcmp(argv[i], "-vv") == 0) {
+            verbosity += 2;
+            // Shift remaining args
+            for (int j = i; j < argc - 1; j++) {
+                argv[j] = argv[j + 1];
+            }
+            argc--;
+            i--; // Check same position again
+        } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
+            verbosity++;
             // Shift remaining args
             for (int j = i; j < argc - 1; j++) {
                 argv[j] = argv[j + 1];
@@ -231,7 +240,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Initialize logging
-    log_init(verbose);
+    log_init(verbosity);
 
     // Initialize global context (determines V1 vs V2 mode)
     global_context_init();

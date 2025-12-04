@@ -197,7 +197,7 @@ static int pg_elm_v2_provider_get_versions(
         v.major = pv->major;
         v.minor = pv->minor;
         v.patch = pv->patch;
-        log_debug("  Version %zu: %d.%d.%d", i, v.major, v.minor, v.patch);
+        log_trace("  Version %zu: %d.%d.%d", i, v.major, v.minor, v.patch);
         out_versions[written] = v;
         written++;
     }
