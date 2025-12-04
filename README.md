@@ -10,7 +10,7 @@ process when all package management is done. The interface to Elm is strictly th
 
 ## Synopsis
 
-    $ export ELM_PACKAGE_REGISTRY_URL=package.elmpad.app
+    $ export ELM_PACKAGE_REGISTRY_URL=elm-wrap.cloud
     $ elm-wrap install some/package
     $ elm-wrap make examples/src/Main.elm
 
@@ -34,7 +34,7 @@ process when all package management is done. The interface to Elm is strictly th
     Packages: 2946
     Versions: 16446
 
-    Registry URL: package.elmpad.app
+    Registry URL: elm-wrap.cloud
     Status: Connected
 
     Project Information
@@ -60,7 +60,6 @@ As elm-wrap seeks to wrap the compiler, it intercepts all of the Elm compiler's 
     elm-wrap install 
     elm-wrap bump    
     elm-wrap diff    
-    elm-wrap publish 
 
 All of these commands ultimately execute on the Elm compiler(*) after dealing
 with any needed package caching.
@@ -88,8 +87,7 @@ Extended comands are organized in sections.
     install [<PACKAGE>]  Install packages for your Elm project
     remove <PACKAGE>     Remove a package from your Elm project
     upgrade [PACKAGE]    Upgrade packages to latest versions
-    check [elm.json]     Check for available package upgrades
-    info                 Display package management information
+    info [elm.json]      Check for available package upgrades
     deps <PACKAGE>       Display dependencies for a specific package
 
     Options:
@@ -102,26 +100,7 @@ Extended comands are organized in sections.
 its own package dependency resolution using PubGrub algorithm. It also uses the same resolution strategy ladder as Elm internally,
 leading to identical outcomes for install actions.
 
-Most important characteristic of the extended `package install` are `--from-url` and `--from-path` switches: with these, it can install any pckage into the ELM_HOME package tree straight from GitHub or from a local package directory (maybe you are developing a package and want to test without having to push to the canonical public repository).
-
-    $ elm-wrap package install --from-url  https://github.com/lydell/core/archive/refs/heads/hot-reload-stop.zip elm/core --pin
-
-    $ elm-wrap make src/Main.elm
-    All dependencies cached. Running elm make...
-
-    Success! Compiled 1 module.
-
-        Main ───> index.html
-    
-    $ ag hotReload index.html
-    ...
-    2025:	app.hotReload = function(hotReloadData) 🔥
-    ...
-
-
-This gets you Simon Lydell's core hot reload improvements as a direct replacement of `elm/core`. Elm will happily compile this file from now on. The `--pin` flag will also mark this version as pinned to notify you during `elm-wrap package check` and `upgrade` commands. 👍👍👍
-
-(if you didn't see hotReload in your compiled output, nuke your project's `elm-stuff` and rebuild).
+Most important characteristic of the extended `package install` are `--from-url` and `--from-path` switches: with these, it can install any pckage into the ELM_HOME package tree straight from GitHub or from a local package directory (maybe you are developing a package and want to test without having to push to the canonical public repository, or an author of a package you depend on deleted the version tag or renamed the github repository).
 
 Of note is also the ability to install new major version upgrade, something that the built-in `elm install` cannot do.
 
@@ -179,9 +158,9 @@ Synopsis:
 
     Would you like me to update your elm.json accordingly? [Y/n]: 
 
-**`check`** sub-command that can check for available upgrades, both minor and major:
+**`info`** sub-command that can check for available upgrades, both minor and major:
 
-    $ elm-wrap package check
+    $ elm-wrap package info
     Available upgrades:
 
     [minor] SiriusStarr/elm-password-strength     1.0.1 -> 1.0.2
@@ -197,9 +176,9 @@ Synopsis:
     [minor] elm/virtual-dom                       1.0.2 -> 1.0.5
 
 
-Conveniently, `check` also takes the path to elm.json, so one can check all projects in a directory tree with:
+Conveniently, `info` also takes the path to elm.json, so one can check all projects in a directory tree with:
 
-    find /path/to/projects -name elm.json -print -exec elm-wrap package check {} \;
+    find /path/to/projects -name elm.json -print -exec elm-wrap package info {} \;
 
 **`deps <package>`** lists the dependencies of a package.
 
