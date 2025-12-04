@@ -84,16 +84,21 @@ Extended comands are organized in sections.
     Usage: elm-wrap package SUBCOMMAND [OPTIONS]
 
     Subcommands:
-    install [<PACKAGE>]  Install packages for your Elm project
-    remove <PACKAGE>     Remove a package from your Elm project
-    upgrade [PACKAGE]    Upgrade packages to latest versions
-    info [elm.json]      Check for available package upgrades
-    deps <PACKAGE>       Display dependencies for a specific package
+    install [PACKAGE]              Add a dependency to current elm.json
+    upgrade [PACKAGE]              Upgrade packages to latest versions
+    remove   PACKAGE               Remove a package from elm.json
+    info    [ PATH                 Display package information and upgrades
+            | PACKAGE [VERSION]
+            ]
+    publish PATH                   Show files that would be published from a package
+    docs    PATH                   Generate documentation JSON for a package
+    cache   [PACKAGE]              Download package to ELM_HOME without adding it to elm.json
 
     Options:
     -y, --yes            Automatically confirm changes
     -v, --verbose        Show detailed logging output
     -h, --help           Show this help message
+
 
 
 **`install`** does full package dependency resolution/download/elm.json updates, without calling elm compiler. It implements
@@ -159,6 +164,38 @@ Synopsis:
     Would you like me to update your elm.json accordingly? [Y/n]: 
 
 **`info`** sub-command that can check for available upgrades, both minor and major:
+
+Synopsis:
+
+    Usage: elm-wrap package info [PATH | <author/package> [VERSION]]
+
+    Display package management information.
+
+    Shows:
+    - Current ELM_HOME directory
+    - Registry cache statistics
+    - Package registry connectivity
+    - Installed packages (if run in a project directory)
+    - Available updates (if run in a project directory)
+
+    Version resolution (for package lookup):
+    - If package is in elm.json: uses that version
+    - If not in elm.json and no VERSION specified: uses latest from registry
+    - If VERSION specified: uses that specific version
+
+    Examples:
+    elm-wrap package info                  # Show general package info
+    elm-wrap package info ./path/to/dir    # Show info for elm.json at path
+    elm-wrap package info elm/core         # Show info for elm/core package
+    elm-wrap package info elm/http 2.0.0   # Show info for elm/http 2.0.0
+
+    Note: Package name format (author/package) takes priority over paths.
+        Use './package/author' to treat as a path instead.
+
+    Options:
+    --help                             # Show this help
+
+Example output:
 
     $ elm-wrap package info
     Available upgrades:
