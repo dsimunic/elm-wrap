@@ -20,6 +20,7 @@ typedef struct {
     char *latest_major;
     bool has_minor_upgrade;
     bool has_major_upgrade;
+    bool is_test_dependency;
 } PackageUpgrade;
 
 /* Parse a package constraint string like "1.0.0 <= v < 2.0.0"
@@ -296,6 +297,11 @@ static int compare_package_names(const void *a, const void *b) {
     const PackageUpgrade *upg_a = (const PackageUpgrade *)a;
     const PackageUpgrade *upg_b = (const PackageUpgrade *)b;
 
+    // First, non-test dependencies come before test dependencies
+    if (upg_a->is_test_dependency != upg_b->is_test_dependency) {
+        return upg_a->is_test_dependency ? 1 : -1;
+    }
+
     // Compare full package name (author/name)
     char name_a[256], name_b[256];
     snprintf(name_a, sizeof(name_a), "%s/%s", upg_a->author, upg_a->name);
@@ -321,7 +327,7 @@ static int compare_package_names(const void *a, const void *b) {
 
 /* Check a package map for upgrades */
 static void check_package_map_upgrades(PackageMap *map, Registry *registry,
-                                        PackageUpgrade **upgrades, int *upgrade_count) {
+                                        PackageUpgrade **upgrades, int *upgrade_count, bool is_test) {
     if (!map) return;
 
     for (int i = 0; i < map->count; i++) {
@@ -344,6 +350,7 @@ static void check_package_map_upgrades(PackageMap *map, Registry *registry,
             upg->latest_major = latest_major;
             upg->has_minor_upgrade = (latest_minor != NULL);
             upg->has_major_upgrade = (latest_major != NULL);
+            upg->is_test_dependency = is_test;
 
             (*upgrade_count)++;
         }
@@ -354,7 +361,7 @@ static void check_package_map_upgrades(PackageMap *map, Registry *registry,
  * Only reports upgrades that are beyond the declared upper bound.
  */
 static void check_package_constraint_upgrades(PackageMap *map, Registry *registry,
-                                              PackageUpgrade **upgrades, int *upgrade_count) {
+                                              PackageUpgrade **upgrades, int *upgrade_count, bool is_test) {
     if (!map) return;
 
     for (int i = 0; i < map->count; i++) {
@@ -376,13 +383,14 @@ static void check_package_constraint_upgrades(PackageMap *map, Registry *registr
             upg->latest_major = latest_beyond;
             upg->has_minor_upgrade = false;
             upg->has_major_upgrade = true;
+            upg->is_test_dependency = is_test;
 
             (*upgrade_count)++;
         }
     }
 }
 
-int check_all_upgrades(const char *elm_json_path, Registry *registry) {
+int check_all_upgrades(const char *elm_json_path, Registry *registry, size_t max_name_len) {
     // Validate registry
     if (!registry) {
         fprintf(stderr, "Error: No registry provided\n");
@@ -400,26 +408,26 @@ int check_all_upgrades(const char *elm_json_path, Registry *registry) {
     if (elm_json->type == ELM_PROJECT_PACKAGE) {
         check_duplicate_exposed_modules(elm_json_path);
     }
-    
+
     // Collect all upgrades
     PackageUpgrade *upgrades = NULL;
     int upgrade_count = 0;
 
     if (elm_json->type == ELM_PROJECT_APPLICATION) {
         check_package_map_upgrades(elm_json->dependencies_direct, registry,
-                                   &upgrades, &upgrade_count);
+                                   &upgrades, &upgrade_count, false);
         check_package_map_upgrades(elm_json->dependencies_indirect, registry,
-                                   &upgrades, &upgrade_count);
+                                   &upgrades, &upgrade_count, false);
         check_package_map_upgrades(elm_json->dependencies_test_direct, registry,
-                                   &upgrades, &upgrade_count);
+                                   &upgrades, &upgrade_count, true);
         check_package_map_upgrades(elm_json->dependencies_test_indirect, registry,
-                                   &upgrades, &upgrade_count);
+                                   &upgrades, &upgrade_count, true);
     } else if (elm_json->type == ELM_PROJECT_PACKAGE) {
         /* For packages, only report versions beyond the declared constraint upper bound */
         check_package_constraint_upgrades(elm_json->package_dependencies, registry,
-                                          &upgrades, &upgrade_count);
+                                          &upgrades, &upgrade_count, false);
         check_package_constraint_upgrades(elm_json->package_test_dependencies, registry,
-                                          &upgrades, &upgrade_count);
+                                          &upgrades, &upgrade_count, true);
     }
 
     // Print results
@@ -436,8 +444,7 @@ int check_all_upgrades(const char *elm_json_path, Registry *registry) {
     // Sort upgrades by package name, then minor before major
     qsort(upgrades, upgrade_count, sizeof(PackageUpgrade), compare_package_names);
 
-    // Find longest package name for alignment
-    size_t max_name_len = 0;
+    // Calculate max_name_len from upgrades if not provided, or update if any upgrade name is longer
     for (int i = 0; i < upgrade_count; i++) {
         char full_name[256];
         snprintf(full_name, sizeof(full_name), "%s/%s",
@@ -448,26 +455,31 @@ int check_all_upgrades(const char *elm_json_path, Registry *registry) {
         }
     }
 
-    // Add 4 spaces padding
-    size_t padding = max_name_len + 4;
-
     printf("Available upgrades:\n\n");
 
+    bool last_was_test = false;
     for (int i = 0; i < upgrade_count; i++) {
         PackageUpgrade *upg = &upgrades[i];
+
+        // Add separator between non-test and test packages
+        if (i > 0 && upg->is_test_dependency && !last_was_test) {
+            printf("\n");
+        }
+        last_was_test = upg->is_test_dependency;
+
         char full_name[256];
         snprintf(full_name, sizeof(full_name), "%s/%s", upg->author, upg->name);
 
         // Print minor upgrades first
         if (upg->has_minor_upgrade) {
-            printf("[minor] %-*s %s -> %s\n",
-                   (int)padding, full_name, upg->current_version, upg->latest_minor);
+            printf("[minor] %-*s  %s -> %s\n",
+                   (int)max_name_len, full_name, upg->current_version, upg->latest_minor);
         }
 
         // Print major upgrades in bold/green
         if (upg->has_major_upgrade) {
-            printf("%s[major] %-*s %s -> %s%s\n",
-                   ANSI_GREEN, (int)padding, full_name,
+            printf("%s[major] %-*s  %s -> %s%s\n",
+                   ANSI_GREEN, (int)max_name_len, full_name,
                    upg->current_version, upg->latest_major, ANSI_RESET);
         }
 
@@ -532,7 +544,7 @@ static void find_latest_versions_v2(V2Registry *registry, const char *author, co
 
 /* Check a package map for upgrades using V2 registry */
 static void check_package_map_upgrades_v2(PackageMap *map, V2Registry *registry,
-                                          PackageUpgrade **upgrades, int *upgrade_count) {
+                                          PackageUpgrade **upgrades, int *upgrade_count, bool is_test) {
     if (!map) return;
 
     for (int i = 0; i < map->count; i++) {
@@ -555,6 +567,7 @@ static void check_package_map_upgrades_v2(PackageMap *map, V2Registry *registry,
             upg->latest_major = latest_major;
             upg->has_minor_upgrade = (latest_minor != NULL);
             upg->has_major_upgrade = (latest_major != NULL);
+            upg->is_test_dependency = is_test;
 
             (*upgrade_count)++;
         }
@@ -604,7 +617,7 @@ static void find_versions_beyond_constraint_v2(V2Registry *registry, const char 
  * Only reports upgrades that are beyond the declared upper bound.
  */
 static void check_package_constraint_upgrades_v2(PackageMap *map, V2Registry *registry,
-                                                 PackageUpgrade **upgrades, int *upgrade_count) {
+                                                 PackageUpgrade **upgrades, int *upgrade_count, bool is_test) {
     if (!map) return;
 
     for (int i = 0; i < map->count; i++) {
@@ -626,13 +639,14 @@ static void check_package_constraint_upgrades_v2(PackageMap *map, V2Registry *re
             upg->latest_major = latest_beyond;
             upg->has_minor_upgrade = false;
             upg->has_major_upgrade = true;
+            upg->is_test_dependency = is_test;
 
             (*upgrade_count)++;
         }
     }
 }
 
-int check_all_upgrades_v2(const char *elm_json_path, V2Registry *registry) {
+int check_all_upgrades_v2(const char *elm_json_path, V2Registry *registry, size_t max_name_len) {
     /* Validate registry */
     if (!registry) {
         fprintf(stderr, "Error: No V2 registry provided\n");
@@ -650,26 +664,26 @@ int check_all_upgrades_v2(const char *elm_json_path, V2Registry *registry) {
     if (elm_json->type == ELM_PROJECT_PACKAGE) {
         check_duplicate_exposed_modules(elm_json_path);
     }
-    
+
     /* Collect all upgrades */
     PackageUpgrade *upgrades = NULL;
     int upgrade_count = 0;
 
     if (elm_json->type == ELM_PROJECT_APPLICATION) {
         check_package_map_upgrades_v2(elm_json->dependencies_direct, registry,
-                                      &upgrades, &upgrade_count);
+                                      &upgrades, &upgrade_count, false);
         check_package_map_upgrades_v2(elm_json->dependencies_indirect, registry,
-                                      &upgrades, &upgrade_count);
+                                      &upgrades, &upgrade_count, false);
         check_package_map_upgrades_v2(elm_json->dependencies_test_direct, registry,
-                                      &upgrades, &upgrade_count);
+                                      &upgrades, &upgrade_count, true);
         check_package_map_upgrades_v2(elm_json->dependencies_test_indirect, registry,
-                                      &upgrades, &upgrade_count);
+                                      &upgrades, &upgrade_count, true);
     } else if (elm_json->type == ELM_PROJECT_PACKAGE) {
         /* For packages, only report versions beyond the declared constraint upper bound */
         check_package_constraint_upgrades_v2(elm_json->package_dependencies, registry,
-                                             &upgrades, &upgrade_count);
+                                             &upgrades, &upgrade_count, false);
         check_package_constraint_upgrades_v2(elm_json->package_test_dependencies, registry,
-                                             &upgrades, &upgrade_count);
+                                             &upgrades, &upgrade_count, true);
     }
 
     /* Print results */
@@ -686,8 +700,7 @@ int check_all_upgrades_v2(const char *elm_json_path, V2Registry *registry) {
     /* Sort upgrades by package name, then minor before major */
     qsort(upgrades, upgrade_count, sizeof(PackageUpgrade), compare_package_names);
 
-    /* Find longest package name for alignment */
-    size_t max_name_len = 0;
+    /* Calculate max_name_len from upgrades if not provided, or update if any upgrade name is longer */
     for (int i = 0; i < upgrade_count; i++) {
         char full_name[256];
         snprintf(full_name, sizeof(full_name), "%s/%s",
@@ -698,26 +711,31 @@ int check_all_upgrades_v2(const char *elm_json_path, V2Registry *registry) {
         }
     }
 
-    /* Add 4 spaces padding */
-    size_t padding = max_name_len + 4;
-
     printf("Available upgrades:\n\n");
 
+    bool last_was_test = false;
     for (int i = 0; i < upgrade_count; i++) {
         PackageUpgrade *upg = &upgrades[i];
+
+        // Add separator between non-test and test packages
+        if (i > 0 && upg->is_test_dependency && !last_was_test) {
+            printf("\n");
+        }
+        last_was_test = upg->is_test_dependency;
+
         char full_name[256];
         snprintf(full_name, sizeof(full_name), "%s/%s", upg->author, upg->name);
 
         /* Print minor upgrades first */
         if (upg->has_minor_upgrade) {
-            printf("[minor] %-*s %s -> %s\n",
-                   (int)padding, full_name, upg->current_version, upg->latest_minor);
+            printf("[minor] %-*s  %s -> %s\n",
+                   (int)max_name_len, full_name, upg->current_version, upg->latest_minor);
         }
 
         /* Print major upgrades in bold/green */
         if (upg->has_major_upgrade) {
-            printf("%s[major] %-*s %s -> %s%s\n",
-                   ANSI_GREEN, (int)padding, full_name,
+            printf("%s[major] %-*s  %s -> %s%s\n",
+                   ANSI_GREEN, (int)max_name_len, full_name,
                    upg->current_version, upg->latest_major, ANSI_RESET);
         }
 
@@ -733,4 +751,100 @@ int check_all_upgrades_v2(const char *elm_json_path, V2Registry *registry) {
     elm_json_free(elm_json);
 
     return 0;
+}
+
+/* ========== Max Name Length Helpers ========== */
+
+size_t get_max_upgrade_name_len(const char *elm_json_path, Registry *registry) {
+    if (!registry) return 0;
+
+    ElmJson *elm_json = elm_json_read(elm_json_path);
+    if (!elm_json) return 0;
+
+    PackageUpgrade *upgrades = NULL;
+    int upgrade_count = 0;
+
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        check_package_map_upgrades(elm_json->dependencies_direct, registry,
+                                   &upgrades, &upgrade_count, false);
+        check_package_map_upgrades(elm_json->dependencies_indirect, registry,
+                                   &upgrades, &upgrade_count, false);
+        check_package_map_upgrades(elm_json->dependencies_test_direct, registry,
+                                   &upgrades, &upgrade_count, true);
+        check_package_map_upgrades(elm_json->dependencies_test_indirect, registry,
+                                   &upgrades, &upgrade_count, true);
+    } else if (elm_json->type == ELM_PROJECT_PACKAGE) {
+        check_package_constraint_upgrades(elm_json->package_dependencies, registry,
+                                          &upgrades, &upgrade_count, false);
+        check_package_constraint_upgrades(elm_json->package_test_dependencies, registry,
+                                          &upgrades, &upgrade_count, true);
+    }
+
+    size_t max_len = 0;
+    for (int i = 0; i < upgrade_count; i++) {
+        char full_name[256];
+        snprintf(full_name, sizeof(full_name), "%s/%s",
+                 upgrades[i].author, upgrades[i].name);
+        size_t len = strlen(full_name);
+        if (len > max_len) {
+            max_len = len;
+        }
+        arena_free(upgrades[i].author);
+        arena_free(upgrades[i].name);
+        arena_free(upgrades[i].current_version);
+        arena_free(upgrades[i].latest_minor);
+        arena_free(upgrades[i].latest_major);
+    }
+
+    arena_free(upgrades);
+    elm_json_free(elm_json);
+
+    return max_len;
+}
+
+size_t get_max_upgrade_name_len_v2(const char *elm_json_path, V2Registry *registry) {
+    if (!registry) return 0;
+
+    ElmJson *elm_json = elm_json_read(elm_json_path);
+    if (!elm_json) return 0;
+
+    PackageUpgrade *upgrades = NULL;
+    int upgrade_count = 0;
+
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        check_package_map_upgrades_v2(elm_json->dependencies_direct, registry,
+                                      &upgrades, &upgrade_count, false);
+        check_package_map_upgrades_v2(elm_json->dependencies_indirect, registry,
+                                      &upgrades, &upgrade_count, false);
+        check_package_map_upgrades_v2(elm_json->dependencies_test_direct, registry,
+                                      &upgrades, &upgrade_count, true);
+        check_package_map_upgrades_v2(elm_json->dependencies_test_indirect, registry,
+                                      &upgrades, &upgrade_count, true);
+    } else if (elm_json->type == ELM_PROJECT_PACKAGE) {
+        check_package_constraint_upgrades_v2(elm_json->package_dependencies, registry,
+                                             &upgrades, &upgrade_count, false);
+        check_package_constraint_upgrades_v2(elm_json->package_test_dependencies, registry,
+                                             &upgrades, &upgrade_count, true);
+    }
+
+    size_t max_len = 0;
+    for (int i = 0; i < upgrade_count; i++) {
+        char full_name[256];
+        snprintf(full_name, sizeof(full_name), "%s/%s",
+                 upgrades[i].author, upgrades[i].name);
+        size_t len = strlen(full_name);
+        if (len > max_len) {
+            max_len = len;
+        }
+        arena_free(upgrades[i].author);
+        arena_free(upgrades[i].name);
+        arena_free(upgrades[i].current_version);
+        arena_free(upgrades[i].latest_minor);
+        arena_free(upgrades[i].latest_major);
+    }
+
+    arena_free(upgrades);
+    elm_json_free(elm_json);
+
+    return max_len;
 }

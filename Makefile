@@ -102,6 +102,12 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/policy/policy.c \
           $(SRCDIR)/commands/review/review.c \
           $(SRCDIR)/commands/review/reporter.c \
+          $(SRCDIR)/commands/package/package_common.c \
+          $(SRCDIR)/commands/package/install_cmd.c \
+          $(SRCDIR)/commands/package/cache_cmd.c \
+          $(SRCDIR)/commands/package/remove_cmd.c \
+          $(SRCDIR)/commands/package/info_cmd.c \
+          $(SRCDIR)/commands/package/upgrade_cmd.c \
           $(SRCDIR)/commands/debug/debug.c \
           $(SRCDIR)/commands/debug/include_tree.c \
           $(SRCDIR)/commands/repository/repository.c \
@@ -111,7 +117,6 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter/lib.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/parser.c \
           $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/scanner.c \
-          $(SRCDIR)/install.c \
           $(SRCDIR)/install_check.c \
           $(SRCDIR)/elm_json.c \
           $(SRCDIR)/elm_compiler.c \
@@ -172,6 +177,12 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/policy.o \
           $(BUILDDIR)/review.o \
           $(BUILDDIR)/reporter.o \
+          $(BUILDDIR)/package_common.o \
+          $(BUILDDIR)/install_cmd.o \
+          $(BUILDDIR)/cache_cmd.o \
+          $(BUILDDIR)/remove_cmd.o \
+          $(BUILDDIR)/info_cmd.o \
+          $(BUILDDIR)/upgrade_cmd.o \
           $(BUILDDIR)/debug.o \
           $(BUILDDIR)/include_tree.o \
           $(BUILDDIR)/repository.o \
@@ -181,7 +192,6 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/ts_lib.o \
           $(BUILDDIR)/ts_elm_parser.o \
           $(BUILDDIR)/ts_elm_scanner.o \
-          $(BUILDDIR)/install.o \
           $(BUILDDIR)/install_check.o \
           $(BUILDDIR)/elm_json.o \
           $(BUILDDIR)/elm_compiler.o \
@@ -444,8 +454,23 @@ $(BUILDDIR)/ts_elm_parser.o: $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-
 $(BUILDDIR)/ts_elm_scanner.o: $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/scanner.c | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
 
-# Build install object
-$(BUILDDIR)/install.o: $(SRCDIR)/install.c $(SRCDIR)/install.h $(SRCDIR)/install_check.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+# Build package command objects
+$(BUILDDIR)/package_common.o: $(SRCDIR)/commands/package/package_common.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/alloc.h $(SRCDIR)/cache.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/install_cmd.o: $(SRCDIR)/commands/package/install_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/http_client.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/cache_cmd.o: $(SRCDIR)/commands/package/cache_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/http_client.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h $(SRCDIR)/fileutil.h $(SRCDIR)/commands/cache/check/cache_check.h $(SRCDIR)/commands/cache/full_scan/cache_full_scan.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/remove_cmd.o: $(SRCDIR)/commands/package/remove_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/solver.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/info_cmd.o: $(SRCDIR)/commands/package/info_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/install_check.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/protocol_v2/install.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/upgrade_cmd.o: $(SRCDIR)/commands/package/upgrade_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build install_check object

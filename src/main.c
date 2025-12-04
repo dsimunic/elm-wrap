@@ -102,15 +102,15 @@ void print_usage(const char *prog) {
 void print_package_usage(const char *prog) {
     printf("Usage: %s package SUBCOMMAND [OPTIONS]\n", prog);
     printf("\nSubcommands:\n");
-    printf("  install [<PACKAGE>]  Install packages for your Elm project\n");
-    printf("  cache [<PACKAGE>]    Download packages to cache without prompting\n");
-    printf("  remove <PACKAGE>     Remove a package from your Elm project\n");
-    printf("  upgrade [PACKAGE]    Upgrade packages to latest versions\n");
-    printf("  check [elm.json]     Check for available package upgrades\n");
-    printf("  info                 Display package management information\n");
-    printf("  deps <PACKAGE>       Display dependencies for a specific package\n");
-    printf("  publish <PATH>       Show files that would be published from a package\n");
-    printf("  docs <PATH>          Generate documentation JSON for a package\n");
+    printf("  install [PACKAGE]              Add a dependency to current elm.json\n");
+    printf("  upgrade [PACKAGE]              Upgrade packages to latest versions\n");
+    printf("  remove   PACKAGE               Remove a package from elm.json\n");
+    printf("  info    [ PATH                 Display package information and upgrades\n");
+    printf("          | PACKAGE [VERSION]\n");
+    printf("          ]\n");
+    printf("  publish PATH                   Show files that would be published from a package\n");
+    printf("  docs    PATH                   Generate documentation JSON for a package\n");
+    printf("  cache   [PACKAGE]              Download package to ELM_HOME without adding it to elm.json\n");
     printf("\nOptions:\n");
     printf("  -y, --yes            Automatically confirm changes\n");
     printf("  -v, --verbose        Show detailed logging output\n");
@@ -150,19 +150,9 @@ int cmd_package(int argc, char *argv[], const char *prog) {
         return cmd_upgrade(argc - 1, argv + 1);
     }
 
-    if (strcmp(subcmd, "check") == 0) {
-        // Pass remaining args to check command
-        return cmd_check(argc - 1, argv + 1);
-    }
-
     if (strcmp(subcmd, "info") == 0) {
         // Pass remaining args to info command
         return cmd_info(argc - 1, argv + 1);
-    }
-
-    if (strcmp(subcmd, "deps") == 0) {
-        // Pass remaining args to deps command
-        return cmd_deps(argc - 1, argv + 1);
     }
 
     if (strcmp(subcmd, "publish") == 0) {

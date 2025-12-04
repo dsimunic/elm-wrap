@@ -23,14 +23,4 @@
 int v2_show_package_dependencies(const char *author, const char *name, const char *version,
                                  V2Registry *registry);
 
-/**
- * Handle package deps command in V2 mode.
- * Loads the V2 registry and displays dependencies.
- *
- * @param package_arg Package name in "author/name" format
- * @param version_arg Optional version string, or NULL for latest/elm.json version
- * @return 0 on success, 1 on error
- */
-int v2_cmd_deps(const char *package_arg, const char *version_arg);
-
 #endif /* PROTOCOL_V2_INSTALL_H */
