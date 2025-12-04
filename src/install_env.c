@@ -4,7 +4,9 @@
 #include "vendor/sha1.h"
 #include "log.h"
 #include "fileutil.h"
+#include "global_context.h"
 #include "protocol_v1/package_fetch.h"
+#include "protocol_v2/solver/v2_registry.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -160,6 +162,7 @@ InstallEnv* install_env_create(void) {
 bool install_env_init(InstallEnv *env) {
     if (!env) return false;
 
+    /* Initialize cache configuration (shared by both protocols) */
     env->cache = cache_config_init();
     if (!env->cache) {
         fprintf(stderr, "Error: Failed to initialize cache configuration\n");
@@ -171,68 +174,120 @@ bool install_env_init(InstallEnv *env) {
         return false;
     }
 
-    env->curl_session = curl_session_create();
-    if (!env->curl_session) {
-        fprintf(stderr, "Error: Failed to initialize HTTP client\n");
-        return false;
-    }
+    /* Determine protocol mode */
+    if (global_context_is_v2()) {
+        env->protocol_mode = PROTOCOL_V2;
+        log_progress("Using V2 protocol mode");
 
-    const char *registry_url_env = getenv("ELM_PACKAGE_REGISTRY_URL");
-    if (registry_url_env && registry_url_env[0] != '\0') {
-        env->registry_url = arena_strdup(registry_url_env);
-    } else {
-        env->registry_url = arena_strdup(DEFAULT_REGISTRY_URL);
-    }
-
-    if (!env->registry_url) {
-        fprintf(stderr, "Error: Failed to allocate registry URL\n");
-        return false;
-    }
-
-    env->registry = registry_load_from_dat(env->cache->registry_path, &env->known_version_count);
-
-    if (env->registry) {
-        log_progress("Loaded cached registry: %zu packages, %zu versions",
-               env->registry->entry_count, env->registry->total_versions);
-    } else {
-        log_progress("No cached registry found, will fetch from network");
-        env->registry = registry_create();
-        if (!env->registry) {
-            fprintf(stderr, "Error: Failed to create registry\n");
+        /* Load V2 registry from local index */
+        GlobalContext *ctx = global_context_get();
+        if (!ctx || !ctx->repository_path) {
+            fprintf(stderr, "Error: V2 mode active but no repository path available\n");
             return false;
         }
+
+        size_t index_path_len = strlen(ctx->repository_path) + strlen("/index.dat") + 1;
+        char *index_path = arena_malloc(index_path_len);
+        if (!index_path) {
+            fprintf(stderr, "Error: Failed to allocate index path\n");
+            return false;
+        }
+
+        snprintf(index_path, index_path_len, "%s/index.dat", ctx->repository_path);
+        log_progress("Loading V2 registry from %s", index_path);
+
+        env->v2_registry = v2_registry_load_from_zip(index_path);
+        arena_free(index_path);
+
+        if (!env->v2_registry) {
+            fprintf(stderr, "Error: Failed to load V2 registry from %s/index.dat\n", ctx->repository_path);
+            fprintf(stderr, "Hint: Run 'elm-wrap repository new' to initialize the repository\n");
+            return false;
+        }
+
+        log_progress("V2 registry loaded successfully");
+
+        /* V2 mode is always "online" since registry is local */
+        env->offline = false;
+
+        /* V1-specific fields remain NULL/uninitialized */
+        env->curl_session = NULL;
+        env->registry = NULL;
+        env->registry_url = NULL;
+        env->registry_etag = NULL;
         env->known_version_count = 0;
-    }
 
-    char health_check_url[URL_MAX];
-    snprintf(health_check_url, sizeof(health_check_url), "%s/all-packages", env->registry_url);
+    } else {
+        env->protocol_mode = PROTOCOL_V1;
+        log_progress("Using V1 protocol mode");
 
-    log_progress("Testing connectivity to %s...", env->registry_url);
-    env->offline = !curl_session_can_connect(env->curl_session, health_check_url);
-
-    if (env->offline) {
-        log_progress("Warning: Cannot connect to package registry (offline mode)");
-
-        if (env->known_version_count == 0) {
-            fprintf(stderr, "Error: No cached registry and cannot connect to network\n");
-            fprintf(stderr, "Please run again when online to download package registry\n");
+        /* Initialize V1-specific resources */
+        env->curl_session = curl_session_create();
+        if (!env->curl_session) {
+            fprintf(stderr, "Error: Failed to initialize HTTP client\n");
             return false;
         }
 
-        log_progress("Using cached registry data");
-    } else {
-        log_progress("Connected to package registry");
+        const char *registry_url_env = getenv("ELM_PACKAGE_REGISTRY_URL");
+        if (registry_url_env && registry_url_env[0] != '\0') {
+            env->registry_url = arena_strdup(registry_url_env);
+        } else {
+            env->registry_url = arena_strdup(DEFAULT_REGISTRY_URL);
+        }
 
-        if (env->known_version_count == 0) {
-            if (!install_env_fetch_registry(env)) {
-                fprintf(stderr, "Error: Failed to fetch registry from network\n");
+        if (!env->registry_url) {
+            fprintf(stderr, "Error: Failed to allocate registry URL\n");
+            return false;
+        }
+
+        env->registry = registry_load_from_dat(env->cache->registry_path, &env->known_version_count);
+
+        if (env->registry) {
+            log_progress("Loaded cached registry: %zu packages, %zu versions",
+                   env->registry->entry_count, env->registry->total_versions);
+        } else {
+            log_progress("No cached registry found, will fetch from network");
+            env->registry = registry_create();
+            if (!env->registry) {
+                fprintf(stderr, "Error: Failed to create registry\n");
                 return false;
             }
+            env->known_version_count = 0;
+        }
+
+        char health_check_url[URL_MAX];
+        snprintf(health_check_url, sizeof(health_check_url), "%s/all-packages", env->registry_url);
+
+        log_progress("Testing connectivity to %s...", env->registry_url);
+        env->offline = !curl_session_can_connect(env->curl_session, health_check_url);
+
+        if (env->offline) {
+            log_progress("Warning: Cannot connect to package registry (offline mode)");
+
+            if (env->known_version_count == 0) {
+                fprintf(stderr, "Error: No cached registry and cannot connect to network\n");
+                fprintf(stderr, "Please run again when online to download package registry\n");
+                return false;
+            }
+
+            log_progress("Using cached registry data");
         } else {
-            if (!install_env_update_registry(env)) {
-                fprintf(stderr, "Warning: Failed to update registry (using cached data)\n");
+            log_progress("Connected to package registry");
+
+            if (env->known_version_count == 0) {
+                if (!install_env_fetch_registry(env)) {
+                    fprintf(stderr, "Error: Failed to fetch registry from network\n");
+                    return false;
+                }
+            } else {
+                if (!install_env_update_registry(env)) {
+                    fprintf(stderr, "Warning: Failed to update registry (using cached data)\n");
+                }
             }
         }
+
+        /* V2-specific fields remain NULL/uninitialized */
+        env->v2_registry = NULL;
     }
 
     return true;
@@ -397,9 +452,25 @@ void install_env_free(InstallEnv *env) {
     if (!env) return;
 
     cache_config_free(env->cache);
-    registry_free(env->registry);
-    curl_session_free(env->curl_session);
-    arena_free(env->registry_url);
-    arena_free(env->registry_etag);
+
+    /* Free V1-specific resources */
+    if (env->registry) {
+        registry_free(env->registry);
+    }
+    if (env->curl_session) {
+        curl_session_free(env->curl_session);
+    }
+    if (env->registry_url) {
+        arena_free(env->registry_url);
+    }
+    if (env->registry_etag) {
+        arena_free(env->registry_etag);
+    }
+
+    /* Free V2-specific resources */
+    if (env->v2_registry) {
+        v2_registry_free(env->v2_registry);
+    }
+
     arena_free(env);
 }

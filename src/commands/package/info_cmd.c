@@ -566,16 +566,28 @@ int cmd_info(int argc, char *argv[]) {
 
     printf("\nELM_HOME: %s\n", env->cache->elm_home);
 
-    printf("\nRegistry Cache:\n");
-    printf("  Location: %s\n", env->cache->registry_path);
-    printf("  Packages: %zu\n", env->registry->entry_count);
-    printf("  Versions: %zu\n", env->registry->total_versions);
-
-    printf("\nRegistry URL: %s\n", env->registry_url);
-    if (env->offline) {
-        printf("  Status: Offline (using cached data)\n");
+    if (global_context_is_v2() && v2_registry) {
+        printf("\nV2 Registry:\n");
+        printf("  Location: %s/index.dat\n", global_context_get()->repository_path);
+        printf("  Packages: %zu\n", v2_registry->entry_count);
+        size_t total_versions = 0;
+        for (size_t i = 0; i < v2_registry->entry_count; i++) {
+            total_versions += v2_registry->entries[i].version_count;
+        }
+        printf("  Versions: %zu\n", total_versions);
+        printf("  Status: Local (V2 protocol)\n");
     } else {
-        printf("  Status: Connected\n");
+        printf("\nRegistry Cache:\n");
+        printf("  Location: %s\n", env->cache->registry_path);
+        printf("  Packages: %zu\n", env->registry->entry_count);
+        printf("  Versions: %zu\n", env->registry->total_versions);
+
+        printf("\nRegistry URL: %s\n", env->registry_url);
+        if (env->offline) {
+            printf("  Status: Offline (using cached data)\n");
+        } else {
+            printf("  Status: Connected\n");
+        }
     }
 
     printf("\n");
