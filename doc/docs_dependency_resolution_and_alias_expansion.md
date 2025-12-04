@@ -517,7 +517,7 @@ Type alias expansion occurs when:
 
 ### Build Verification
 ```bash
-make clean all
+make clean all install-user
 ```
 
 ### Test Command
