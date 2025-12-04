@@ -82,17 +82,17 @@ static bool cache_download_package_recursive(InstallEnv *env, const char *author
     if (!env || !author || !name || !version) return false;
 
     if (cache_package_fully_downloaded(env->cache, author, name, version)) {
-        log_debug("Package %s/%s@%s already cached (verified src/ exists)", author, name, version);
+        log_debug("Package %s/%s %s already cached (verified src/ exists)", author, name, version);
         return true;
     }
 
     if (cache_package_exists(env->cache, author, name, version)) {
-        log_debug("Package %s/%s@%s directory exists but src/ is missing - re-downloading", author, name, version);
+        log_debug("Package %s/%s %s directory exists but src/ is missing - re-downloading", author, name, version);
     }
 
-    log_progress("Downloading %s/%s@%s...", author, name, version);
+    log_progress("Downloading %s/%s %s...", author, name, version);
     if (!install_env_download_package(env, author, name, version)) {
-        fprintf(stderr, "Error: Failed to download %s/%s@%s\n", author, name, version);
+        fprintf(stderr, "Error: Failed to download %s/%s %s\n", author, name, version);
         return false;
     }
 
@@ -100,7 +100,7 @@ static bool cache_download_package_recursive(InstallEnv *env, const char *author
 
     char *pkg_path = cache_get_package_path(env->cache, author, name, version);
     if (!pkg_path) {
-        fprintf(stderr, "Error: Failed to get package path for %s/%s@%s\n", author, name, version);
+        fprintf(stderr, "Error: Failed to get package path for %s/%s %s\n", author, name, version);
         return false;
     }
 
@@ -110,7 +110,7 @@ static bool cache_download_package_recursive(InstallEnv *env, const char *author
 
     ElmJson *pkg_elm_json = elm_json_read(elm_json_path);
     if (!pkg_elm_json) {
-        log_debug("Could not read elm.json for %s/%s@%s, skipping dependencies", author, name, version);
+        log_debug("Could not read elm.json for %s/%s %s, skipping dependencies", author, name, version);
         return true;
     }
 
@@ -429,7 +429,7 @@ int cmd_cache(int argc, char *argv[]) {
             return 1;
         }
 
-        printf("Successfully cached %s/%s@%s!\n", author, name, version);
+        printf("Successfully cached %s/%s %s!\n", author, name, version);
 
         if (from_url && temp_dir_buf[0] != '\0') {
             remove_directory_recursive(temp_dir_buf);
@@ -522,7 +522,7 @@ int cmd_cache(int argc, char *argv[]) {
                     printf("  %s\n", downloaded->packages[i]);
                 }
             } else {
-                printf("Package %s/%s@%s and all dependencies already cached\n", author, name, version);
+                printf("Package %s/%s %s and all dependencies already cached\n", author, name, version);
             }
             result = 0;
         } else {

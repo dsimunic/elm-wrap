@@ -653,7 +653,7 @@ int cmd_install(int argc, char *argv[]) {
             return 1;
         }
 
-        printf("Successfully installed %s/%s@%s!\n", author, name, version);
+        printf("Successfully installed %s/%s %s!\n", author, name, version);
 
         if (version) arena_free(version);
         arena_free(author);

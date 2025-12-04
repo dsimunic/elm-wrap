@@ -65,11 +65,11 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
             if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
                 printf("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
                 if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
-                    log_error("Failed to download %s/%s@%s", pkg->author, pkg->name, pkg->version);
+                    log_error("Failed to download %s/%s %s", pkg->author, pkg->name, pkg->version);
                     return 1;
                 }
             } else {
-                log_debug("Package %s/%s@%s already cached", pkg->author, pkg->name, pkg->version);
+                log_debug("Package %s/%s %s already cached", pkg->author, pkg->name, pkg->version);
             }
         }
 
@@ -79,11 +79,11 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
             if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
                 printf("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
                 if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
-                    log_error("Failed to download %s/%s@%s", pkg->author, pkg->name, pkg->version);
+                    log_error("Failed to download %s/%s %s", pkg->author, pkg->name, pkg->version);
                     return 1;
                 }
             } else {
-                log_debug("Package %s/%s@%s already cached", pkg->author, pkg->name, pkg->version);
+                log_debug("Package %s/%s %s already cached", pkg->author, pkg->name, pkg->version);
             }
         }
 
@@ -93,11 +93,11 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
             if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
                 printf("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
                 if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
-                    log_error("Failed to download %s/%s@%s", pkg->author, pkg->name, pkg->version);
+                    log_error("Failed to download %s/%s %s", pkg->author, pkg->name, pkg->version);
                     return 1;
                 }
             } else {
-                log_debug("Package %s/%s@%s already cached", pkg->author, pkg->name, pkg->version);
+                log_debug("Package %s/%s %s already cached", pkg->author, pkg->name, pkg->version);
             }
         }
 
@@ -107,11 +107,11 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
             if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
                 printf("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
                 if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
-                    log_error("Failed to download %s/%s@%s", pkg->author, pkg->name, pkg->version);
+                    log_error("Failed to download %s/%s %s", pkg->author, pkg->name, pkg->version);
                     return 1;
                 }
             } else {
-                log_debug("Package %s/%s@%s already cached", pkg->author, pkg->name, pkg->version);
+                log_debug("Package %s/%s %s already cached", pkg->author, pkg->name, pkg->version);
             }
         }
     } else {
@@ -143,12 +143,12 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
             if (!cache_package_exists(env->cache, pkg->author, pkg->name, version_str)) {
                 printf("Downloading %s/%s %s\n", pkg->author, pkg->name, version_str);
                 if (!cache_download_package_with_env(env, pkg->author, pkg->name, version_str)) {
-                    log_error("Failed to download %s/%s@%s", pkg->author, pkg->name, version_str);
+                    log_error("Failed to download %s/%s %s", pkg->author, pkg->name, version_str);
                     if (version_str != pkg->version) arena_free(version_str);
                     return 1;
                 }
             } else {
-                log_debug("Package %s/%s@%s already cached", pkg->author, pkg->name, version_str);
+                log_debug("Package %s/%s %s already cached", pkg->author, pkg->name, version_str);
             }
             if (version_str != pkg->version) arena_free(version_str);
         }
@@ -175,12 +175,12 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
             if (!cache_package_exists(env->cache, pkg->author, pkg->name, version_str)) {
                 printf("Downloading %s/%s %s\n", pkg->author, pkg->name, version_str);
                 if (!cache_download_package_with_env(env, pkg->author, pkg->name, version_str)) {
-                    log_error("Failed to download %s/%s@%s", pkg->author, pkg->name, version_str);
+                    log_error("Failed to download %s/%s %s", pkg->author, pkg->name, version_str);
                     if (version_str != pkg->version) arena_free(version_str);
                     return 1;
                 }
             } else {
-                log_debug("Package %s/%s@%s already cached", pkg->author, pkg->name, version_str);
+                log_debug("Package %s/%s %s already cached", pkg->author, pkg->name, version_str);
             }
             if (version_str != pkg->version) arena_free(version_str);
         }

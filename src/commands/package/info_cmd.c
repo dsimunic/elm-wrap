@@ -487,7 +487,7 @@ int cmd_info(int argc, char *argv[]) {
             }
         }
 
-        printf("\nInstalled Package Versions:\n");
+        printf("\nInstalled Package Versions:\n\n");
         if (elm_json->type == ELM_PROJECT_APPLICATION) {
             for (int i = 0; i < elm_json->dependencies_direct->count; i++) {
                 Package *pkg = &elm_json->dependencies_direct->packages[i];

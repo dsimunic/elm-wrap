@@ -146,7 +146,7 @@ int v1_show_package_dependencies(const char *author, const char *name, const cha
     if (!elm_json) {
         log_debug("Package not in cache, attempting download");
         if (!cache_download_package_with_env(env, author, name, version)) {
-            log_error("Failed to download package %s/%s@%s", author, name, version);
+            log_error("Failed to download package %s/%s %s", author, name, version);
             if (elm_json_path) arena_free(elm_json_path);
             arena_free(pkg_path);
             return 1;
@@ -160,7 +160,7 @@ int v1_show_package_dependencies(const char *author, const char *name, const cha
         }
 
         if (!elm_json) {
-            log_error("Failed to read elm.json for %s/%s@%s", author, name, version);
+            log_error("Failed to read elm.json for %s/%s %s", author, name, version);
             if (elm_json_path) arena_free(elm_json_path);
             arena_free(pkg_path);
             return 1;
@@ -171,7 +171,7 @@ int v1_show_package_dependencies(const char *author, const char *name, const cha
     arena_free(pkg_path);
 
     printf("\n");
-    printf("Package: %s/%s @ %s\n", author, name, version);
+    printf("Package: %s/%s %s\n", author, name, version);
     printf("========================================\n\n");
 
     if (elm_json->type == ELM_PROJECT_PACKAGE && elm_json->package_dependencies) {

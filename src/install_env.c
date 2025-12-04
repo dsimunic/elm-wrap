@@ -401,11 +401,11 @@ bool install_env_download_package(InstallEnv *env, const char *author, const cha
         return false;
     }
 
-    log_progress("Downloading %s/%s@%s...", author, name, version);
+    log_progress("Downloading %s/%s %s...", author, name, version);
 
     char *archive_path = fetch_package_complete(env, author, name, version);
     if (!archive_path) {
-        fprintf(stderr, "Error: Failed to fetch package %s/%s@%s\n", author, name, version);
+        fprintf(stderr, "Error: Failed to fetch package %s/%s %s\n", author, name, version);
         return false;
     }
 
@@ -443,7 +443,7 @@ bool install_env_download_package(InstallEnv *env, const char *author, const cha
     arena_free(archive_path);
     arena_free(pkg_dir);
 
-    log_progress("  Successfully installed %s/%s@%s", author, name, version);
+    log_progress("  Successfully installed %s/%s %s", author, name, version);
 
     return true;
 }

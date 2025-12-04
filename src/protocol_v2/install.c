@@ -29,7 +29,7 @@ int v2_show_package_dependencies(const char *author, const char *name, const cha
     }
 
     printf("\n");
-    printf("Package: %s/%s @ %s\n", author, name, version);
+    printf("Package: %s/%s %s\n", author, name, version);
     printf("========================================\n\n");
 
     if (pkg_version->dependency_count == 0) {

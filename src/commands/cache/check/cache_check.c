@@ -269,7 +269,7 @@ int cache_check_package(const char *package_name, bool purge_broken, bool fix_br
                     arena_free(pkg_path);
                 }
 
-                printf("  Downloading %s/%s@%s... ", author, name, broken_versions[i]);
+                printf("  Downloading %s/%s %s... ", author, name, broken_versions[i]);
                 fflush(stdout);
 
                 if (install_env_download_package(env, author, name, broken_versions[i])) {
@@ -303,7 +303,7 @@ int cache_check_package(const char *package_name, bool purge_broken, bool fix_br
                     int redundant = import_tree_redundant_count(analysis);
                     if (redundant > 0) {
                         total_with_redundant++;
-                        printf("%s%s/%s@%s%s: %s%d redundant file(s)%s\n", 
+                        printf("%s%s/%s %s%s: %s%d redundant file(s)%s\n", 
                                ANSI_CYAN, author, name, cached_versions[vi], ANSI_RESET,
                                ANSI_YELLOW, redundant, ANSI_RESET);
                         if (verbose) {
@@ -312,13 +312,13 @@ int cache_check_package(const char *package_name, bool purge_broken, bool fix_br
                             }
                         }
                     } else if (verbose) {
-                        printf("%s%s/%s@%s%s: %sNo redundant files%s\n",
+                        printf("%s%s/%s %s%s: %sNo redundant files%s\n",
                                ANSI_CYAN, author, name, cached_versions[vi], ANSI_RESET,
                                ANSI_GREEN, ANSI_RESET);
                     }
                     import_tree_free(analysis);
                 } else if (verbose) {
-                    printf("%sWarning:%s Could not analyze %s/%s@%s (missing elm.json?)\n",
+                    printf("%sWarning:%s Could not analyze %s/%s %s (missing elm.json?)\n",
                            ANSI_YELLOW, ANSI_RESET, author, name, cached_versions[vi]);
                 }
                 arena_free(pkg_path);

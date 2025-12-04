@@ -472,13 +472,13 @@ int check_all_upgrades(const char *elm_json_path, Registry *registry, size_t max
 
         // Print minor upgrades first
         if (upg->has_minor_upgrade) {
-            printf("[minor] %-*s  %s -> %s\n",
+            printf("  %-*s  %s -> %s\n",
                    (int)max_name_len, full_name, upg->current_version, upg->latest_minor);
         }
 
         // Print major upgrades in bold/green
         if (upg->has_major_upgrade) {
-            printf("%s[major] %-*s  %s -> %s%s\n",
+            printf("%s  %-*s  %s -> %s (major)%s\n",
                    ANSI_GREEN, (int)max_name_len, full_name,
                    upg->current_version, upg->latest_major, ANSI_RESET);
         }
@@ -728,13 +728,13 @@ int check_all_upgrades_v2(const char *elm_json_path, V2Registry *registry, size_
 
         /* Print minor upgrades first */
         if (upg->has_minor_upgrade) {
-            printf("[minor] %-*s  %s -> %s\n",
+            printf("  %-*s  %s -> %s\n",
                    (int)max_name_len, full_name, upg->current_version, upg->latest_minor);
         }
 
         /* Print major upgrades in bold/green */
         if (upg->has_major_upgrade) {
-            printf("%s[major] %-*s  %s -> %s%s\n",
+            printf("%s  %-*s  %s -> %s (major)%s\n",
                    ANSI_GREEN, (int)max_name_len, full_name,
                    upg->current_version, upg->latest_major, ANSI_RESET);
         }

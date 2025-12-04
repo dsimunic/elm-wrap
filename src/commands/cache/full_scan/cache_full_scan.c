@@ -241,7 +241,7 @@ static void scan_package(const char *packages_dir, const char *author, const cha
                         }
                         stats->total_redundant_files += redundant;
                         if (!quiet) {
-                            printf("%s%s/%s@%s%s: %s%d redundant file(s)%s\n",
+                            printf("%s%s/%s %s%s: %s%d redundant file(s)%s\n",
                                    ANSI_CYAN, author, name, ver_str, ANSI_RESET,
                                    ANSI_YELLOW, redundant, ANSI_RESET);
                             if (verbose) {

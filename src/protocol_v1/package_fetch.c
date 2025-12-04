@@ -371,11 +371,11 @@ bool fetch_package_metadata(InstallEnv *env, const char *author,
             continue;
         }
 
-        log_progress("Fetching %s for %s/%s@%s...", filename, author, name, version);
+        log_progress("Fetching %s for %s/%s %s...", filename, author, name, version);
         HttpResult result = http_download_file(env->curl_session, url, file_path);
 
         if (result != HTTP_OK) {
-            fprintf(stderr, "Error: Failed to download %s for %s/%s@%s: %s\n",
+            fprintf(stderr, "Error: Failed to download %s for %s/%s %s: %s\n",
                     filename, author, name, version, http_result_to_string(result));
             success = false;
         }
@@ -398,7 +398,7 @@ char* fetch_package_archive(InstallEnv *env, const char *author,
         return NULL;
     }
 
-    log_progress("Downloading archive for %s/%s@%s...", author, name, version);
+    log_progress("Downloading archive for %s/%s %s...", author, name, version);
     log_progress("  Archive URL: %s", endpoint->url);
     log_progress("  Expected SHA-1: %s", endpoint->hash);
 
@@ -447,11 +447,11 @@ char* fetch_package_complete(InstallEnv *env, const char *author,
                              const char *name, const char *version) {
     if (!env || !author || !name || !version) return NULL;
 
-    log_progress("Fetching package %s/%s@%s...", author, name, version);
+    log_progress("Fetching package %s/%s %s...", author, name, version);
 
     if (!package_metadata_exists(env->cache, author, name, version)) {
         if (!fetch_package_metadata(env, author, name, version)) {
-            fprintf(stderr, "Error: Failed to fetch metadata for %s/%s@%s\n",
+            fprintf(stderr, "Error: Failed to fetch metadata for %s/%s %s\n",
                     author, name, version);
             return NULL;
         }
