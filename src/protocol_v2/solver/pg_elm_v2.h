@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include "../../pgsolver/pg_core.h"
 #include "v2_registry.h"
+#include "../../pgsolver/solver_common.h"
 
 struct InstallEnv;
 
@@ -90,5 +91,15 @@ bool pg_elm_v2_add_root_dependency(
  * Parse an Elm constraint string like "1.0.0 <= v < 2.0.0" into a version range.
  */
 bool pg_elm_v2_parse_constraint(const char *constraint, PgVersionRange *out_range);
+
+/**
+ * Get the package name for a given package ID.
+ * Returns "author/name" for regular packages, or "__root__" for the root package.
+ * Returns NULL if the package ID is invalid.
+ *
+ * Note: The returned string is owned by the context and should not be freed.
+ */
+const char *pg_elm_v2_get_package_name(PgElmV2Context *ctx, PgPackageId pkg);
+const char *pg_elm_v2_get_package_name_with_ctx(void *ctx, PgPackageId pkg);
 
 #endif /* PROTOCOL_V2_SOLVER_PG_ELM_V2_H */

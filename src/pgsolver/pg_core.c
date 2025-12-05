@@ -1,4 +1,5 @@
 #include "pg_core.h"
+#include "solver_common.h"
 #include "../alloc.h"
 #include "../log.h"
 
@@ -104,6 +105,18 @@ struct PgSolver {
 
     /* Root incompatibility when solving fails (for error reporting) */
     PgIncompatibility *root_incompatibility;
+
+    /* Version cache to avoid repeated get_versions() calls */
+    PgVersion **cached_versions;  /* Array of version arrays, indexed by package ID */
+    int *cached_counts;           /* Count of versions for each package */
+    int cache_capacity;           /* Capacity of cache arrays */
+
+    /* Statistics for performance analysis */
+    int stats_cache_hits;
+    int stats_cache_misses;
+    int stats_decisions;
+    int stats_propagations;
+    int stats_conflicts;
 };
 
 #define PG_DECISION_VERSION_BUFFER 128
@@ -849,7 +862,7 @@ static bool pg_solver_version_is_forbidden(
             continue;
         }
         if (pg_range_contains(assignment->range, version)) {
-            log_debug("pkg=%d forbidden by range %d.%d.%d",
+            log_trace("pkg=%d forbidden by range %d.%d.%d",
                 pkg,
                 assignment->range.lower.v.major,
                 assignment->range.lower.v.minor,
@@ -951,15 +964,72 @@ static PgSolverStatus pg_solver_evaluate_candidate(
         conflict_ptr = &temp_conflict;
     }
 
-    PgVersion versions[PG_DECISION_VERSION_BUFFER];
-    int version_count = solver->provider.get_versions(
-        solver->provider_ctx,
-        pkg,
-        versions,
-        sizeof(versions) / sizeof(versions[0])
-    );
-    if (version_count < 0) {
-        return PG_SOLVER_INTERNAL_ERROR;
+    /* Check cache first */
+    PgVersion *versions = NULL;
+    int version_count = 0;
+
+    /* Cache hit if pkg is in range AND we've fetched it before (count != -1 means cached) */
+    if (pkg >= 0 && pkg < solver->cache_capacity && solver->cached_counts[pkg] != -1) {
+        /* Cache hit - use cached versions */
+        solver->stats_cache_hits++;
+        versions = solver->cached_versions[pkg];
+        version_count = solver->cached_counts[pkg];
+    } else {
+        /* Cache miss - fetch versions and cache them */
+        solver->stats_cache_misses++;
+        PgVersion temp_versions[PG_DECISION_VERSION_BUFFER];
+        version_count = solver->provider.get_versions(
+            solver->provider_ctx,
+            pkg,
+            temp_versions,
+            sizeof(temp_versions) / sizeof(temp_versions[0])
+        );
+        if (version_count < 0) {
+            return PG_SOLVER_INTERNAL_ERROR;
+        }
+
+        /* Grow cache arrays if needed */
+        if (pkg >= solver->cache_capacity) {
+            int new_capacity = (pkg + 1) * 2;
+            PgVersion **new_cached_versions = (PgVersion **)arena_realloc(
+                solver->cached_versions, (size_t)new_capacity * sizeof(PgVersion *));
+            int *new_cached_counts = (int *)arena_realloc(
+                solver->cached_counts, (size_t)new_capacity * sizeof(int));
+
+            if (!new_cached_versions || !new_cached_counts) {
+                arena_free(new_cached_versions);
+                arena_free(new_cached_counts);
+                return PG_SOLVER_INTERNAL_ERROR;
+            }
+
+            /* Initialize new entries (-1 means not cached yet) */
+            for (int i = solver->cache_capacity; i < new_capacity; i++) {
+                new_cached_versions[i] = NULL;
+                new_cached_counts[i] = -1;
+            }
+
+            solver->cached_versions = new_cached_versions;
+            solver->cached_counts = new_cached_counts;
+            solver->cache_capacity = new_capacity;
+        }
+
+        /* Allocate and cache the versions */
+        if (version_count > 0) {
+            solver->cached_versions[pkg] = (PgVersion *)arena_malloc(
+                (size_t)version_count * sizeof(PgVersion));
+            if (!solver->cached_versions[pkg]) {
+                return PG_SOLVER_INTERNAL_ERROR;
+            }
+            memcpy(solver->cached_versions[pkg], temp_versions,
+                   (size_t)version_count * sizeof(PgVersion));
+            solver->cached_counts[pkg] = version_count;
+            versions = solver->cached_versions[pkg];
+        } else {
+            /* No versions - cache this fact too */
+            solver->cached_versions[pkg] = NULL;
+            solver->cached_counts[pkg] = 0;
+            versions = NULL;
+        }
     }
 
     int available = 0;
@@ -1228,7 +1298,7 @@ static PgSolverStatus pg_make_decision(
             return eval_status;
         }
         if (out_conflict && *out_conflict) {
-            log_debug("pkg=%d no versions available", pkg);
+            log_trace("pkg=%d no versions available", pkg);
             return PG_SOLVER_OK;
         }
         if (!eval.found) {
@@ -1247,8 +1317,8 @@ static PgSolverStatus pg_make_decision(
         return PG_SOLVER_OK;
     }
 
-    log_debug("decision candidate pkg=%d (choices=%d)", best_pkg, best_eval.available_count);
-    log_debug("pkg=%d choose %d.%d.%d", best_pkg, best_eval.newest.major, best_eval.newest.minor, best_eval.newest.patch);
+    log_trace("decision candidate pkg=%d (choices=%d)", best_pkg, best_eval.available_count);
+    log_trace("pkg=%d choose %d.%d.%d", best_pkg, best_eval.newest.major, best_eval.newest.minor, best_eval.newest.patch);
 
     int prev_level = solver->current_decision_level;
     solver->current_decision_level = prev_level + 1;
@@ -1540,30 +1610,30 @@ static PgIncompatibility *pg_resolve_conflict(
 
     int iteration = 0;
     while (true) {
-        log_debug("resolve iteration %d, terms=%zu", iteration++, current->term_count);
+        log_trace("resolve iteration %d, terms=%zu", iteration++, current->term_count);
 
         if (pg_incompatibility_is_root_failure(solver, current)) {
-            log_debug("root failure detected");
+            log_trace("root failure detected");
             solver->root_incompatibility = current;
             return NULL;
         }
 
         size_t satisfier_index = SIZE_MAX;
         size_t term_index = SIZE_MAX;
-        log_debug("finding satisfier");
+        log_trace("finding satisfier");
         if (!pg_incompatibility_find_satisfier(
                 solver,
                 current,
                 &satisfier_index,
                 &term_index)) {
-            log_debug("no satisfier found");
+            log_trace("no satisfier found");
             return NULL;
         }
-        log_debug("found satisfier at index %zu", satisfier_index);
+        log_trace("found satisfier at index %zu", satisfier_index);
 
         PgAssignment *satisfier = &solver->trail.items[satisfier_index];
         PgTerm term = current->terms[term_index];
-        log_debug("satisfier pkg=%d, decided=%d, level=%d",
+        log_trace("satisfier pkg=%d, decided=%d, level=%d",
                 satisfier->pkg, satisfier->decided, satisfier->decision_level);
 
         int previous_level = pg_incompatibility_previous_level(
@@ -1571,18 +1641,18 @@ static PgIncompatibility *pg_resolve_conflict(
             current,
             satisfier->pkg
         );
-        log_debug("previous_level=%d", previous_level);
+        log_trace("previous_level=%d", previous_level);
 
         if (satisfier->decided ||
             previous_level == satisfier->decision_level) {
-            log_debug("stopping resolution, backjump to %d", previous_level);
+            log_trace("stopping resolution, backjump to %d", previous_level);
             /* If we would backjump to level 0 or below, it means the conflict
              * involves only root-level decisions (level 0 or 1). This indicates
              * that the root dependencies themselves are unsatisfiable.
              * Adjusting to level 1 would cause an infinite loop, so instead we
              * detect this as "no solution exists". */
             if (previous_level < 1) {
-                log_debug("conflict at root level - no solution exists");
+                log_trace("conflict at root level - no solution exists");
                 solver->root_incompatibility = current;
                 return NULL;
             }
@@ -1591,7 +1661,7 @@ static PgIncompatibility *pg_resolve_conflict(
         }
 
         if (!satisfier->cause) {
-            log_debug("satisfier has no cause (root decision or root dependency)");
+            log_trace("satisfier has no cause (root decision or root dependency)");
 
             // When satisfier has no cause, it can be:
             // 1. The root package decision (level 1)
@@ -1599,7 +1669,7 @@ static PgIncompatibility *pg_resolve_conflict(
             // In both cases, we derive a final incompatibility by removing this term.
             if ((satisfier->pkg == solver->root_pkg && satisfier->decision_level == 1) ||
                 satisfier->decision_level == 0) {
-                log_debug("deriving final incompatibility (level=%d, pkg=%d)",
+                log_trace("deriving final incompatibility (level=%d, pkg=%d)",
                         satisfier->decision_level, satisfier->pkg);
 
                 // Create array of terms without the satisfier's term
@@ -1609,7 +1679,7 @@ static PgIncompatibility *pg_resolve_conflict(
                 if (new_term_count > 0) {
                     new_terms = (PgTerm *)arena_malloc(new_term_count * sizeof(PgTerm));
                     if (!new_terms) {
-                        log_debug("failed to allocate terms array");
+                        log_trace("failed to allocate terms array");
                         return NULL;
                     }
 
@@ -1634,23 +1704,23 @@ static PgIncompatibility *pg_resolve_conflict(
                 arena_free(new_terms);
 
                 if (!derived) {
-                    log_debug("failed to create derived incompatibility");
+                    log_trace("failed to create derived incompatibility");
                     return NULL;
                 }
 
                 // This derived incompatibility is now the root cause
                 solver->root_incompatibility = derived;
-                log_debug("created root incompatibility with %zu terms", derived->term_count);
+                log_trace("created root incompatibility with %zu terms", derived->term_count);
                 return NULL;
             } else {
-                log_debug("satisfier has no cause but is not root (pkg=%d, level=%d) - internal error",
+                log_trace("satisfier has no cause but is not root (pkg=%d, level=%d) - internal error",
                         satisfier->pkg, satisfier->decision_level);
                 solver->root_incompatibility = current;
                 return NULL;
             }
         }
 
-        log_debug("resolving with cause");
+        log_trace("resolving with cause");
         PgIncompatibility *resolved = pg_incompatibility_resolve_with(
             solver,
             current,
@@ -1658,10 +1728,10 @@ static PgIncompatibility *pg_resolve_conflict(
             term.pkg
         );
         if (!resolved) {
-            log_debug("resolution failed");
+            log_trace("resolution failed");
             return NULL;
         }
-        log_debug("resolved, new term_count=%zu", resolved->term_count);
+        log_trace("resolved, new term_count=%zu", resolved->term_count);
 
         current = resolved;
     }
@@ -1846,6 +1916,18 @@ PgSolver *pg_solver_new(
     solver->solved = false;
     solver->root_incompatibility = NULL;
 
+    /* Initialize version cache */
+    solver->cached_versions = NULL;
+    solver->cached_counts = NULL;
+    solver->cache_capacity = 0;
+
+    /* Initialize statistics */
+    solver->stats_cache_hits = 0;
+    solver->stats_cache_misses = 0;
+    solver->stats_decisions = 0;
+    solver->stats_propagations = 0;
+    solver->stats_conflicts = 0;
+
     return solver;
 }
 
@@ -1871,6 +1953,16 @@ void pg_solver_free(PgSolver *solver) {
         arena_free(solver->pkg_incompat_lists);
     }
     arena_free(solver->changed_pkgs);
+
+    /* Free version cache */
+    if (solver->cached_versions) {
+        for (int i = 0; i < solver->cache_capacity; i++) {
+            arena_free(solver->cached_versions[i]);
+        }
+        arena_free(solver->cached_versions);
+    }
+    arena_free(solver->cached_counts);
+
     arena_free(solver);
 }
 
@@ -1941,7 +2033,8 @@ PgSolverStatus pg_solver_solve(PgSolver *solver) {
         if (status != PG_SOLVER_OK) {
             return status;
         }
-        log_debug("propagation done conflict=%p", (void *)conflict);
+        solver->stats_propagations++;
+        log_trace("propagation done conflict=%p", (void *)conflict);
 
         if (!conflict) {
             bool made_decision = false;
@@ -1951,17 +2044,19 @@ PgSolverStatus pg_solver_solve(PgSolver *solver) {
             }
 
             if (!conflict && !made_decision) {
-                log_debug("solve complete");
+                log_trace("solve complete");
                 break;
             }
 
             if (!conflict) {
-                log_debug("made decision");
+                solver->stats_decisions++;
+                log_trace("made decision");
                 continue;
             }
         }
 
-        log_debug("resolving conflict");
+        solver->stats_conflicts++;
+        log_trace("resolving conflict");
         int backjump_level = 0;
         PgIncompatibility *learned = pg_resolve_conflict(
             solver,
@@ -1969,27 +2064,27 @@ PgSolverStatus pg_solver_solve(PgSolver *solver) {
             &backjump_level
         );
         if (!learned) {
-            log_debug("no solution found");
+            log_trace("no solution found");
             return PG_SOLVER_NO_SOLUTION;
         }
-        log_debug("learned incompatibility with %zu terms, backjump to %d",
+        log_trace("learned incompatibility with %zu terms, backjump to %d",
                 learned->term_count, backjump_level);
 
         if (!learned->attached) {
-            log_debug("attaching learned incompatibility");
+            log_trace("attaching learned incompatibility");
             if (!pg_solver_attach_incompatibility(solver, learned)) {
-                log_debug("attach failed");
+                log_trace("attach failed");
                 return PG_SOLVER_INTERNAL_ERROR;
             }
-            log_debug("attached");
+            log_trace("attached");
         }
 
-        log_debug("backtracking to level %d", backjump_level);
+        log_trace("backtracking to level %d", backjump_level);
         if (!pg_solver_backtrack_to_level(solver, backjump_level)) {
-            log_debug("backtrack failed");
+            log_trace("backtrack failed");
             return PG_SOLVER_INTERNAL_ERROR;
         }
-        log_debug("backtracked, continuing main loop");
+        log_trace("backtracked, continuing main loop");
     }
 
     solver->solved = true;
@@ -2026,6 +2121,18 @@ bool pg_solver_get_selected_version(
     }
 
     return false;
+}
+
+void pg_solver_get_stats(PgSolver *solver, PgSolverStats *out_stats) {
+    if (!solver || !out_stats) {
+        return;
+    }
+
+    out_stats->cache_hits = solver->stats_cache_hits;
+    out_stats->cache_misses = solver->stats_cache_misses;
+    out_stats->decisions = solver->stats_decisions;
+    out_stats->propagations = solver->stats_propagations;
+    out_stats->conflicts = solver->stats_conflicts;
 }
 
 /* Error reporting implementation */
@@ -2310,6 +2417,71 @@ static void pg_explain_dependency_inline(
     pg_error_writer_appendf(writer, "%s depends on %s", pkg_str, dep_str);
 }
 
+/* Explain an external incompatibility inline (e.g., NO_VERSIONS) */
+static void pg_explain_external_inline(
+    PgIncompatibility *inc,
+    PgErrorWriter *writer,
+    PgPackageNameResolver name_resolver,
+    void *name_ctx
+) {
+    if (!inc) {
+        pg_error_writer_append(writer, "[external constraint]");
+        return;
+    }
+
+    if (inc->reason == PG_REASON_NO_VERSIONS && inc->term_count > 0) {
+        char term_str[256];
+        PgTerm term = inc->terms[0];
+        if (!term.positive) {
+            term.positive = true;
+        }
+        pg_format_term(&term, name_resolver, name_ctx, term_str, sizeof(term_str));
+
+        /* Try to show the required range and current pinned version (if available) */
+        char range_str[128];
+        bool is_any = false;
+        pg_format_version_range(term.range, range_str, sizeof(range_str), &is_any);
+
+        const char *current_version = NULL;
+        const char *pkg_name = name_resolver ? name_resolver(name_ctx, term.pkg) : NULL;
+        if (name_ctx && pkg_name) {
+            PgExplainContext *ctx = (PgExplainContext *)name_ctx;
+            if (ctx->current_packages) {
+                const char *slash = strchr(pkg_name, '/');
+                if (slash) {
+                    size_t author_len = (size_t)(slash - pkg_name);
+                    char *author = arena_malloc(author_len + 1);
+                    if (author) {
+                        memcpy(author, pkg_name, author_len);
+                        author[author_len] = '\0';
+                        const char *name = slash + 1;
+                        Package *pkg = package_map_find(ctx->current_packages, author, name);
+                        if (pkg) {
+                            current_version = pkg->version;
+                        }
+                        arena_free(author);
+                    }
+                }
+            }
+        }
+
+        if (current_version) {
+            pg_error_writer_appendf(writer,
+                "no versions of %s satisfy the constraints (%s) while your project pins %s",
+                term_str, is_any ? "any version" : range_str, current_version);
+        } else {
+            pg_error_writer_appendf(writer,
+                "no versions of %s satisfy the constraints%s%s",
+                term_str,
+                is_any ? "" : " ",
+                is_any ? "" : range_str);
+        }
+        return;
+    }
+
+    pg_error_writer_append(writer, "[external constraint]");
+}
+
 /* Explain the conclusion derived from an incompatibility */
 static void pg_explain_conclusion(
     PgIncompatibility *inc,
@@ -2410,10 +2582,87 @@ static void pg_explain_incompatibility(
         return;
     }
 
+    /* Case 1: Both external (base case) */
+    if (inc->cause_count == 2 &&
+        inc->causes[0]->cause_count == 0 &&
+        inc->causes[1]->cause_count == 0) {
+
+        /* Special case: root depends on package with no versions.
+         * We used to short-circuit with a "package does not exist" message here,
+         * but that hides conflicts when the package actually exists in the registry.
+         * Continue to the generic explanation so we show which constraints block it. */
+        PgIncompatibility *dep_cause = NULL;
+        PgIncompatibility *no_vers_cause = NULL;
+
+        if (inc->causes[0]->reason == PG_REASON_DEPENDENCY &&
+            inc->causes[1]->reason == PG_REASON_NO_VERSIONS) {
+            dep_cause = inc->causes[0];
+            no_vers_cause = inc->causes[1];
+        } else if (inc->causes[1]->reason == PG_REASON_DEPENDENCY &&
+                   inc->causes[0]->reason == PG_REASON_NO_VERSIONS) {
+            dep_cause = inc->causes[1];
+            no_vers_cause = inc->causes[0];
+        }
+
+        pg_error_writer_append(writer, "Because ");
+        if (inc->causes[0]->reason == PG_REASON_DEPENDENCY) {
+            pg_explain_dependency_inline(inc->causes[0], writer, name_resolver, name_ctx, root_pkg);
+        } else {
+            pg_explain_external_inline(inc->causes[0], writer, name_resolver, name_ctx);
+        }
+        pg_error_writer_append(writer, " and ");
+        if (inc->causes[1]->reason == PG_REASON_DEPENDENCY) {
+            pg_explain_dependency_inline(inc->causes[1], writer, name_resolver, name_ctx, root_pkg);
+        } else {
+            pg_explain_external_inline(inc->causes[1], writer, name_resolver, name_ctx);
+        }
+        pg_error_writer_append(writer, ", ");
+        pg_explain_conclusion(inc, writer, name_resolver, name_ctx, root_pkg);
+        pg_error_writer_append(writer, ".\n");
+        (void)dep_cause;
+        (void)no_vers_cause;
+        return;
+    }
+
     /* Special case: Single positive root term - root package can't be satisfied */
     if (inc->term_count == 1 && inc->terms[0].pkg == root_pkg && inc->terms[0].positive) {
         if (inc->cause_count > 0) {
-            /* Explain why the root package can't be satisfied */
+            /* Check for the common pattern: trying to install a non-existent package
+             * where one cause is NO_VERSIONS and the other is a DEPENDENCY from root.
+             * Only emit the shortcut when the NO_VERSIONS cause is external (no derived causes),
+             * otherwise explain the real conflict chain. */
+            if (inc->cause_count == 2) {
+                PgIncompatibility *dep_cause = NULL;
+                PgIncompatibility *no_vers_cause = NULL;
+
+                if (inc->causes[0]->reason == PG_REASON_DEPENDENCY &&
+                    inc->causes[1]->reason == PG_REASON_NO_VERSIONS) {
+                    dep_cause = inc->causes[0];
+                    no_vers_cause = inc->causes[1];
+                } else if (inc->causes[1]->reason == PG_REASON_DEPENDENCY &&
+                           inc->causes[0]->reason == PG_REASON_NO_VERSIONS) {
+                    dep_cause = inc->causes[1];
+                    no_vers_cause = inc->causes[0];
+                }
+
+                /* If we have a dependency from root to a package with no versions,
+                 * we used to emit a "does not exist" shortcut. Keep going instead so
+                 * we surface the actual constraints that removed all versions. */
+                if (dep_cause && no_vers_cause &&
+                    dep_cause->term_count == 2 &&
+                    no_vers_cause->term_count > 0 &&
+                    no_vers_cause->cause_count == 0) {
+                    PgTerm depender = dep_cause->terms[0];
+                    PgTerm dependency = dep_cause->terms[1];
+                    PgTerm no_vers_term = no_vers_cause->terms[0];
+
+                    (void)depender;
+                    (void)dependency;
+                    (void)no_vers_term;
+                }
+            }
+
+            /* Default: explain why the root package can't be satisfied */
             pg_explain_incompatibility(inc->causes[0], writer, ln, name_resolver, name_ctx, root_pkg, false);
             if (inc->cause_count > 1) {
                 pg_explain_incompatibility(inc->causes[1], writer, ln, name_resolver, name_ctx, root_pkg, false);
@@ -2425,7 +2674,7 @@ static void pg_explain_incompatibility(
         return;
     }
 
-    /* Case 1: Two derived causes */
+    /* Case 2: Two derived causes */
     if (inc->cause_count == 2 &&
         inc->causes[0]->cause_count > 0 &&
         inc->causes[1]->cause_count > 0) {
@@ -2510,7 +2759,7 @@ static void pg_explain_incompatibility(
                 if (external->reason == PG_REASON_DEPENDENCY) {
                     pg_explain_dependency_inline(external, writer, name_resolver, name_ctx, root_pkg);
                 } else {
-                    pg_error_writer_append(writer, "[external constraint]");
+                    pg_explain_external_inline(external, writer, name_resolver, name_ctx);
                 }
                 pg_error_writer_appendf(writer, " and (%d), ", derived_line);
                 pg_explain_conclusion(inc, writer, name_resolver, name_ctx, root_pkg);
@@ -2538,10 +2787,14 @@ static void pg_explain_incompatibility(
                     pg_error_writer_append(writer, "And because ");
                     if (prior_external->reason == PG_REASON_DEPENDENCY) {
                         pg_explain_dependency_inline(prior_external, writer, name_resolver, name_ctx, root_pkg);
+                    } else {
+                        pg_explain_external_inline(prior_external, writer, name_resolver, name_ctx);
                     }
                     pg_error_writer_append(writer, " and ");
                     if (external->reason == PG_REASON_DEPENDENCY) {
                         pg_explain_dependency_inline(external, writer, name_resolver, name_ctx, root_pkg);
+                    } else {
+                        pg_explain_external_inline(external, writer, name_resolver, name_ctx);
                     }
                     pg_error_writer_append(writer, ", ");
                     pg_explain_conclusion(inc, writer, name_resolver, name_ctx, root_pkg);
@@ -2556,7 +2809,7 @@ static void pg_explain_incompatibility(
             if (external->reason == PG_REASON_DEPENDENCY) {
                 pg_explain_dependency_inline(external, writer, name_resolver, name_ctx, root_pkg);
             } else {
-                pg_error_writer_append(writer, "[external constraint]");
+                pg_explain_external_inline(external, writer, name_resolver, name_ctx);
             }
             pg_error_writer_append(writer, ", ");
             pg_explain_conclusion(inc, writer, name_resolver, name_ctx, root_pkg);
@@ -2574,13 +2827,13 @@ static void pg_explain_incompatibility(
         if (inc->causes[0]->reason == PG_REASON_DEPENDENCY) {
             pg_explain_dependency_inline(inc->causes[0], writer, name_resolver, name_ctx, root_pkg);
         } else {
-            pg_error_writer_append(writer, "[external constraint]");
+            pg_explain_external_inline(inc->causes[0], writer, name_resolver, name_ctx);
         }
         pg_error_writer_append(writer, " and ");
         if (inc->causes[1]->reason == PG_REASON_DEPENDENCY) {
             pg_explain_dependency_inline(inc->causes[1], writer, name_resolver, name_ctx, root_pkg);
         } else {
-            pg_error_writer_append(writer, "[external constraint]");
+            pg_explain_external_inline(inc->causes[1], writer, name_resolver, name_ctx);
         }
         pg_error_writer_append(writer, ", ");
         pg_explain_conclusion(inc, writer, name_resolver, name_ctx, root_pkg);

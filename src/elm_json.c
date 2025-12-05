@@ -1,6 +1,6 @@
 #include "elm_json.h"
 #include "alloc.h"
-#include "cJSON.h"
+#include "vendor/cJSON.h"
 #include "log.h"
 #include <stdlib.h>
 #include <string.h>

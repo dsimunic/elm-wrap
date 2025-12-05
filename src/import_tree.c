@@ -9,7 +9,7 @@
 #include "alloc.h"
 #include "fileutil.h"
 #include "dyn_array.h"
-#include "cJSON.h"
+#include "vendor/cJSON.h"
 #include "ast/skeleton.h"
 
 #include <stdio.h>

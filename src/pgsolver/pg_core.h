@@ -108,6 +108,21 @@ bool pg_solver_get_selected_version(
     PgVersion *out_version
 );
 
+/* Statistics */
+
+typedef struct {
+    int cache_hits;
+    int cache_misses;
+    int decisions;
+    int propagations;
+    int conflicts;
+} PgSolverStats;
+
+/*
+ * Get solver statistics after pg_solver_solve.
+ */
+void pg_solver_get_stats(PgSolver *solver, PgSolverStats *out_stats);
+
 /* Error reporting */
 
 /* Callback for resolving package IDs to human-readable names */

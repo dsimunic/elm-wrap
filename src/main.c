@@ -93,6 +93,7 @@ void print_usage(const char *prog) {
     printf("  debug SUBCOMMAND   Diagnostic tools for development\n");
     printf("\nOptions:\n");
     printf("  -v, --verbose      Show detailed logging output\n");
+    printf("  -vv                Show extra verbose (trace) logging output\n");
     printf("  -V                 Show version number\n");
     printf("  --version          Show detailed version information\n");
     printf("  --sbom, --spdx     Show Software Bill of Materials (SBOM)\n");
@@ -114,6 +115,7 @@ void print_package_usage(const char *prog) {
     printf("\nOptions:\n");
     printf("  -y, --yes            Automatically confirm changes\n");
     printf("  -v, --verbose        Show detailed logging output\n");
+    printf("  -vv                  Show extra verbose (trace) logging output\n");
     printf("  -h, --help           Show this help message\n");
 }
 

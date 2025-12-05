@@ -110,6 +110,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/package/upgrade_cmd.c \
           $(SRCDIR)/commands/debug/debug.c \
           $(SRCDIR)/commands/debug/include_tree.c \
+          $(SRCDIR)/commands/debug/install_plan.c \
           $(SRCDIR)/commands/repository/repository.c \
           $(SRCDIR)/import_tree.c \
           $(SRCDIR)/commands/cache/check/cache_check.c \
@@ -123,7 +124,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/cache.c \
           $(SRCDIR)/solver.c \
           $(SRCDIR)/pgsolver/solver_common.c \
-          $(SRCDIR)/cJSON.c \
+          $(SRCDIR)/vendor/cJSON.c \
           $(SRCDIR)/http_client.c \
           $(SRCDIR)/registry.c \
           $(SRCDIR)/protocol_v1/package_fetch.c \
@@ -188,6 +189,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/upgrade_cmd.o \
           $(BUILDDIR)/debug.o \
           $(BUILDDIR)/include_tree.o \
+          $(BUILDDIR)/install_plan.o \
           $(BUILDDIR)/repository.o \
           $(BUILDDIR)/import_tree.o \
           $(BUILDDIR)/cache_check.o \
@@ -404,7 +406,7 @@ $(BUILDDIR)/path_util.o: $(SRCDIR)/commands/publish/docs/path_util.c $(SRCDIR)/c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build package_publish command object
-$(BUILDDIR)/package_publish.o: $(SRCDIR)/commands/publish/package/package_publish.c $(SRCDIR)/commands/publish/package/package_publish.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/dyn_array.h $(SRCDIR)/cJSON.h $(SRCDIR)/rulr/rulr.h $(SRCDIR)/rulr/rulr_dl.h | $(BUILDDIR)
+$(BUILDDIR)/package_publish.o: $(SRCDIR)/commands/publish/package/package_publish.c $(SRCDIR)/commands/publish/package/package_publish.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/dyn_array.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/rulr/rulr.h $(SRCDIR)/rulr/rulr_dl.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -I$(SRCDIR)/rulr -c $< -o $@
 
 # Build code command object
@@ -432,11 +434,15 @@ $(BUILDDIR)/policy.o: $(SRCDIR)/commands/policy/policy.c $(SRCDIR)/commands/poli
 	$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
 
 # Build include_tree command object
-$(BUILDDIR)/include_tree.o: $(SRCDIR)/commands/debug/include_tree.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/log.h $(SRCDIR)/dyn_array.h $(SRCDIR)/cJSON.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/import_tree.h | $(BUILDDIR)
+$(BUILDDIR)/include_tree.o: $(SRCDIR)/commands/debug/include_tree.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/log.h $(SRCDIR)/dyn_array.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/import_tree.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
 
+# Build install_plan command object
+$(BUILDDIR)/install_plan.o: $(SRCDIR)/commands/debug/install_plan.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/log.h $(SRCDIR)/solver.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/fileutil.h $(SRCDIR)/global_context.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # Build import_tree shared library object
-$(BUILDDIR)/import_tree.o: $(SRCDIR)/import_tree.c $(SRCDIR)/import_tree.h $(SRCDIR)/alloc.h $(SRCDIR)/dyn_array.h $(SRCDIR)/cJSON.h $(SRCDIR)/ast/skeleton.h | $(BUILDDIR)
+$(BUILDDIR)/import_tree.o: $(SRCDIR)/import_tree.c $(SRCDIR)/import_tree.h $(SRCDIR)/alloc.h $(SRCDIR)/dyn_array.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/ast/skeleton.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
 
 # Build cache_check object
@@ -480,7 +486,7 @@ $(BUILDDIR)/upgrade_cmd.o: $(SRCDIR)/commands/package/upgrade_cmd.c $(SRCDIR)/co
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build install_check object
-$(BUILDDIR)/install_check.o: $(SRCDIR)/install_check.c $(SRCDIR)/install_check.h $(SRCDIR)/elm_json.h $(SRCDIR)/cJSON.h | $(BUILDDIR)
+$(BUILDDIR)/install_check.o: $(SRCDIR)/install_check.c $(SRCDIR)/install_check.h $(SRCDIR)/elm_json.h $(SRCDIR)/vendor/cJSON.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build elm_json object
@@ -536,7 +542,7 @@ $(BUILDDIR)/pg_file_test.o: test/src/pg_file_test.c $(SRCDIR)/pgsolver/pg_core.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build cJSON object
-$(BUILDDIR)/cJSON.o: $(SRCDIR)/cJSON.c $(SRCDIR)/cJSON.h | $(BUILDDIR)
+$(BUILDDIR)/cJSON.o: $(SRCDIR)/vendor/cJSON.c $(SRCDIR)/vendor/cJSON.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build http_client object
@@ -548,7 +554,7 @@ $(BUILDDIR)/registry.o: $(SRCDIR)/registry.c $(SRCDIR)/registry.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build package_fetch object
-$(BUILDDIR)/package_fetch.o: $(SRCDIR)/protocol_v1/package_fetch.c $(SRCDIR)/protocol_v1/package_fetch.h $(SRCDIR)/install_env.h $(SRCDIR)/cache.h $(SRCDIR)/http_client.h $(SRCDIR)/cJSON.h $(SRCDIR)/vendor/sha1.h $(SRCDIR)/log.h | $(BUILDDIR)
+$(BUILDDIR)/package_fetch.o: $(SRCDIR)/protocol_v1/package_fetch.c $(SRCDIR)/protocol_v1/package_fetch.h $(SRCDIR)/install_env.h $(SRCDIR)/cache.h $(SRCDIR)/http_client.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/vendor/sha1.h $(SRCDIR)/log.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build v1_install object (protocol v1 install functions)
@@ -580,7 +586,7 @@ $(BUILDDIR)/v2_solver.o: $(SRCDIR)/protocol_v2/solver/solver.c $(SRCDIR)/protoco
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build install_env object
-$(BUILDDIR)/install_env.o: $(SRCDIR)/install_env.c $(SRCDIR)/install_env.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/http_client.h $(SRCDIR)/cJSON.h $(SRCDIR)/vendor/sha1.h $(SRCDIR)/fileutil.h $(SRCDIR)/protocol_v1/package_fetch.h | $(BUILDDIR)
+$(BUILDDIR)/install_env.o: $(SRCDIR)/install_env.c $(SRCDIR)/install_env.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/http_client.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/vendor/sha1.h $(SRCDIR)/fileutil.h $(SRCDIR)/protocol_v1/package_fetch.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build fileutil object
@@ -592,7 +598,7 @@ $(BUILDDIR)/elm_cmd_common.o: $(SRCDIR)/commands/wrappers/elm_cmd_common.c $(SRC
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build elm_project object
-$(BUILDDIR)/elm_project.o: $(SRCDIR)/elm_project.c $(SRCDIR)/elm_project.h $(SRCDIR)/fileutil.h $(SRCDIR)/cJSON.h $(SRCDIR)/dyn_array.h | $(BUILDDIR)
+$(BUILDDIR)/elm_project.o: $(SRCDIR)/elm_project.c $(SRCDIR)/elm_project.h $(SRCDIR)/fileutil.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/dyn_array.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build env_defaults object

@@ -3,7 +3,7 @@
 #include "../../../alloc.h"
 #include "../../../elm_json.h"
 #include "../../../cache.h"
-#include "../../../cJSON.h"
+#include "../../../vendor/cJSON.h"
 #include "../../../registry.h"
 #include <stdio.h>
 #include <stdlib.h>

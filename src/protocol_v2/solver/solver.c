@@ -338,7 +338,7 @@ static bool build_roots_strategy_cross_major_for_target_v2(
      * - Test dependencies: Keep exact to avoid unnecessary test changes
      */
 
-    log_debug("Cross-major strategy (V2): skipping direct/indirect dependencies, only constraining tests");
+    log_trace("Cross-major strategy (V2): skipping direct/indirect dependencies, only constraining tests");
 
     bool ok = true;
     if (include_test) {
@@ -419,25 +419,25 @@ SolverResult run_with_strategy_v2(
                 pg_solver_free(pg_solver);
                 return SOLVER_NO_SOLUTION;
             }
-            log_debug("Added target package %s/%s as root with unconstrained range (V2, ID=%d)",
+            log_trace("Added target package %s/%s as root with unconstrained range (V2, ID=%d)",
                      author, name, target_pkg_id);
         }
 
         switch (strategy) {
             case STRATEGY_EXACT_ALL:
-                log_debug("Trying strategy (V2): exact versions for all dependencies");
+                log_trace("Trying strategy (V2): exact versions for all dependencies");
                 root_ok = build_roots_strategy_exact_app_v2(pg_ctx, elm_json, include_prod, include_test);
                 break;
             case STRATEGY_EXACT_DIRECT_UPGRADABLE_INDIRECT:
-                log_debug("Trying strategy (V2): exact direct, upgradable indirect dependencies");
+                log_trace("Trying strategy (V2): exact direct, upgradable indirect dependencies");
                 root_ok = build_roots_strategy_exact_direct_app_v2(pg_ctx, elm_json, include_prod, include_test);
                 break;
             case STRATEGY_UPGRADABLE_WITHIN_MAJOR:
-                log_debug("Trying strategy (V2): upgradable within major version");
+                log_trace("Trying strategy (V2): upgradable within major version");
                 root_ok = build_roots_strategy_upgradable_app_v2(pg_ctx, elm_json, include_prod, include_test);
                 break;
             case STRATEGY_CROSS_MAJOR_FOR_TARGET:
-                log_debug("Trying strategy (V2): cross-major upgrade for %s/%s", author, name);
+                log_trace("Trying strategy (V2): cross-major upgrade for %s/%s", author, name);
                 root_ok = build_roots_strategy_cross_major_for_target_v2(pg_ctx, elm_json, author, name, include_test);
                 break;
         }
@@ -501,13 +501,57 @@ SolverResult run_with_strategy_v2(
     /* Run the PubGrub-style solver */
     PgSolverStatus pg_status = pg_solver_solve(pg_solver);
     if (pg_status != PG_SOLVER_OK) {
-        log_debug("Strategy failed to find solution (V2)");
+        log_trace("Strategy failed to find solution (V2)");
+
+        /* Generate a human-readable error explanation */
+        char error_buffer[4096];
+        PgExplainContext explain_ctx;
+        explain_ctx.resolver_ctx = pg_ctx;
+        explain_ctx.current_packages = current_packages;
+
+        if (pg_solver_explain_failure(pg_solver,
+                                      (PgPackageNameResolver)pg_elm_v2_get_package_name_with_ctx,
+                                      &explain_ctx,
+                                      error_buffer,
+                                      sizeof(error_buffer))) {
+            log_error("Solver conflict:\n%s", error_buffer);
+        }
+
         pg_solver_free(pg_solver);
         pg_elm_v2_context_free(pg_ctx);
         return SOLVER_NO_SOLUTION;
     }
 
-    log_debug("Requested package %s/%s has ID %d (V2)", author, name, new_pkg_id);
+    /* Get and print solver statistics */
+    PgSolverStats stats;
+    pg_solver_get_stats(pg_solver, &stats);
+    if (log_is_progress()) {
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Solver Statistics:\n");
+        fprintf(stderr, "  Strategy: ");
+        switch (strategy) {
+            case STRATEGY_EXACT_ALL:
+                fprintf(stderr, "exact versions for all dependencies\n");
+                break;
+            case STRATEGY_EXACT_DIRECT_UPGRADABLE_INDIRECT:
+                fprintf(stderr, "exact direct, upgradable indirect\n");
+                break;
+            case STRATEGY_UPGRADABLE_WITHIN_MAJOR:
+                fprintf(stderr, "upgradable within major version\n");
+                break;
+            case STRATEGY_CROSS_MAJOR_FOR_TARGET:
+                fprintf(stderr, "cross-major upgrade\n");
+                break;
+        }
+        fprintf(stderr, "  Registry lookups:  %d (cache hits: %d, misses: %d)\n",
+                stats.cache_hits + stats.cache_misses, stats.cache_hits, stats.cache_misses);
+        fprintf(stderr, "  Decisions:         %d\n", stats.decisions);
+        fprintf(stderr, "  Propagations:      %d\n", stats.propagations);
+        fprintf(stderr, "  Conflicts:         %d\n", stats.conflicts);
+        fprintf(stderr, "\n");
+    }
+
+    log_trace("Requested package %s/%s has ID %d (V2)", author, name, new_pkg_id);
 
     /* Extract the chosen version for the requested package */
     PgVersion chosen;
@@ -525,7 +569,7 @@ SolverResult run_with_strategy_v2(
              chosen.minor,
              chosen.patch);
 
-    log_debug("Selected version (V2): %s", selected_version);
+    log_trace("Selected version (V2): %s", selected_version);
 
     /* Create install plan */
     InstallPlan *plan = install_plan_create();
@@ -551,7 +595,7 @@ SolverResult run_with_strategy_v2(
             Package *existing = package_map_find(current_packages, pkg_author, pkg_name);
             const char *old_ver = existing ? existing->version : NULL;
 
-            log_debug("Package[%d] %s/%s: old=%s new=%s (V2)", i, pkg_author, pkg_name,
+            log_trace("Package[%d] %s/%s: old=%s new=%s (V2)", i, pkg_author, pkg_name,
                       old_ver ? old_ver : "NULL", version_str);
 
             /* Only add to plan if it's new or changed */
@@ -571,7 +615,7 @@ SolverResult run_with_strategy_v2(
      * install_env interface which handles protocol differences internally.
      */
     if (selected_version[0] && !cache_package_exists(state->cache, author, name, selected_version)) {
-        log_debug("Package not in cache, downloading (V2)");
+        log_trace("Package not in cache, downloading (V2)");
         if (state->install_env) {
             if (!cache_download_package_with_env(state->install_env, author, name, selected_version)) {
                 install_plan_free(plan);
@@ -587,14 +631,14 @@ SolverResult run_with_strategy_v2(
             return SOLVER_INVALID_PACKAGE;
         }
     } else {
-        log_debug("Package found in cache (V2)");
+        log_trace("Package found in cache (V2)");
     }
 
     pg_solver_free(pg_solver);
     pg_elm_v2_context_free(pg_ctx);
 
     *out_plan = plan;
-    log_debug("Plan created with %d changes (V2)", plan->count);
+    log_trace("Plan created with %d changes (V2)", plan->count);
     return SOLVER_OK;
 }
 
@@ -644,7 +688,7 @@ SolverResult solver_upgrade_all_v2(
     if (elm_json->type == ELM_PROJECT_APPLICATION) {
         if (major_upgrade) {
             /* For major upgrades, allow any version */
-            log_debug("Allowing major upgrades for all packages (V2)");
+            log_trace("Allowing major upgrades for all packages (V2)");
             /* Don't add any root constraints - let solver pick latest versions.
              * V2 registry already contains only versions compatible with
              * the current compiler.
@@ -652,7 +696,7 @@ SolverResult solver_upgrade_all_v2(
             root_ok = true;
         } else {
             /* For minor upgrades, use upgradable within major strategy */
-            log_debug("Using upgradable within major version strategy (V2)");
+            log_trace("Using upgradable within major version strategy (V2)");
             root_ok = build_roots_strategy_upgradable_app_v2(pg_ctx, elm_json, true, true);
         }
     } else {
@@ -680,7 +724,22 @@ SolverResult solver_upgrade_all_v2(
     /* Run the PubGrub-style solver */
     PgSolverStatus pg_status = pg_solver_solve(pg_solver);
     if (pg_status != PG_SOLVER_OK) {
-        log_debug("Upgrade failed to find solution (V2)");
+        log_trace("Upgrade failed to find solution (V2)");
+
+        /* Generate a human-readable error explanation */
+        char error_buffer[4096];
+        PgExplainContext explain_ctx;
+        explain_ctx.resolver_ctx = pg_ctx;
+        explain_ctx.current_packages = current_packages;
+
+        if (pg_solver_explain_failure(pg_solver,
+                                      (PgPackageNameResolver)pg_elm_v2_get_package_name_with_ctx,
+                                      &explain_ctx,
+                                      error_buffer,
+                                      sizeof(error_buffer))) {
+            log_error("Solver conflict:\n%s", error_buffer);
+        }
+
         pg_solver_free(pg_solver);
         pg_elm_v2_context_free(pg_ctx);
         package_map_free(current_packages);
@@ -712,7 +771,7 @@ SolverResult solver_upgrade_all_v2(
             Package *existing = package_map_find(current_packages, pkg_author, pkg_name);
             const char *old_ver = existing ? existing->version : NULL;
 
-            log_debug("Package[%d] %s/%s: old=%s new=%s (V2)", i, pkg_author, pkg_name,
+            log_trace("Package[%d] %s/%s: old=%s new=%s (V2)", i, pkg_author, pkg_name,
                       old_ver ? old_ver : "NULL", version_str);
 
             /* Only add to plan if it changed */
@@ -733,6 +792,6 @@ SolverResult solver_upgrade_all_v2(
     package_map_free(current_packages);
 
     *out_plan = plan;
-    log_debug("Upgrade plan created with %d changes (V2)", plan->count);
+    log_trace("Upgrade plan created with %d changes (V2)", plan->count);
     return SOLVER_OK;
 }

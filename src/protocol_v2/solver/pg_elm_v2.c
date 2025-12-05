@@ -8,6 +8,7 @@
 
 #include "pg_elm_v2.h"
 #include "v2_registry.h"
+#include "../../pgsolver/solver_common.h"
 #include "../../alloc.h"
 #include "../../log.h"
 
@@ -177,11 +178,11 @@ static int pg_elm_v2_provider_get_versions(
     /* Find the package in the V2 registry */
     V2PackageEntry *entry = v2_registry_find(ctx->registry, author, name);
     if (!entry) {
-        log_debug("Package %s/%s not found in V2 registry", author, name);
+        log_trace("Package %s/%s not found in V2 registry", author, name);
         return 0;
     }
     
-    log_debug("Found %s/%s in V2 registry with %zu versions", author, name, entry->version_count);
+    log_trace("Found %s/%s in V2 registry with %zu versions", author, name, entry->version_count);
     
     /* Copy versions to output buffer (V2 registry stores newest-first) */
     int written = 0;
@@ -202,7 +203,7 @@ static int pg_elm_v2_provider_get_versions(
         written++;
     }
     
-    log_debug("Returning %d versions for %s/%s", written, author, name);
+    log_trace("Returning %d versions for %s/%s", written, author, name);
     return written;
 }
 
@@ -322,7 +323,7 @@ static int pg_elm_v2_provider_get_dependencies(
     );
     
     if (!pv) {
-        log_debug("Version %d.%d.%d not found for %s/%s in V2 registry",
+        log_trace("Version %d.%d.%d not found for %s/%s in V2 registry",
                   version.major, version.minor, version.patch, author, name);
         return 0;
     }
@@ -368,6 +369,44 @@ static int pg_elm_v2_provider_get_dependencies(
     }
     
     return written;
+}
+
+const char *pg_elm_v2_get_package_name(PgElmV2Context *ctx, PgPackageId pkg) {
+    if (!ctx || pkg < 0 || pkg >= ctx->package_count) {
+        return NULL;
+    }
+
+    /* For root package, return the special name */
+    if (pkg == 0) {
+        return "__root__";
+    }
+
+    /* Build "author/name" string */
+    const char *author = ctx->authors[pkg];
+    const char *name = ctx->names[pkg];
+
+    if (!author || !name) {
+        return NULL;
+    }
+
+    /* Allocate and build the full package name */
+    size_t len = strlen(author) + 1 + strlen(name) + 1;
+    char *full_name = arena_malloc(len);
+    if (!full_name) {
+        return NULL;
+    }
+
+    snprintf(full_name, len, "%s/%s", author, name);
+    return full_name;
+}
+
+const char *pg_elm_v2_get_package_name_with_ctx(void *ctx, PgPackageId pkg) {
+    if (!ctx) {
+        return NULL;
+    }
+    PgExplainContext *explain_ctx = (PgExplainContext *)ctx;
+    PgElmV2Context *pg_ctx = (PgElmV2Context *)explain_ctx->resolver_ctx;
+    return pg_elm_v2_get_package_name(pg_ctx, pkg);
 }
 
 PgDependencyProvider pg_elm_v2_make_provider(PgElmV2Context *ctx) {

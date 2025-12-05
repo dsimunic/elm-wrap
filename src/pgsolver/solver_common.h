@@ -13,6 +13,12 @@ typedef enum {
     STRATEGY_CROSS_MAJOR_FOR_TARGET            /* Allow cross-major upgrade for target package */
 } SolverStrategy;
 
+/* Extra context passed to error explainer */
+typedef struct {
+    void *resolver_ctx;          /* Underlying name resolver context (e.g., PgElmV2Context*) */
+    PackageMap *current_packages;/* Current project packages, if available */
+} PgExplainContext;
+
 /* InstallPlan operations */
 InstallPlan* install_plan_create(void);
 void install_plan_free(InstallPlan *plan);

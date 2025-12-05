@@ -14,7 +14,7 @@
 #include "../../../fileutil.h"
 #include "../../../ast/skeleton.h"
 #include "../../../dyn_array.h"
-#include "../../../cJSON.h"
+#include "../../../vendor/cJSON.h"
 #include "../../../rulr/rulr.h"
 #include "../../../rulr/rulr_dl.h"
 #include "../../../rulr/host_helpers.h"

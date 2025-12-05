@@ -1,6 +1,6 @@
 #include "install_env.h"
 #include "alloc.h"
-#include "cJSON.h"
+#include "vendor/cJSON.h"
 #include "vendor/sha1.h"
 #include "log.h"
 #include "fileutil.h"

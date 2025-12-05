@@ -11,6 +11,7 @@ static void print_debug_usage(void) {
     printf("\n");
     printf("Subcommands:\n");
     printf("  include-tree <path>  Show import dependency tree for a file or package\n");
+    printf("  install-plan <pkg>   Show what packages would be installed for a package (dry-run)\n");
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help           Show this help message\n");
@@ -31,6 +32,10 @@ int cmd_debug(int argc, char *argv[]) {
 
     if (strcmp(subcmd, "include-tree") == 0) {
         return cmd_debug_include_tree(argc - 1, argv + 1);
+    }
+
+    if (strcmp(subcmd, "install-plan") == 0) {
+        return cmd_debug_install_plan(argc - 1, argv + 1);
     }
 
     fprintf(stderr, "Error: Unknown debug subcommand '%s'\n", subcmd);

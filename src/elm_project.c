@@ -5,7 +5,7 @@
 #include "elm_project.h"
 #include "fileutil.h"
 #include "alloc.h"
-#include "cJSON.h"
+#include "vendor/cJSON.h"
 #include "dyn_array.h"
 #include <stdio.h>
 #include <stdlib.h>
