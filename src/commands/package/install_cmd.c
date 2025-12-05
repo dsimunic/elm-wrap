@@ -1,4 +1,5 @@
 #include "package_common.h"
+#include "install_local_dev.h"
 #include "../../install.h"
 #include "../../elm_json.h"
 #include "../../cache.h"
@@ -116,6 +117,8 @@ static void print_install_usage(void) {
     printf("  --major <package>                  # Allow major version upgrade for package\n");
     printf("  --from-file <path> <package>       # Install from local file/directory\n");
     printf("  --from-url <url> <package>         # Install from URL (skip SHA check)\n");
+    printf("  --local-dev [--from-path <path>] [<package>]\n");
+    printf("                                     # Install package as symlink for local development\n");
     printf("  --pin                              # Create PIN file with package version\n");
     printf("  -v, --verbose                      # Show progress reports (registry, connectivity)\n");
     printf("  -q, --quiet                        # Suppress progress reports\n");
@@ -434,10 +437,12 @@ int cmd_install(int argc, char *argv[]) {
     bool cmd_verbose = false;
     bool cmd_quiet = false;
     bool pin_flag = false;
+    bool local_dev = false;
     const char *package_name = NULL;
     const char *major_package_name = NULL;
     const char *from_file_path = NULL;
     const char *from_url = NULL;
+    const char *from_path = NULL;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -485,6 +490,17 @@ int cmd_install(int argc, char *argv[]) {
                 print_install_usage();
                 return 1;
             }
+        } else if (strcmp(argv[i], "--local-dev") == 0) {
+            local_dev = true;
+        } else if (strcmp(argv[i], "--from-path") == 0) {
+            if (i + 1 < argc) {
+                i++;
+                from_path = argv[i];
+            } else {
+                fprintf(stderr, "Error: --from-path requires a path argument\n");
+                print_install_usage();
+                return 1;
+            }
         } else if (argv[i][0] != '-') {
             if (package_name) {
                 fprintf(stderr, "Error: Multiple package names specified\n");
@@ -513,6 +529,16 @@ int cmd_install(int argc, char *argv[]) {
 
     if (from_file_path && from_url) {
         fprintf(stderr, "Error: Cannot use both --from-file and --from-url\n");
+        return 1;
+    }
+
+    if (local_dev && (from_file_path || from_url)) {
+        fprintf(stderr, "Error: Cannot use --local-dev with --from-file or --from-url\n");
+        return 1;
+    }
+
+    if (from_path && !local_dev) {
+        fprintf(stderr, "Error: --from-path requires --local-dev flag\n");
         return 1;
     }
 
@@ -550,7 +576,35 @@ int cmd_install(int argc, char *argv[]) {
 
     int result = 0;
 
-    if (from_file_path || from_url) {
+    if (local_dev) {
+        /* Handle --local-dev installation */
+        const char *source_path = from_path ? from_path : ".";
+        
+        /*
+         * Check if we're running from within a package directory itself.
+         * In that case, we just register the package in the cache/registry
+         * without trying to add it as a dependency to anything.
+         *
+         * This is detected when:
+         * 1. No explicit --from-path was specified (source defaults to ".")
+         * 2. The current elm.json is a package (not an application)
+         */
+        if (!from_path && elm_json->type == ELM_PROJECT_PACKAGE) {
+            /* Register-only mode: just put in cache and registry */
+            result = register_local_dev_package(source_path, package_name, env, auto_yes);
+            elm_json_free(elm_json);
+            install_env_free(env);
+            log_set_level(original_level);
+            return result;
+        }
+        
+        result = install_local_dev(source_path, package_name, ELM_JSON_PATH, env, is_test, auto_yes);
+        
+        elm_json_free(elm_json);
+        install_env_free(env);
+        log_set_level(original_level);
+        return result;
+    } else if (from_file_path || from_url) {
         if (!package_name) {
             fprintf(stderr, "Error: Package name required for --from-file or --from-url\n");
             elm_json_free(elm_json);
@@ -779,6 +833,15 @@ int cmd_install(int argc, char *argv[]) {
         result = 0;
     } else if (package_name) {
         result = install_package(package_name, is_test, major_upgrade, auto_yes, elm_json, env);
+        
+        /* If we're in a package directory that's being tracked for local-dev,
+         * refresh all dependent applications' indirect dependencies */
+        if (result == 0) {
+            int refresh_result = refresh_local_dev_dependents(env);
+            if (refresh_result != 0) {
+                log_error("Warning: Some dependent applications may need manual update");
+            }
+        }
     } else {
         char *elm_home = arena_strdup(env->cache->elm_home);
         elm_json_free(elm_json);

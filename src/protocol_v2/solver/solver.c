@@ -514,7 +514,7 @@ SolverResult run_with_strategy_v2(
                                       &explain_ctx,
                                       error_buffer,
                                       sizeof(error_buffer))) {
-            log_error("Solver conflict:\n%s", error_buffer);
+            log_trace("Solver conflict:\n%s", error_buffer);
         }
 
         pg_solver_free(pg_solver);
@@ -737,7 +737,7 @@ SolverResult solver_upgrade_all_v2(
                                       &explain_ctx,
                                       error_buffer,
                                       sizeof(error_buffer))) {
-            log_error("Solver conflict:\n%s", error_buffer);
+            log_trace("Solver conflict:\n%s", error_buffer);
         }
 
         pg_solver_free(pg_solver);

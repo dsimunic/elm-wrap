@@ -1,0 +1,1323 @@
+/**
+ * install_local_dev.c - Local development package installation
+ *
+ * Implements the --local-dev flag for `wrap package install` which creates
+ * symlinks instead of copying package files, enabling live development.
+ */
+
+#include "install_local_dev.h"
+#include "package_common.h"
+#include "../../alloc.h"
+#include "../../log.h"
+#include "../../fileutil.h"
+#include "../../env_defaults.h"
+#include "../../elm_json.h"
+#include "../../cache.h"
+#include "../../registry.h"
+#include "../../solver.h"
+#include "../../global_context.h"
+#include "../../protocol_v2/solver/v2_registry.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <errno.h>
+#include <limits.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
+/* Local dev version when package exists in registry */
+#define LOCAL_DEV_VERSION_EXISTS "999.0.0"
+/* Local dev version when package does not exist in registry */
+#define LOCAL_DEV_VERSION_NEW "0.0.0"
+
+/* Tracking directory name under ELM_WRAP_REPOSITORY_LOCAL_PATH */
+#define LOCAL_DEV_TRACKING_DIR "_local-dev-dependency-track"
+
+/* Simple hash function for path -> filename */
+static unsigned long hash_path(const char *str) {
+    unsigned long hash = 5381;
+    int c;
+    while ((c = *str++)) {
+        hash = ((hash << 5) + hash) + c;
+    }
+    return hash;
+}
+
+char *get_local_dev_tracking_dir(void) {
+    char *repo_path = env_get_repository_local_path();
+    if (!repo_path) {
+        log_error("ELM_WRAP_REPOSITORY_LOCAL_PATH is not configured");
+        return NULL;
+    }
+
+    size_t len = strlen(repo_path) + strlen("/") + strlen(LOCAL_DEV_TRACKING_DIR) + 1;
+    char *tracking_dir = arena_malloc(len);
+    if (!tracking_dir) {
+        arena_free(repo_path);
+        return NULL;
+    }
+    snprintf(tracking_dir, len, "%s/%s", repo_path, LOCAL_DEV_TRACKING_DIR);
+    arena_free(repo_path);
+    return tracking_dir;
+}
+
+/**
+ * Create all directories in a path (like mkdir -p).
+ */
+static bool ensure_path_exists(const char *path) {
+    if (!path || path[0] == '\0') {
+        return false;
+    }
+
+    char *mutable_path = arena_strdup(path);
+    if (!mutable_path) {
+        return false;
+    }
+
+    bool ok = true;
+    size_t len = strlen(mutable_path);
+    for (size_t i = 1; i < len && ok; i++) {
+        if (mutable_path[i] == '/') {
+            mutable_path[i] = '\0';
+            struct stat st;
+            if (stat(mutable_path, &st) != 0) {
+                if (mkdir(mutable_path, 0755) != 0 && errno != EEXIST) {
+                    log_error("Failed to create directory: %s", mutable_path);
+                    ok = false;
+                }
+            }
+            mutable_path[i] = '/';
+        }
+    }
+
+    if (ok) {
+        struct stat st;
+        if (stat(mutable_path, &st) != 0) {
+            if (mkdir(mutable_path, 0755) != 0 && errno != EEXIST) {
+                log_error("Failed to create directory: %s", mutable_path);
+                ok = false;
+            }
+        }
+    }
+
+    arena_free(mutable_path);
+    return ok;
+}
+
+/**
+ * Determine the version to use for the local-dev package.
+ * Returns "999.0.0" if package exists in the MAIN registry (published), "0.0.0" otherwise.
+ * 
+ * We need to distinguish between:
+ * - Package published in main registry → use 999.0.0 (higher than any published version)
+ * - Package only in local-dev registry (or not at all) → use 0.0.0
+ * 
+ * Since env->registry includes merged local-dev packages, we check if the only
+ * versions are 0.0.0 or 999.0.0 (local-dev versions), which means it's not published.
+ */
+static const char *get_local_dev_version(InstallEnv *env, const char *author, const char *name) {
+    if (env->protocol_mode == PROTOCOL_V2) {
+        if (env->v2_registry) {
+            V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
+            if (entry && entry->version_count > 0) {
+                /* Check if any version is NOT a local-dev version (not 0.0.0 or 999.0.0) */
+                for (size_t i = 0; i < entry->version_count; i++) {
+                    int major = entry->versions[i].major;
+                    int minor = entry->versions[i].minor;
+                    int patch = entry->versions[i].patch;
+                    /* Skip local-dev versions */
+                    if ((major == 0 && minor == 0 && patch == 0) ||
+                        (major == 999 && minor == 0 && patch == 0)) {
+                        continue;
+                    }
+                    /* Found a real published version */
+                    return LOCAL_DEV_VERSION_EXISTS;
+                }
+            }
+        }
+    } else {
+        if (env->registry) {
+            RegistryEntry *entry = registry_find(env->registry, author, name);
+            if (entry && entry->version_count > 0) {
+                /* Check if any version is NOT a local-dev version */
+                for (size_t i = 0; i < entry->version_count; i++) {
+                    int major = entry->versions[i].major;
+                    int minor = entry->versions[i].minor;
+                    int patch = entry->versions[i].patch;
+                    /* Skip local-dev versions */
+                    if ((major == 0 && minor == 0 && patch == 0) ||
+                        (major == 999 && minor == 0 && patch == 0)) {
+                        continue;
+                    }
+                    /* Found a real published version */
+                    return LOCAL_DEV_VERSION_EXISTS;
+                }
+            }
+        }
+    }
+    return LOCAL_DEV_VERSION_NEW;
+}
+
+/**
+ * Create a symlink for the package in ELM_HOME.
+ * Creates: ELM_HOME/packages/author/name/version -> source_path
+ */
+static bool create_package_symlink(InstallEnv *env, const char *source_path,
+                                   const char *author, const char *name, const char *version) {
+    /* Build path: packages_dir/author/name */
+    size_t base_len = strlen(env->cache->packages_dir) + strlen(author) + strlen(name) + 3;
+    char *base_dir = arena_malloc(base_len);
+    if (!base_dir) {
+        return false;
+    }
+    snprintf(base_dir, base_len, "%s/%s/%s", env->cache->packages_dir, author, name);
+
+    if (!ensure_path_exists(base_dir)) {
+        log_error("Failed to create package directory: %s", base_dir);
+        arena_free(base_dir);
+        return false;
+    }
+
+    /* Build symlink path: packages_dir/author/name/version */
+    size_t link_len = base_len + strlen(version) + 2;
+    char *link_path = arena_malloc(link_len);
+    if (!link_path) {
+        arena_free(base_dir);
+        return false;
+    }
+    snprintf(link_path, link_len, "%s/%s", base_dir, version);
+    arena_free(base_dir);
+
+    /* Remove existing symlink or directory */
+    struct stat st;
+    if (lstat(link_path, &st) == 0) {
+        if (S_ISLNK(st.st_mode)) {
+            if (unlink(link_path) != 0) {
+                log_error("Failed to remove existing symlink: %s", link_path);
+                arena_free(link_path);
+                return false;
+            }
+        } else if (S_ISDIR(st.st_mode)) {
+            if (!remove_directory_recursive(link_path)) {
+                log_error("Failed to remove existing directory: %s", link_path);
+                arena_free(link_path);
+                return false;
+            }
+        } else {
+            if (unlink(link_path) != 0) {
+                log_error("Failed to remove existing file: %s", link_path);
+                arena_free(link_path);
+                return false;
+            }
+        }
+    }
+
+    /* Create symlink */
+    if (symlink(source_path, link_path) != 0) {
+        log_error("Failed to create symlink %s -> %s: %s", link_path, source_path, strerror(errno));
+        arena_free(link_path);
+        return false;
+    }
+
+    log_debug("Created symlink: %s -> %s", link_path, source_path);
+    arena_free(link_path);
+    return true;
+}
+
+/**
+ * Register the application's elm.json in the dependency tracking directory.
+ * Creates: tracking_dir/author/name/version/<hash_of_path>
+ */
+static bool register_dependency_tracking(const char *author, const char *name, const char *version,
+                                         const char *app_elm_json_path) {
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        return false;
+    }
+
+    /* Build path: tracking_dir/author/name/version */
+    size_t dir_len = strlen(tracking_dir) + strlen(author) + strlen(name) + strlen(version) + 4;
+    char *version_dir = arena_malloc(dir_len);
+    if (!version_dir) {
+        arena_free(tracking_dir);
+        return false;
+    }
+    snprintf(version_dir, dir_len, "%s/%s/%s/%s", tracking_dir, author, name, version);
+    arena_free(tracking_dir);
+
+    if (!ensure_path_exists(version_dir)) {
+        log_error("Failed to create tracking directory: %s", version_dir);
+        arena_free(version_dir);
+        return false;
+    }
+
+    /* Get absolute path of the app's elm.json */
+    char abs_path[PATH_MAX];
+    if (!realpath(app_elm_json_path, abs_path)) {
+        log_error("Failed to resolve absolute path for: %s", app_elm_json_path);
+        arena_free(version_dir);
+        return false;
+    }
+
+    /* Create filename from hash of path */
+    unsigned long path_hash = hash_path(abs_path);
+    char hash_filename[32];
+    snprintf(hash_filename, sizeof(hash_filename), "%lx", path_hash);
+
+    /* Build full tracking file path */
+    size_t file_len = strlen(version_dir) + strlen(hash_filename) + 2;
+    char *tracking_file = arena_malloc(file_len);
+    if (!tracking_file) {
+        arena_free(version_dir);
+        return false;
+    }
+    snprintf(tracking_file, file_len, "%s/%s", version_dir, hash_filename);
+    arena_free(version_dir);
+
+    /* Write the app elm.json path to the tracking file */
+    FILE *f = fopen(tracking_file, "w");
+    if (!f) {
+        log_error("Failed to create tracking file: %s", tracking_file);
+        arena_free(tracking_file);
+        return false;
+    }
+
+    fprintf(f, "%s\n", abs_path);
+    fclose(f);
+
+    log_debug("Registered dependency tracking: %s", tracking_file);
+    arena_free(tracking_file);
+    return true;
+}
+
+/* Registry local-dev dat file name */
+#define REGISTRY_LOCAL_DEV_DAT "registry-local-dev.dat"
+
+static bool ensure_local_dev_in_registry_dat(InstallEnv *env, const char *author, const char *name,
+                                             const char *version) {
+    if (!env || !env->cache || !env->cache->registry_path) {
+        log_error("Cannot update registry.dat for local-dev package (missing cache configuration)");
+        return false;
+    }
+
+    const char *registry_path = env->cache->registry_path;
+    Registry *registry = NULL;
+
+    if (file_exists(registry_path)) {
+        registry = registry_load_from_dat(registry_path, NULL);
+        if (!registry) {
+            log_error("Failed to load existing registry.dat from %s", registry_path);
+            return false;
+        }
+    } else {
+        registry = registry_create();
+        if (!registry) {
+            log_error("Failed to allocate registry for local-dev entry");
+            return false;
+        }
+    }
+
+    size_t previous_total = registry->total_versions;
+    Version parsed = version_parse(version);
+
+    if (!registry_add_version(registry, author, name, parsed)) {
+        log_error("Failed to add %s/%s %s to registry.dat", author, name, version);
+        registry_free(registry);
+        return false;
+    }
+
+    bool changed = registry->total_versions != previous_total;
+
+    if (changed) {
+        registry_sort_entries(registry);
+        if (!registry_dat_write(registry, registry_path)) {
+            log_error("Failed to write updated registry.dat with local-dev package");
+            registry_free(registry);
+            return false;
+        }
+        log_debug("Registered %s/%s %s in registry.dat", author, name, version);
+    } else {
+        log_debug("Package %s/%s %s already present in registry.dat", author, name, version);
+    }
+
+    registry_free(registry);
+    return true;
+}
+
+static bool register_local_dev_v2_text_registry(InstallEnv *env, const char *author, const char *name,
+                                                const char *version, const char *source_elm_json_path) {
+    (void)env;
+
+    GlobalContext *ctx = global_context_get();
+    if (!ctx || !ctx->repository_path) {
+        log_error("V2 mode but no repository path available");
+        return false;
+    }
+
+    size_t path_len = strlen(ctx->repository_path) + strlen("/") + strlen(REGISTRY_LOCAL_DEV_DAT) + 1;
+    char *reg_path = arena_malloc(path_len);
+    if (!reg_path) return false;
+    snprintf(reg_path, path_len, "%s/%s", ctx->repository_path, REGISTRY_LOCAL_DEV_DAT);
+
+    ElmJson *pkg_json = elm_json_read(source_elm_json_path);
+    if (!pkg_json) {
+        log_error("Failed to read local package elm.json: %s", source_elm_json_path);
+        arena_free(reg_path);
+        return false;
+    }
+
+    char *existing_content = file_read_contents(reg_path);
+    bool entry_exists = false;
+
+    if (existing_content) {
+        char search_pattern[256];
+        snprintf(search_pattern, sizeof(search_pattern), "package: %s/%s", author, name);
+        char *pkg_pos = strstr(existing_content, search_pattern);
+        if (pkg_pos) {
+            char version_pattern[64];
+            snprintf(version_pattern, sizeof(version_pattern), "version: %s", version);
+            char *next_pkg = strstr(pkg_pos + 1, "package: ");
+            if (next_pkg) {
+                size_t search_len = (size_t)(next_pkg - pkg_pos);
+                char *section = arena_malloc(search_len + 1);
+                if (section) {
+                    memcpy(section, pkg_pos, search_len);
+                    section[search_len] = '\0';
+                    entry_exists = strstr(section, version_pattern) != NULL;
+                    arena_free(section);
+                }
+            } else {
+                entry_exists = strstr(pkg_pos, version_pattern) != NULL;
+            }
+        }
+        arena_free(existing_content);
+    }
+
+    if (entry_exists) {
+        log_debug("Package %s/%s %s already in registry-local-dev.dat", author, name, version);
+        elm_json_free(pkg_json);
+        arena_free(reg_path);
+        return true;
+    }
+
+    FILE *f = fopen(reg_path, "a");
+    if (!f) {
+        log_error("Failed to open %s for appending", reg_path);
+        elm_json_free(pkg_json);
+        arena_free(reg_path);
+        return false;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    if (fsize == 0) {
+        fprintf(f, "format 2\n");
+        fprintf(f, "%s %s\n\n", ctx->compiler_name ? ctx->compiler_name : "elm",
+                ctx->compiler_version ? ctx->compiler_version : "0.19.1");
+    }
+
+    fprintf(f, "package: %s/%s\n", author, name);
+    fprintf(f, "    version: %s\n", version);
+    fprintf(f, "    status: valid\n");
+    fprintf(f, "    license: BSD-3-Clause\n");
+    fprintf(f, "    dependencies:\n");
+
+    if (pkg_json->package_dependencies && pkg_json->package_dependencies->count > 0) {
+        for (int i = 0; i < pkg_json->package_dependencies->count; i++) {
+            Package *dep = &pkg_json->package_dependencies->packages[i];
+            fprintf(f, "        %s/%s  %s\n", dep->author, dep->name,
+                    dep->version ? dep->version : "1.0.0 <= v < 2.0.0");
+        }
+    }
+    fprintf(f, "\n");
+
+    fclose(f);
+    log_debug("Registered %s/%s %s in registry-local-dev.dat (V2)", author, name, version);
+
+    elm_json_free(pkg_json);
+    arena_free(reg_path);
+    return true;
+}
+
+/**
+ * Register the local-dev package so solvers can discover it.
+ * Updates the V2-local text registry when applicable and always
+ * appends the package into the canonical V1 registry.dat.
+ */
+static bool register_in_local_dev_registry(InstallEnv *env, const char *author, const char *name,
+                                           const char *version, const char *source_elm_json_path) {
+    bool v2_result = true;
+    if (env->protocol_mode == PROTOCOL_V2) {
+        v2_result = register_local_dev_v2_text_registry(env, author, name, version, source_elm_json_path);
+    }
+
+    bool registry_dat_result = ensure_local_dev_in_registry_dat(env, author, name, version);
+    return v2_result && registry_dat_result;
+}
+
+/**
+ * Check if the current directory is a package being tracked for local-dev.
+ * Returns the package info if found, NULL otherwise.
+ */
+static bool find_local_dev_package_info(const char *package_elm_json_path,
+                                        char **out_author, char **out_name, char **out_version) {
+    /* Read the package's elm.json to get author/name */
+    ElmJson *pkg_json = elm_json_read(package_elm_json_path);
+    if (!pkg_json || pkg_json->type != ELM_PROJECT_PACKAGE) {
+        if (pkg_json) elm_json_free(pkg_json);
+        return false;
+    }
+
+    if (!pkg_json->package_name) {
+        elm_json_free(pkg_json);
+        return false;
+    }
+
+    char *author = NULL;
+    char *name = NULL;
+    if (!parse_package_name(pkg_json->package_name, &author, &name)) {
+        elm_json_free(pkg_json);
+        return false;
+    }
+    elm_json_free(pkg_json);
+
+    /* Check if this package is being tracked */
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        arena_free(author);
+        arena_free(name);
+        return false;
+    }
+
+    /* Look for tracking_dir/author/name/ */
+    size_t pkg_track_len = strlen(tracking_dir) + strlen(author) + strlen(name) + 3;
+    char *pkg_track_dir = arena_malloc(pkg_track_len);
+    if (!pkg_track_dir) {
+        arena_free(tracking_dir);
+        arena_free(author);
+        arena_free(name);
+        return false;
+    }
+    snprintf(pkg_track_dir, pkg_track_len, "%s/%s/%s", tracking_dir, author, name);
+    arena_free(tracking_dir);
+
+    struct stat st;
+    if (stat(pkg_track_dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        arena_free(pkg_track_dir);
+        arena_free(author);
+        arena_free(name);
+        return false;
+    }
+
+    /* Find the version directory (there should be one) */
+    DIR *dir = opendir(pkg_track_dir);
+    if (!dir) {
+        arena_free(pkg_track_dir);
+        arena_free(author);
+        arena_free(name);
+        return false;
+    }
+
+    char *version = NULL;
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+        version = arena_strdup(entry->d_name);
+        break;
+    }
+    closedir(dir);
+    arena_free(pkg_track_dir);
+
+    if (!version) {
+        arena_free(author);
+        arena_free(name);
+        return false;
+    }
+
+    *out_author = author;
+    *out_name = name;
+    *out_version = version;
+    return true;
+}
+
+/**
+ * Get list of dependent application elm.json paths for a local-dev package.
+ */
+static char **get_dependent_app_paths(const char *author, const char *name, const char *version,
+                                      int *out_count) {
+    *out_count = 0;
+
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        return NULL;
+    }
+
+    /* Build path: tracking_dir/author/name/version */
+    size_t dir_len = strlen(tracking_dir) + strlen(author) + strlen(name) + strlen(version) + 4;
+    char *version_dir = arena_malloc(dir_len);
+    if (!version_dir) {
+        arena_free(tracking_dir);
+        return NULL;
+    }
+    snprintf(version_dir, dir_len, "%s/%s/%s/%s", tracking_dir, author, name, version);
+    arena_free(tracking_dir);
+
+    DIR *dir = opendir(version_dir);
+    if (!dir) {
+        arena_free(version_dir);
+        return NULL;
+    }
+
+    /* Count entries first */
+    int capacity = 16;
+    int count = 0;
+    char **paths = arena_malloc(capacity * sizeof(char *));
+    if (!paths) {
+        closedir(dir);
+        arena_free(version_dir);
+        return NULL;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+
+        /* Read the tracking file to get the app elm.json path */
+        size_t file_len = strlen(version_dir) + strlen(entry->d_name) + 2;
+        char *tracking_file = arena_malloc(file_len);
+        if (!tracking_file) continue;
+        snprintf(tracking_file, file_len, "%s/%s", version_dir, entry->d_name);
+
+        char *content = file_read_contents(tracking_file);
+        arena_free(tracking_file);
+        if (!content) continue;
+
+        /* Strip trailing newline */
+        size_t content_len = strlen(content);
+        if (content_len > 0 && content[content_len - 1] == '\n') {
+            content[content_len - 1] = '\0';
+        }
+
+        /* Check if the elm.json still exists */
+        struct stat st;
+        if (stat(content, &st) != 0) {
+            arena_free(content);
+            continue;
+        }
+
+        /* Add to list */
+        if (count >= capacity) {
+            capacity *= 2;
+            paths = arena_realloc(paths, capacity * sizeof(char *));
+            if (!paths) {
+                arena_free(content);
+                break;
+            }
+        }
+        paths[count++] = content;
+    }
+
+    closedir(dir);
+    arena_free(version_dir);
+
+    *out_count = count;
+    return paths;
+}
+
+/**
+ * Refresh indirect dependencies for an application that depends on a local-dev package.
+ * 
+ * Since local-dev packages are not in the registry, we can't use the solver to look them up.
+ * Instead, we read the local package's elm.json directly and resolve its dependencies
+ * one by one (which ARE in the registry).
+ */
+static bool refresh_app_indirect_deps(const char *app_elm_json_path, InstallEnv *env,
+                                      const char *pkg_author, const char *pkg_name,
+                                      const char *local_pkg_elm_json_path) {
+    log_debug("Refreshing indirect dependencies for: %s", app_elm_json_path);
+
+    /* Read the application's elm.json */
+    ElmJson *app_json = elm_json_read(app_elm_json_path);
+    if (!app_json) {
+        log_error("Failed to read application elm.json: %s", app_elm_json_path);
+        return false;
+    }
+
+    if (app_json->type != ELM_PROJECT_APPLICATION) {
+        log_debug("Skipping non-application project: %s", app_elm_json_path);
+        elm_json_free(app_json);
+        return true;
+    }
+
+    /* Read the local package's elm.json to get its dependencies */
+    ElmJson *pkg_json = elm_json_read(local_pkg_elm_json_path);
+    if (!pkg_json) {
+        log_error("Failed to read local package elm.json: %s", local_pkg_elm_json_path);
+        elm_json_free(app_json);
+        return false;
+    }
+
+    if (pkg_json->type != ELM_PROJECT_PACKAGE) {
+        log_error("Local-dev path is not a package project: %s", local_pkg_elm_json_path);
+        elm_json_free(pkg_json);
+        elm_json_free(app_json);
+        return false;
+    }
+
+    /* Resolve each dependency of the local package */
+    bool changed = false;
+    bool resolution_failed = false;
+
+    if (pkg_json->package_dependencies && pkg_json->package_dependencies->count > 0) {
+        for (int i = 0; i < pkg_json->package_dependencies->count && !resolution_failed; i++) {
+            Package *dep = &pkg_json->package_dependencies->packages[i];
+
+            /* Skip if already present in the app (direct or indirect) */
+            bool already_present = 
+                package_map_find(app_json->dependencies_direct, dep->author, dep->name) != NULL ||
+                package_map_find(app_json->dependencies_indirect, dep->author, dep->name) != NULL ||
+                package_map_find(app_json->dependencies_test_direct, dep->author, dep->name) != NULL ||
+                package_map_find(app_json->dependencies_test_indirect, dep->author, dep->name) != NULL;
+            
+            if (already_present) {
+                log_debug("Dependency %s/%s already present in app", dep->author, dep->name);
+                continue;
+            }
+
+            /* Check if package exists in registry */
+            bool found_in_registry = false;
+            if (env->protocol_mode == PROTOCOL_V2 && env->v2_registry) {
+                found_in_registry = v2_registry_find(env->v2_registry, dep->author, dep->name) != NULL;
+            } else if (env->registry) {
+                found_in_registry = registry_find(env->registry, dep->author, dep->name) != NULL;
+            }
+
+            if (!found_in_registry) {
+                log_error("Dependency %s/%s is not in the registry", dep->author, dep->name);
+                log_error("This dependency is required by local package %s/%s", pkg_author, pkg_name);
+                resolution_failed = true;
+                break;
+            }
+
+            /* Use solver to resolve this dependency */
+            SolverState *solver = solver_init(env, true);
+            if (!solver) {
+                log_error("Failed to initialize solver for %s/%s", dep->author, dep->name);
+                resolution_failed = true;
+                break;
+            }
+
+            InstallPlan *dep_plan = NULL;
+            SolverResult result = solver_add_package(solver, app_json, dep->author, dep->name, false, false, &dep_plan);
+            solver_free(solver);
+
+            if (result != SOLVER_OK) {
+                log_error("Failed to resolve dependency %s/%s", dep->author, dep->name);
+                if (dep_plan) install_plan_free(dep_plan);
+                resolution_failed = true;
+                break;
+            }
+
+            /* Apply resolved dependencies to app_json */
+            if (dep_plan) {
+                for (int j = 0; j < dep_plan->count; j++) {
+                    PackageChange *change = &dep_plan->changes[j];
+
+                    /* Skip if already a direct dependency */
+                    if (package_map_find(app_json->dependencies_direct, change->author, change->name) ||
+                        package_map_find(app_json->dependencies_test_direct, change->author, change->name)) {
+                        continue;
+                    }
+
+                    /* Check if this is a new or updated indirect dependency */
+                    Package *existing = package_map_find(app_json->dependencies_indirect, change->author, change->name);
+                    if (!existing) {
+                        existing = package_map_find(app_json->dependencies_test_indirect, change->author, change->name);
+                    }
+
+                    if (!existing) {
+                        /* New indirect dependency */
+                        package_map_add(app_json->dependencies_indirect, change->author, change->name, change->new_version);
+                        changed = true;
+                        log_debug("Added indirect dependency: %s/%s %s", change->author, change->name, change->new_version);
+                    } else if (change->new_version && strcmp(existing->version, change->new_version) != 0) {
+                        /* Update existing indirect dependency version */
+                        arena_free(existing->version);
+                        existing->version = arena_strdup(change->new_version);
+                        changed = true;
+                        log_debug("Updated indirect dependency: %s/%s %s", change->author, change->name, change->new_version);
+                    }
+                }
+                install_plan_free(dep_plan);
+            }
+        }
+    }
+
+    elm_json_free(pkg_json);
+
+    if (resolution_failed) {
+        elm_json_free(app_json);
+        return false;
+    }
+
+    if (changed) {
+        if (!elm_json_write(app_json, app_elm_json_path)) {
+            log_error("Failed to write updated elm.json: %s", app_elm_json_path);
+            elm_json_free(app_json);
+            return false;
+        }
+        printf("Updated indirect dependencies in: %s\n", app_elm_json_path);
+    }
+
+    elm_json_free(app_json);
+    return true;
+}
+
+int refresh_local_dev_dependents(InstallEnv *env) {
+    /* Check if we're in a package directory that's being tracked */
+    char *author = NULL;
+    char *name = NULL;
+    char *version = NULL;
+
+    if (!find_local_dev_package_info("elm.json", &author, &name, &version)) {
+        /* Not a tracked local-dev package, nothing to do */
+        return 0;
+    }
+
+    log_debug("Found local-dev package: %s/%s %s", author, name, version);
+
+    /* Get all dependent applications */
+    int dep_count = 0;
+    char **dep_paths = get_dependent_app_paths(author, name, version, &dep_count);
+
+    if (dep_count == 0) {
+        log_debug("No dependent applications to refresh");
+        arena_free(author);
+        arena_free(name);
+        arena_free(version);
+        return 0;
+    }
+
+    printf("Refreshing %d dependent application(s)...\n", dep_count);
+
+    int failed = 0;
+    for (int i = 0; i < dep_count; i++) {
+        /* We're in the local package directory, so elm.json is right here */
+        if (!refresh_app_indirect_deps(dep_paths[i], env, author, name, "elm.json")) {
+            log_error("Failed to refresh: %s", dep_paths[i]);
+            failed++;
+        }
+        arena_free(dep_paths[i]);
+    }
+    arena_free(dep_paths);
+
+    arena_free(author);
+    arena_free(name);
+    arena_free(version);
+
+    return failed > 0 ? 1 : 0;
+}
+
+int register_local_dev_package(const char *source_path, const char *package_name,
+                               InstallEnv *env, bool auto_yes) {
+    struct stat st;
+    char resolved_source[PATH_MAX];
+
+    /* Resolve source path to absolute path */
+    if (!realpath(source_path, resolved_source)) {
+        log_error("Failed to resolve source path: %s", source_path);
+        return 1;
+    }
+
+    /* Verify source is a directory */
+    if (stat(resolved_source, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        log_error("Source path is not a directory: %s", resolved_source);
+        return 1;
+    }
+
+    /* Check for elm.json in source directory */
+    char source_elm_json[PATH_MAX];
+    snprintf(source_elm_json, sizeof(source_elm_json), "%s/elm.json", resolved_source);
+    if (stat(source_elm_json, &st) != 0) {
+        log_error("No elm.json found in source directory: %s", resolved_source);
+        return 1;
+    }
+
+    /* Read package info from source elm.json */
+    char *actual_author = NULL;
+    char *actual_name = NULL;
+    char *actual_version = NULL;
+    if (!read_package_info_from_elm_json(source_elm_json, &actual_author, &actual_name, &actual_version)) {
+        log_error("Failed to read package info from: %s", source_elm_json);
+        return 1;
+    }
+
+    /* Verify this is actually a package (not an application) */
+    ElmJson *pkg_json = elm_json_read(source_elm_json);
+    if (!pkg_json) {
+        log_error("Failed to read elm.json: %s", source_elm_json);
+        arena_free(actual_author);
+        arena_free(actual_name);
+        arena_free(actual_version);
+        return 1;
+    }
+
+    if (pkg_json->type != ELM_PROJECT_PACKAGE) {
+        log_error("Source is not a package project: %s", resolved_source);
+        elm_json_free(pkg_json);
+        arena_free(actual_author);
+        arena_free(actual_name);
+        arena_free(actual_version);
+        return 1;
+    }
+    elm_json_free(pkg_json);
+
+    /* If package_name specified, verify it matches */
+    if (package_name) {
+        char *spec_author = NULL;
+        char *spec_name = NULL;
+        if (!parse_package_name(package_name, &spec_author, &spec_name)) {
+            arena_free(actual_author);
+            arena_free(actual_name);
+            arena_free(actual_version);
+            return 1;
+        }
+
+        if (strcmp(spec_author, actual_author) != 0 || strcmp(spec_name, actual_name) != 0) {
+            log_error("Package name mismatch: specified %s/%s but elm.json has %s/%s",
+                      spec_author, spec_name, actual_author, actual_name);
+            arena_free(spec_author);
+            arena_free(spec_name);
+            arena_free(actual_author);
+            arena_free(actual_name);
+            arena_free(actual_version);
+            return 1;
+        }
+        arena_free(spec_author);
+        arena_free(spec_name);
+    }
+
+    /* Determine version to use */
+    const char *version = get_local_dev_version(env, actual_author, actual_name);
+    log_debug("Using local-dev version: %s (package %s in registry)",
+              version, strcmp(version, LOCAL_DEV_VERSION_EXISTS) == 0 ? "exists" : "not found");
+
+    /* Show plan */
+    printf("Here is my plan:\n");
+    printf("  \n");
+    printf("  Register (local-dev):\n");
+    printf("    %s/%s    %s (local)\n", actual_author, actual_name, version);
+    printf("  \n");
+    printf("  Source: %s\n", resolved_source);
+    printf("  \n");
+    printf("Note: This only registers the package in the cache.\n");
+    printf("To use it in an application, run from the application directory:\n");
+    printf("    wrap package install --local-dev --from-path %s\n", resolved_source);
+    printf("  \n");
+
+    if (!auto_yes) {
+        printf("\nWould you like me to proceed? [Y/n]: ");
+        fflush(stdout);
+
+        char response[10];
+        if (!fgets(response, sizeof(response), stdin) ||
+            (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n')) {
+            printf("Aborted.\n");
+            arena_free(actual_author);
+            arena_free(actual_name);
+            arena_free(actual_version);
+            return 0;
+        }
+    }
+
+    /* Create symlink in ELM_HOME */
+    if (!create_package_symlink(env, resolved_source, actual_author, actual_name, version)) {
+        log_error("Failed to register the package in the package cache");
+        arena_free(actual_author);
+        arena_free(actual_name);
+        arena_free(actual_version);
+        return 1;
+    }
+
+    /* Register in registry-local-dev.dat so the solver can find this package */
+    if (!register_in_local_dev_registry(env, actual_author, actual_name, version, source_elm_json)) {
+        log_error("Warning: Failed to register in local-dev registry");
+        /* Continue anyway - the symlink was created successfully */
+    }
+
+    printf("Successfully registered %s/%s %s (local)!\n", actual_author, actual_name, version);
+
+    arena_free(actual_author);
+    arena_free(actual_name);
+    arena_free(actual_version);
+
+    return 0;
+}
+
+int install_local_dev(const char *source_path, const char *package_name,
+                      const char *target_elm_json, InstallEnv *env,
+                      bool is_test, bool auto_yes) {
+    struct stat st;
+    char resolved_source[PATH_MAX];
+
+    /* Resolve source path to absolute path */
+    if (!realpath(source_path, resolved_source)) {
+        log_error("Failed to resolve source path: %s", source_path);
+        return 1;
+    }
+
+    /* Verify source is a directory */
+    if (stat(resolved_source, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        log_error("Source path is not a directory: %s", resolved_source);
+        return 1;
+    }
+
+    /* Check for elm.json in source directory */
+    char source_elm_json[PATH_MAX];
+    snprintf(source_elm_json, sizeof(source_elm_json), "%s/elm.json", resolved_source);
+    if (stat(source_elm_json, &st) != 0) {
+        log_error("No elm.json found in source directory: %s", resolved_source);
+        return 1;
+    }
+
+    /* Read package info from source elm.json */
+    char *actual_author = NULL;
+    char *actual_name = NULL;
+    char *actual_version = NULL;
+    if (!read_package_info_from_elm_json(source_elm_json, &actual_author, &actual_name, &actual_version)) {
+        log_error("Failed to read package info from: %s", source_elm_json);
+        return 1;
+    }
+
+    /* If package_name specified, verify it matches */
+    if (package_name) {
+        char *spec_author = NULL;
+        char *spec_name = NULL;
+        if (!parse_package_name(package_name, &spec_author, &spec_name)) {
+            arena_free(actual_author);
+            arena_free(actual_name);
+            arena_free(actual_version);
+            return 1;
+        }
+
+        if (strcmp(spec_author, actual_author) != 0 || strcmp(spec_name, actual_name) != 0) {
+            log_error("Package name mismatch: specified %s/%s but elm.json has %s/%s",
+                      spec_author, spec_name, actual_author, actual_name);
+            arena_free(spec_author);
+            arena_free(spec_name);
+            arena_free(actual_author);
+            arena_free(actual_name);
+            arena_free(actual_version);
+            return 1;
+        }
+        arena_free(spec_author);
+        arena_free(spec_name);
+    }
+
+    /* Determine version to use */
+    const char *version = get_local_dev_version(env, actual_author, actual_name);
+    log_debug("Using local-dev version: %s (package %s in registry)",
+              version, strcmp(version, LOCAL_DEV_VERSION_EXISTS) == 0 ? "exists" : "not found");
+
+    /* Read target application's elm.json */
+    ElmJson *app_json = elm_json_read(target_elm_json);
+    if (!app_json) {
+        log_error("Failed to read target elm.json: %s", target_elm_json);
+        arena_free(actual_author);
+        arena_free(actual_name);
+        arena_free(actual_version);
+        return 1;
+    }
+
+    /* Check if package already exists */
+    Package *existing = find_existing_package(app_json, actual_author, actual_name);
+    bool is_update = (existing != NULL);
+
+    /* 
+     * PHASE 1: Resolve all transitive dependencies BEFORE showing the plan.
+     * This lets us show a complete install plan and fail early if deps can't resolve.
+     */
+    
+    /* Read the local package's elm.json to get its dependencies */
+    ElmJson *pkg_json = elm_json_read(source_elm_json);
+    if (!pkg_json) {
+        log_error("Failed to read local package elm.json: %s", source_elm_json);
+        elm_json_free(app_json);
+        arena_free(actual_author);
+        arena_free(actual_name);
+        arena_free(actual_version);
+        return 1;
+    }
+    
+    if (pkg_json->type != ELM_PROJECT_PACKAGE) {
+        log_error("Local path is not a package project");
+        elm_json_free(pkg_json);
+        elm_json_free(app_json);
+        arena_free(actual_author);
+        arena_free(actual_name);
+        arena_free(actual_version);
+        return 1;
+    }
+    
+    /* Collect all install plan changes for display */
+    int plan_capacity = 32;
+    int plan_count = 0;
+    PackageChange *plan_changes = arena_malloc(plan_capacity * sizeof(PackageChange));
+    if (!plan_changes) {
+        log_error("Out of memory");
+        elm_json_free(pkg_json);
+        elm_json_free(app_json);
+        arena_free(actual_author);
+        arena_free(actual_name);
+        arena_free(actual_version);
+        return 1;
+    }
+    
+    /* Process each dependency of the local package to build the install plan */
+    bool resolution_failed = false;
+    if (pkg_json->package_dependencies && pkg_json->package_dependencies->count > 0) {
+        log_progress("Resolving dependencies from local package...");
+        
+        for (int i = 0; i < pkg_json->package_dependencies->count; i++) {
+            Package *dep = &pkg_json->package_dependencies->packages[i];
+            
+            /* Check if this dependency is already in the app */
+            bool already_present = false;
+            if (app_json->type == ELM_PROJECT_APPLICATION) {
+                already_present = 
+                    package_map_find(app_json->dependencies_direct, dep->author, dep->name) != NULL ||
+                    package_map_find(app_json->dependencies_indirect, dep->author, dep->name) != NULL ||
+                    package_map_find(app_json->dependencies_test_direct, dep->author, dep->name) != NULL ||
+                    package_map_find(app_json->dependencies_test_indirect, dep->author, dep->name) != NULL;
+            }
+            
+            if (already_present) {
+                log_debug("Dependency %s/%s already present in app", dep->author, dep->name);
+                continue;
+            }
+            
+            /* Check if package exists in registry at all */
+            bool found_in_registry = false;
+            if (env->protocol_mode == PROTOCOL_V2 && env->v2_registry) {
+                found_in_registry = v2_registry_find(env->v2_registry, dep->author, dep->name) != NULL;
+            } else if (env->registry) {
+                found_in_registry = registry_find(env->registry, dep->author, dep->name) != NULL;
+            }
+            
+            if (!found_in_registry) {
+                log_error("Dependency %s/%s is not in the registry", dep->author, dep->name);
+                log_error("This dependency is required by local package %s/%s", actual_author, actual_name);
+                log_error("You may need to install it with --local-dev first");
+                resolution_failed = true;
+                break;
+            }
+            
+            /* Use solver to resolve this dependency */
+            SolverState *solver = solver_init(env, true);
+            if (!solver) {
+                log_error("Failed to initialize solver for %s/%s", dep->author, dep->name);
+                resolution_failed = true;
+                break;
+            }
+            
+            InstallPlan *dep_plan = NULL;
+            SolverResult result = solver_add_package(solver, app_json, dep->author, dep->name, is_test, false, &dep_plan);
+            solver_free(solver);
+            
+            if (result != SOLVER_OK) {
+                log_error("Failed to resolve dependency %s/%s (constraint: %s)", 
+                          dep->author, dep->name, dep->version ? dep->version : "any");
+                log_error("This dependency is required by local package %s/%s", actual_author, actual_name);
+                if (dep_plan) install_plan_free(dep_plan);
+                resolution_failed = true;
+                break;
+            }
+            
+            /* Add resolved dependencies to our plan and to app_json (for subsequent solver calls) */
+            if (dep_plan && app_json->type == ELM_PROJECT_APPLICATION) {
+                for (int j = 0; j < dep_plan->count; j++) {
+                    PackageChange *change = &dep_plan->changes[j];
+                    
+                    /* Check if already in direct deps (don't demote to indirect) */
+                    if (package_map_find(app_json->dependencies_direct, change->author, change->name) ||
+                        package_map_find(app_json->dependencies_test_direct, change->author, change->name)) {
+                        continue;
+                    }
+                    
+                    /* Check if already in plan */
+                    bool in_plan = false;
+                    for (int k = 0; k < plan_count; k++) {
+                        if (strcmp(plan_changes[k].author, change->author) == 0 &&
+                            strcmp(plan_changes[k].name, change->name) == 0) {
+                            in_plan = true;
+                            break;
+                        }
+                    }
+                    if (in_plan) continue;
+                    
+                    /* Add to install plan for display */
+                    if (plan_count >= plan_capacity) {
+                        plan_capacity *= 2;
+                        plan_changes = arena_realloc(plan_changes, plan_capacity * sizeof(PackageChange));
+                    }
+                    plan_changes[plan_count].author = arena_strdup(change->author);
+                    plan_changes[plan_count].name = arena_strdup(change->name);
+                    plan_changes[plan_count].old_version = change->old_version ? arena_strdup(change->old_version) : NULL;
+                    plan_changes[plan_count].new_version = arena_strdup(change->new_version);
+                    plan_count++;
+                    
+                    /* Add or update in app_json indirect deps (for subsequent solver calls) */
+                    Package *exist = package_map_find(app_json->dependencies_indirect, change->author, change->name);
+                    if (!exist) {
+                        exist = package_map_find(app_json->dependencies_test_indirect, change->author, change->name);
+                    }
+                    
+                    if (exist) {
+                        if (strcmp(exist->version, change->new_version) != 0) {
+                            arena_free(exist->version);
+                            exist->version = arena_strdup(change->new_version);
+                        }
+                    } else {
+                        PackageMap *indirect_map = is_test ? app_json->dependencies_test_indirect : app_json->dependencies_indirect;
+                        package_map_add(indirect_map, change->author, change->name, change->new_version);
+                    }
+                }
+            }
+            
+            if (dep_plan) install_plan_free(dep_plan);
+        }
+    }
+    
+    elm_json_free(pkg_json);
+    
+    if (resolution_failed) {
+        elm_json_free(app_json);
+        arena_free(actual_author);
+        arena_free(actual_name);
+        arena_free(actual_version);
+        arena_free(plan_changes);
+        return 1;
+    }
+    
+    /* 
+     * PHASE 2: Show complete plan and ask for confirmation
+     */
+    printf("Here is my plan:\n");
+    printf("  \n");
+    if (is_update) {
+        printf("  Change (local):\n");
+        printf("    %s/%s    %s => %s (local)\n", actual_author, actual_name, existing->version, version);
+    } else {
+        printf("  Add (local):\n");
+        printf("    %s/%s    %s (local)\n", actual_author, actual_name, version);
+    }
+    
+    if (plan_count > 0) {
+        printf("  \n");
+        printf("  Add (indirect dependencies):\n");
+        for (int i = 0; i < plan_count; i++) {
+            if (plan_changes[i].old_version) {
+                printf("    %s/%s    %s => %s\n", 
+                       plan_changes[i].author, plan_changes[i].name,
+                       plan_changes[i].old_version, plan_changes[i].new_version);
+            } else {
+                printf("    %s/%s    %s\n", 
+                       plan_changes[i].author, plan_changes[i].name,
+                       plan_changes[i].new_version);
+            }
+        }
+    }
+    
+    printf("  \n");
+    printf("  Source: %s\n", resolved_source);
+    printf("  \n");
+
+    if (!auto_yes) {
+        printf("\nWould you like me to proceed? [Y/n]: ");
+        fflush(stdout);
+
+        char response[10];
+        if (!fgets(response, sizeof(response), stdin) ||
+            (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n')) {
+            printf("Aborted.\n");
+            elm_json_free(app_json);
+            arena_free(actual_author);
+            arena_free(actual_name);
+            arena_free(actual_version);
+            arena_free(plan_changes);
+            return 0;
+        }
+    }
+
+    /*
+     * PHASE 3: Apply the changes
+     */
+    
+    /* Create symlink in ELM_HOME */
+    if (!create_package_symlink(env, resolved_source, actual_author, actual_name, version)) {
+        log_error("Failed to register the package in the package cache.");
+        elm_json_free(app_json);
+        arena_free(actual_author);
+        arena_free(actual_name);
+        arena_free(actual_version);
+        arena_free(plan_changes);
+        return 1;
+    }
+
+    /* Register in registry-local-dev.dat so the solver can find this package */
+    if (!register_in_local_dev_registry(env, actual_author, actual_name, version, source_elm_json)) {
+        log_error("Warning: Failed to register in local-dev registry");
+        /* Continue anyway - the symlink was created successfully */
+    }
+
+    /* Add the local-dev package to elm.json */
+    if (is_update) {
+        arena_free(existing->version);
+        existing->version = arena_strdup(version);
+    } else {
+        PackageMap *target_map = NULL;
+        if (app_json->type == ELM_PROJECT_APPLICATION) {
+            target_map = is_test ? app_json->dependencies_test_direct : app_json->dependencies_direct;
+        } else {
+            target_map = is_test ? app_json->package_test_dependencies : app_json->package_dependencies;
+        }
+
+        if (target_map) {
+            package_map_add(target_map, actual_author, actual_name, version);
+        }
+    }
+
+    /* Write updated elm.json */
+    printf("Saving elm.json...\n");
+    if (!elm_json_write(app_json, target_elm_json)) {
+        log_error("Failed to write elm.json");
+        elm_json_free(app_json);
+        arena_free(actual_author);
+        arena_free(actual_name);
+        arena_free(actual_version);
+        arena_free(plan_changes);
+        return 1;
+    }
+
+    /* Register in dependency tracking */
+    if (!register_dependency_tracking(actual_author, actual_name, version, target_elm_json)) {
+        log_error("Warning: Failed to register dependency tracking");
+        /* Continue anyway - the install succeeded */
+    }
+
+    printf("Successfully installed %s/%s %s (local)!\n", actual_author, actual_name, version);
+
+    elm_json_free(app_json);
+    arena_free(actual_author);
+    arena_free(actual_name);
+    arena_free(actual_version);
+    arena_free(plan_changes);
+
+    return 0;
+}

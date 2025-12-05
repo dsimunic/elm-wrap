@@ -51,4 +51,19 @@ int rulr_insert_fact_2s(Rulr *r, const char *pred, const char *s1, const char *s
  */
 int rulr_insert_fact_3s(Rulr *r, const char *pred, const char *s1, const char *s2, const char *s3);
 
+/**
+ * Insert a fact with four symbol arguments.
+ *
+ * If the predicate doesn't exist, it will be registered automatically.
+ *
+ * @param r Rulr instance
+ * @param pred Predicate name
+ * @param s1 First symbol value
+ * @param s2 Second symbol value
+ * @param s3 Third symbol value
+ * @param s4 Fourth symbol value
+ * @return Fact ID on success, -1 on failure
+ */
+int rulr_insert_fact_4s(Rulr *r, const char *pred, const char *s1, const char *s2, const char *s3, const char *s4);
+
 #endif /* RULR_HOST_HELPERS_H */

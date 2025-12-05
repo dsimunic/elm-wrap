@@ -79,6 +79,24 @@ char* version_to_string(const Version *v) {
     return str;
 }
 
+/* Compare two registry entries by author/name alphabetically */
+static int registry_entry_compare(const void *a, const void *b) {
+    const RegistryEntry *entry_a = (const RegistryEntry *)a;
+    const RegistryEntry *entry_b = (const RegistryEntry *)b;
+
+    int author_cmp = strcmp(entry_a->author, entry_b->author);
+    if (author_cmp != 0) return author_cmp;
+
+    return strcmp(entry_a->name, entry_b->name);
+}
+
+/* Sort registry entries alphabetically by package name */
+void registry_sort_entries(Registry *registry) {
+    if (!registry || registry->entry_count <= 1) return;
+
+    qsort(registry->entries, registry->entry_count, sizeof(RegistryEntry), registry_entry_compare);
+}
+
 /* Registry lifecycle */
 Registry* registry_create(void) {
     Registry *registry = arena_calloc(1, sizeof(Registry));
@@ -297,6 +315,9 @@ Registry* registry_load_from_dat(const char *path, size_t *known_count) {
         registry->entries[registry->entry_count].version_count = total_version_count;
         registry->entry_count++;
     }
+
+    /* Ensure entries are sorted */
+    registry_sort_entries(registry);
 
     fclose(f);
     return registry;
@@ -594,5 +615,65 @@ void registry_print(const Registry *registry) {
     if (registry->entry_count > 10) {
         printf("  ... and %zu more packages\n", registry->entry_count - 10);
     }
+}
+
+/* Merge local-dev registry into main registry */
+bool registry_merge_local_dev(Registry *registry, const char *local_dev_path) {
+    if (!registry || !local_dev_path) {
+        return false;
+    }
+    
+    /* Try to load local-dev registry */
+    Registry *local_dev = registry_load_from_dat(local_dev_path, NULL);
+    if (!local_dev) {
+        /* File doesn't exist or couldn't be read - that's fine */
+        return true;
+    }
+    
+    /* Merge each entry */
+    for (size_t i = 0; i < local_dev->entry_count; i++) {
+        RegistryEntry *local_entry = &local_dev->entries[i];
+        
+        /* Find or create entry in main registry */
+        RegistryEntry *main_entry = registry_find(registry, local_entry->author, local_entry->name);
+        
+        if (!main_entry) {
+            /* Add new entry */
+            if (!registry_add_entry(registry, local_entry->author, local_entry->name)) {
+                registry_free(local_dev);
+                return false;
+            }
+            main_entry = registry_find(registry, local_entry->author, local_entry->name);
+        }
+        
+        if (!main_entry) {
+            registry_free(local_dev);
+            return false;
+        }
+        
+        /* Add versions that don't exist */
+        for (size_t j = 0; j < local_entry->version_count; j++) {
+            Version *v = &local_entry->versions[j];
+            
+            /* Check if version exists */
+            bool exists = false;
+            for (size_t k = 0; k < main_entry->version_count; k++) {
+                if (main_entry->versions[k].major == v->major &&
+                    main_entry->versions[k].minor == v->minor &&
+                    main_entry->versions[k].patch == v->patch) {
+                    exists = true;
+                    break;
+                }
+            }
+            
+            if (!exists) {
+                registry_add_version(registry, local_entry->author, local_entry->name, *v);
+            }
+        }
+    }
+    
+    registry_sort_entries(registry);
+    registry_free(local_dev);
+    return true;
 }
 

@@ -1,0 +1,16 @@
+.pred direct_dependency(author: symbol, package: symbol).
+.pred indirect_dependency(author: symbol, package: symbol).
+.pred package_dependency(from_author: symbol, from_package: symbol, to_author: symbol, to_package: symbol).
+.pred reachable(author: symbol, package: symbol).
+.pred orphaned(author: symbol, package: symbol).
+
+reachable(Author, Package) :-
+    direct_dependency(Author, Package).
+
+reachable(ToAuthor, ToPackage) :-
+    reachable(FromAuthor, FromPackage),
+    package_dependency(FromAuthor, FromPackage, ToAuthor, ToPackage).
+
+orphaned(Author, Package) :-
+    indirect_dependency(Author, Package),
+    not reachable(Author, Package).

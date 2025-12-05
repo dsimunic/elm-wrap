@@ -64,6 +64,8 @@ RULR_CFLAGS = $(CFLAGS) -Isrc -Isrc/rulr
 BUILTIN_RULES_DIR = rulr/rules
 BUILTIN_RULES_ZIP = $(BUILDDIR)/builtin_rules.zip
 BUILTIN_RULES_DLC = $(BUILDDIR)/builtin_rules
+EMBEDDED_ARCHIVE_DIR = $(BUILDDIR)/embedded_archive
+TEMPLATES_DIR = templates
 
 # Rulr compiler (rulrc)
 RULRC = $(BINDIR)/rulrc
@@ -76,7 +78,10 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/alloc.c \
           $(SRCDIR)/log.c \
           $(SRCDIR)/progname.c \
+          $(SRCDIR)/embedded_archive.c \
           $(SRCDIR)/commands/wrappers/init.c \
+          $(SRCDIR)/commands/wrappers/init_v1.c \
+          $(SRCDIR)/commands/wrappers/init_v2.c \
           $(SRCDIR)/commands/wrappers/make.c \
           $(SRCDIR)/commands/wrappers/repl.c \
           $(SRCDIR)/commands/wrappers/reactor.c \
@@ -104,13 +109,19 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/review/reporter.c \
           $(SRCDIR)/commands/package/package_common.c \
           $(SRCDIR)/commands/package/install_cmd.c \
+          $(SRCDIR)/commands/package/install_local_dev.c \
+          $(SRCDIR)/commands/package/init_cmd.c \
           $(SRCDIR)/commands/package/cache_cmd.c \
           $(SRCDIR)/commands/package/remove_cmd.c \
           $(SRCDIR)/commands/package/info_cmd.c \
           $(SRCDIR)/commands/package/upgrade_cmd.c \
+          $(SRCDIR)/commands/application/application.c \
+          $(SRCDIR)/commands/application/init.c \
+          $(SRCDIR)/commands/application/info.c \
           $(SRCDIR)/commands/debug/debug.c \
           $(SRCDIR)/commands/debug/include_tree.c \
           $(SRCDIR)/commands/debug/install_plan.c \
+          $(SRCDIR)/commands/debug/registry_v1.c \
           $(SRCDIR)/commands/repository/repository.c \
           $(SRCDIR)/import_tree.c \
           $(SRCDIR)/commands/cache/check/cache_check.c \
@@ -155,7 +166,10 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/alloc.o \
           $(BUILDDIR)/log.o \
           $(BUILDDIR)/progname.o \
+          $(BUILDDIR)/embedded_archive.o \
           $(BUILDDIR)/init.o \
+          $(BUILDDIR)/init_v1.o \
+          $(BUILDDIR)/init_v2.o \
           $(BUILDDIR)/make.o \
           $(BUILDDIR)/repl.o \
           $(BUILDDIR)/reactor.o \
@@ -183,13 +197,19 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/reporter.o \
           $(BUILDDIR)/package_common.o \
           $(BUILDDIR)/install_cmd.o \
+          $(BUILDDIR)/install_local_dev.o \
+          $(BUILDDIR)/init_cmd.o \
           $(BUILDDIR)/cache_cmd.o \
           $(BUILDDIR)/remove_cmd.o \
           $(BUILDDIR)/info_cmd.o \
           $(BUILDDIR)/upgrade_cmd.o \
+          $(BUILDDIR)/application.o \
+          $(BUILDDIR)/app_init.o \
+          $(BUILDDIR)/app_info.o \
           $(BUILDDIR)/debug.o \
           $(BUILDDIR)/include_tree.o \
           $(BUILDDIR)/install_plan.o \
+          $(BUILDDIR)/registry_v1.o \
           $(BUILDDIR)/repository.o \
           $(BUILDDIR)/import_tree.o \
           $(BUILDDIR)/cache_check.o \
@@ -289,7 +309,13 @@ compile-builtin-rules: $(RULRC)
 append-builtin-rules: $(TARGET) compile-builtin-rules
 	@echo "Creating built-in rules archive..."
 	@rm -f $(BUILTIN_RULES_ZIP)
-	@cd $(BUILTIN_RULES_DLC) && zip -q ../builtin_rules.zip *.dlc 2>/dev/null || true
+	@rm -rf $(EMBEDDED_ARCHIVE_DIR)
+	@mkdir -p $(EMBEDDED_ARCHIVE_DIR)
+	@cp $(BUILTIN_RULES_DLC)/*.dlc $(EMBEDDED_ARCHIVE_DIR) 2>/dev/null || true
+	@if [ -d $(TEMPLATES_DIR) ]; then \
+		rsync -a $(TEMPLATES_DIR) $(EMBEDDED_ARCHIVE_DIR)/; \
+	fi
+	@cd $(EMBEDDED_ARCHIVE_DIR) && { find . -mindepth 1 -print | sed 's|^./||'; } | zip -q ../builtin_rules.zip -@ 2>/dev/null || true
 	@if [ -f $(BUILTIN_RULES_ZIP) ]; then \
 		echo "Appending rules to binary..."; \
 		cat $(BUILTIN_RULES_ZIP) >> $(TARGET); \
@@ -325,8 +351,20 @@ $(BUILDDIR)/log.o: $(SRCDIR)/log.c $(SRCDIR)/log.h | $(BUILDDIR)
 $(BUILDDIR)/progname.o: $(SRCDIR)/progname.c $(SRCDIR)/progname.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Build embedded_archive object
+$(BUILDDIR)/embedded_archive.o: $(SRCDIR)/embedded_archive.c $(SRCDIR)/embedded_archive.h $(SRCDIR)/alloc.h $(SRCDIR)/vendor/miniz.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # Build init object
-$(BUILDDIR)/init.o: $(SRCDIR)/commands/wrappers/init.c $(SRCDIR)/commands/wrappers/init.h $(SRCDIR)/install_env.h | $(BUILDDIR)
+$(BUILDDIR)/init.o: $(SRCDIR)/commands/wrappers/init.c $(SRCDIR)/commands/wrappers/init.h $(SRCDIR)/commands/wrappers/init_v1.h $(SRCDIR)/commands/wrappers/init_v2.h $(SRCDIR)/install_env.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build init_v1 object
+$(BUILDDIR)/init_v1.o: $(SRCDIR)/commands/wrappers/init_v1.c $(SRCDIR)/commands/wrappers/init_v1.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/pgsolver/pg_elm.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build init_v2 object
+$(BUILDDIR)/init_v2.o: $(SRCDIR)/commands/wrappers/init_v2.c $(SRCDIR)/commands/wrappers/init_v2.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/protocol_v2/solver/pg_elm_v2.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build make object
@@ -429,6 +467,16 @@ $(BUILDDIR)/reporter.o: $(SRCDIR)/commands/review/reporter.c $(SRCDIR)/commands/
 $(BUILDDIR)/debug.o: $(SRCDIR)/commands/debug/debug.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Build application command objects
+$(BUILDDIR)/application.o: $(SRCDIR)/commands/application/application.c $(SRCDIR)/commands/application/application.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/app_init.o: $(SRCDIR)/commands/application/init.c $(SRCDIR)/commands/application/application.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h $(SRCDIR)/commands/wrappers/init_v1.h $(SRCDIR)/commands/wrappers/init_v2.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/app_info.o: $(SRCDIR)/commands/application/info.c $(SRCDIR)/commands/application/application.h $(SRCDIR)/install.h $(SRCDIR)/progname.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # Build policy command object
 $(BUILDDIR)/policy.o: $(SRCDIR)/commands/policy/policy.c $(SRCDIR)/commands/policy/policy.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/rulr/rulr_dl.h $(SRCDIR)/rulr/frontend/ast.h $(SRCDIR)/rulr/frontend/ast_serialize.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
@@ -439,6 +487,10 @@ $(BUILDDIR)/include_tree.o: $(SRCDIR)/commands/debug/include_tree.c $(SRCDIR)/co
 
 # Build install_plan command object
 $(BUILDDIR)/install_plan.o: $(SRCDIR)/commands/debug/install_plan.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/log.h $(SRCDIR)/solver.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/fileutil.h $(SRCDIR)/global_context.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build registry_v1 command object
+$(BUILDDIR)/registry_v1.o: $(SRCDIR)/commands/debug/registry_v1.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/progname.h $(SRCDIR)/log.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/commands/package/package_common.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build import_tree shared library object
@@ -470,14 +522,20 @@ $(BUILDDIR)/ts_elm_scanner.o: $(SRCDIR)/commands/publish/docs/vendor/tree-sitter
 $(BUILDDIR)/package_common.o: $(SRCDIR)/commands/package/package_common.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/alloc.h $(SRCDIR)/cache.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/install_cmd.o: $(SRCDIR)/commands/package/install_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/http_client.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+$(BUILDDIR)/install_cmd.o: $(SRCDIR)/commands/package/install_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/http_client.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/install_local_dev.o: $(SRCDIR)/commands/package/install_local_dev.c $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/env_defaults.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/init_cmd.o: $(SRCDIR)/commands/package/init_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install_env.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h $(SRCDIR)/embedded_archive.h $(SRCDIR)/fileutil.h $(SRCDIR)/vendor/cJSON.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILDDIR)/cache_cmd.o: $(SRCDIR)/commands/package/cache_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/http_client.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h $(SRCDIR)/fileutil.h $(SRCDIR)/commands/cache/check/cache_check.h $(SRCDIR)/commands/cache/full_scan/cache_full_scan.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/remove_cmd.o: $(SRCDIR)/commands/package/remove_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/solver.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILDDIR)/remove_cmd.o: $(SRCDIR)/commands/package/remove_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/solver.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h $(SRCDIR)/rulr/rulr.h $(SRCDIR)/rulr/rulr_dl.h $(SRCDIR)/rulr/host_helpers.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
 
 $(BUILDDIR)/info_cmd.o: $(SRCDIR)/commands/package/info_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/install_check.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/protocol_v2/install.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/progname.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -611,7 +669,7 @@ $(BUILDDIR)/global_context.o: $(SRCDIR)/global_context.c $(SRCDIR)/global_contex
 
 # Build repository object
 $(BUILDDIR)/repository.o: $(SRCDIR)/commands/repository/repository.c $(SRCDIR)/commands/repository/repository.h $(SRCDIR)/env_defaults.h $(SRCDIR)/elm_compiler.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
 
 # Build sha1 object
 $(BUILDDIR)/sha1.o: $(SRCDIR)/vendor/sha1.c $(SRCDIR)/vendor/sha1.h | $(BUILDDIR)

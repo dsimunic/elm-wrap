@@ -12,6 +12,9 @@ int cmd_cache(int argc, char *argv[]);
 /* Remove command entry point */
 int cmd_remove(int argc, char *argv[]);
 
+/* Package init command entry point */
+int cmd_package_init(int argc, char *argv[]);
+
 /* Info command entry point */
 int cmd_info(int argc, char *argv[]);
 

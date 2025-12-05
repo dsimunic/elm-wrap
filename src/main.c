@@ -20,6 +20,7 @@
 #include "commands/debug/debug.h"
 #include "commands/policy/policy.h"
 #include "commands/review/review.h"
+#include "commands/application/application.h"
 #include "commands/publish/package/package_publish.h"
 #include "commands/publish/docs/docs.h"
 #include "commands/repository/repository.h"
@@ -28,6 +29,7 @@
 #include "progname.h"
 #include "rulr/builtin_rules.h"
 #include "global_context.h"
+#include "embedded_archive.h"
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
@@ -85,6 +87,7 @@ void print_usage(const char *prog) {
 
     printf("\n");
     printf("  config             Display current configuration\n");
+    printf("  application SUBCOMMAND Application management commands\n");
     printf("  package SUBCOMMAND Package management commands\n");
     printf("  repository SUBCOMMAND Repository management commands\n");
     printf("  code SUBCOMMAND    Code analysis and transformation commands\n");
@@ -104,6 +107,7 @@ void print_package_usage(const char *prog) {
     printf("Usage: %s package SUBCOMMAND [OPTIONS]\n", prog);
     printf("\nSubcommands:\n");
     printf("  install [PACKAGE]              Add a dependency to current elm.json\n");
+    printf("  init author/name               Initialize a package from embedded templates\n");
     printf("  upgrade [PACKAGE]              Upgrade packages to latest versions\n");
     printf("  remove   PACKAGE               Remove a package from elm.json\n");
     printf("  info    [ PATH                 Display package information and upgrades\n");
@@ -111,7 +115,7 @@ void print_package_usage(const char *prog) {
     printf("          ]\n");
     printf("  publish PATH                   Show files that would be published from a package\n");
     printf("  docs    PATH                   Generate documentation JSON for a package\n");
-    printf("  cache   [PACKAGE]              Download package to ELM_HOME without adding it to elm.json\n");
+    printf("  cache   PACKAGE                Download package to ELM_HOME without adding it to elm.json\n");
     printf("\nOptions:\n");
     printf("  -y, --yes            Automatically confirm changes\n");
     printf("  -v, --verbose        Show detailed logging output\n");
@@ -135,6 +139,10 @@ int cmd_package(int argc, char *argv[], const char *prog) {
     if (strcmp(subcmd, "install") == 0) {
         // Pass remaining args to install command
         return cmd_install(argc - 1, argv + 1);
+    }
+
+    if (strcmp(subcmd, "init") == 0) {
+        return cmd_package_init(argc - 1, argv + 1);
     }
 
     if (strcmp(subcmd, "cache") == 0) {
@@ -206,8 +214,19 @@ int main(int argc, char *argv[]) {
             got_exe_path = true;
         }
 #endif
+
+        if (!got_exe_path) {
+            char *resolved = realpath(argv[0], NULL);
+            if (resolved) {
+                strncpy(exe_path, resolved, sizeof(exe_path) - 1);
+                exe_path[sizeof(exe_path) - 1] = '\0';
+                free(resolved);
+                got_exe_path = true;
+            }
+        }
         
         if (got_exe_path) {
+            embedded_archive_init(exe_path);
             builtin_rules_init(exe_path);
         }
     }
@@ -291,6 +310,10 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "package") == 0) {
             return cmd_package(argc - 1, argv + 1, program_name);
+        }
+
+        if (strcmp(argv[1], "application") == 0 || strcmp(argv[1], "app") == 0) {
+            return cmd_application(argc - 1, argv + 1);
         }
 
         if (strcmp(argv[1], "bump") == 0) {

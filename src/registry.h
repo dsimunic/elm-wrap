@@ -59,6 +59,12 @@ bool registry_resolve_constraint(Registry *registry, const char *author, const c
 /* Check if a version string is a constraint (contains "<=" or "<") vs exact version */
 bool registry_is_version_constraint(const char *version_str);
 
+/* Merge local-dev registry into main registry */
+bool registry_merge_local_dev(Registry *registry, const char *local_dev_path);
+
+/* Sort registry entries alphabetically by package name */
+void registry_sort_entries(Registry *registry);
+
 /* Utility */
 void registry_print(const Registry *registry);
 

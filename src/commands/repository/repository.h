@@ -7,6 +7,7 @@
  * Commands:
  *   repository new [<root_path>] [--compiler <name>] [--version <version>]
  *   repository list [<root_path>]
+ *   repository local-dev [clear ...]
  */
 
 /* Main entry point for the 'repository' command group */
@@ -17,5 +18,8 @@ int cmd_repository_new(int argc, char *argv[]);
 
 /* Subcommand: list - list repositories at path */
 int cmd_repository_list(int argc, char *argv[]);
+
+/* Subcommand: local-dev - manage local development tracking */
+int cmd_repository_local_dev(int argc, char *argv[]);
 
 #endif /* REPOSITORY_H */

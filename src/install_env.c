@@ -5,6 +5,7 @@
 #include "log.h"
 #include "fileutil.h"
 #include "global_context.h"
+#include "registry.h"
 #include "protocol_v1/package_fetch.h"
 #include "protocol_v2/solver/v2_registry.h"
 #include <stdlib.h>
@@ -80,6 +81,9 @@ static bool parse_all_packages_json(const char *json_str, Registry *registry) {
 
         arena_free(author);
     }
+
+    /* Ensure registry is sorted */
+    registry_sort_entries(registry);
 
     cJSON_Delete(json);
     return true;
@@ -205,6 +209,18 @@ bool install_env_init(InstallEnv *env) {
             return false;
         }
 
+        /* Merge local-dev registry if it exists */
+        size_t local_dev_path_len = strlen(ctx->repository_path) + strlen("/registry-local-dev.dat") + 1;
+        char *local_dev_path = arena_malloc(local_dev_path_len);
+        if (local_dev_path) {
+            snprintf(local_dev_path, local_dev_path_len, "%s/registry-local-dev.dat", ctx->repository_path);
+            if (!v2_registry_merge_local_dev(env->v2_registry, local_dev_path)) {
+                log_progress("Warning: Failed to merge local-dev registry");
+                /* Continue anyway - main registry is loaded */
+            }
+            arena_free(local_dev_path);
+        }
+
         log_progress("V2 registry loaded successfully");
 
         /* V2 mode is always "online" since registry is local */
@@ -245,6 +261,26 @@ bool install_env_init(InstallEnv *env) {
         if (env->registry) {
             log_progress("Loaded cached registry: %zu packages, %zu versions",
                    env->registry->entry_count, env->registry->total_versions);
+            
+            /* Merge local-dev registry if it exists */
+            /* Build path for registry-local-dev.dat next to registry.dat */
+            char *reg_dir = arena_strdup(env->cache->registry_path);
+            if (reg_dir) {
+                char *last_slash = strrchr(reg_dir, '/');
+                if (last_slash) {
+                    *last_slash = '\0';
+                    size_t local_dev_path_len = strlen(reg_dir) + strlen("/registry-local-dev.dat") + 1;
+                    char *local_dev_path = arena_malloc(local_dev_path_len);
+                    if (local_dev_path) {
+                        snprintf(local_dev_path, local_dev_path_len, "%s/registry-local-dev.dat", reg_dir);
+                        if (!registry_merge_local_dev(env->registry, local_dev_path)) {
+                            log_progress("Warning: Failed to merge local-dev registry");
+                        }
+                        arena_free(local_dev_path);
+                    }
+                }
+                arena_free(reg_dir);
+            }
         } else {
             log_progress("No cached registry found, will fetch from network");
             env->registry = registry_create();
@@ -333,6 +369,7 @@ bool install_env_fetch_registry(InstallEnv *env) {
     printf("Registry loaded: %zu packages, %zu versions\n",
            env->registry->entry_count, env->registry->total_versions);
 
+    registry_sort_entries(env->registry);
     if (!registry_dat_write(env->registry, env->cache->registry_path)) {
         fprintf(stderr, "Warning: Failed to cache registry to %s\n", env->cache->registry_path);
     } else {
@@ -381,6 +418,7 @@ bool install_env_update_registry(InstallEnv *env) {
     if (new_total > env->known_version_count) {
         log_progress("Registry updated: %zu new version(s)", new_total - env->known_version_count);
 
+        registry_sort_entries(env->registry);
         if (!registry_dat_write(env->registry, env->cache->registry_path)) {
             fprintf(stderr, "Warning: Failed to cache updated registry\n");
         } else {

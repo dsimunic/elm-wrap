@@ -101,6 +101,20 @@ V2Registry *v2_registry_parse(const char *data, size_t size);
 void v2_registry_free(V2Registry *registry);
 
 /**
+ * Add a version to a package entry (with dynamic expansion).
+ * Used internally and by the local-dev registry merge.
+ */
+V2PackageVersion *v2_package_add_version(V2PackageEntry *entry);
+
+/**
+ * Add a dependency to a version (with dynamic expansion).
+ * Used internally and by the local-dev registry merge.
+ */
+bool v2_version_add_dependency(V2PackageVersion *version, 
+                               const char *package_name, 
+                               const char *constraint);
+
+/**
  * Find a package entry in the V2 registry.
  *
  * @param registry The registry to search
@@ -124,5 +138,15 @@ V2PackageEntry *v2_registry_find(V2Registry *registry, const char *author, const
 V2PackageVersion *v2_registry_find_version(V2Registry *registry,
                                            const char *author, const char *name,
                                            uint16_t major, uint16_t minor, uint16_t patch);
+
+/**
+ * Merge entries from a local-dev registry file into the main registry.
+ * The local-dev file is in the same text format as the main index.
+ * 
+ * @param registry The main registry to merge into
+ * @param local_dev_path Path to the registry-local-dev.dat file
+ * @return true on success (or if file doesn't exist), false on error
+ */
+bool v2_registry_merge_local_dev(V2Registry *registry, const char *local_dev_path);
 
 #endif /* PROTOCOL_V2_SOLVER_V2_REGISTRY_H */

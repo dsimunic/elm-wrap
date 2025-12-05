@@ -263,7 +263,7 @@ static V2PackageEntry *v2_registry_add_entry(V2Registry *registry, const char *a
 /**
  * Add a version to a package entry (with dynamic expansion).
  */
-static V2PackageVersion *v2_package_add_version(V2PackageEntry *entry) {
+V2PackageVersion *v2_package_add_version(V2PackageEntry *entry) {
     /* Calculate current capacity based on allocation size */
     if (entry->versions == NULL) {
         entry->versions = arena_malloc(INITIAL_VERSION_CAPACITY * sizeof(V2PackageVersion));
@@ -301,7 +301,7 @@ static V2PackageVersion *v2_package_add_version(V2PackageEntry *entry) {
 /**
  * Add a dependency to a version (with dynamic expansion).
  */
-static bool v2_version_add_dependency(V2PackageVersion *version, 
+bool v2_version_add_dependency(V2PackageVersion *version, 
                                        const char *package_name, 
                                        const char *constraint) {
     if (version->dependencies == NULL) {
@@ -649,4 +649,105 @@ V2PackageVersion *v2_registry_find_version(V2Registry *registry,
     }
     
     return NULL;
+}
+
+bool v2_registry_merge_local_dev(V2Registry *registry, const char *local_dev_path) {
+    if (!registry || !local_dev_path) {
+        return false;
+    }
+    
+    /* Check if file exists */
+    FILE *f = fopen(local_dev_path, "r");
+    if (!f) {
+        /* File doesn't exist - that's fine, just return success */
+        log_debug("No local-dev registry at %s", local_dev_path);
+        return true;
+    }
+    fclose(f);
+    
+    /* Parse the local-dev registry file */
+    V2Registry *local_dev = v2_registry_load_from_text(local_dev_path);
+    if (!local_dev) {
+        log_error("Failed to parse local-dev registry: %s", local_dev_path);
+        return false;
+    }
+    
+    log_debug("Merging %zu local-dev packages into main registry", local_dev->entry_count);
+    
+    /* Merge each entry from local-dev into main registry */
+    for (size_t i = 0; i < local_dev->entry_count; i++) {
+        V2PackageEntry *local_entry = &local_dev->entries[i];
+        
+        /* Find or create entry in main registry */
+        V2PackageEntry *main_entry = v2_registry_find(registry, local_entry->author, local_entry->name);
+        
+        if (!main_entry) {
+            /* Create new entry in main registry */
+            if (registry->entry_count >= registry->entry_capacity) {
+                size_t new_capacity = registry->entry_capacity * 2;
+                V2PackageEntry *new_entries = arena_realloc(registry->entries, 
+                                                             new_capacity * sizeof(V2PackageEntry));
+                if (!new_entries) {
+                    v2_registry_free(local_dev);
+                    return false;
+                }
+                registry->entries = new_entries;
+                registry->entry_capacity = new_capacity;
+            }
+            
+            main_entry = &registry->entries[registry->entry_count];
+            memset(main_entry, 0, sizeof(V2PackageEntry));
+            main_entry->author = arena_strdup(local_entry->author);
+            main_entry->name = arena_strdup(local_entry->name);
+            registry->entry_count++;
+            
+            log_debug("Added new local-dev package: %s/%s", local_entry->author, local_entry->name);
+        }
+        
+        /* Merge versions from local-dev into main entry */
+        for (size_t j = 0; j < local_entry->version_count; j++) {
+            V2PackageVersion *local_ver = &local_entry->versions[j];
+            
+            /* Check if version already exists */
+            bool exists = false;
+            for (size_t k = 0; k < main_entry->version_count; k++) {
+                V2PackageVersion *main_ver = &main_entry->versions[k];
+                if (main_ver->major == local_ver->major &&
+                    main_ver->minor == local_ver->minor &&
+                    main_ver->patch == local_ver->patch) {
+                    exists = true;
+                    break;
+                }
+            }
+            
+            if (!exists) {
+                /* Add version to main entry */
+                V2PackageVersion *new_ver = v2_package_add_version(main_entry);
+                if (!new_ver) {
+                    v2_registry_free(local_dev);
+                    return false;
+                }
+                
+                new_ver->major = local_ver->major;
+                new_ver->minor = local_ver->minor;
+                new_ver->patch = local_ver->patch;
+                new_ver->status = local_ver->status;
+                new_ver->license = local_ver->license ? arena_strdup(local_ver->license) : NULL;
+                
+                /* Copy dependencies */
+                for (size_t k = 0; k < local_ver->dependency_count; k++) {
+                    v2_version_add_dependency(new_ver, 
+                                              local_ver->dependencies[k].package_name,
+                                              local_ver->dependencies[k].constraint);
+                }
+                
+                log_debug("Added local-dev version: %s/%s %u.%u.%u", 
+                          local_entry->author, local_entry->name,
+                          local_ver->major, local_ver->minor, local_ver->patch);
+            }
+        }
+    }
+    
+    v2_registry_free(local_dev);
+    return true;
 }

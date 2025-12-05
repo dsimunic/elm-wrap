@@ -1,0 +1,7 @@
+.pred tracked_connection(author: symbol, package: symbol, version: symbol, app_path: symbol).
+.pred app_dependency(app_path: symbol, author: symbol, package: symbol).
+.pred stale_connection(author: symbol, package: symbol, version: symbol, app_path: symbol).
+
+stale_connection(Author, Package, Version, AppPath) :-
+    tracked_connection(Author, Package, Version, AppPath),
+    not app_dependency(AppPath, Author, Package).
