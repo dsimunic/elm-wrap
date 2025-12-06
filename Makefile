@@ -125,9 +125,9 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/import_tree.c \
           $(SRCDIR)/commands/cache/check/cache_check.c \
           $(SRCDIR)/commands/cache/full_scan/cache_full_scan.c \
-          $(SRCDIR)/commands/publish/docs/vendor/tree-sitter/lib.c \
-          $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/parser.c \
-          $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/scanner.c \
+          $(SRCDIR)/vendor/tree-sitter/lib.c \
+          $(SRCDIR)/vendor/tree-sitter-elm/parser.c \
+          $(SRCDIR)/vendor/tree-sitter-elm/scanner.c \
           $(SRCDIR)/install_check.c \
           $(SRCDIR)/elm_json.c \
           $(SRCDIR)/elm_compiler.c \
@@ -400,31 +400,31 @@ $(BUILDDIR)/docs.o: $(SRCDIR)/commands/publish/docs/docs.c $(SRCDIR)/commands/pu
 
 # Build elm_docs object
 $(BUILDDIR)/elm_docs.o: $(SRCDIR)/commands/publish/docs/elm_docs.c $(SRCDIR)/commands/publish/docs/elm_docs.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/commands/publish/docs/type_maps.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/commands/publish/docs/comment_extract.h $(SRCDIR)/commands/publish/docs/type_qualify.h $(SRCDIR)/commands/publish/docs/module_parse.h $(SRCDIR)/commands/publish/docs/decl_extract.h $(SRCDIR)/commands/publish/docs/docs_json.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build type_maps object
 $(BUILDDIR)/type_maps.o: $(SRCDIR)/commands/publish/docs/type_maps.c $(SRCDIR)/commands/publish/docs/type_maps.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build tree_util object
 $(BUILDDIR)/tree_util.o: $(SRCDIR)/commands/publish/docs/tree_util.c $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build comment_extract object
 $(BUILDDIR)/comment_extract.o: $(SRCDIR)/commands/publish/docs/comment_extract.c $(SRCDIR)/commands/publish/docs/comment_extract.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build type_qualify object
 $(BUILDDIR)/type_qualify.o: $(SRCDIR)/commands/publish/docs/type_qualify.c $(SRCDIR)/commands/publish/docs/type_qualify.h $(SRCDIR)/commands/publish/docs/type_maps.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build module_parse object
 $(BUILDDIR)/module_parse.o: $(SRCDIR)/commands/publish/docs/module_parse.c $(SRCDIR)/commands/publish/docs/module_parse.h $(SRCDIR)/commands/publish/docs/type_maps.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build decl_extract object
 $(BUILDDIR)/decl_extract.o: $(SRCDIR)/commands/publish/docs/decl_extract.c $(SRCDIR)/commands/publish/docs/decl_extract.h $(SRCDIR)/commands/publish/docs/type_maps.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/commands/publish/docs/type_qualify.h $(SRCDIR)/commands/publish/docs/comment_extract.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build docs_json object
 $(BUILDDIR)/docs_json.o: $(SRCDIR)/commands/publish/docs/docs_json.c $(SRCDIR)/commands/publish/docs/docs_json.h $(SRCDIR)/commands/publish/docs/elm_docs.h | $(BUILDDIR)
@@ -432,7 +432,7 @@ $(BUILDDIR)/docs_json.o: $(SRCDIR)/commands/publish/docs/docs_json.c $(SRCDIR)/c
 
 # Build dependency_cache object
 $(BUILDDIR)/dependency_cache.o: $(SRCDIR)/commands/publish/docs/dependency_cache.c $(SRCDIR)/commands/publish/docs/dependency_cache.h $(SRCDIR)/commands/publish/docs/path_util.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build path_util object
 $(BUILDDIR)/path_util.o: $(SRCDIR)/commands/publish/docs/path_util.c $(SRCDIR)/commands/publish/docs/path_util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
@@ -440,7 +440,7 @@ $(BUILDDIR)/path_util.o: $(SRCDIR)/commands/publish/docs/path_util.c $(SRCDIR)/c
 
 # Build package_publish command object
 $(BUILDDIR)/package_publish.o: $(SRCDIR)/commands/publish/package/package_publish.c $(SRCDIR)/commands/publish/package/package_publish.h $(SRCDIR)/alloc.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/dyn_array.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/rulr/rulr.h $(SRCDIR)/rulr/rulr_dl.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -I$(SRCDIR)/rulr -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -I$(SRCDIR)/rulr -c $< -o $@
 
 # Build code command object
 $(BUILDDIR)/code.o: $(SRCDIR)/commands/code/code.c $(SRCDIR)/commands/code/code.h $(SRCDIR)/alloc.h | $(BUILDDIR)
@@ -448,11 +448,11 @@ $(BUILDDIR)/code.o: $(SRCDIR)/commands/code/code.c $(SRCDIR)/commands/code/code.
 
 # Build format command object
 $(BUILDDIR)/format.o: $(SRCDIR)/commands/code/format.c $(SRCDIR)/commands/code/code.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build review command object
 $(BUILDDIR)/review.o: $(SRCDIR)/commands/review/review.c $(SRCDIR)/commands/review/review.h $(SRCDIR)/commands/review/reporter.h $(SRCDIR)/alloc.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/rulr/rulr.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -I$(SRCDIR)/rulr -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -I$(SRCDIR)/rulr -c $< -o $@
 
 # Build reporter object for review command
 $(BUILDDIR)/reporter.o: $(SRCDIR)/commands/review/reporter.c $(SRCDIR)/commands/review/reporter.h $(SRCDIR)/alloc.h $(SRCDIR)/rulr/rulr.h $(SRCDIR)/rulr/runtime/runtime.h | $(BUILDDIR)
@@ -478,7 +478,7 @@ $(BUILDDIR)/policy.o: $(SRCDIR)/commands/policy/policy.c $(SRCDIR)/commands/poli
 
 # Build include_tree command object
 $(BUILDDIR)/include_tree.o: $(SRCDIR)/commands/debug/include_tree.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/dyn_array.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/import_tree.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build install_plan command object
 $(BUILDDIR)/install_plan.o: $(SRCDIR)/commands/debug/install_plan.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/solver.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/fileutil.h $(SRCDIR)/global_context.h | $(BUILDDIR)
@@ -490,28 +490,28 @@ $(BUILDDIR)/registry_v1.o: $(SRCDIR)/commands/debug/registry_v1.c $(SRCDIR)/comm
 
 # Build import_tree shared library object
 $(BUILDDIR)/import_tree.o: $(SRCDIR)/import_tree.c $(SRCDIR)/import_tree.h $(SRCDIR)/alloc.h $(SRCDIR)/dyn_array.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/ast/skeleton.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build cache_check object
 $(BUILDDIR)/cache_check.o: $(SRCDIR)/commands/cache/check/cache_check.c $(SRCDIR)/commands/cache/check/cache_check.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/install_env.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/import_tree.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build cache_full_scan object
 $(BUILDDIR)/cache_full_scan.o: $(SRCDIR)/commands/cache/full_scan/cache_full_scan.c $(SRCDIR)/commands/cache/full_scan/cache_full_scan.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/install_env.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/import_tree.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build tree-sitter lib object
-$(BUILDDIR)/ts_lib.o: $(SRCDIR)/commands/publish/docs/vendor/tree-sitter/lib.c | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+$(BUILDDIR)/ts_lib.o: $(SRCDIR)/vendor/tree-sitter/lib.c | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build tree-sitter-elm parser object
-$(BUILDDIR)/ts_elm_parser.o: $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/parser.c | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+$(BUILDDIR)/ts_elm_parser.o: $(SRCDIR)/vendor/tree-sitter-elm/parser.c | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build tree-sitter-elm scanner object
-$(BUILDDIR)/ts_elm_scanner.o: $(SRCDIR)/commands/publish/docs/vendor/tree-sitter-elm/scanner.c | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+$(BUILDDIR)/ts_elm_scanner.o: $(SRCDIR)/vendor/tree-sitter-elm/scanner.c | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build package command objects
 $(BUILDDIR)/package_common.o: $(SRCDIR)/commands/package/package_common.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/alloc.h $(SRCDIR)/cache.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
@@ -572,19 +572,19 @@ $(BUILDDIR)/pg_elm.o: $(SRCDIR)/pgsolver/pg_elm.c $(SRCDIR)/pgsolver/pg_elm.h $(
 
 # Build AST skeleton object
 $(BUILDDIR)/ast_skeleton.o: $(SRCDIR)/ast/skeleton.c $(SRCDIR)/ast/skeleton.h $(SRCDIR)/ast/util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build AST qualify object
 $(BUILDDIR)/ast_qualify.o: $(SRCDIR)/ast/qualify.c $(SRCDIR)/ast/qualify.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/ast/util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build AST canonicalize object
 $(BUILDDIR)/ast_canonicalize.o: $(SRCDIR)/ast/canonicalize.c $(SRCDIR)/ast/canonicalize.h $(SRCDIR)/ast/util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build AST util object
 $(BUILDDIR)/ast_util.o: $(SRCDIR)/ast/util.c $(SRCDIR)/ast/util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/commands/publish/docs/vendor/tree-sitter -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build pg_core test object
 $(BUILDDIR)/pg_core_test.o: test/src/pg_core_test.c $(SRCDIR)/pgsolver/pg_core.h | $(BUILDDIR)

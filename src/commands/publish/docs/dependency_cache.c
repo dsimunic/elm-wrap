@@ -10,7 +10,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <dirent.h>
-#include <tree_sitter/api.h>
+#include "tree_sitter/api.h"
 
 /* External tree-sitter language function */
 extern TSLanguage *tree_sitter_elm(void);

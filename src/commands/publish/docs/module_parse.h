@@ -1,7 +1,7 @@
 #ifndef MODULE_PARSE_H
 #define MODULE_PARSE_H
 
-#include <tree_sitter/api.h>
+#include "tree_sitter/api.h"
 #include "type_maps.h"
 
 /* Helper function to extract module name and exports */

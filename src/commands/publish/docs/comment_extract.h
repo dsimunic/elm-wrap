@@ -1,7 +1,7 @@
 #ifndef COMMENT_EXTRACT_H
 #define COMMENT_EXTRACT_H
 
-#include <tree_sitter/api.h>
+#include "tree_sitter/api.h"
 
 /* Helper function to clean documentation comment
  * Removes {-| and -} markers and returns the inner content */

@@ -1,7 +1,7 @@
 #ifndef DECL_EXTRACT_H
 #define DECL_EXTRACT_H
 
-#include <tree_sitter/api.h>
+#include "tree_sitter/api.h"
 #include <stdbool.h>
 #include "elm_docs.h"
 #include "type_maps.h"

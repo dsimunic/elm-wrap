@@ -3,7 +3,7 @@
 #include "../../global_context.h"
 #include "../../alloc.h"
 #include "../../ast/canonicalize.h"
-#include <tree_sitter/api.h>
+#include "tree_sitter/api.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>

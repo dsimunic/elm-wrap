@@ -12,7 +12,7 @@
 #ifndef AST_CANONICALIZE_H
 #define AST_CANONICALIZE_H
 
-#include <tree_sitter/api.h>
+#include "tree_sitter/api.h"
 #include <stdbool.h>
 #include <stddef.h>
 

@@ -25,7 +25,7 @@
 #include "dependency_cache.h"
 #include "../../../alloc.h"
 
-#include <tree_sitter/api.h>
+#include "tree_sitter/api.h"
 #include <stdio.h>
 #include <string.h>
 

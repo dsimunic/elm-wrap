@@ -18,7 +18,7 @@
 #ifndef AST_SKELETON_H
 #define AST_SKELETON_H
 
-#include <tree_sitter/api.h>
+#include "tree_sitter/api.h"
 #include <stdbool.h>
 
 /* ============================================================================

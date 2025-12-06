@@ -7,7 +7,7 @@
 #ifndef AST_UTIL_H
 #define AST_UTIL_H
 
-#include <tree_sitter/api.h>
+#include "tree_sitter/api.h"
 #include <stddef.h>
 #include <stdbool.h>
 
