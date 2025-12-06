@@ -80,6 +80,7 @@ SolverResult solver_add_package(
     const char *name,
     bool is_test_dependency,
     bool major_upgrade,
+    bool upgrade_all,
     InstallPlan **out_plan
 );
 

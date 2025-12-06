@@ -14,6 +14,7 @@ SolverResult run_with_strategy_v1(
     const char *author,
     const char *name,
     bool is_test_dependency,
+    bool upgrade_all,
     SolverStrategy strategy,
     PackageMap *current_packages,
     InstallPlan **out_plan

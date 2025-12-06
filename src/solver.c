@@ -15,6 +15,7 @@ static SolverResult run_with_strategy(
     const char *author,
     const char *name,
     bool is_test_dependency,
+    bool upgrade_all,
     SolverStrategy strategy,
     PackageMap *current_packages,
     InstallPlan **out_plan
@@ -23,10 +24,10 @@ static SolverResult run_with_strategy(
     bool is_v2 = (state->install_env && state->install_env->protocol_mode == PROTOCOL_V2);
     if (is_v2) {
         return run_with_strategy_v2(state, elm_json, author, name, is_test_dependency,
-                                     strategy, current_packages, out_plan);
+                                     upgrade_all, strategy, current_packages, out_plan);
     } else {
         return run_with_strategy_v1(state, elm_json, author, name, is_test_dependency,
-                                     strategy, current_packages, out_plan);
+                                     upgrade_all, strategy, current_packages, out_plan);
     }
 }
 
@@ -38,6 +39,7 @@ SolverResult solver_add_package(
     const char *name,
     bool is_test_dependency,
     bool major_upgrade,
+    bool upgrade_all,
     InstallPlan **out_plan
 ) {
     if (!state || !elm_json || !author || !name || !out_plan) {
@@ -94,6 +96,7 @@ SolverResult solver_add_package(
             author,
             name,
             is_test_dependency,
+            upgrade_all,
             strategies[i],
             current_packages,
             out_plan

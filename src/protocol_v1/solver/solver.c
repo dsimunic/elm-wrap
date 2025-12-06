@@ -390,6 +390,7 @@ SolverResult run_with_strategy_v1(
     const char *author,
     const char *name,
     bool is_test_dependency,
+    bool upgrade_all,
     SolverStrategy strategy,
     PackageMap *current_packages,
     InstallPlan **out_plan
@@ -444,6 +445,9 @@ SolverResult run_with_strategy_v1(
                      author, name, target_pkg_id);
         }
 
+        /* Pin production deps when installing test deps (unless --upgrade-all) */
+        bool pin_prod = is_test_dependency && !upgrade_all;
+
         switch (strategy) {
             case STRATEGY_EXACT_ALL:
                 log_debug("Trying strategy: exact versions for all dependencies");
@@ -451,11 +455,11 @@ SolverResult run_with_strategy_v1(
                 break;
             case STRATEGY_EXACT_DIRECT_UPGRADABLE_INDIRECT:
                 log_debug("Trying strategy: exact direct, upgradable indirect dependencies");
-                root_ok = build_roots_strategy_exact_direct_app(pg_ctx, elm_json, include_prod, include_test, is_test_dependency);
+                root_ok = build_roots_strategy_exact_direct_app(pg_ctx, elm_json, include_prod, include_test, pin_prod);
                 break;
             case STRATEGY_UPGRADABLE_WITHIN_MAJOR:
                 log_debug("Trying strategy: upgradable within major version");
-                root_ok = build_roots_strategy_upgradable_app(pg_ctx, elm_json, include_prod, include_test, is_test_dependency);
+                root_ok = build_roots_strategy_upgradable_app(pg_ctx, elm_json, include_prod, include_test, pin_prod);
                 break;
             case STRATEGY_CROSS_MAJOR_FOR_TARGET:
                 log_debug("Trying strategy: cross-major upgrade for %s/%s", author, name);

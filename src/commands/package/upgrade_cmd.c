@@ -326,7 +326,7 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
                     package_map_find(elm_json->dependencies_test_indirect, author, name) != NULL ||
                     package_map_find(elm_json->package_test_dependencies, author, name) != NULL);
 
-    SolverResult result = solver_add_package(solver, elm_json, author, name, is_test, major_upgrade, &out_plan);
+    SolverResult result = solver_add_package(solver, elm_json, author, name, is_test, major_upgrade, false, &out_plan);
 
     solver_free(solver);
 

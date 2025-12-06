@@ -392,7 +392,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
                     if (solver) {
                         InstallPlan *dep_plan = NULL;
                         SolverResult result = solver_add_package(solver, app_json, dep->author, dep->name, 
-                                                                  is_test, false, &dep_plan);
+                                                                  is_test, false, false, &dep_plan);
                         
                         if (result == SOLVER_OK) {
                             printf("    Resolution: OK\n");
@@ -522,7 +522,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
 
     // Run solver to get install plan
     InstallPlan *plan = NULL;
-    SolverResult result = solver_add_package(solver, elm_json, author, name, is_test, major_upgrade, &plan);
+    SolverResult result = solver_add_package(solver, elm_json, author, name, is_test, major_upgrade, false, &plan);
 
     if (result != SOLVER_OK) {
         /* If V2, try to spell out obvious pinned-version conflicts for the target package */

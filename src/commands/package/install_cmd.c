@@ -115,6 +115,7 @@ static void print_install_usage(void) {
     printf("\n");
     printf("Options:\n");
     printf("  --test                             # Install as test dependency\n");
+    printf("  --upgrade-all                      # Allow upgrading production deps (with --test)\n");
     printf("  --major PACKAGE                    # Allow major version upgrade for package\n");
     printf("  --from-file PATH PACKAGE           # Install from local file/directory\n");
     printf("  --from-url URL PACKAGE             # Install from URL (skips V1 installer SHA check)\n");
@@ -148,7 +149,7 @@ static bool create_pin_file(const char *pkg_path, const char *version) {
     return true;
 }
 
-static int install_package(const char *package, bool is_test, bool major_upgrade, bool auto_yes, ElmJson *elm_json, InstallEnv *env) {
+static int install_package(const char *package, bool is_test, bool major_upgrade, bool upgrade_all, bool auto_yes, ElmJson *elm_json, InstallEnv *env) {
     char *author = NULL;
     char *name = NULL;
 
@@ -321,7 +322,7 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
     }
 
     InstallPlan *out_plan = NULL;
-    SolverResult result = solver_add_package(solver, elm_json, author, name, is_test, major_upgrade, &out_plan);
+    SolverResult result = solver_add_package(solver, elm_json, author, name, is_test, major_upgrade, upgrade_all, &out_plan);
 
     solver_free(solver);
 
@@ -331,6 +332,20 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
         switch (result) {
             case SOLVER_NO_SOLUTION:
                 log_error("No compatible version found for %s/%s", author, name);
+                if (is_test && !upgrade_all) {
+                    fprintf(stderr, "\n");
+                    fprintf(stderr, "When installing a test dependency, production dependencies are pinned\n");
+                    fprintf(stderr, "to their current versions. The package %s/%s may require newer\n", author, name);
+                    fprintf(stderr, "versions of packages you already have in your production dependencies.\n");
+                    fprintf(stderr, "\n");
+                    fprintf(stderr, "To see what versions %s/%s requires, run:\n", author, name);
+                    fprintf(stderr, "    %s package info %s/%s\n", global_context_program_name(), author, name);
+                    fprintf(stderr, "\n");
+                    fprintf(stderr, "If there's a version conflict, you can either:\n");
+                    fprintf(stderr, "  1. Use --upgrade-all to allow upgrading production dependencies\n");
+                    fprintf(stderr, "  2. Upgrade the conflicting production dependency first\n");
+                    fprintf(stderr, "  3. Use a different version or alternative package for testing\n");
+                }
                 break;
             case SOLVER_NO_OFFLINE_SOLUTION:
                 log_error("Cannot solve offline (no cached registry)");
@@ -501,6 +516,7 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
 int cmd_install(int argc, char *argv[]) {
     bool is_test = false;
     bool major_upgrade = false;
+    bool upgrade_all = false;
     bool auto_yes = false;
     bool cmd_verbose = false;
     bool cmd_quiet = false;
@@ -524,6 +540,8 @@ int cmd_install(int argc, char *argv[]) {
             cmd_quiet = true;
         } else if (strcmp(argv[i], "--test") == 0) {
             is_test = true;
+        } else if (strcmp(argv[i], "--upgrade-all") == 0) {
+            upgrade_all = true;
         } else if (strcmp(argv[i], "--pin") == 0) {
             pin_flag = true;
         } else if (strcmp(argv[i], "--from-file") == 0) {
@@ -607,6 +625,12 @@ int cmd_install(int argc, char *argv[]) {
 
     if (from_path && !local_dev) {
         fprintf(stderr, "Error: --from-path requires --local-dev flag\n");
+        return 1;
+    }
+
+    if (upgrade_all && !is_test) {
+        fprintf(stderr, "Error: --upgrade-all can only be used with --test\n");
+        print_install_usage();
         return 1;
     }
 
@@ -900,7 +924,7 @@ int cmd_install(int argc, char *argv[]) {
         arena_free(name);
         result = 0;
     } else if (package_name) {
-        result = install_package(package_name, is_test, major_upgrade, auto_yes, elm_json, env);
+        result = install_package(package_name, is_test, major_upgrade, upgrade_all, auto_yes, elm_json, env);
         
         /* If we're in a package directory that's being tracked for local-dev,
          * refresh all dependent applications' indirect dependencies */

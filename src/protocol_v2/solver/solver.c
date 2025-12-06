@@ -389,11 +389,12 @@ SolverResult run_with_strategy_v2(
     const char *author,
     const char *name,
     bool is_test_dependency,
+    bool upgrade_all,
     SolverStrategy strategy,
     PackageMap *current_packages,
     InstallPlan **out_plan
 ) {
-    (void)is_test_dependency; /* May be used in future strategies */
+    (void)upgrade_all; /* May be used in future strategies */
 
     if (!state->install_env->v2_registry) {
         log_error("V2 mode but no V2 registry loaded");
@@ -450,6 +451,9 @@ SolverResult run_with_strategy_v2(
                      author, name, target_pkg_id);
         }
 
+        /* Pin production deps when installing test deps (unless --upgrade-all) */
+        bool pin_prod = is_test_dependency && !upgrade_all;
+
         switch (strategy) {
             case STRATEGY_EXACT_ALL:
                 log_trace("Trying strategy (V2): exact versions for all dependencies");
@@ -457,11 +461,11 @@ SolverResult run_with_strategy_v2(
                 break;
             case STRATEGY_EXACT_DIRECT_UPGRADABLE_INDIRECT:
                 log_trace("Trying strategy (V2): exact direct, upgradable indirect dependencies");
-                root_ok = build_roots_strategy_exact_direct_app_v2(pg_ctx, elm_json, include_prod, include_test, is_test_dependency);
+                root_ok = build_roots_strategy_exact_direct_app_v2(pg_ctx, elm_json, include_prod, include_test, pin_prod);
                 break;
             case STRATEGY_UPGRADABLE_WITHIN_MAJOR:
                 log_trace("Trying strategy (V2): upgradable within major version");
-                root_ok = build_roots_strategy_upgradable_app_v2(pg_ctx, elm_json, include_prod, include_test, is_test_dependency);
+                root_ok = build_roots_strategy_upgradable_app_v2(pg_ctx, elm_json, include_prod, include_test, pin_prod);
                 break;
             case STRATEGY_CROSS_MAJOR_FOR_TARGET:
                 log_trace("Trying strategy (V2): cross-major upgrade for %s/%s", author, name);
