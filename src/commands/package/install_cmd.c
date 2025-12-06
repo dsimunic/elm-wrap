@@ -172,6 +172,73 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
             log_debug("Package not downloaded yet");
         }
 
+        /*
+         * Handle --test flag specially: when the user explicitly asks for a test
+         * dependency, we need to ensure the package ends up in test-dependencies,
+         * not just get promoted within production dependencies.
+         */
+        if (is_test && elm_json->type == ELM_PROJECT_APPLICATION) {
+            /* Check if already in test-dependencies/direct */
+            if (package_map_find(elm_json->dependencies_test_direct, author, name)) {
+                printf("It is already a direct test dependency!\n");
+                arena_free(author);
+                arena_free(name);
+                return 0;
+            }
+            
+            /* Check if in test-dependencies/indirect - promote within test deps */
+            Package *test_indirect = package_map_find(elm_json->dependencies_test_indirect, author, name);
+            if (test_indirect) {
+                package_map_add(elm_json->dependencies_test_direct, author, name, test_indirect->version);
+                package_map_remove(elm_json->dependencies_test_indirect, author, name);
+                printf("Promoted %s/%s from test-indirect to test-direct dependencies.\n", author, name);
+                if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+                    log_error("Failed to write elm.json");
+                    arena_free(author);
+                    arena_free(name);
+                    return 1;
+                }
+                arena_free(author);
+                arena_free(name);
+                return 0;
+            }
+            
+            /* Package is in production deps (direct or indirect) - add to test-direct */
+            package_map_add(elm_json->dependencies_test_direct, author, name, existing_pkg->version);
+            printf("Added %s/%s to test-direct dependencies (already available as production dependency).\n", author, name);
+            if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+                log_error("Failed to write elm.json");
+                arena_free(author);
+                arena_free(name);
+                return 1;
+            }
+            arena_free(author);
+            arena_free(name);
+            return 0;
+        } else if (is_test && elm_json->type == ELM_PROJECT_PACKAGE) {
+            /* For packages: check if already in test-dependencies */
+            if (package_map_find(elm_json->package_test_dependencies, author, name)) {
+                printf("It is already a test dependency!\n");
+                arena_free(author);
+                arena_free(name);
+                return 0;
+            }
+            
+            /* Package is in main deps - add to test deps */
+            package_map_add(elm_json->package_test_dependencies, author, name, existing_pkg->version);
+            printf("Added %s/%s to test-dependencies (already available as main dependency).\n", author, name);
+            if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+                log_error("Failed to write elm.json");
+                arena_free(author);
+                arena_free(name);
+                return 1;
+            }
+            arena_free(author);
+            arena_free(name);
+            return 0;
+        }
+
+        /* Standard promotion (not --test) */
         if (promotion != PROMOTION_NONE) {
             if (elm_json_promote_package(elm_json, author, name)) {
                 log_debug("Saving updated elm.json");

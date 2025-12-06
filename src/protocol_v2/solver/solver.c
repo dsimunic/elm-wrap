@@ -243,27 +243,37 @@ static bool build_roots_strategy_exact_app_v2(
     return ok;
 }
 
-/* Build root dependencies with exact direct, upgradable indirect (V2, strategy 1) */
+/* Build root dependencies with exact direct, upgradable indirect (V2, strategy 1)
+ * When pin_prod is true, production dependencies always use exact versions. */
 static bool build_roots_strategy_exact_direct_app_v2(
     PgElmV2Context *pg_ctx,
     const ElmJson *elm_json,
     bool include_prod,
-    bool include_test
+    bool include_test,
+    bool pin_prod
 ) {
     bool ok = true;
 
-    /* Direct dependencies get exact ranges, indirect get upgradable */
+    /* Direct dependencies get exact ranges, indirect get upgradable (unless pinned) */
     if (include_prod) {
         ok = ok && solver_v2_add_exact_map_dependencies(
             pg_ctx,
             elm_json->dependencies_direct,
             "dependencies_direct"
         );
-        ok = ok && solver_v2_add_upgradable_map_dependencies(
-            pg_ctx,
-            elm_json->dependencies_indirect,
-            "dependencies_indirect"
-        );
+        if (pin_prod) {
+            ok = ok && solver_v2_add_exact_map_dependencies(
+                pg_ctx,
+                elm_json->dependencies_indirect,
+                "dependencies_indirect"
+            );
+        } else {
+            ok = ok && solver_v2_add_upgradable_map_dependencies(
+                pg_ctx,
+                elm_json->dependencies_indirect,
+                "dependencies_indirect"
+            );
+        }
     }
     /* Test dependencies stay exact to avoid unnecessary test framework upgrades */
     if (include_test) {
@@ -282,27 +292,42 @@ static bool build_roots_strategy_exact_direct_app_v2(
     return ok;
 }
 
-/* Build root dependencies allowing upgrades within major version (V2, strategy 2) */
+/* Build root dependencies allowing upgrades within major version (V2, strategy 2)
+ * When pin_prod is true, production dependencies always use exact versions. */
 static bool build_roots_strategy_upgradable_app_v2(
     PgElmV2Context *pg_ctx,
     const ElmJson *elm_json,
     bool include_prod,
-    bool include_test
+    bool include_test,
+    bool pin_prod
 ) {
     bool ok = true;
 
-    /* All dependencies get upgradable ranges */
+    /* All dependencies get upgradable ranges (unless prod is pinned) */
     if (include_prod) {
-        ok = ok && solver_v2_add_upgradable_map_dependencies(
-            pg_ctx,
-            elm_json->dependencies_direct,
-            "dependencies_direct"
-        );
-        ok = ok && solver_v2_add_upgradable_map_dependencies(
-            pg_ctx,
-            elm_json->dependencies_indirect,
-            "dependencies_indirect"
-        );
+        if (pin_prod) {
+            ok = ok && solver_v2_add_exact_map_dependencies(
+                pg_ctx,
+                elm_json->dependencies_direct,
+                "dependencies_direct"
+            );
+            ok = ok && solver_v2_add_exact_map_dependencies(
+                pg_ctx,
+                elm_json->dependencies_indirect,
+                "dependencies_indirect"
+            );
+        } else {
+            ok = ok && solver_v2_add_upgradable_map_dependencies(
+                pg_ctx,
+                elm_json->dependencies_direct,
+                "dependencies_direct"
+            );
+            ok = ok && solver_v2_add_upgradable_map_dependencies(
+                pg_ctx,
+                elm_json->dependencies_indirect,
+                "dependencies_indirect"
+            );
+        }
     }
     if (include_test) {
         ok = ok && solver_v2_add_upgradable_map_dependencies(
@@ -399,7 +424,9 @@ SolverResult run_with_strategy_v2(
     /* Build root dependencies based on strategy */
     bool root_ok = true;
     if (elm_json->type == ELM_PROJECT_APPLICATION) {
-        bool include_prod = !is_test_dependency;
+        /* Always include production dependencies (test code can depend on them).
+         * Include test dependencies only when installing a test dependency. */
+        bool include_prod = true;
         bool include_test = is_test_dependency;
 
         /* For STRATEGY_CROSS_MAJOR_FOR_TARGET, add the target package FIRST
@@ -430,11 +457,11 @@ SolverResult run_with_strategy_v2(
                 break;
             case STRATEGY_EXACT_DIRECT_UPGRADABLE_INDIRECT:
                 log_trace("Trying strategy (V2): exact direct, upgradable indirect dependencies");
-                root_ok = build_roots_strategy_exact_direct_app_v2(pg_ctx, elm_json, include_prod, include_test);
+                root_ok = build_roots_strategy_exact_direct_app_v2(pg_ctx, elm_json, include_prod, include_test, is_test_dependency);
                 break;
             case STRATEGY_UPGRADABLE_WITHIN_MAJOR:
                 log_trace("Trying strategy (V2): upgradable within major version");
-                root_ok = build_roots_strategy_upgradable_app_v2(pg_ctx, elm_json, include_prod, include_test);
+                root_ok = build_roots_strategy_upgradable_app_v2(pg_ctx, elm_json, include_prod, include_test, is_test_dependency);
                 break;
             case STRATEGY_CROSS_MAJOR_FOR_TARGET:
                 log_trace("Trying strategy (V2): cross-major upgrade for %s/%s", author, name);
@@ -442,8 +469,10 @@ SolverResult run_with_strategy_v2(
                 break;
         }
     } else {
-        /* Packages use constraints from elm.json */
-        bool include_prod = !is_test_dependency;
+        /* Packages use constraints from elm.json.
+         * Always include production dependencies (test code can depend on them).
+         * Include test dependencies only when installing a test dependency. */
+        bool include_prod = true;
         bool include_test = is_test_dependency;
 
         if (include_prod) {
@@ -697,7 +726,7 @@ SolverResult solver_upgrade_all_v2(
         } else {
             /* For minor upgrades, use upgradable within major strategy */
             log_trace("Using upgradable within major version strategy (V2)");
-            root_ok = build_roots_strategy_upgradable_app_v2(pg_ctx, elm_json, true, true);
+            root_ok = build_roots_strategy_upgradable_app_v2(pg_ctx, elm_json, true, true, false);
         }
     } else {
         /* Packages use constraints from elm.json */
