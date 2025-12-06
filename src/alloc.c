@@ -1,6 +1,7 @@
 #define LARENA_IMPLEMENTATION
 #include "larena.h"
 #include "alloc.h"
+#include "constants.h"
 
 #include <limits.h>
 #include <stdbool.h>
@@ -12,7 +13,7 @@ static bool alloc_initialized = false;
 
 static void alloc_ensure_init(void) {
     if (!alloc_initialized) {
-        larena_init(&global_arena, 1024 * 1024);
+        larena_init(&global_arena, INITIAL_ARENA_SIZE);
         alloc_initialized = true;
     }
 }

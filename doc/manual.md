@@ -158,7 +158,7 @@ If you point it to a path with `elm.json`, it will show package information for 
 
 This is super-useful for a quick check of all your projects' dependencies and available updates in a single command.
 
-    find /path/to/projects -name elm.json -print -exec elm-wrap package info {} \;
+    find /path/to/projects -name elm.json -print -exec wrap package info {} \;
 
   
 #### **`publish <PATH>`**       

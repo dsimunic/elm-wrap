@@ -1,11 +1,11 @@
 #include "code.h"
 #include "../../alloc.h"
-#include "../../progname.h"
+#include "../../global_context.h"
 #include <stdio.h>
 #include <string.h>
 
 static void print_code_usage(void) {
-    printf("Usage: %s code SUBCOMMAND [OPTIONS]\n", program_name);
+    printf("Usage: %s code SUBCOMMAND [OPTIONS]\n", global_context_program_name());
     printf("\n");
     printf("Code analysis and transformation commands.\n");
     printf("\n");
@@ -34,6 +34,6 @@ int cmd_code(int argc, char *argv[]) {
     }
 
     fprintf(stderr, "Error: Unknown code subcommand '%s'\n", subcmd);
-    fprintf(stderr, "Run '%s code --help' for usage information.\n", program_name);
+    fprintf(stderr, "Run '%s code --help' for usage information.\n", global_context_program_name());
     return 1;
 }

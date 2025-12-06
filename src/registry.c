@@ -1,5 +1,6 @@
 #include "registry.h"
 #include "alloc.h"
+#include "constants.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -72,10 +73,10 @@ int registry_version_compare(const Version *a, const Version *b) {
 char* version_to_string(const Version *v) {
     if (!v) return NULL;
 
-    char *str = arena_malloc(32);  /* Enough for "65535.65535.65535" */
+    char *str = arena_malloc(MAX_VERSION_STRING_LENGTH);  /* Enough for "65535.65535.65535" */
     if (!str) return NULL;
 
-    snprintf(str, 32, "%u.%u.%u", v->major, v->minor, v->patch);
+    snprintf(str, MAX_VERSION_STRING_LENGTH, "%u.%u.%u", v->major, v->minor, v->patch);
     return str;
 }
 
@@ -102,7 +103,7 @@ Registry* registry_create(void) {
     Registry *registry = arena_calloc(1, sizeof(Registry));
     if (!registry) return NULL;
 
-    registry->capacity = 128;
+    registry->capacity = INITIAL_REGISTRY_CAPACITY;
     registry->entries = arena_malloc(sizeof(RegistryEntry) * registry->capacity);
 
     if (!registry->entries) {
@@ -328,7 +329,7 @@ bool registry_dat_write(const Registry *registry, const char *path) {
     if (!registry || !path) return false;
 
     /* Write to temporary file first */
-    char tmp_path[1024];
+    char tmp_path[MAX_TEMP_PATH_LENGTH];
     snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
 
     FILE *f = fopen(tmp_path, "wb");

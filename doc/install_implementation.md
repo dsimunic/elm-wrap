@@ -12,7 +12,7 @@ The implementation correctly handles all promotion scenarios:
 
 Example output:
 ```
-$ elm-wrap install elm/json
+$ wrap install elm/json
 Package elm/json is already in your dependencies.
 Promoted elm/json from indirect to direct dependencies.
 ```

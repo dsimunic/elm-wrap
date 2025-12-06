@@ -1,12 +1,13 @@
 #include "package_common.h"
 #include "../../install.h"
+#include "../../global_context.h"
 #include "../../elm_json.h"
 #include "../../install_env.h"
 #include "../../registry.h"
 #include "../../protocol_v1/install.h"
+#include "../../protocol_v2/solver/v2_registry.h"
 #include "../../alloc.h"
 #include "../../log.h"
-#include "../../progname.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,7 +36,7 @@ static int upgrade_single_package(const char *package, ElmJson *elm_json, Instal
     Package *existing_pkg = find_existing_package(elm_json, author, name);
     if (!existing_pkg) {
         fprintf(stderr, "Error: Package %s/%s is not installed\n", author, name);
-        fprintf(stderr, "Run '%s package check' to see available upgrades\n", program_name);
+        fprintf(stderr, "Run '%s package check' to see available upgrades\n", global_context_program_name());
         arena_free(author);
         arena_free(name);
         return 1;
@@ -682,17 +683,17 @@ static int upgrade_all_packages(ElmJson *elm_json, InstallEnv *env, bool major_u
 }
 
 static void print_upgrade_usage(void) {
-    printf("Usage: %s package upgrade [PACKAGE|all]\n", program_name);
+    printf("Usage: %s package upgrade [PACKAGE|all]\n", global_context_program_name());
     printf("\n");
     printf("Upgrade packages to their latest available versions.\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s package upgrade                        # Upgrade all packages to latest minor versions\n", program_name);
-    printf("  %s package upgrade all                    # Same as above\n", program_name);
-    printf("  %s package upgrade elm/html               # Upgrade elm/html to latest minor version\n", program_name);
-    printf("  %s package upgrade --major elm/html       # Upgrade elm/html to latest major version\n", program_name);
-    printf("  %s package upgrade --major all            # Upgrade all packages to latest major versions\n", program_name);
-    printf("  %s package upgrade --major-ignore-test elm/html # Major upgrade, ignore test deps\n", program_name);
+    printf("  %s package upgrade                        # Upgrade all packages to latest minor versions\n", global_context_program_name());
+    printf("  %s package upgrade all                    # Same as above\n", global_context_program_name());
+    printf("  %s package upgrade elm/html               # Upgrade elm/html to latest minor version\n", global_context_program_name());
+    printf("  %s package upgrade --major elm/html       # Upgrade elm/html to latest major version\n", global_context_program_name());
+    printf("  %s package upgrade --major all            # Upgrade all packages to latest major versions\n", global_context_program_name());
+    printf("  %s package upgrade --major-ignore-test elm/html # Major upgrade, ignore test deps\n", global_context_program_name());
     printf("\n");
     printf("Options:\n");
     printf("  --major                              # Allow major version upgrades\n");

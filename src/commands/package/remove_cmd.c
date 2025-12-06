@@ -1,11 +1,11 @@
 #include "package_common.h"
 #include "../../install.h"
+#include "../../global_context.h"
 #include "../../elm_json.h"
 #include "../../install_env.h"
 #include "../../solver.h"
 #include "../../alloc.h"
 #include "../../log.h"
-#include "../../progname.h"
 #include "../../rulr/rulr.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"
@@ -17,7 +17,7 @@
 #include <stdbool.h>
 
 static void print_remove_usage(void) {
-    printf("Usage: %s package remove <PACKAGE>\n", program_name);
+    printf("Usage: %s package remove <PACKAGE>\n", global_context_program_name());
     printf("\n");
     printf("Remove a package from your Elm project.\n");
     printf("\n");
@@ -25,7 +25,7 @@ static void print_remove_usage(void) {
     printf("needed by other packages.\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s package remove elm/html      # Remove elm/html from your project\n", program_name);
+    printf("  %s package remove elm/html      # Remove elm/html from your project\n", global_context_program_name());
     printf("\n");
     printf("Options:\n");
     printf("  -y, --yes                          # Automatically confirm changes\n");

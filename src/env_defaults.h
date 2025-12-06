@@ -10,13 +10,13 @@
  * Returns arena-allocated strings that expand ~ to the user's home directory.
  */
 
-/* Get ELM_WRAP_REGISTRY_V2_FULL_INDEX_URL with fallback to compiled default */
+/* Get WRAP_REGISTRY_V2_FULL_INDEX_URL with fallback to compiled default */
 char *env_get_registry_v2_full_index_url(void);
 
-/* Get ELM_WRAP_REPOSITORY_LOCAL_PATH with fallback to compiled default */
+/* Get WRAP_REPOSITORY_LOCAL_PATH with fallback to compiled default */
 char *env_get_repository_local_path(void);
 
-/* Get ELM_WRAP_ELM_COMPILER_PATH (no compiled default, returns NULL if not set) */
+/* Get WRAP_ELM_COMPILER_PATH (no compiled default, returns NULL if not set) */
 char *env_get_elm_compiler_path(void);
 
 #endif /* ENV_DEFAULTS_H */

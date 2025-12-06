@@ -6,7 +6,7 @@
 
 #include "debug.h"
 #include "../../alloc.h"
-#include "../../progname.h"
+#include "../../global_context.h"
 #include "../../registry.h"
 #include "../../cache.h"
 #include "../../log.h"
@@ -18,7 +18,7 @@
 #include <sys/stat.h>
 
 static void print_registry_v1_usage(void) {
-    printf("Usage: %s debug registry_v1 SUBCOMMAND [OPTIONS]\n", program_name);
+    printf("Usage: %s debug registry_v1 SUBCOMMAND [OPTIONS]\n", global_context_program_name());
     printf("\n");
     printf("Manage the V1 protocol registry.dat file.\n");
     printf("\n");
@@ -31,9 +31,9 @@ static void print_registry_v1_usage(void) {
     printf("  -h, --help              Show this help message\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s debug registry_v1 list\n", program_name);
-    printf("  %s debug registry_v1 add elm/core@1.0.5\n", program_name);
-    printf("  %s debug registry_v1 remove elm/core@1.0.5\n", program_name);
+    printf("  %s debug registry_v1 list\n", global_context_program_name());
+    printf("  %s debug registry_v1 add elm/core@1.0.5\n", global_context_program_name());
+    printf("  %s debug registry_v1 remove elm/core@1.0.5\n", global_context_program_name());
 }
 
 /**
@@ -97,7 +97,7 @@ static int cmd_registry_v1_list(void) {
 static int cmd_registry_v1_add(const char *package_spec) {
     if (!package_spec) {
         fprintf(stderr, "Error: Package specification required\n");
-        fprintf(stderr, "Usage: %s debug registry_v1 add AUTHOR/NAME@VERSION\n", program_name);
+        fprintf(stderr, "Usage: %s debug registry_v1 add AUTHOR/NAME@VERSION\n", global_context_program_name());
         return 1;
     }
 
@@ -235,7 +235,7 @@ static int cmd_registry_v1_add(const char *package_spec) {
 static int cmd_registry_v1_remove(const char *package_spec) {
     if (!package_spec) {
         fprintf(stderr, "Error: Package specification required\n");
-        fprintf(stderr, "Usage: %s debug registry_v1 remove AUTHOR/NAME@VERSION\n", program_name);
+        fprintf(stderr, "Usage: %s debug registry_v1 remove AUTHOR/NAME@VERSION\n", global_context_program_name());
         return 1;
     }
 
@@ -423,7 +423,7 @@ int cmd_debug_registry_v1(int argc, char *argv[]) {
     if (strcmp(subcmd, "add") == 0) {
         if (argc < 3) {
             fprintf(stderr, "Error: Package specification required\n");
-            fprintf(stderr, "Usage: %s debug registry_v1 add AUTHOR/NAME@VERSION\n", program_name);
+            fprintf(stderr, "Usage: %s debug registry_v1 add AUTHOR/NAME@VERSION\n", global_context_program_name());
             return 1;
         }
         return cmd_registry_v1_add(argv[2]);
@@ -432,13 +432,13 @@ int cmd_debug_registry_v1(int argc, char *argv[]) {
     if (strcmp(subcmd, "remove") == 0) {
         if (argc < 3) {
             fprintf(stderr, "Error: Package specification required\n");
-            fprintf(stderr, "Usage: %s debug registry_v1 remove AUTHOR/NAME@VERSION\n", program_name);
+            fprintf(stderr, "Usage: %s debug registry_v1 remove AUTHOR/NAME@VERSION\n", global_context_program_name());
             return 1;
         }
         return cmd_registry_v1_remove(argv[2]);
     }
 
     fprintf(stderr, "Error: Unknown registry_v1 subcommand '%s'\n", subcmd);
-    fprintf(stderr, "Run '%s debug registry_v1 --help' for usage information.\n", program_name);
+    fprintf(stderr, "Run '%s debug registry_v1 --help' for usage information.\n", global_context_program_name());
     return 1;
 }

@@ -1,10 +1,10 @@
 #include "cache_check.h"
 #include "../../../cache.h"
+#include "../../../global_context.h"
 #include "../../../registry.h"
 #include "../../../install_env.h"
 #include "../../../alloc.h"
 #include "../../../log.h"
-#include "../../../progname.h"
 #include "../../../fileutil.h"
 #include "../../../import_tree.h"
 #include <stdio.h>
@@ -117,7 +117,7 @@ static PackageStatus get_package_status(CacheConfig *cache, const char *author,
 
 /* Print usage for cache check command */
 static void print_cache_check_usage(void) {
-    printf("Usage: %s package cache check <PACKAGE> [OPTIONS]\n", program_name);
+    printf("Usage: %s package cache check PACKAGE [OPTIONS]\n", global_context_program_name());
     printf("\n");
     printf("Check cache status for a specific package.\n");
     printf("\n");
@@ -127,10 +127,10 @@ static void print_cache_check_usage(void) {
     printf("  - Report broken packages (missing or empty src/ directory)\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s package cache check elm/json            # Check cache status for elm/json\n", program_name);
-    printf("  %s package cache check elm/html --purge-broken  # Remove broken cached versions\n", program_name);
-    printf("  %s package cache check elm/html --fix-broken    # Re-download broken versions\n", program_name);
-    printf("  %s package cache check elm/html --no-check-redundant  # Skip redundant file check\n", program_name);
+    printf("  %s package cache check elm/json            # Check cache status for elm/json\n", global_context_program_name());
+    printf("  %s package cache check elm/html --purge-broken  # Remove broken cached versions\n", global_context_program_name());
+    printf("  %s package cache check elm/html --fix-broken    # Re-download broken versions\n", global_context_program_name());
+    printf("  %s package cache check elm/html --no-check-redundant  # Skip redundant file check\n", global_context_program_name());
     printf("\n");
     printf("Options:\n");
     printf("  --purge-broken            Remove broken directories without re-downloading\n");
@@ -175,7 +175,7 @@ int cache_check_package(const char *package_name, bool purge_broken, bool fix_br
     if (!entry) {
         printf("%sPackage not found in registry%s\n\n", ANSI_YELLOW, ANSI_RESET);
         printf("Note: The package might exist but is not in the cached registry.\n");
-        printf("Try running 'elm-wrap install' to update the registry.\n");
+        printf("Try running '%s install' to update the registry.\n", global_context_program_name());
     } else {
         printf("Registry versions (%zu):\n", entry->version_count);
         for (size_t i = 0; i < entry->version_count; i++) {
@@ -355,7 +355,6 @@ int cmd_cache_check(int argc, char *argv[]) {
     bool check_redundant = true;
     bool verbose = false;
 
-    /* Parse arguments */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_cache_check_usage();
@@ -380,10 +379,9 @@ int cmd_cache_check(int argc, char *argv[]) {
         }
     }
 
-    /* Validate arguments */
     if (!package_arg) {
         fprintf(stderr, "Error: Package name is required\n");
-        fprintf(stderr, "Usage: %s package cache check <PACKAGE>\n", program_name);
+        fprintf(stderr, "Usage: %s package cache check <PACKAGE>\n", global_context_program_name());
         return 1;
     }
 

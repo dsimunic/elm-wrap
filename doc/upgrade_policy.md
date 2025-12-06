@@ -11,7 +11,7 @@ Package does not change its position in the dependency tree, only its version is
 change their dependency ranges, so existing indirect dependencies remain the same as before.
 
 
-    $ elm-wrap package update elm/core
+    $ wrap package update elm/core
 
 Before:
 
@@ -38,7 +38,7 @@ Package does not change its position in the dependency tree, only its version is
 **happy path:** dependent package's version range allows the upgrade of the dependency -> update only the package without updating its dependent.
 
 
-    $ elm-wrap package update elm/virtual-dom
+    $ wrap package update elm/virtual-dom
 
 Before:
 
@@ -69,7 +69,7 @@ Package must transition to 1.0.5. Present the plan before the upgrade unless --y
 
 ## Test dependency, direct, minor upgrade
 
-    elm-wrap package check | grep elm-explorations
+    wrap package check | grep elm-explorations
     [minor] elm-explorations/test                 1.0.0 -> 1.2.2
     [major] elm-explorations/test                 1.0.0 -> 2.2.0
     
@@ -77,7 +77,7 @@ Package must transition to 1.0.5. Present the plan before the upgrade unless --y
 
 Expected behavior:
 
-    $ elm-wrap package upgrade elm-explorations/test
+    $ wrap package upgrade elm-explorations/test
     --> present plan
     --> upgrade in-place
 
@@ -149,7 +149,7 @@ Running upgrade when there are no version changes should not change the position
 
 Available upgrades for the example:
 
-    $ elm-wrap package check
+    $ wrap package check
     Available upgrades:
 
     [minor] SiriusStarr/elm-password-strength     1.0.1 -> 1.0.2

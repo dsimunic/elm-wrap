@@ -5,7 +5,7 @@ set -euo pipefail
 # Get script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-ELM_WRAP_BIN="$PROJECT_ROOT/bin/elm-wrap"
+WRAP_BIN="$PROJECT_ROOT/bin/wrap"
 
 # Default paths
 DEFAULT_REPOSITORY_DIR="/Volumes/Devel/var/elm-wrap/package_repository/0.19.1/packages/"
@@ -64,9 +64,9 @@ if [ ! -d "$TARGET_DIR" ]; then
     exit 1
 fi
 
-# Check if elm-wrap binary exists
-if [ ! -x "$ELM_WRAP_BIN" ]; then
-    log_err "Error: elm-wrap binary not found at $ELM_WRAP_BIN"
+# Check if wrap binary exists
+if [ ! -x "$WRAP_BIN" ]; then
+    log_err "Error: wrap binary not found at $WRAP_BIN"
     exit 1
 fi
 
@@ -166,22 +166,22 @@ process_package() {
     local output_file="$TARGET_DIR/${flat_name}_docs.generated.json"
     local original_file="$TARGET_DIR/${flat_name}_docs.json"
 
-    # Generate docs using elm-wrap (capture output and errors separately)
+    # Generate docs using wrap (capture output and errors separately)
     local tmpdir
     tmpdir=$(mktemp -d)
     local raw_output="$tmpdir/raw.json"
-    local elm_wrap_stderr="$tmpdir/elm-wrap.stderr"
+    local elm_wrap_stderr="$tmpdir/wrap.stderr"
     local jq_stderr="$tmpdir/jq.stderr"
     
-    # Run elm-wrap and capture exit status
+    # Run wrap and capture exit status
     local elm_wrap_status=0
-    "$ELM_WRAP_BIN" publish docs "$package_dir" > "$raw_output" 2> "$elm_wrap_stderr" || elm_wrap_status=$?
+    "$WRAP_BIN" publish docs "$package_dir" > "$raw_output" 2> "$elm_wrap_stderr" || elm_wrap_status=$?
     
     if [ $elm_wrap_status -ne 0 ]; then
         log_err "[generate-failed] $relative_path"
-        log_err "  elm-wrap exit status: $elm_wrap_status"
+        log_err "  wrap exit status: $elm_wrap_status"
         if [ -s "$elm_wrap_stderr" ]; then
-            log_err "  elm-wrap stderr: $(cat "$elm_wrap_stderr")"
+            log_err "  wrap stderr: $(cat "$elm_wrap_stderr")"
         fi
         GENERATE_FAIL_COUNT=$((GENERATE_FAIL_COUNT + 1))
         rm -rf "$tmpdir"

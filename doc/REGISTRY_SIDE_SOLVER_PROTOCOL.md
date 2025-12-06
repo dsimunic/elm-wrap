@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document proposes a server-side dependency solver protocol for elm-wrap registries. Instead of implementing complex constraint solving on the client, the solver logic moves to the registry server, which can provide richer functionality, better performance, and centralized policy enforcement.
+This document proposes a server-side dependency solver protocol for **elm-wrap** registries. Instead of implementing complex constraint solving on the client, the solver logic moves to the registry server, which can provide richer functionality, better performance, and centralized policy enforcement.
 
 ## Motivation
 
@@ -43,7 +43,7 @@ Move dependency resolution to the registry server. Clients send their current pr
 
 ### Architecture Fit
 
-This leverages elm-wrap's hierarchical registry design, which supports extended protocols beyond the basic canonical registry. Registries can advertise solver capabilities via capability discovery.
+This leverages **elm-wrap**'s hierarchical registry design, which supports extended protocols beyond the basic canonical registry. Registries can advertise solver capabilities via capability discovery.
 
 ## Protocol Specification
 
@@ -292,4 +292,4 @@ To support efficient client-side solving when server-side solving is unavailable
 - **Policy DSL**: Allow registries to define custom constraint rules
 - **Integration Testing**: Verify solutions against test suites
 
-This protocol transforms elm-wrap from a compiler extension into a comprehensive package management platform, enabling sophisticated enterprise package ecosystems while maintaining compatibility with the existing Elm ecosystem.
+This protocol transforms **elm-wrap** into a comprehensive package management platform, enabling sophisticated enterprise package ecosystems while maintaining compatibility with the existing Elm ecosystem.

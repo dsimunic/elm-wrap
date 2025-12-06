@@ -2,6 +2,7 @@
 #include "install_env.h"
 #include "elm_compiler.h"
 #include "alloc.h"
+#include "constants.h"
 #include "log.h"
 #include <stdlib.h>
 #include <string.h>
@@ -79,7 +80,7 @@ static bool ensure_path_exists(const char *path) {
             struct stat st;
             if (mutable_path[0] != '\0' &&
                 stat(mutable_path, &st) != 0) {
-                if (mkdir(mutable_path, 0755) != 0) {
+                if (mkdir(mutable_path, DIR_PERMISSIONS) != 0) {
                     perror("Failed to create directory");
                     ok = false;
                 }
@@ -91,7 +92,7 @@ static bool ensure_path_exists(const char *path) {
     if (ok) {
         struct stat st;
         if (stat(mutable_path, &st) != 0) {
-            if (mkdir(mutable_path, 0755) != 0) {
+            if (mkdir(mutable_path, DIR_PERMISSIONS) != 0) {
                 perror("Failed to create directory");
                 ok = false;
             }

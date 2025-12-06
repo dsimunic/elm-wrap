@@ -41,7 +41,7 @@ static char *expand_tilde(const char *path) {
 }
 
 char *env_get_registry_v2_full_index_url(void) {
-    const char *env_val = getenv("ELM_WRAP_REGISTRY_V2_FULL_INDEX_URL");
+    const char *env_val = getenv("WRAP_REGISTRY_V2_FULL_INDEX_URL");
     if (env_val && env_val[0] != '\0') {
         return arena_strdup(env_val);
     }
@@ -49,7 +49,7 @@ char *env_get_registry_v2_full_index_url(void) {
 }
 
 char *env_get_repository_local_path(void) {
-    const char *env_val = getenv("ELM_WRAP_REPOSITORY_LOCAL_PATH");
+    const char *env_val = getenv("WRAP_REPOSITORY_LOCAL_PATH");
     if (env_val && env_val[0] != '\0') {
         return expand_tilde(env_val);
     }
@@ -57,7 +57,7 @@ char *env_get_repository_local_path(void) {
 }
 
 char *env_get_elm_compiler_path(void) {
-    const char *env_val = getenv("ELM_WRAP_ELM_COMPILER_PATH");
+    const char *env_val = getenv("WRAP_ELM_COMPILER_PATH");
     if (env_val && env_val[0] != '\0') {
         return expand_tilde(env_val);
     }

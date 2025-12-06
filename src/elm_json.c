@@ -1,5 +1,6 @@
 #include "elm_json.h"
 #include "alloc.h"
+#include "constants.h"
 #include "vendor/cJSON.h"
 #include "log.h"
 #include <stdlib.h>
@@ -31,8 +32,8 @@ void package_free(Package *pkg) {
 PackageMap* package_map_create(void) {
     PackageMap *map = arena_malloc(sizeof(PackageMap));
     if (!map) return NULL;
-    
-    map->capacity = 16;
+
+    map->capacity = INITIAL_SMALL_CAPACITY;
     map->count = 0;
     map->packages = arena_malloc(sizeof(Package) * map->capacity);
     
@@ -142,7 +143,7 @@ ElmJson* elm_json_read(const char *filepath) {
             free(abs_path);
         } else {
             // realpath failed, show cwd for context
-            char cwd[1024];
+            char cwd[MAX_TEMP_PATH_LENGTH];
             if (getcwd(cwd, sizeof(cwd))) {
                 log_debug("Could not open '%s' (cwd: %s)", filepath, cwd);
             } else {
@@ -575,7 +576,7 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
         cJSON *direct = cJSON_CreateObject();
         for (int i = 0; i < elm_json->dependencies_direct->count; i++) {
             Package *pkg = &elm_json->dependencies_direct->packages[i];
-            char key[256];
+            char key[MAX_KEY_LENGTH];
             snprintf(key, sizeof(key), "%s/%s", pkg->author, pkg->name);
             cJSON_AddStringToObject(direct, key, pkg->version);
         }
@@ -585,7 +586,7 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
         cJSON *indirect = cJSON_CreateObject();
         for (int i = 0; i < elm_json->dependencies_indirect->count; i++) {
             Package *pkg = &elm_json->dependencies_indirect->packages[i];
-            char key[256];
+            char key[MAX_KEY_LENGTH];
             snprintf(key, sizeof(key), "%s/%s", pkg->author, pkg->name);
             cJSON_AddStringToObject(indirect, key, pkg->version);
         }
@@ -600,7 +601,7 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
         cJSON *test_direct = cJSON_CreateObject();
         for (int i = 0; i < elm_json->dependencies_test_direct->count; i++) {
             Package *pkg = &elm_json->dependencies_test_direct->packages[i];
-            char key[256];
+            char key[MAX_KEY_LENGTH];
             snprintf(key, sizeof(key), "%s/%s", pkg->author, pkg->name);
             cJSON_AddStringToObject(test_direct, key, pkg->version);
         }
@@ -610,7 +611,7 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
         cJSON *test_indirect = cJSON_CreateObject();
         for (int i = 0; i < elm_json->dependencies_test_indirect->count; i++) {
             Package *pkg = &elm_json->dependencies_test_indirect->packages[i];
-            char key[256];
+            char key[MAX_KEY_LENGTH];
             snprintf(key, sizeof(key), "%s/%s", pkg->author, pkg->name);
             cJSON_AddStringToObject(test_indirect, key, pkg->version);
         }
@@ -634,7 +635,7 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
             cJSON *deps = cJSON_CreateObject();
             for (int i = 0; i < elm_json->package_dependencies->count; i++) {
                 Package *pkg = &elm_json->package_dependencies->packages[i];
-                char key[256];
+                char key[MAX_KEY_LENGTH];
                 snprintf(key, sizeof(key), "%s/%s", pkg->author, pkg->name);
                 cJSON_AddStringToObject(deps, key, pkg->version);
             }
@@ -646,7 +647,7 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
             cJSON *test_deps = cJSON_CreateObject();
             for (int i = 0; i < elm_json->package_test_dependencies->count; i++) {
                 Package *pkg = &elm_json->package_test_dependencies->packages[i];
-                char key[256];
+                char key[MAX_KEY_LENGTH];
                 snprintf(key, sizeof(key), "%s/%s", pkg->author, pkg->name);
                 cJSON_AddStringToObject(test_deps, key, pkg->version);
             }

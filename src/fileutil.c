@@ -1,6 +1,7 @@
 #include "fileutil.h"
 #include "vendor/miniz.h"
 #include "alloc.h"
+#include "constants.h"
 #include "log.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +14,7 @@
 #include <limits.h>
 
 #ifndef PATH_MAX
-#define PATH_MAX 4096
+#define PATH_MAX MAX_PATH_LENGTH
 #endif
 
 static bool ensure_directory(const char *path) {
@@ -36,7 +37,7 @@ static bool ensure_directory(const char *path) {
     arena_free(path_copy);
 
     /* Create this directory */
-    if (mkdir(path, 0755) != 0 && errno != EEXIST) {
+    if (mkdir(path, DIR_PERMISSIONS) != 0 && errno != EEXIST) {
         return false;
     }
 
@@ -327,7 +328,7 @@ bool remove_directory_recursive(const char *path) {
             continue;
         }
 
-        char entry_path[4096];
+        char entry_path[MAX_PATH_LENGTH];
         snprintf(entry_path, sizeof(entry_path), "%s/%s", path, entry->d_name);
 
         if (!remove_directory_recursive(entry_path)) {
@@ -438,8 +439,8 @@ bool copy_directory_selective(const char *src_path, const char *dest_path) {
 
     /* Copy individual files */
     for (int i = 0; files_to_copy[i] != NULL; i++) {
-        char src_file[4096];
-        char dest_file[4096];
+        char src_file[MAX_PATH_LENGTH];
+        char dest_file[MAX_PATH_LENGTH];
         snprintf(src_file, sizeof(src_file), "%s/%s", src_path, files_to_copy[i]);
         snprintf(dest_file, sizeof(dest_file), "%s/%s", dest_path, files_to_copy[i]);
 
@@ -487,8 +488,8 @@ bool copy_directory_selective(const char *src_path, const char *dest_path) {
     }
 
     /* Copy src/ directory recursively */
-    char src_dir[4096];
-    char dest_dir[4096];
+    char src_dir[MAX_PATH_LENGTH];
+    char dest_dir[MAX_PATH_LENGTH];
     snprintf(src_dir, sizeof(src_dir), "%s/src", src_path);
     snprintf(dest_dir, sizeof(dest_dir), "%s/src", dest_path);
 

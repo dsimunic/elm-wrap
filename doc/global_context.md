@@ -1,12 +1,12 @@
 # Global Context and Protocol Mode Detection
 
-This document describes the global context system in elm-wrap, particularly how the program determines whether to operate in V1 (legacy Elm) or V2 (elm-wrap repository) protocol mode.
+This document describes the global context system in **elm-wrap**, particularly how the program determines whether to operate in V1 (legacy Elm) or V2 (**elm-wrap** repository) protocol mode.
 
 ## Overview
 
 The global context (`GlobalContext`) is a singleton structure initialized at program startup that holds configuration state affecting all commands. Its primary purposes are:
 
-1. **Protocol Mode Detection** - Determine whether to use V1 (legacy Elm) or V2 (elm-wrap repository) protocol for package management
+1. **Protocol Mode Detection** - Determine whether to use V1 (legacy Elm) or V2 (**elm-wrap** repository) protocol for package management
 2. **Compiler Type Detection** - Identify the compiler backend (elm, lamdera, wrapc) to adjust available commands
 
 ## Protocol Modes
@@ -19,9 +19,9 @@ V1 mode emulates the existing Elm package management system:
 - Works with existing Elm tooling and workflows
 - **Default mode** when no V2 repository is detected
 
-### V2 Mode (elm-wrap repositories)
+### V2 Mode (**elm-wrap** repositories)
 
-V2 mode uses elm-wrap's new repository system:
+V2 mode uses **elm-wrap**'s new repository system:
 - Packages are managed through local repositories created with `repository new`
 - Uses the V2 registry index format
 - Enables advanced features like multiple registry sources and custom package hosting
@@ -33,11 +33,11 @@ The protocol mode is determined at startup in `global_context_init()`:
 
 ```
 1. Get repository root path
-   - Check ELM_WRAP_REPOSITORY_LOCAL_PATH environment variable
+   - Check WRAP_REPOSITORY_LOCAL_PATH environment variable
    - Fall back to compiled default (~/.elm-wrap/repository)
 
 2. Determine compiler name
-   - Extract basename from ELM_WRAP_ELM_COMPILER_PATH if set
+   - Extract basename from WRAP_ELM_COMPILER_PATH if set
    - Default to "elm"
 
 3. Determine compiler version
@@ -128,10 +128,10 @@ if (global_context_is_v2()) {
 
 ## Viewing Current Mode
 
-Run `elm-wrap config` to see the current protocol mode:
+Run `wrap config` to see the current protocol mode:
 
 ```
-$ elm-wrap config
+$ wrap config
 Protocol mode: V2
 Repository path: /Users/dev/.elm-wrap/repository/elm/0.19.1
 ELM_HOME: /Users/dev/.elm
@@ -144,14 +144,14 @@ Elm compiler path: /usr/local/bin/elm
 To switch from V1 to V2 mode, create a repository:
 
 ```bash
-elm-wrap repository new
+wrap repository new
 ```
 
-This creates the repository directory structure and downloads the registry index. Subsequent runs of elm-wrap will detect this repository and operate in V2 mode.
+This creates the repository directory structure and downloads the registry index. Subsequent `wrap` runs will detect this repository and operate in V2 mode.
 
 ## Supported Compilers
 
-elm-wrap recognizes the following compiler backends, each with different command sets:
+`wrap` recognizes the following compiler backends, each with different command sets:
 
 ### elm (default)
 
@@ -170,14 +170,14 @@ Minimal compiler wrapper supporting only:
 
 ### Compiler Detection
 
-The compiler is detected from the `ELM_WRAP_ELM_COMPILER_PATH` environment variable basename, defaulting to "elm". The `--help` output adjusts automatically to show only the commands supported by the detected compiler.
+The compiler is detected from the `WRAP_ELM_COMPILER_PATH` environment variable basename, defaulting to `elm`. The `--help` output adjusts automatically to show only the commands supported by the detected compiler.
 
 ## Environment Variables
 
 | Variable | Purpose |
 |----------|---------|
-| `ELM_WRAP_REPOSITORY_LOCAL_PATH` | Root path for V2 repositories |
-| `ELM_WRAP_ELM_COMPILER_PATH` | Path to Elm compiler (affects compiler name detection) |
+| `WRAP_REPOSITORY_LOCAL_PATH` | Root path for V2 repositories |
+| `WRAP_ELM_COMPILER_PATH` | Path to Elm compiler (affects compiler name detection) |
 
 ## Related Files
 

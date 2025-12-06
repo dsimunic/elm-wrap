@@ -1,6 +1,6 @@
 # Built-in Rules
 
-elm-wrap ships with pre-compiled policy rules embedded directly in the binary. These rules can be used without needing external rule files.
+**elm-wrap** ships with pre-compiled policy rules embedded directly in the binary. These rules can be used without needing external rule files.
 
 ## Using Built-in Rules
 
@@ -8,22 +8,22 @@ Built-in rules can be referenced by name (without path separators):
 
 ```bash
 # List all available built-in rules
-elm-wrap policy built-in
+wrap policy built-in
 
 # View a built-in rule's source
-elm-wrap policy view no_unused_dependencies
+wrap policy view no_unused_dependencies
 
 # Use a built-in rule for package review
-elm-wrap review package . --rule no_unused_dependencies
+wrap review package . --rule no_unused_dependencies
 ```
 
-When you specify a rule by name only (no `/` or `\` in the name), elm-wrap:
+When you specify a rule by name only (no `/` or `\` in the name), `wrap`:
 1. First checks the embedded built-in rules
 2. Falls back to the file system if not found
 
 To explicitly use a file system rule instead of a built-in, include a path:
 ```bash
-elm-wrap policy view ./my_rules/no_unused_dependencies
+wrap policy view ./my_rules/no_unused_dependencies
 ```
 
 ## Available Built-in Rules
@@ -64,12 +64,12 @@ During `make all`:
 
 3. **Append to binary**: The zip is concatenated to the executable:
    ```
-   cat build/builtin_rules.zip >> bin/elm-wrap
+   cat build/builtin_rules.zip >> bin/wrap
    ```
 
 ### Runtime Loading
 
-At startup, elm-wrap:
+At startup, `wrap`:
 
 1. Determines its own executable path using platform-specific APIs:
    - macOS: `_NSGetExecutablePath()`
@@ -86,7 +86,7 @@ At startup, elm-wrap:
 ### File Structure
 
 ```
-bin/elm-wrap
+bin/wrap
 ├── [Mach-O/ELF executable data]
 └── [ZIP archive]
     ├── core_package_files.dlc
@@ -123,7 +123,7 @@ To add a new built-in rule:
 
 3. Verify it's included:
    ```bash
-   ./bin/elm-wrap policy built-in
+   ./bin/wrap policy built-in
    ```
 
 The rule will automatically be compiled, zipped, and embedded in the binary.
@@ -133,24 +133,24 @@ The rule will automatically be compiled, zipped, and embedded in the binary.
 ### Verify embedded rules exist
 ```bash
 # Using system unzip (will show warning about extra bytes)
-unzip -t bin/elm-wrap
+unzip -t bin/wrap
 
-# Using elm-wrap itself
-./bin/elm-wrap policy built-in
+# Using `wrap` itself
+./bin/wrap policy built-in
 ```
 
 ### Check binary size
 ```bash
 # Original binary size (before zip append)
-ls -la bin/elm-wrap  # during build, before append
+ls -l bin/wrap  # during build, before append
 
 # Final size includes zip
-ls -la bin/elm-wrap  # after build complete
-ls -la build/builtin_rules.zip  # size of embedded rules
+ls -l bin/wrap  # after build complete
+ls -l build/builtin_rules.zip  # size of embedded rules
 ```
 
 ### Extract embedded rules
 ```bash
 # Extract to inspect (creates files in current directory)
-unzip bin/elm-wrap -d /tmp/extracted-rules/
+unzip bin/wrap -d /tmp/extracted-rules/
 ```

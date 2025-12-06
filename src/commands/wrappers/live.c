@@ -12,7 +12,6 @@
 #include "../../elm_compiler.h"
 #include "../../alloc.h"
 #include "../../log.h"
-#include "../../progname.h"
 #include "../../global_context.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,7 +23,7 @@
 #define ELM_JSON_PATH "elm.json"
 
 static void print_live_usage(void) {
-    printf("Usage: %s live [OPTIONS]\n", program_name);
+    printf("Usage: %s live [OPTIONS]\n", global_context_program_name());
     printf("\n");
     printf("Start the Lamdera live development server.\n");
     printf("\n");
@@ -38,7 +37,7 @@ int cmd_live(int argc, char *argv[]) {
     // Check if compiler is lamdera
     if (!global_context_is_lamdera()) {
         fprintf(stderr, "Error: The 'live' command is only available when using the Lamdera compiler.\n");
-        fprintf(stderr, "Set ELM_WRAP_ELM_COMPILER_PATH to point to your lamdera binary.\n");
+        fprintf(stderr, "Set WRAP_ELM_COMPILER_PATH to point to your lamdera binary.\n");
         return 1;
     }
 
@@ -94,7 +93,7 @@ int cmd_live(int argc, char *argv[]) {
     char *lamdera_path = elm_compiler_get_path();
     if (!lamdera_path) {
         log_error("Could not find lamdera binary");
-        log_error("Please install lamdera or set the ELM_WRAP_ELM_COMPILER_PATH environment variable");
+        log_error("Please install lamdera or set the WRAP_ELM_COMPILER_PATH environment variable");
         return 1;
     }
 
@@ -123,8 +122,8 @@ int cmd_live(int argc, char *argv[]) {
 
     // If execve returns, it failed
     log_error("Failed to execute lamdera compiler at: %s", lamdera_path);
-    if (getenv("ELM_WRAP_ELM_COMPILER_PATH")) {
-        log_error("The compiler was not found at the path specified in ELM_WRAP_ELM_COMPILER_PATH");
+    if (getenv("WRAP_ELM_COMPILER_PATH")) {
+        log_error("The compiler was not found at the path specified in WRAP_ELM_COMPILER_PATH");
     }
     perror("execve");
     arena_free(elm_args);

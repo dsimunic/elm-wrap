@@ -1,6 +1,6 @@
 #include "debug.h"
 #include "../../alloc.h"
-#include "../../progname.h"
+#include "../../global_context.h"
 #include "../../log.h"
 #include "../../fileutil.h"
 #include "../../dyn_array.h"
@@ -38,7 +38,7 @@ static char *read_file_content(const char *filepath);
 #define TREE_SPACE  "    "
 
 static void print_include_tree_usage(void) {
-    printf("Usage: %s debug include-tree <file-path>|<directory-path>\n", program_name);
+    printf("Usage: %s debug include-tree <file-path>|<directory-path>\n", global_context_program_name());
     printf("\n");
     printf("Show import dependency tree for an Elm file or package.\n");
     printf("\n");

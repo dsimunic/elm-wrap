@@ -14,7 +14,7 @@ char **build_elm_environment(void) {
     extern char **environ;
 
     // Check if we should keep elm online
-    const char *keep_online = getenv("ELM_WRAP_ALLOW_ELM_ONLINE");
+    const char *keep_online = getenv("WRAP_ALLOW_ELM_ONLINE");
 
     // Count current environment variables
     int env_count = 0;

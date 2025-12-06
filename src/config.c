@@ -4,15 +4,14 @@
 #include "global_context.h"
 #include "alloc.h"
 #include "log.h"
-#include "progname.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 static void print_config_usage(void) {
-    printf("Usage: %s config\n", program_name);
+    printf("Usage: %s config\n", global_context_program_name());
     printf("\n");
-    printf("Display current elm-wrap configuration.\n");
+    printf("Display current configuration.\n");
     printf("\n");
     printf("Shows:\n");
     printf("  - Protocol mode (V1 or V2)\n");

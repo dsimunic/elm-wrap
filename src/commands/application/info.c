@@ -6,12 +6,12 @@
 
 #include "application.h"
 #include "../../install.h"
-#include "../../progname.h"
+#include "../../global_context.h"
 #include <stdio.h>
 #include <string.h>
 
 static void print_application_info_usage(void) {
-    printf("Usage: %s application info [PATH]\n", program_name);
+    printf("Usage: %s application info [PATH]\n", global_context_program_name());
     printf("\n");
     printf("Display application information.\n");
     printf("\n");
@@ -23,8 +23,8 @@ static void print_application_info_usage(void) {
     printf("  - Available updates\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s application info              # Show info for current directory\n", program_name);
-    printf("  %s application info ./path/to    # Show info for elm.json at path\n", program_name);
+    printf("  %s application info              # Show info for current directory\n", global_context_program_name());
+    printf("  %s application info ./path/to    # Show info for elm.json at path\n", global_context_program_name());
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help   Show this help message\n");

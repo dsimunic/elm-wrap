@@ -205,7 +205,7 @@ bool install_env_init(InstallEnv *env) {
 
         if (!env->v2_registry) {
             fprintf(stderr, "Error: Failed to load V2 registry from %s/index.dat\n", ctx->repository_path);
-            fprintf(stderr, "Hint: Run 'elm-wrap repository new' to initialize the repository\n");
+            fprintf(stderr, "Hint: Run '%s repository new' to initialize the repository\n", global_context_program_name());
             return false;
         }
 

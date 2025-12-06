@@ -1,5 +1,6 @@
 #include "package_common.h"
 #include "../../install.h"
+#include "../../global_context.h"
 #include "../../elm_json.h"
 #include "../../cache.h"
 #include "../../install_env.h"
@@ -7,7 +8,6 @@
 #include "../../http_client.h"
 #include "../../alloc.h"
 #include "../../log.h"
-#include "../../progname.h"
 #include "../../fileutil.h"
 #include "../../commands/cache/check/cache_check.h"
 #include "../../commands/cache/full_scan/cache_full_scan.h"
@@ -144,7 +144,7 @@ static bool cache_download_package_recursive(InstallEnv *env, const char *author
 }
 
 static void print_cache_usage(void) {
-    printf("Usage: %s package cache SUBCOMMAND [OPTIONS]\n", program_name);
+    printf("Usage: %s package cache SUBCOMMAND [OPTIONS]\n", global_context_program_name());
     printf("\n");
     printf("Cache management commands.\n");
     printf("\n");
@@ -154,14 +154,14 @@ static void print_cache_usage(void) {
     printf("  full-scan                          Scan entire cache and verify all packages\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s package cache elm/html                  # Download latest elm/html\n", program_name);
-    printf("  %s package cache elm/html 1.0.0            # Download specific version\n", program_name);
-    printf("  %s package cache check elm/html            # Check cache status for elm/html\n", program_name);
-    printf("  %s package cache check elm/html --fix-broken # Re-download broken versions\n", program_name);
-    printf("  %s package cache full-scan                 # Scan all packages in cache\n", program_name);
-    printf("  %s package cache --from-url <url> elm/html # Download from URL to cache\n", program_name);
-    printf("  %s package cache --from-file ./pkg elm/html # Download from local file to cache\n", program_name);
-    printf("  %s package cache --major elm/html         # Download next major version\n", program_name);
+    printf("  %s package cache elm/html                  # Download latest elm/html\n", global_context_program_name());
+    printf("  %s package cache elm/html 1.0.0            # Download specific version\n", global_context_program_name());
+    printf("  %s package cache check elm/html            # Check cache status for elm/html\n", global_context_program_name());
+    printf("  %s package cache check elm/html --fix-broken # Re-download broken versions\n", global_context_program_name());
+    printf("  %s package cache full-scan                 # Scan all packages in cache\n", global_context_program_name());
+    printf("  %s package cache --from-url <url> elm/html # Download from URL to cache\n", global_context_program_name());
+    printf("  %s package cache --from-file ./pkg elm/html # Download from local file to cache\n", global_context_program_name());
+    printf("  %s package cache --major elm/html         # Download next major version\n", global_context_program_name());
     printf("\n");
     printf("Download Options:\n");
     printf("  <PACKAGE> <VERSION>             # Download specific version (e.g., 1.0.0)\n");
@@ -273,7 +273,7 @@ int cmd_cache(int argc, char *argv[]) {
 
     if (!package_arg) {
         fprintf(stderr, "Error: Package name is required\n");
-        fprintf(stderr, "Usage: %s package cache <PACKAGE>\n", program_name);
+        fprintf(stderr, "Usage: %s package cache <PACKAGE>\n", global_context_program_name());
         return 1;
     }
 

@@ -36,9 +36,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: elm-wrap-${{ matrix.platform }}
-        path: bin/elm-wrap
+        path: bin/wrap
         if-no-files-found: error
     
     - name: Display version
       run: |
-        ./bin/elm-wrap --version || echo "Version command not available"
+        ./bin/wrap --version || echo "Version command not available"

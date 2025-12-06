@@ -9,10 +9,11 @@
 #include "../../protocol_v1/install.h"
 #include "../../protocol_v2/install.h"
 #include "../../protocol_v2/solver/v2_registry.h"
+#include "info_v1.h"
+#include "info_v2.h"
 #include "../../global_context.h"
 #include "../../alloc.h"
 #include "../../log.h"
-#include "../../progname.h"
 #include "../../fileutil.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,7 +28,7 @@
 #endif
 
 static void print_info_usage(void) {
-    printf("Usage: %s package info [PATH | <author/package> [VERSION]]\n", program_name);
+    printf("Usage: %s package info [PATH | <author/package> [VERSION]]\n", global_context_program_name());
     printf("\n");
     printf("Display package management information.\n");
     printf("\n");
@@ -44,10 +45,10 @@ static void print_info_usage(void) {
     printf("  - If VERSION specified: uses that specific version\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s package info                  # Show general package info\n", program_name);
-    printf("  %s package info ./path/to/dir    # Show info for elm.json at path\n", program_name);
-    printf("  %s package info elm/core         # Show info for elm/core package\n", program_name);
-    printf("  %s package info elm/http 2.0.0   # Show info for elm/http 2.0.0\n", program_name);
+    printf("  %s package info                  # Show general package info\n", global_context_program_name());
+    printf("  %s package info ./path/to/dir    # Show info for elm.json at path\n", global_context_program_name());
+    printf("  %s package info elm/core         # Show info for elm/core package\n", global_context_program_name());
+    printf("  %s package info elm/http 2.0.0   # Show info for elm/http 2.0.0\n", global_context_program_name());
     printf("\n");
     printf("Note: Package name format (author/package) takes priority over paths.\n");
     printf("      Use './package/author' to treat as a path instead.\n");

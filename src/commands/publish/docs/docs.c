@@ -4,7 +4,7 @@
 #include "dependency_cache.h"
 #include "path_util.h"
 #include "../../../alloc.h"
-#include "../../../progname.h"
+#include "../../../global_context.h"
 #include "../../../cache.h"
 #include <stdio.h>
 #include <string.h>
@@ -13,12 +13,12 @@
 #include <ctype.h>
 
 static void print_docs_usage(void) {
-    printf("Usage: %s publish docs [OPTIONS] <PATH>\n", program_name);
+    printf("Usage: %s publish docs PATH\n", global_context_program_name());
     printf("\n");
     printf("Generate documentation JSON for an Elm package.\n");
     printf("\n");
     printf("Arguments:\n");
-    printf("  <PATH>             Path to package directory containing elm.json and src/\n");
+    printf("  PATH               Path to package directory containing elm.json and src/\n");
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help         Show this help message\n");

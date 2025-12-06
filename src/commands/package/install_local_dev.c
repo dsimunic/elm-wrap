@@ -36,7 +36,7 @@
 /* Local dev version when package does not exist in registry */
 #define LOCAL_DEV_VERSION_NEW "0.0.0"
 
-/* Tracking directory name under ELM_WRAP_REPOSITORY_LOCAL_PATH */
+/* Tracking directory name under WRAP_REPOSITORY_LOCAL_PATH */
 #define LOCAL_DEV_TRACKING_DIR "_local-dev-dependency-track"
 
 /* Simple hash function for path -> filename */
@@ -52,7 +52,7 @@ static unsigned long hash_path(const char *str) {
 char *get_local_dev_tracking_dir(void) {
     char *repo_path = env_get_repository_local_path();
     if (!repo_path) {
-        log_error("ELM_WRAP_REPOSITORY_LOCAL_PATH is not configured");
+        log_error("WRAP_REPOSITORY_LOCAL_PATH is not configured");
         return NULL;
     }
 

@@ -1,6 +1,6 @@
 # Shared Code Functionality
 
-This document describes the shared modules and functions available for use when implementing new commands or extending existing functionality in elm-wrap. Using these shared modules ensures consistency and reduces code duplication.
+This document describes the shared modules and functions available for use when implementing new commands or extending existing functionality in **elm-wrap**. Using these shared modules ensures consistency and reduces code duplication. Note that the project is called **elm-wrap**, but the binary is named `wrap`.
 
 ## Overview
 
@@ -27,7 +27,7 @@ This module provides shared functionality for commands that wrap the Elm compile
 
 Builds an environment array suitable for `execve()` when running elm commands.
 
-By default, this adds `https_proxy=http://1` to force elm into offline mode, since elm-wrap pre-downloads all packages. Set the environment variable `ELM_WRAP_ALLOW_ELM_ONLINE=1` to skip this and allow elm to access the network.
+By default, this adds `https_proxy=http://1` to force elm into offline mode, since `wrap` pre-downloads all packages. Set the environment variable `WRAP_ALLOW_ELM_ONLINE=1` to skip this and allow elm to access the network.
 
 **Returns:** Arena-allocated environment array, or NULL on failure.
 
@@ -269,6 +269,41 @@ When writing Rulr rules, these are commonly inserted host facts:
 | `source_file(path)` | 1 | Source file in package |
 | `file_module(file, module)` | 2 | File to module mapping |
 | `file_import(file, module)` | 2 | Import in a specific file |
+
+---
+
+## Program Name Access
+
+**Include:** `#include "global_context.h"`
+
+To display the actual program name in error messages and usage text, use the global context function instead of hard-coding "wrap":
+
+### `const char *global_context_program_name(void)`
+
+Returns the actual program name (from `argv[0]`).
+
+This allows the binary to work correctly even if renamed or aliased by the user.
+
+**Returns:** The program name as invoked, or the value from `buildinfo.h` (`build_program_name`) if not initialized. The `build_program_name` constant is automatically synchronized with the Makefile's `TARGET_FILE` variable during build.
+
+**Example:**
+```c
+static void print_usage(void) {
+    printf("Usage: %s command [OPTIONS]\n", global_context_program_name());
+    printf("Run '%s --help' for more information\n", global_context_program_name());
+}
+
+// In error messages
+fprintf(stderr, "Error: Failed to initialize\n");
+fprintf(stderr, "Hint: Run '%s repository new' to create a repository\n",
+        global_context_program_name());
+```
+
+**Important:**
+- The global context is initialized early in `main()` with `argv[0]`
+- The program name is extracted internally using `basename(argv[0])`
+- Never hard-code "wrap" in user-facing messages
+- Subcommands can safely call `global_context_init(argv[0])` again; it will return the existing context
 
 ---
 

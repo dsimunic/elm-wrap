@@ -1,5 +1,5 @@
 /**
- * global_context.c - Global context management for elm-wrap
+ * global_context.c - Global context management
  *
  * This module provides global state that is determined at program startup
  * and influences how commands operate throughout the program's lifetime.
@@ -12,6 +12,7 @@
 #include "alloc.h"
 #include "env_defaults.h"
 #include "elm_compiler.h"
+#include "buildinfo.h"
 #include "log.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,7 +52,7 @@ static CompilerType determine_compiler_type(const char *compiler_name) {
  * Returns "elm" if no custom path is set.
  */
 static char *get_compiler_name(void) {
-    const char *compiler_path = getenv("ELM_WRAP_ELM_COMPILER_PATH");
+    const char *compiler_path = getenv("WRAP_ELM_COMPILER_PATH");
     if (compiler_path && compiler_path[0] != '\0') {
         /* Make a copy to use basename */
         char *path_copy = arena_strdup(compiler_path);
@@ -101,19 +102,33 @@ static char *build_repository_path(const char *root_path, const char *compiler, 
     return repo_path;
 }
 
-GlobalContext *global_context_init(void) {
+GlobalContext *global_context_init(const char *argv0) {
     /* Return existing context if already initialized */
     if (g_context) {
         return g_context;
     }
-    
+
     /* Allocate context */
     g_context = arena_calloc(1, sizeof(GlobalContext));
     if (!g_context) {
         log_error("Failed to allocate global context");
         return NULL;
     }
-    
+
+    /* Extract and store program name from argv[0] */
+    if (argv0 && argv0[0] != '\0') {
+        /* Make a copy to use basename (since basename may modify the string) */
+        char *argv0_copy = arena_strdup(argv0);
+        if (argv0_copy) {
+            char *prog_name = basename(argv0_copy);
+            g_context->program_name = arena_strdup(prog_name);
+        } else {
+            g_context->program_name = arena_strdup(build_program_name);
+        }
+    } else {
+        g_context->program_name = arena_strdup(build_program_name);
+    }
+
     /* Default to V1 mode */
     g_context->protocol_mode = PROTOCOL_V1;
     g_context->compiler_name = NULL;
@@ -208,4 +223,11 @@ bool global_context_is_wrapc(void) {
         return false;
     }
     return g_context->compiler_type == COMPILER_WRAPC;
+}
+
+const char *global_context_program_name(void) {
+    if (!g_context || !g_context->program_name) {
+        return build_program_name;
+    }
+    return g_context->program_name;
 }

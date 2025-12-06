@@ -11,7 +11,7 @@ set -euo pipefail
 # Get script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-ELM_WRAP_BIN="$PROJECT_ROOT/bin/elm-wrap"
+WRAP_BIN="$PROJECT_ROOT/bin/wrap"
 
 # Default paths
 DEFAULT_REPOSITORY_DIR="/Volumes/Devel/var/elm-wrap/package_repository/0.19.1/packages"
@@ -47,9 +47,9 @@ if [ ! -d "$REPOSITORY_DIR" ]; then
     exit 1
 fi
 
-# Check if elm-wrap binary exists
-if [ ! -x "$ELM_WRAP_BIN" ]; then
-    echo "Error: elm-wrap binary not found at $ELM_WRAP_BIN" >&2
+# Check if wrap binary exists
+if [ ! -x "$WRAP_BIN" ]; then
+    echo "Error: wrap binary not found at $WRAP_BIN" >&2
     exit 1
 fi
 
@@ -117,12 +117,12 @@ while IFS= read -r -d '' elm_json_path; do
     failed_rules=""
     
     # Check no_unused_dependencies rule
-    "$ELM_WRAP_BIN" review package "$package_dir" \
+    "$WRAP_BIN" review package "$package_dir" \
         --rule "$RULE_NO_UNUSED_DEPS" \
         -q >/dev/null 2>&1 || failed_rules="no_unused_dependencies"
     
     # Check no_redundant_files rule
-    "$ELM_WRAP_BIN" review package "$package_dir" \
+    "$WRAP_BIN" review package "$package_dir" \
         --rule "$RULE_NO_REDUNDANT_FILES" \
         -q >/dev/null 2>&1 || {
             if [ -n "$failed_rules" ]; then

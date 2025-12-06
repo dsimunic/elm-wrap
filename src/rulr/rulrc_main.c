@@ -35,20 +35,20 @@
 static int verbose = 0;
 
 static void print_usage(const char *prog) {
-    printf("Usage: %s compile [options] <file.dl>\n", prog);
-    printf("       %s compile --output <out.dlc>   (read from stdin)\n", prog);
-    printf("       %s view <file.dlc>\n", prog);
-    printf("       %s [options] <path> [path ...]  (batch mode)\n", prog);
+    printf("Usage: %s compile [options] RULE_FILE\n", prog);
+    printf("       %s compile --output OUTPUT_FILE  (read from stdin)\n", prog);
+    printf("       %s view COMPILED_FILE\n", prog);
+    printf("       %s [options] PATH [PATH ...]  (batch mode)\n", prog);
     printf("\n");
-    printf("Compile .dl (Datalog) rule files to binary .dlc format.\n");
+    printf("Compile .dl source rule files to binary .dlc format.\n");
     printf("\n");
     printf("Commands:\n");
-    printf("  compile <file>   Compile a .dl file to .dlc\n");
-    printf("  view <file>      Pretty-print a compiled .dlc file\n");
-    printf("  <path>           Compile .dl file(s) or all .dl files in directory\n");
+    printf("  compile FILE     Compile a source FILE\n");
+    printf("  view FILE        Pretty-print a compiled FILE\n");
+    printf("  PATH             Compile all source file(s) in a directory at PATH\n");
     printf("\n");
     printf("Options:\n");
-    printf("  -o, --output <file>  Output file path (for compile command)\n");
+    printf("  -o, --output FILE    Output file path (for compile command)\n");
     printf("  -v, --verbose        Verbose output\n");
     printf("  -h, --help           Show this help message\n");
     printf("\n");

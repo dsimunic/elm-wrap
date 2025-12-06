@@ -1,8 +1,8 @@
 /**
- * builtin_rules.h - Built-in rules embedded in the elm-wrap binary
+ * builtin_rules.h - Built-in rules embedded in the comand binary
  *
  * This module provides access to pre-compiled rulr rules that are embedded
- * in the elm-wrap binary as a zip archive appended to the executable.
+ * in the command binary as a zip archive appended to the executable.
  *
  * The zip archive contains .dlc (compiled Datalog) files that can be loaded
  * directly without needing external rule files.

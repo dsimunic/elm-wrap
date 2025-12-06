@@ -1,5 +1,6 @@
 #include "http_client.h"
 #include "alloc.h"
+#include "http_constants.h"
 #include <curl/curl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -202,12 +203,12 @@ HttpResult http_download_file(CurlSession *session, const char *url, const char 
     long response_code;
     curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &response_code);
 
-    if (response_code >= 200 && response_code < 300) {
+    if (http_is_success(response_code)) {
         return HTTP_OK;
-    } else if (response_code >= 400 && response_code < 500) {
+    } else if (http_is_client_error(response_code)) {
         remove(dest_path);
         return HTTP_ERROR_4XX;
-    } else if (response_code >= 500) {
+    } else if (http_is_server_error(response_code)) {
         remove(dest_path);
         return HTTP_ERROR_5XX;
     }
@@ -241,11 +242,11 @@ HttpResult http_head(CurlSession *session, const char *url) {
     long response_code;
     curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &response_code);
 
-    if (response_code >= 200 && response_code < 300) {
+    if (http_is_success(response_code)) {
         return HTTP_OK;
-    } else if (response_code >= 400 && response_code < 500) {
+    } else if (http_is_client_error(response_code)) {
         return HTTP_ERROR_4XX;
-    } else if (response_code >= 500) {
+    } else if (http_is_server_error(response_code)) {
         return HTTP_ERROR_5XX;
     }
 
@@ -281,11 +282,11 @@ HttpResult http_get_json(CurlSession *session, const char *url, MemoryBuffer *ou
     long response_code;
     curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &response_code);
 
-    if (response_code >= 200 && response_code < 300) {
+    if (http_is_success(response_code)) {
         return HTTP_OK;
-    } else if (response_code >= 400 && response_code < 500) {
+    } else if (http_is_client_error(response_code)) {
         return HTTP_ERROR_4XX;
-    } else if (response_code >= 500) {
+    } else if (http_is_server_error(response_code)) {
         return HTTP_ERROR_5XX;
     }
 

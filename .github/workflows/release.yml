@@ -44,11 +44,11 @@ jobs:
         include:
           - os: macos-14
             platform: macos-arm64
-            artifact_name: elm-wrap
+            artifact_name: wrap
             asset_name: elm-wrap-macos-arm64
           - os: macos-15-intel
             platform: macos-amd64
-            artifact_name: elm-wrap
+            artifact_name: wrap
             asset_name: elm-wrap-macos-amd64
     
     steps:

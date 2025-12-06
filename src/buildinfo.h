@@ -2,6 +2,7 @@
 #define BUILDINFO_H
 
 /* Build metadata - generated at compile time by buildinfo.mk */
+extern const char *build_program_name;
 extern const char *build_base_version;
 extern const char *build_full_version;
 extern const char *build_commit_short;

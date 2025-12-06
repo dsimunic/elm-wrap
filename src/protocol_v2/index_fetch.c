@@ -8,8 +8,10 @@
 #include "index_fetch.h"
 #include "../alloc.h"
 #include "../buildinfo.h"
+#include "../constants.h"
 #include "../env_defaults.h"
 #include "../http_client.h"
+#include "../http_constants.h"
 #include "../log.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,14 +41,14 @@ static int progress_callback(void *clientp,
     gettimeofday(&now, NULL);
 
     double elapsed = (now.tv_sec - state->start_time.tv_sec) +
-                     (now.tv_usec - state->start_time.tv_usec) / 1000000.0;
+                     (now.tv_usec - state->start_time.tv_usec) / MICROSECONDS_PER_SECOND;
 
     /* If download is taking longer than 1 second, show progress */
     if (elapsed >= 1.0 && dlnow > 0) {
         if (!state->progress_started) {
             /* First progress report - announce file size if known */
             if (dltotal > 0) {
-                printf("Downloading index (%.1f KB)...", (double)dltotal / 1024.0);
+                printf("Downloading index (%.1f KB)...", (double)dltotal / BYTES_PER_KB);
             } else {
                 printf("Downloading index...");
             }
@@ -55,7 +57,7 @@ static int progress_callback(void *clientp,
             state->last_reported_bytes = dlnow;
         } else {
             /* Show dots for progress (every 50KB) */
-            curl_off_t bytes_per_dot = 50 * 1024;
+            curl_off_t bytes_per_dot = PROGRESS_BYTES_PER_DOT;
             curl_off_t dots_now = dlnow / bytes_per_dot;
             curl_off_t dots_last = state->last_reported_bytes / bytes_per_dot;
             for (curl_off_t i = dots_last; i < dots_now; i++) {
@@ -85,7 +87,7 @@ bool v2_index_fetch(const char *repo_path, const char *compiler, const char *ver
     /* Get base URL from environment/defaults */
     char *base_url = env_get_registry_v2_full_index_url();
     if (!base_url || base_url[0] == '\0') {
-        log_error("ELM_WRAP_REGISTRY_V2_FULL_INDEX_URL is not configured");
+        log_error("WRAP_REGISTRY_V2_FULL_INDEX_URL is not configured");
         return false;
     }
 
@@ -147,7 +149,8 @@ bool v2_index_fetch(const char *repo_path, const char *compiler, const char *ver
 
     /* Configure curl */
     char error_buffer[CURL_ERROR_SIZE] = {0};
-    char user_agent[64];
+    char user_agent[MAX_USER_AGENT_LENGTH];
+    /* We'll stick to `elm-wrap` user agent identifier regardless of the actual command binary's name */
     snprintf(user_agent, sizeof(user_agent), "elm-wrap/%s", build_base_version);
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, file_write_cb);
@@ -187,13 +190,13 @@ bool v2_index_fetch(const char *repo_path, const char *compiler, const char *ver
         long response_code = 0;
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
 
-        if (response_code >= 200 && response_code < 300) {
+        if (http_is_success(response_code)) {
             /* Get downloaded file size */
             curl_off_t dl_size = 0;
             curl_easy_getinfo(curl, CURLINFO_SIZE_DOWNLOAD_T, &dl_size);
-            printf("Downloaded index.dat (%.1f KB)\n", (double)dl_size / 1024.0);
+            printf("Downloaded index.dat (%.1f KB)\n", (double)dl_size / BYTES_PER_KB);
             success = true;
-        } else if (response_code >= 400 && response_code < 500) {
+        } else if (http_is_client_error(response_code)) {
             log_error("Index not found: HTTP %ld (URL: %s)", response_code, url);
             remove(dest_path);
         } else {

@@ -1,9 +1,9 @@
 #include "package_common.h"
 #include "install_local_dev.h"
 #include "../../install_env.h"
+#include "../../global_context.h"
 #include "../../alloc.h"
 #include "../../log.h"
-#include "../../progname.h"
 #include "../../embedded_archive.h"
 #include "../../fileutil.h"
 #include "../../vendor/cJSON.h"
@@ -20,7 +20,7 @@
 #define TEMPLATE_PREFIX "templates/package/init"
 
 static void print_package_init_usage(void) {
-    printf("Usage: %s package init [--no-local-dev] author/name\n", program_name);
+    printf("Usage: %s package init [--no-local-dev] PACKAGE\n", global_context_program_name());
     printf("\n");
     printf("Initialize a new Elm package from embedded templates.\n");
     printf("\nOptions:\n");

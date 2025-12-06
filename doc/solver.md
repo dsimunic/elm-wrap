@@ -69,7 +69,7 @@ The solver employs multiple strategies in order of preference:
 4. **Until next major** version for direct dependencies
 5. **Any version** for direct dependencies
 
-For Elm application projects, `elm-wrap` mirrors this ladder in its C
+For Elm application projects, **elm-wrap** mirrors this ladder in its C
 implementation. In particular, for the most permissive "any version" / major
 upgrade strategy, the client-side solver does not add additional elm-version
 constraints for individual packages. Instead, it relies on the registry

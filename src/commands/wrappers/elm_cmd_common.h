@@ -15,7 +15,7 @@
  * Build an environment array for running elm commands.
  * 
  * By default, adds https_proxy=http://1 to force elm into offline mode
- * (since we pre-download all packages). Set ELM_WRAP_ALLOW_ELM_ONLINE=1
+ * (since we pre-download all packages). Set WRAP_ALLOW_ELM_ONLINE=1
  * to skip this and allow elm to access the network.
  *
  * Returns NULL if memory allocation fails.

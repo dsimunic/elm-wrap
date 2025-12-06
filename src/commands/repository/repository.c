@@ -7,7 +7,7 @@
 
 #include "repository.h"
 #include "../../alloc.h"
-#include "../../progname.h"
+#include "../../global_context.h"
 #include "../../env_defaults.h"
 #include "../../elm_compiler.h"
 #include "../../elm_json.h"
@@ -34,13 +34,13 @@
  * ========================================================================== */
 
 static void print_repository_usage(void) {
-    printf("Usage: %s repository SUBCOMMAND [OPTIONS]\n", program_name);
+    printf("Usage: %s repository SUBCOMMAND [OPTIONS]\n", global_context_program_name());
     printf("\n");
     printf("Manage local package repositories.\n");
     printf("\n");
     printf("Subcommands:\n");
-    printf("  new [<root_path>]     Create a new repository directory\n");
-    printf("  list [<root_path>]    List repositories at path\n");
+    printf("  init [ROOT_PATH]      Create a new repository directory\n");
+    printf("  list [ROOT_PATH]      List repositories at path\n");
     printf("  local-dev             Manage local development tracking\n");
     printf("\n");
     printf("Options:\n");
@@ -48,45 +48,45 @@ static void print_repository_usage(void) {
 }
 
 static void print_new_usage(void) {
-    printf("Usage: %s repository new [<root_path>] [OPTIONS]\n", program_name);
+    printf("Usage: %s repository init [ROOT_PATH] [OPTIONS]\n", global_context_program_name());
     printf("\n");
     printf("Create a new repository directory for the current (or specified) compiler.\n");
     printf("\n");
     printf("Arguments:\n");
-    printf("  <root_path>           Root path for repositories (default: ELM_WRAP_REPOSITORY_LOCAL_PATH)\n");
+    printf("  ROOT_PATH             Root path for repositories (default: WRAP_REPOSITORY_LOCAL_PATH)\n");
     printf("\n");
     printf("Options:\n");
-    printf("  --compiler <name>     Compiler name (elm, lamdera, wrapc, etc.)\n");
-    printf("  --version <version>   Compiler version (e.g., 0.19.1)\n");
+    printf("  --compiler NAME       Compiler name (elm, lamdera, wrapc, etc.)\n");
+    printf("  --version VERSION     Compiler version (e.g., 0.19.1)\n");
     printf("  -h, --help            Show this help message\n");
     printf("\n");
-    printf("The repository path is: <root_path>/<compiler>/<version>/\n");
+    printf("The repository path is: ROOT_PATH/NAME/VERSION\n");
     printf("For example: ~/.elm-wrap/repository/elm/0.19.1/\n");
 }
 
 static void print_list_usage(void) {
-    printf("Usage: %s repository list [<root_path>]\n", program_name);
+    printf("Usage: %s repository list [ROOT_PATH]\n", global_context_program_name());
     printf("\n");
     printf("List all repositories at the given path.\n");
     printf("\n");
     printf("Arguments:\n");
-    printf("  <root_path>           Root path for repositories (default: ELM_WRAP_REPOSITORY_LOCAL_PATH)\n");
+    printf("  ROOT_PATH             Root path for repositories (default: WRAP_REPOSITORY_LOCAL_PATH)\n");
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help            Show this help message\n");
 }
 
 static void print_local_dev_usage(void) {
-    printf("Usage: %s repository local-dev [COMMAND]\n", program_name);
+    printf("Usage: %s repository local-dev [COMMAND]\n", global_context_program_name());
     printf("\n");
     printf("Manage local development package tracking.\n");
     printf("\n");
     printf("Commands:\n");
     printf("  (no command)          List all tracked local-dev packages and their dependents\n");
     printf("  clear --all           Clear all dependency tracking\n");
-    printf("  clear <author/name> <version>\n");
+    printf("  clear PACKAGE VERSION\n");
     printf("                        Clear tracking for a specific package version\n");
-    printf("  clear <author/name> <version> <path>\n");
+    printf("  clear PACKAGE VERSION PATH\n");
     printf("                        Clear tracking for a specific path only\n");
     printf("\n");
     printf("Options:\n");
@@ -103,7 +103,7 @@ static void print_local_dev_usage(void) {
  * Returns "elm" if no custom path is set.
  */
 static char *get_compiler_name(void) {
-    const char *compiler_path = getenv("ELM_WRAP_ELM_COMPILER_PATH");
+    const char *compiler_path = getenv("WRAP_ELM_COMPILER_PATH");
     if (compiler_path && compiler_path[0] != '\0') {
         /* Make a copy to use basename */
         char *path_copy = arena_strdup(compiler_path);
@@ -233,11 +233,11 @@ int cmd_repository_new(int argc, char *argv[]) {
 
     if (!effective_root || effective_root[0] == '\0') {
         fprintf(stderr, "Error: Could not determine repository root path\n");
-        fprintf(stderr, "Set ELM_WRAP_REPOSITORY_LOCAL_PATH or provide a path argument\n");
+        fprintf(stderr, "Set WRAP_REPOSITORY_LOCAL_PATH or provide a path argument\n");
         return 1;
     }
 
-    /* Get compiler name (from argument, ELM_WRAP_ELM_COMPILER_PATH basename, or "elm") */
+    /* Get compiler name (from argument, WRAP_ELM_COMPILER_PATH basename, or "elm") */
     char *effective_compiler = NULL;
     if (compiler_name) {
         effective_compiler = arena_strdup(compiler_name);
@@ -357,7 +357,7 @@ int cmd_repository_list(int argc, char *argv[]) {
 
     if (!effective_root || effective_root[0] == '\0') {
         fprintf(stderr, "Error: Could not determine repository root path\n");
-        fprintf(stderr, "Set ELM_WRAP_REPOSITORY_LOCAL_PATH or provide a path argument\n");
+        fprintf(stderr, "Set WRAP_REPOSITORY_LOCAL_PATH or provide a path argument\n");
         return 1;
     }
 
@@ -464,7 +464,7 @@ int cmd_repository_list(int argc, char *argv[]) {
  * Local-dev Subcommand
  * ========================================================================== */
 
-/* Tracking directory name under ELM_WRAP_REPOSITORY_LOCAL_PATH */
+/* Tracking directory name under WRAP_REPOSITORY_LOCAL_PATH */
 #define LOCAL_DEV_TRACKING_DIR "_local-dev-dependency-track"
 
 typedef struct {
@@ -1110,7 +1110,7 @@ int cmd_repository(int argc, char *argv[]) {
         return 0;
     }
 
-    if (strcmp(subcmd, "new") == 0) {
+    if (strcmp(subcmd, "init") == 0) {
         return cmd_repository_new(argc - 1, argv + 1);
     }
 
@@ -1123,6 +1123,6 @@ int cmd_repository(int argc, char *argv[]) {
     }
 
     fprintf(stderr, "Error: Unknown repository subcommand '%s'\n", subcmd);
-    fprintf(stderr, "Run '%s repository --help' for usage information.\n", program_name);
+    fprintf(stderr, "Run '%s repository --help' for usage information.\n", global_context_program_name());
     return 1;
 }

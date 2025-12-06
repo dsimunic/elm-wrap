@@ -26,7 +26,6 @@
 #include "commands/repository/repository.h"
 #include "alloc.h"
 #include "log.h"
-#include "progname.h"
 #include "rulr/builtin_rules.h"
 #include "global_context.h"
 #include "embedded_archive.h"
@@ -57,18 +56,18 @@ void print_usage(const char *prog) {
 
         case COMPILER_LAMDERA:
             /* Lamdera commands - ordered as in lamdera --help */
-            printf("  live               Local development with live reload\n");
-            printf("  login              Log in to the Lamdera CLI\n");
-            printf("  check              Compile and type-check against deployed app\n");
-            printf("  deploy             Deploy Lamdera app after a successful check\n");
-            printf("  init               Start a Lamdera Elm project\n");
-            printf("  install <PACKAGE>  Install packages for your Elm project\n");
-            printf("  make <ELM_FILE>    Compile Elm code to JavaScript or HTML\n");
-            printf("  repl               Open an interactive programming session\n");
-            printf("  reset              Delete all compiler caches\n");
-            printf("  update             Update the Lamdera compiler to latest version\n");
-            printf("  annotate <FILE> <EXPR>  Print the type annotation for expression\n");
-            printf("  eval <FILE> <EXPR>      Evaluate an expression\n");
+            printf("  live                 Local development with live reload\n");
+            printf("  login                Log in to the Lamdera CLI\n");
+            printf("  check                Compile and type-check against deployed app\n");
+            printf("  deploy               Deploy Lamdera app after a successful check\n");
+            printf("  init                 Start a Lamdera Elm project\n");
+            printf("  install PACKAGE      Install packages for your Elm project\n");
+            printf("  make ELM_FILE        Compile Elm code to JavaScript or HTML\n");
+            printf("  repl                 Open an interactive programming session\n");
+            printf("  reset                Delete all compiler caches\n");
+            printf("  update               Update the Lamdera compiler to latest version\n");
+            printf("  annotate FILE EXPR   Print the type annotation for expression\n");
+            printf("  eval FILE EXPR       Evaluate an expression\n");
             break;
 
         case COMPILER_ELM:
@@ -78,22 +77,22 @@ void print_usage(const char *prog) {
             printf("  repl               Open an interactive Elm REPL\n");
             printf("  init               Initialize a new Elm project\n");
             printf("  reactor            Start the Elm Reactor development server\n");
-            printf("  make <ELM_FILE>    Compile Elm code to JavaScript or HTML\n");
-            printf("  install <PACKAGE>  Install packages for your Elm project\n");
+            printf("  make ELM_FILE      Compile Elm code to JavaScript or HTML\n");
+            printf("  install PACKAGE    Install packages for your Elm project\n");
             printf("  bump               Bump version based on API changes\n");
             printf("  diff [VERSION]     Show API differences between versions\n");
             break;
     }
 
     printf("\n");
-    printf("  config             Display current configuration\n");
-    printf("  application SUBCOMMAND Application management commands\n");
-    printf("  package SUBCOMMAND Package management commands\n");
-    printf("  repository SUBCOMMAND Repository management commands\n");
-    printf("  code SUBCOMMAND    Code analysis and transformation commands\n");
-    printf("  policy SUBCOMMAND  View and manage rulr policy rules\n");
-    printf("  review SUBCOMMAND  Run rulr rules against Elm files\n");
-    printf("  debug SUBCOMMAND   Diagnostic tools for development\n");
+    printf("  config                    Display current configuration\n");
+    printf("  application SUBCOMMAND    Application management commands\n");
+    printf("  package SUBCOMMAND        Package management commands\n");
+    printf("  repository SUBCOMMAND     Repository management commands\n");
+    printf("  code SUBCOMMAND           Code analysis and transformation commands\n");
+    printf("  policy SUBCOMMAND         View and manage rulr policy rules\n");
+    printf("  review SUBCOMMAND         Run review rules against Elm files\n");
+    printf("  debug SUBCOMMAND          Diagnostic tools for development\n");
     printf("\nOptions:\n");
     printf("  -v, --verbose      Show detailed logging output\n");
     printf("  -vv                Show extra verbose (trace) logging output\n");
@@ -106,9 +105,9 @@ void print_usage(const char *prog) {
 void print_package_usage(const char *prog) {
     printf("Usage: %s package SUBCOMMAND [OPTIONS]\n", prog);
     printf("\nSubcommands:\n");
-    printf("  install [PACKAGE]              Add a dependency to current elm.json\n");
-    printf("  init author/name               Initialize a package from embedded templates\n");
-    printf("  upgrade [PACKAGE]              Upgrade packages to latest versions\n");
+    printf("  install PACKAGE                Add a dependency to current elm.json\n");
+    printf("  init PACKAGE                   Initialize a package\n");
+    printf("  upgrade PACKAGE                Upgrade packages to latest versions\n");
     printf("  remove   PACKAGE               Remove a package from elm.json\n");
     printf("  info    [ PATH                 Display package information and upgrades\n");
     printf("          | PACKAGE [VERSION]\n");
@@ -183,12 +182,7 @@ int cmd_package(int argc, char *argv[], const char *prog) {
 int main(int argc, char *argv[]) {
     alloc_init();
 
-    // Set global program name (extract basename from path)
-    // NOTE: Must use arena_strdup because basename() on macOS uses a static buffer
-    // that gets overwritten by subsequent basename() calls (e.g., in global_context_init)
-    program_name = arena_strdup(basename(argv[0]));
-
-    /* 
+    /*
      * Initialize built-in rules subsystem.
      * Get the full path to the executable to find the embedded zip archive.
      */
@@ -263,8 +257,8 @@ int main(int argc, char *argv[]) {
     // Initialize logging
     log_init(verbosity);
 
-    // Initialize global context (determines V1 vs V2 mode)
-    global_context_init();
+    // Initialize global context (determines V1 vs V2 mode and stores program name from argv[0])
+    global_context_init(argv[0]);
 
     if (argc > 1) {
         if (strcmp(argv[1], "-V") == 0) {
@@ -283,7 +277,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
-            print_usage(program_name);
+            print_usage(global_context_program_name());
             return 0;
         }
 
@@ -309,7 +303,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (strcmp(argv[1], "package") == 0) {
-            return cmd_package(argc - 1, argv + 1, program_name);
+            return cmd_package(argc - 1, argv + 1, global_context_program_name());
         }
 
         if (strcmp(argv[1], "application") == 0 || strcmp(argv[1], "app") == 0) {
@@ -358,11 +352,11 @@ int main(int argc, char *argv[]) {
 
         // Unknown command
         fprintf(stderr, "Error: Unknown command '%s'\n", argv[1]);
-        fprintf(stderr, "Run '%s --help' for usage information.\n", program_name);
+        fprintf(stderr, "Run '%s --help' for usage information.\n", global_context_program_name());
         return 1;
     }
 
     // No command specified
-    print_usage(program_name);
+    print_usage(global_context_program_name());
     return 1;
 }

@@ -315,7 +315,7 @@ Cases:
 
 ### 5.3 Integration Tests (CLI Level)
 
-For now, these can be manual tests using `elm-wrap`:
+For now, these can be manual tests using `wrap`:
 
 - **Install a simple package**
   - Create a dummy project `elm.json` with no dependencies.

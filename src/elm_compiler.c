@@ -43,7 +43,7 @@ static char* find_elm_binary_in_path(void) {
 }
 
 char* elm_compiler_get_path(void) {
-    const char *compiler_path = getenv("ELM_WRAP_ELM_COMPILER_PATH");
+    const char *compiler_path = getenv("WRAP_ELM_COMPILER_PATH");
     if (compiler_path && compiler_path[0] != '\0') {
         return arena_strdup(compiler_path);
     }

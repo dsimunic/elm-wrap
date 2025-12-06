@@ -14,7 +14,9 @@
 #include "review.h"
 #include "reporter.h"
 #include "../../alloc.h"
-#include "../../progname.h"
+#include "../../constants.h"
+#include "../../exit_codes.h"
+#include "../../global_context.h"
 #include "../../elm_json.h"
 #include "../../fileutil.h"
 #include "../../ast/skeleton.h"
@@ -40,13 +42,13 @@
  * ========================================================================== */
 
 static void print_review_usage(void) {
-    printf("Usage: %s review SUBCOMMAND [OPTIONS]\n", program_name);
+    printf("Usage: %s review SUBCOMMAND [OPTIONS]\n", global_context_program_name());
     printf("\n");
     printf("Run rulr rules against Elm source files for code review.\n");
     printf("\n");
     printf("Subcommands:\n");
-    printf("  file <FILE>        Analyze an Elm source file with rulr rules\n");
-    printf("  package <PATH>     Analyze an Elm package directory with rulr rules\n");
+    printf("  file FILE          Analyze an Elm source file with rulr rules\n");
+    printf("  package PATH       Analyze an Elm package directory with rulr rules\n");
     printf("\n");
     printf("Options:\n");
     printf("  -q, --quiet        Quiet mode: no output, exit 100 on first error, 0 if OK\n");
@@ -54,23 +56,23 @@ static void print_review_usage(void) {
 }
 
 static void print_file_usage(void) {
-    printf("Usage: %s review file <FILE> [OPTIONS]\n", program_name);
+    printf("Usage: %s review file FILE [OPTIONS]\n", global_context_program_name());
     printf("\n");
-    printf("Analyze an Elm source file using rulr (Datalog) rules.\n");
+    printf("Analyze an Elm source file using rulr rules.\n");
     printf("\n");
     printf("Arguments:\n");
-    printf("  <FILE>             Path to Elm source file (.elm)\n");
+    printf("  FILE               Path to Elm source file (.elm)\n");
     printf("\n");
     printf("Options:\n");
-    printf("  --config <PATH>    Path to elm.json (default: auto-detect in parent dirs)\n");
-    printf("  --rule <NAME>      Rule name or path (without extension) - can be repeated\n");
+    printf("  --config PATH      Path to elm.json (default: auto-detect in parent dirs)\n");
+    printf("  --rule NAME        Rule name or path (without extension) - can be repeated\n");
     printf("                     Tries .dlc (compiled) first, falls back to .dl (source)\n");
     printf("  -q, --quiet        Quiet mode: no output, exit 100 on first error, 0 if OK\n");
     printf("  -h, --help         Show this help message\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s review file src/Main.elm --rule rules/no-debug\n", program_name);
-    printf("  %s review file src/Main.elm --config elm.json --rule a --rule b\n", program_name);
+    printf("  %s review file src/Main.elm --rule rules/no-debug\n", global_context_program_name());
+    printf("  %s review file src/Main.elm --config elm.json --rule a --rule b\n", global_context_program_name());
     printf("\n");
     printf("Host-generated facts available in rules:\n");
     printf("  module(name)                   - Module name\n");
@@ -92,21 +94,21 @@ static void print_file_usage(void) {
 }
 
 static void print_package_usage(void) {
-    printf("Usage: %s review package <PATH> [OPTIONS]\n", program_name);
+    printf("Usage: %s review package PATH [OPTIONS]\n", global_context_program_name());
     printf("\n");
-    printf("Analyze an Elm package directory using rulr (Datalog) rules.\n");
+    printf("Analyze an Elm package directory using rulr rules.\n");
     printf("\n");
     printf("Arguments:\n");
-    printf("  <PATH>             Path to package directory (must contain elm.json, src/)\n");
+    printf("  PATH               Path to package directory (must contain elm.json, src/)\n");
     printf("\n");
     printf("Options:\n");
-    printf("  --rule <NAME>      Rule name or path (without extension) - can be repeated\n");
+    printf("  --rule NAME        Rule name or path (without extension) - can be repeated\n");
     printf("                     Tries .dlc (compiled) first, falls back to .dl (source)\n");
     printf("  -q, --quiet        Quiet mode: no output, exit 100 on first error, 0 if OK\n");
     printf("  -h, --help         Show this help message\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s review package /path/to/package --rule rules/no_redundant_files\n", program_name);
+    printf("  %s review package /path/to/package --rule rules/no_redundant_files\n", global_context_program_name());
     printf("\n");
     printf("Host-generated facts available in rules:\n");
     printf("  exposed_module(module)         - Modules from exposed-modules in elm.json\n");
@@ -382,7 +384,7 @@ static char **parse_package_exposed_modules(const char *elm_json_path, int *coun
     arena_free(content);
     if (!root) return NULL;
 
-    int modules_capacity = 16;
+    int modules_capacity = INITIAL_MODULE_CAPACITY;
     int modules_count = 0;
     char **modules = arena_malloc(modules_capacity * sizeof(char*));
     if (!modules) {
@@ -800,7 +802,7 @@ static char **pkg_parse_exposed_modules(const char *elm_json_path, int *count) {
         return NULL;
     }
 
-    int modules_capacity = 16;
+    int modules_capacity = INITIAL_MODULE_CAPACITY;
     int modules_count = 0;
     char **modules = arena_malloc(modules_capacity * sizeof(char*));
 
@@ -1151,7 +1153,7 @@ int cmd_review_package(int argc, char *argv[]) {
     char *clean_path = strip_trailing_slash(pkg_path);
     
     /* Check for elm.json */
-    char elm_json_path[2048];
+    char elm_json_path[MAX_MEDIUM_PATH_LENGTH];
     snprintf(elm_json_path, sizeof(elm_json_path), "%s/elm.json", clean_path);
     if (!file_exists(elm_json_path)) {
         if (!quiet_mode) {
@@ -1161,7 +1163,7 @@ int cmd_review_package(int argc, char *argv[]) {
     }
 
     /* Build src directory path */
-    char src_dir[2048];
+    char src_dir[MAX_MEDIUM_PATH_LENGTH];
     snprintf(src_dir, sizeof(src_dir), "%s/src", clean_path);
     
     /* Parse exposed modules */
@@ -1187,20 +1189,20 @@ int cmd_review_package(int argc, char *argv[]) {
     }
 
     /* Collect all .elm files in src */
-    int all_elm_files_capacity = 256;
+    int all_elm_files_capacity = INITIAL_FILE_CAPACITY;
     int all_elm_files_count = 0;
     char **all_elm_files = arena_malloc(all_elm_files_capacity * sizeof(char*));
     pkg_collect_all_elm_files(src_dir, &all_elm_files, &all_elm_files_count, &all_elm_files_capacity);
 
     /* Collect ALL files in the package (for package_file facts) */
-    int all_pkg_files_capacity = 256;
+    int all_pkg_files_capacity = INITIAL_FILE_CAPACITY;
     int all_pkg_files_count = 0;
     char **all_pkg_files = arena_malloc(all_pkg_files_capacity * sizeof(char*));
     pkg_collect_all_files(clean_path, &all_pkg_files, &all_pkg_files_count, &all_pkg_files_capacity);
 
     /* Build allowed root file paths */
-    char license_path[2048];
-    char readme_path[2048];
+    char license_path[MAX_MEDIUM_PATH_LENGTH];
+    char readme_path[MAX_MEDIUM_PATH_LENGTH];
     snprintf(license_path, sizeof(license_path), "%s/LICENSE", clean_path);
     snprintf(readme_path, sizeof(readme_path), "%s/README.md", clean_path);
     
@@ -1350,7 +1352,7 @@ int cmd_review_package(int argc, char *argv[]) {
                 if (abs_license) free(abs_license);
                 if (abs_readme) free(abs_readme);
                 if (abs_elm_json) free(abs_elm_json);
-                return 100;
+                return EXIT_NO_UPGRADES_AVAILABLE;
             }
             if (skip_error_detail) {
                 printf("Found %d error(s) (see redundant files below)\n", error_view.num_tuples);
@@ -1424,6 +1426,6 @@ int cmd_review(int argc, char *argv[]) {
     }
 
     fprintf(stderr, "Error: Unknown review subcommand '%s'\n", subcmd);
-    fprintf(stderr, "Run '%s review --help' for usage information.\n", program_name);
+    fprintf(stderr, "Run '%s review --help' for usage information.\n", global_context_program_name());
     return 1;
 }

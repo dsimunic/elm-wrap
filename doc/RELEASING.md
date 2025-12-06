@@ -1,6 +1,6 @@
-# Releasing elm-wrap
+# Releasing **elm-wrap**
 
-This document describes how to cut a new elm-wrap release and how the Homebrew tap is wired into the process.
+This document describes how to cut a new **elm-wrap** release and how the Homebrew tap is wired into the process.
 
 The high‑level flow is:
 
@@ -8,7 +8,7 @@ The high‑level flow is:
 2. Tag the release (`vX.Y.Z`) and push the tag.
 3. GitHub Actions builds release binaries and publishes a GitHub Release.
 4. A second workflow notifies the Homebrew tap repository.
-5. The tap updates the `elm-wrap` formula automatically and pushes the change.
+5. The tap updates the **elm-wrap** formula automatically and pushes the change.
 
 Once everything is green, users can install or upgrade via:
 
@@ -148,9 +148,9 @@ This Homebrew formula:
 - Defines macOS URLs and SHA256 checksums for:
   - `elm-wrap-macos-arm64`
   - `elm-wrap-macos-amd64`
-- Installs the appropriate binary as `elm-wrap` in `bin`.
+- Installs the appropriate binary as `wrap` in `bin`.
 - Includes a basic test:
-  - Runs `elm-wrap --help` and checks the output.
+  - Runs `wrap --help` and checks the output.
 
 The formula is **auto‑generated** by the tap workflow described below and should not need manual editing for normal releases.
 
@@ -210,10 +210,10 @@ In `dsimunic/elm-wrap`:
 
 3. Optional: download and test the binary locally:
    ```bash
-   curl -L -o elm-wrap \
+   curl -L -o wrap \
      https://github.com/dsimunic/elm-wrap/releases/download/vX.Y.Z/elm-wrap-macos-arm64
-   chmod +x elm-wrap
-   ./elm-wrap --version
+   chmod +x wrap
+   ./wrap --version
    ```
 
 ### 2. Tap repo: formula update
@@ -242,11 +242,11 @@ brew upgrade dsimunic/elm-wrap/elm-wrap     # upgrade existing install
 Then verify:
 
 ```bash
-elm-wrap --help
-elm-wrap --version
+wrap --help
+wrap --version
 ```
 
-If `elm-wrap --version` includes the correct base version (e.g. `1.2.3`), the release and tap are in sync.
+If `wrap --version` includes the correct base version (e.g. `1.2.3`), the release and tap are in sync.
 
 ## One-time setup vs ongoing releases
 
@@ -283,5 +283,5 @@ If `elm-wrap --version` includes the correct base version (e.g. `1.2.3`), the re
   - Fix the underlying build/test issue in `dsimunic/elm-wrap`.
   - Push a new commit and tag (e.g. bump patch to `vX.Y.(Z+1)`).
 
-This process keeps the elm-wrap binary releases, GitHub Releases, and Homebrew tap formula all in sync with a single `git tag` operation. 
+This process keeps the **elm-wrap** binary releases, GitHub Releases, and Homebrew tap formula all in sync with a single `git tag` operation. 
 

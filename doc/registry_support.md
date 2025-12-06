@@ -15,7 +15,7 @@ Policy-wise, we can imagine an organization internally wanting to distribute pac
 
 Clearly there are a number of possible ways one would want to distribute Elm code through the package-style mechanism.
 
-`elm-wrap` caters to this desire, without the burden of forking the canonical compiler.
+**elm-wrap** caters to this desire, without the burden of forking the canonical compiler.
 
 ## Desiderata and constraints
 
@@ -25,7 +25,7 @@ Clearly there are a number of possible ways one would want to distribute Elm cod
 
 It is already the case with the canonical repository: local `ELM_HOME` is really a locally cached, pass-through repository. If a package doesn't exist locally, we'll pull it from the canonical repository into the cache for future requests. The inverse is probably not true, though. (Does `publish` leave a copy in `ELM_HOME`?).  
 
-`elm-wrap` further specializes this by suffixing `ELM_HOME` with the Elm compiler
+`wrap` further specializes this by suffixing `ELM_HOME` with the Elm compiler
 version (for example, `$ELM_HOME/0.19.1/`). Each such per-version cache contains
 its own `packages/registry.dat`, and registry providers are expected to expose
 only package versions that are compatible with that Elm release. The
@@ -39,7 +39,7 @@ package versions.
 
 **persistence/avialailiby** has already bitten a few times, especially in the current "metadata-only" architecture where git packages got renamed, or the canonical repository went down. A pro-level repository must store full sources, without further dependencies. This is standard for most package-based systems (whether Debian APT, PHP Composer/Packagist, or what not).
 
-**trivial deployment** is paramount. Who wants to fiddle with setting things up and running services. A local developer's repository should be a simple drag-and-drop, maybe even just a file-system layout driven by `elm-wrap` directly. For organizational level and wider, some maintenance is expacted and a certain level of control desired.
+**trivial deployment** is paramount. Who wants to fiddle with setting things up and running services. A local developer's repository should be a simple drag-and-drop, maybe even just a file-system layout driven by `wrap` directly. For organizational level and wider, some maintenance is expacted and a certain level of control desired.
 
 ## Protocol
 

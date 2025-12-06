@@ -2,15 +2,14 @@
 #include "elm_json.h"
 #include "registry.h"
 #include "alloc.h"
+#include "constants.h"
+#include "exit_codes.h"
+#include "terminal_colors.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <ctype.h>
-
-// ANSI color codes for terminal output
-#define ANSI_GREEN "\033[1;32m"
-#define ANSI_RESET "\033[0m"
 
 typedef struct {
     char *author;
@@ -93,7 +92,7 @@ static int check_duplicate_exposed_modules(const char *elm_json_path) {
 
     /* Collect all module names */
     int modules_count = 0;
-    int modules_capacity = 16;
+    int modules_capacity = INITIAL_MODULE_CAPACITY;
     char **modules = arena_malloc(modules_capacity * sizeof(char*));
 
     /* Parse all arrays (for categorized format, there may be multiple) */
@@ -303,7 +302,7 @@ static int compare_package_names(const void *a, const void *b) {
     }
 
     // Compare full package name (author/name)
-    char name_a[256], name_b[256];
+    char name_a[MAX_PACKAGE_NAME_LENGTH], name_b[MAX_PACKAGE_NAME_LENGTH];
     snprintf(name_a, sizeof(name_a), "%s/%s", upg_a->author, upg_a->name);
     snprintf(name_b, sizeof(name_b), "%s/%s", upg_b->author, upg_b->name);
 
@@ -438,7 +437,7 @@ int check_all_upgrades(const char *elm_json_path, Registry *registry, size_t max
             printf("No upgrades available. All packages at their latest version\n");
         }
         elm_json_free(elm_json);
-        return 100;
+        return EXIT_NO_UPGRADES_AVAILABLE;
     }
 
     // Sort upgrades by package name, then minor before major
@@ -446,7 +445,7 @@ int check_all_upgrades(const char *elm_json_path, Registry *registry, size_t max
 
     // Calculate max_name_len from upgrades if not provided, or update if any upgrade name is longer
     for (int i = 0; i < upgrade_count; i++) {
-        char full_name[256];
+        char full_name[MAX_PACKAGE_NAME_LENGTH];
         snprintf(full_name, sizeof(full_name), "%s/%s",
                  upgrades[i].author, upgrades[i].name);
         size_t len = strlen(full_name);
@@ -467,7 +466,7 @@ int check_all_upgrades(const char *elm_json_path, Registry *registry, size_t max
         }
         last_was_test = upg->is_test_dependency;
 
-        char full_name[256];
+        char full_name[MAX_PACKAGE_NAME_LENGTH];
         snprintf(full_name, sizeof(full_name), "%s/%s", upg->author, upg->name);
 
         // Print minor upgrades first
@@ -479,7 +478,7 @@ int check_all_upgrades(const char *elm_json_path, Registry *registry, size_t max
         // Print major upgrades in bold/green
         if (upg->has_major_upgrade) {
             printf("%s  %-*s  %s -> %s (major)%s\n",
-                   ANSI_GREEN, (int)max_name_len, full_name,
+                   ANSI_BRIGHT_GREEN, (int)max_name_len, full_name,
                    upg->current_version, upg->latest_major, ANSI_RESET);
         }
 
@@ -521,7 +520,7 @@ static void find_latest_versions_v2(V2Registry *registry, const char *author, co
         }
         
         /* Format version string */
-        char ver_str[32];
+        char ver_str[MAX_VERSION_STRING_LENGTH];
         snprintf(ver_str, sizeof(ver_str), "%u.%u.%u", v->major, v->minor, v->patch);
 
         /* Check for minor upgrade */
@@ -602,7 +601,7 @@ static void find_versions_beyond_constraint_v2(V2Registry *registry, const char 
 
         /* Check if version is at or beyond the upper bound */
         if ((int)v->major >= upper_major) {
-            char ver_str[32];
+            char ver_str[MAX_VERSION_STRING_LENGTH];
             snprintf(ver_str, sizeof(ver_str), "%u.%u.%u", v->major, v->minor, v->patch);
             
             if (!*latest_beyond || compare_versions(ver_str, *latest_beyond) > 0) {
@@ -694,7 +693,7 @@ int check_all_upgrades_v2(const char *elm_json_path, V2Registry *registry, size_
             printf("No upgrades available. All packages at their latest version\n");
         }
         elm_json_free(elm_json);
-        return 100;
+        return EXIT_NO_UPGRADES_AVAILABLE;
     }
 
     /* Sort upgrades by package name, then minor before major */
@@ -702,7 +701,7 @@ int check_all_upgrades_v2(const char *elm_json_path, V2Registry *registry, size_
 
     /* Calculate max_name_len from upgrades if not provided, or update if any upgrade name is longer */
     for (int i = 0; i < upgrade_count; i++) {
-        char full_name[256];
+        char full_name[MAX_PACKAGE_NAME_LENGTH];
         snprintf(full_name, sizeof(full_name), "%s/%s",
                  upgrades[i].author, upgrades[i].name);
         size_t len = strlen(full_name);
@@ -723,7 +722,7 @@ int check_all_upgrades_v2(const char *elm_json_path, V2Registry *registry, size_
         }
         last_was_test = upg->is_test_dependency;
 
-        char full_name[256];
+        char full_name[MAX_PACKAGE_NAME_LENGTH];
         snprintf(full_name, sizeof(full_name), "%s/%s", upg->author, upg->name);
 
         /* Print minor upgrades first */
@@ -735,7 +734,7 @@ int check_all_upgrades_v2(const char *elm_json_path, V2Registry *registry, size_
         /* Print major upgrades in bold/green */
         if (upg->has_major_upgrade) {
             printf("%s  %-*s  %s -> %s (major)%s\n",
-                   ANSI_GREEN, (int)max_name_len, full_name,
+                   ANSI_BRIGHT_GREEN, (int)max_name_len, full_name,
                    upg->current_version, upg->latest_major, ANSI_RESET);
         }
 
@@ -782,7 +781,7 @@ size_t get_max_upgrade_name_len(const char *elm_json_path, Registry *registry) {
 
     size_t max_len = 0;
     for (int i = 0; i < upgrade_count; i++) {
-        char full_name[256];
+        char full_name[MAX_PACKAGE_NAME_LENGTH];
         snprintf(full_name, sizeof(full_name), "%s/%s",
                  upgrades[i].author, upgrades[i].name);
         size_t len = strlen(full_name);
@@ -829,7 +828,7 @@ size_t get_max_upgrade_name_len_v2(const char *elm_json_path, V2Registry *regist
 
     size_t max_len = 0;
     for (int i = 0; i < upgrade_count; i++) {
-        char full_name[256];
+        char full_name[MAX_PACKAGE_NAME_LENGTH];
         snprintf(full_name, sizeof(full_name), "%s/%s",
                  upgrades[i].author, upgrades[i].name);
         size_t len = strlen(full_name);

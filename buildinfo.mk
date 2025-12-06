@@ -89,6 +89,7 @@ generate-buildinfo:
 	@echo "#include <stdio.h>" >> $(BUILDDIR)/buildinfo.c
 	@echo "#include <string.h>" >> $(BUILDDIR)/buildinfo.c
 	@echo "" >> $(BUILDDIR)/buildinfo.c
+	@echo "const char *build_program_name = \"$(TARGET_FILE)\";" >> $(BUILDDIR)/buildinfo.c
 	@echo "const char *build_base_version = \"$(BASE_VERSION)\";" >> $(BUILDDIR)/buildinfo.c
 	@echo "const char *build_full_version = \"$(GITVER)\";" >> $(BUILDDIR)/buildinfo.c
 	@echo "const char *build_commit_short = \"$(REV)\";" >> $(BUILDDIR)/buildinfo.c

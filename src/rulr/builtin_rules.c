@@ -1,5 +1,5 @@
 /**
- * builtin_rules.c - Built-in rules embedded in the elm-wrap binary
+ * builtin_rules.c - Built-in rules embedded in the command binary
  *
  * Reads pre-compiled rulr rules from a zip archive appended to the executable.
  * Uses miniz to read the zip archive from the tail of the binary.

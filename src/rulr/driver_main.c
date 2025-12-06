@@ -7,11 +7,11 @@
 #include "runtime/runtime.h"
 
 static void print_usage(const char *prog) {
-    printf("Usage: %s --rules <rules> [--facts <facts.dl>]\n", prog);
+    printf("Usage: %s --rules RULE_NAME [--facts FACT_FILE]\n", prog);
     printf("\nOptions:\n");
     printf("  --rules, -r        Rule name or path (without extension)\n");
     printf("                     Tries .dlc (compiled) first, then .dl (source)\n");
-    printf("  --facts, -f        Path to fact file (.dl)\n");
+    printf("  --facts, -f        Path to fact file in source format\n");
     printf("  -h, --help         Show this help message\n");
     printf("\nIf only one positional argument is provided, it is treated as the rule file.\n");
 }

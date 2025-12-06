@@ -1,11 +1,8 @@
-
-
-
 ## Test dependency, direct, minor upgrade
 
 Desired behavior:
 
-    $ elm-wrap install elm-explorations/test
+    $ wrap install elm-explorations/test
     I found it in your elm.json file, but in the "test-dependencies" field.
     Should I move it into "dependencies" for more general use? [Y/n]: n
     Okay, I did not change anything!
@@ -14,9 +11,12 @@ If the user specifies y, move into 'dependencies' as suggested.
 
 ## Test dependency, indirect, minor upgrade
 
+OBSOLETE: We will no longer suggest moving indirect dependencies from test-dependencies to dependencies.  
+  `test-dependencies` is a world in itself that we only consider when `--test` switch is in effect.
+
 Desired behavior:
 
-    $ elm-wrap install elm/random
+    $ wrap install elm/random
     I found it in your elm.json file, but in the "test-dependencies" field.
     Should I move it into "dependencies" for more general use? [Y/n]: n
     Okay, I did not change anything!
@@ -71,7 +71,7 @@ If the user specifies y, move into 'dependencies' as suggested.
 
 Available upgrades for the example:
 
-    $ elm-wrap package check
+    $ wrap package check
     Available upgrades:
 
     [minor] SiriusStarr/elm-password-strength     1.0.1 -> 1.0.2

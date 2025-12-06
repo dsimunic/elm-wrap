@@ -9,7 +9,7 @@
 #include "package_publish.h"
 #include "../../review/reporter.h"
 #include "../../../alloc.h"
-#include "../../../progname.h"
+#include "../../../global_context.h"
 #include "../../../elm_json.h"
 #include "../../../fileutil.h"
 #include "../../../ast/skeleton.h"
@@ -33,12 +33,12 @@
  * ========================================================================== */
 
 static void print_usage(void) {
-    printf("Usage: %s package publish <source-path>\n", program_name);
+    printf("Usage: %s package publish SOURCE_PATH\n", global_context_program_name());
     printf("\n");
     printf("Determine which files should be published from a package.\n");
     printf("\n");
     printf("Arguments:\n");
-    printf("  <source-path>      Path to the package directory\n");
+    printf("  SOURCE_PATH        Path to the package directory\n");
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help         Show this help message\n");

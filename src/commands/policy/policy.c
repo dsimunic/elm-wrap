@@ -7,7 +7,7 @@
 
 #include "policy.h"
 #include "../../alloc.h"
-#include "../../progname.h"
+#include "../../global_context.h"
 #include "../../fileutil.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/builtin_rules.h"
@@ -22,12 +22,12 @@
  * ========================================================================== */
 
 static void print_policy_usage(void) {
-    printf("Usage: %s policy SUBCOMMAND [OPTIONS]\n", program_name);
+    printf("Usage: %s policy SUBCOMMAND [OPTIONS]\n", global_context_program_name());
     printf("\n");
-    printf("Manage and view rulr policy rules.\n");
+    printf("Manage and view policy rules.\n");
     printf("\n");
     printf("Subcommands:\n");
-    printf("  view <RULE>        Print rule source to stdout\n");
+    printf("  view RULE          Print rule source to stdout\n");
     printf("  built-in           List all built-in rules\n");
     printf("\n");
     printf("Options:\n");
@@ -35,12 +35,12 @@ static void print_policy_usage(void) {
 }
 
 static void print_view_usage(void) {
-    printf("Usage: %s policy view <RULE>\n", program_name);
+    printf("Usage: %s policy view RULE\n", global_context_program_name());
     printf("\n");
-    printf("Print the source of a rulr rule to stdout.\n");
+    printf("Print the source of a rule to stdout.\n");
     printf("\n");
     printf("Arguments:\n");
-    printf("  <RULE>             Rule name or path (without extension)\n");
+    printf("  RULE               Rule name or path (without extension)\n");
     printf("                     For simple names (no path), looks in built-in rules first\n");
     printf("                     Tries .dlc (compiled) first, falls back to .dl (source)\n");
     printf("                     Can also specify with extension to use exact path\n");
@@ -49,9 +49,9 @@ static void print_view_usage(void) {
     printf("For compiled (.dlc) files, prints in canonical pretty-printed format.\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s policy view no_unused_dependencies\n", program_name);
-    printf("  %s policy view rulr/rules/core_package_files\n", program_name);
-    printf("  %s policy view rulr/rules/core_package_files.dl\n", program_name);
+    printf("  %s policy view no_unused_dependencies\n", global_context_program_name());
+    printf("  %s policy view rulr/rules/core_package_files\n", global_context_program_name());
+    printf("  %s policy view rulr/rules/core_package_files.dl\n", global_context_program_name());
 }
 
 /* ============================================================================
@@ -230,7 +230,7 @@ int cmd_policy_view(int argc, char *argv[]) {
  * ========================================================================== */
 
 static void print_builtin_usage(void) {
-    printf("Usage: %s policy built-in\n", program_name);
+    printf("Usage: %s policy built-in\n", global_context_program_name());
     printf("\n");
     printf("List all built-in rules embedded in the binary.\n");
     printf("\n");
@@ -293,6 +293,6 @@ int cmd_policy(int argc, char *argv[]) {
     }
     
     fprintf(stderr, "Error: Unknown policy subcommand '%s'\n", subcmd);
-    fprintf(stderr, "Run '%s policy --help' for usage information.\n", program_name);
+    fprintf(stderr, "Run '%s policy --help' for usage information.\n", global_context_program_name());
     return 1;
 }

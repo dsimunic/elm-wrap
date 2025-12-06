@@ -7,7 +7,7 @@
  * Download the V2 registry index file.
  *
  * The URL is formed as: <base_url>/index_<compiler>_<version>
- * where base_url comes from ELM_WRAP_REGISTRY_V2_FULL_INDEX_URL.
+ * where base_url comes from WRAP_REGISTRY_V2_FULL_INDEX_URL.
  *
  * The downloaded file is saved as "index.dat" in the repository directory.
  * Progress is reported if the download takes longer than 1 second.

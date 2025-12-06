@@ -2,7 +2,7 @@
 
 ## Overview
 
-When generating Elm package documentation, `elm-wrap publish docs` resolves dependency types and expands module/type aliases and fully qualifies type signatures. This is consistent with Elm 0.19.1 compiler's output.
+When generating Elm package documentation, `wrap publish docs` resolves dependency types and expands module/type aliases and fully qualifies type signatures. This is consistent with Elm 0.19.1 compiler's output.
 
 For example:
 
@@ -475,7 +475,7 @@ For `andThen fn decoder ctx edn`:
 7. **Reconstruction:**
    - `(a -> Decoder b) -> Decoder a -> Context -> Edn -> Result String b`
 
-### Implementation in elm-wrap
+### Implementation in **elm-wrap**
 
 The `expand_function_type_aliases()` function in `elm_docs.c` replicates this behavior:
 
@@ -522,7 +522,7 @@ make clean all install-user
 
 ### Test Command
 ```bash
-bin/elm-wrap publish docs /path/to/package | jq . > output.json
+bin/wrap publish docs /path/to/package | jq . > output.json
 ```
 
 ### Grep Verification (No Direct Allocations)

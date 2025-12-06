@@ -1,6 +1,5 @@
 #include "debug.h"
 #include "../../alloc.h"
-#include "../../progname.h"
 #include "../../log.h"
 #include "../../solver.h"
 #include "../../install_env.h"
@@ -56,7 +55,7 @@ static char *find_elm_json(void) {
 }
 
 static void print_install_plan_usage(void) {
-    printf("Usage: %s debug install-plan <package> [OPTIONS]\n", program_name);
+    printf("Usage: %s debug install-plan <package> [OPTIONS]\n", global_context_program_name());
     printf("\n");
     printf("Show what packages would be installed for a package (dry-run).\n");
     printf("This exercises the dependency solver without actually installing anything.\n");
@@ -326,10 +325,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         }
         
         printf("Target app: %s\n\n", elm_json_path);
-        
-        // Initialize global context and environment
-        global_context_init();
-        
+
         InstallEnv *install_env = install_env_create();
         if (!install_env) {
             fprintf(stderr, "Error: Failed to create install environment\n");
@@ -496,9 +492,6 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         arena_free(elm_json_path);
         return 1;
     }
-
-    // Initialize global context
-    global_context_init();
 
     // Create install environment
     InstallEnv *install_env = install_env_create();

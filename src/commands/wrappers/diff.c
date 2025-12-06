@@ -3,9 +3,9 @@
 #include "elm_cmd_common.h"
 #include "../../install_env.h"
 #include "../../elm_compiler.h"
+#include "../../global_context.h"
 #include "../../alloc.h"
 #include "../../log.h"
-#include "../../progname.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +16,7 @@
 #define ELM_JSON_PATH "elm.json"
 
 static void print_diff_usage(void) {
-    printf("Usage: %s diff [VERSION]\n", program_name);
+    printf("Usage: %s diff [VERSION]\n", global_context_program_name());
     printf("\n");
     printf("Show API differences between package versions.\n");
     printf("\n");
@@ -79,7 +79,7 @@ int cmd_diff(int argc, char *argv[]) {
     char *elm_path = elm_compiler_get_path();
     if (!elm_path) {
         log_error("Could not find elm binary");
-        log_error("Please install elm or set the ELM_WRAP_ELM_COMPILER_PATH environment variable");
+        log_error("Please install elm or set the WRAP_ELM_COMPILER_PATH environment variable");
         return 1;
     }
 
@@ -109,8 +109,8 @@ int cmd_diff(int argc, char *argv[]) {
 
     // If execve returns, it failed
     log_error("Failed to execute elm compiler at: %s", elm_path);
-    if (getenv("ELM_WRAP_ELM_COMPILER_PATH")) {
-        log_error("The compiler was not found at the path specified in ELM_WRAP_ELM_COMPILER_PATH");
+    if (getenv("WRAP_ELM_COMPILER_PATH")) {
+        log_error("The compiler was not found at the path specified in WRAP_ELM_COMPILER_PATH");
     }
     perror("execve");
     arena_free(elm_args);

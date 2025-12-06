@@ -1,7 +1,7 @@
 #include "code.h"
 #include "../publish/docs/tree_util.h"
+#include "../../global_context.h"
 #include "../../alloc.h"
-#include "../../progname.h"
 #include "../../ast/canonicalize.h"
 #include <tree_sitter/api.h>
 #include <stdio.h>
@@ -12,12 +12,12 @@
 extern const TSLanguage *tree_sitter_elm(void);
 
 static void print_format_usage(void) {
-    printf("Usage: %s code format <FILE> [OPTIONS]\n", program_name);
+    printf("Usage: %s code format FILE [OPTIONS]\n", global_context_program_name());
     printf("\n");
     printf("Parse an Elm source file and output canonicalized AST.\n");
     printf("\n");
     printf("Arguments:\n");
-    printf("  <FILE>             Path to Elm source file\n");
+    printf("  FILE               Path to Elm source file\n");
     printf("\n");
     printf("Options:\n");
     printf("  --types            Only show type annotations and their canonical form\n");

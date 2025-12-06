@@ -1,10 +1,10 @@
 #include "cache_full_scan.h"
 #include "../../../cache.h"
+#include "../../../global_context.h"
 #include "../../../registry.h"
 #include "../../../install_env.h"
 #include "../../../alloc.h"
 #include "../../../log.h"
-#include "../../../progname.h"
 #include "../../../fileutil.h"
 #include "../../../import_tree.h"
 #include <stdio.h>
@@ -315,7 +315,7 @@ static void scan_author(const char *packages_dir, const char *author,
 
 /* Print usage for cache full-scan command */
 static void print_full_scan_usage(void) {
-    printf("Usage: %s package cache full-scan [OPTIONS]\n", program_name);
+    printf("Usage: %s package cache full-scan [OPTIONS]\n", global_context_program_name());
     printf("\n");
     printf("Scan the entire package cache and verify all packages.\n");
     printf("\n");
@@ -326,10 +326,10 @@ static void print_full_scan_usage(void) {
     printf("  - Provide a summary of cache health\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s package cache full-scan           # Scan and report broken packages\n", program_name);
-    printf("  %s package cache full-scan -q        # Quiet mode - only show summary\n", program_name);
-    printf("  %s package cache full-scan -v        # Verbose - show all issues\n", program_name);
-    printf("  %s package cache full-scan --no-check-redundant  # Skip redundant file check\n", program_name);
+    printf("  %s package cache full-scan           # Scan and report broken packages\n", global_context_program_name());
+    printf("  %s package cache full-scan -q        # Quiet mode - only show summary\n", global_context_program_name());
+    printf("  %s package cache full-scan -v        # Verbose - show all issues\n", global_context_program_name());
+    printf("  %s package cache full-scan --no-check-redundant  # Skip redundant file check\n", global_context_program_name());
     printf("\n");
     printf("Options:\n");
     printf("  -q, --quiet               Only show summary counts\n");

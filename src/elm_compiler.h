@@ -3,7 +3,7 @@
 
 /* Find and get the path to the Elm compiler binary
  * Searches in this order:
- * 1. ELM_WRAP_ELM_COMPILER_PATH environment variable
+ * 1. WRAP_ELM_COMPILER_PATH environment variable
  * 2. Search for 'elm' in PATH
  * Returns: heap-allocated string with compiler path, or NULL if not found
  */

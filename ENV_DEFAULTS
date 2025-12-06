@@ -1,2 +1,2 @@
-ELM_WRAP_REGISTRY_V2_FULL_INDEX_URL=http://localhost:8080/full_index/
-ELM_WRAP_REPOSITORY_LOCAL_PATH=~/.elm-wrap/repository
+WRAP_REGISTRY_V2_FULL_INDEX_URL=http://localhost:8080/full_index/
+WRAP_REPOSITORY_LOCAL_PATH=~/.elm-wrap/repository

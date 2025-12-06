@@ -7,10 +7,10 @@
 
 #include "application.h"
 #include "../../install_env.h"
+#include "../../global_context.h"
 #include "../../elm_json.h"
 #include "../../alloc.h"
 #include "../../log.h"
-#include "../../progname.h"
 #include "../wrappers/init_v1.h"
 #include "../wrappers/init_v2.h"
 #include <stdio.h>
@@ -26,7 +26,7 @@
 #define ANSI_RESET "\033[0m"
 
 static void print_application_init_usage(void) {
-    printf("Usage: %s application init [options]\n", program_name);
+    printf("Usage: %s application init [options]\n", global_context_program_name());
     printf("\n");
     printf("Initialize a new Elm application project by creating an elm.json file.\n");
     printf("\n");
@@ -35,8 +35,8 @@ static void print_application_init_usage(void) {
     printf("  -h, --help   Show this help message\n");
     printf("\n");
     printf("Example:\n");
-    printf("  %s application init       # Create a new elm.json with prompt\n", program_name);
-    printf("  %s application init -y    # Create a new elm.json without prompt\n", program_name);
+    printf("  %s application init       # Create a new elm.json with prompt\n", global_context_program_name());
+    printf("  %s application init -y    # Create a new elm.json without prompt\n", global_context_program_name());
 }
 
 static bool elm_json_exists(void) {

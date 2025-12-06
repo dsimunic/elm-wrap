@@ -1,6 +1,7 @@
 #include "package_common.h"
 #include "install_local_dev.h"
 #include "../../install.h"
+#include "../../global_context.h"
 #include "../../elm_json.h"
 #include "../../cache.h"
 #include "../../solver.h"
@@ -10,7 +11,6 @@
 #include "../../http_client.h"
 #include "../../alloc.h"
 #include "../../log.h"
-#include "../../progname.h"
 #include "../../fileutil.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -101,25 +101,25 @@ static void print_install_what(const char *elm_home) {
 }
 
 static void print_install_usage(void) {
-    printf("Usage: %s install [PACKAGE]\n", program_name);
+    printf("Usage: %s install PACKAGE\n", global_context_program_name());
     printf("\n");
     printf("Install packages for your Elm project.\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s install elm/html              # Add elm/html to your project\n", program_name);
-    printf("  %s install elm/json --test       # Add elm/json as a test dependency\n", program_name);
-    printf("  %s install --major elm/html      # Upgrade elm/html to next major version\n", program_name);
-    printf("  %s install --from-file ./pkg.zip elm/html  # Install from local file\n", program_name);
-    printf("  %s install --from-url <url> elm/html       # Install from URL\n", program_name);
+    printf("  %s install elm/html              # Add elm/html to your project\n", global_context_program_name());
+    printf("  %s install --test elm/json       # Add elm/json as a test dependency\n", global_context_program_name());
+    printf("  %s install --major elm/html      # Upgrade elm/html to next major version\n", global_context_program_name());
+    printf("  %s install --from-file ./pkg.zip elm/html  # Install from local file\n", global_context_program_name());
+    printf("  %s install --from-url URL elm/html         # Install from URL\n", global_context_program_name());
     printf("\n");
     printf("Options:\n");
     printf("  --test                             # Install as test dependency\n");
-    printf("  --major <package>                  # Allow major version upgrade for package\n");
-    printf("  --from-file <path> <package>       # Install from local file/directory\n");
-    printf("  --from-url <url> <package>         # Install from URL (skip SHA check)\n");
-    printf("  --local-dev [--from-path <path>] [<package>]\n");
-    printf("                                     # Install package as symlink for local development\n");
-    printf("  --pin                              # Create PIN file with package version\n");
+    printf("  --major PACKAGE                    # Allow major version upgrade for package\n");
+    printf("  --from-file PATH PACKAGE           # Install from local file/directory\n");
+    printf("  --from-url URL PACKAGE             # Install from URL (skips V1 installer SHA check)\n");
+    printf("  --local-dev [--from-path PATH] [PACKAGE]\n");
+    printf("                                     # Install package for local development\n");
+    // printf("  --pin                              # Create PIN file with package version\n");
     printf("  -v, --verbose                      # Show progress reports (registry, connectivity)\n");
     printf("  -q, --quiet                        # Suppress progress reports\n");
     printf("  -y, --yes                          # Automatically confirm changes\n");
@@ -465,7 +465,7 @@ int cmd_install(int argc, char *argv[]) {
                 i++;
                 package_name = argv[i];
             } else {
-                fprintf(stderr, "Error: --from-file requires <path> and <package> arguments\n");
+                fprintf(stderr, "Error: --from-file requires PATH and PACKAGE arguments\n");
                 print_install_usage();
                 return 1;
             }
@@ -476,7 +476,7 @@ int cmd_install(int argc, char *argv[]) {
                 i++;
                 package_name = argv[i];
             } else {
-                fprintf(stderr, "Error: --from-url requires <url> and <package> arguments\n");
+                fprintf(stderr, "Error: --from-url requires URL and PACKAGE arguments\n");
                 print_install_usage();
                 return 1;
             }
@@ -497,7 +497,7 @@ int cmd_install(int argc, char *argv[]) {
                 i++;
                 from_path = argv[i];
             } else {
-                fprintf(stderr, "Error: --from-path requires a path argument\n");
+                fprintf(stderr, "Error: --from-path requires a PATH argument\n");
                 print_install_usage();
                 return 1;
             }
@@ -569,7 +569,7 @@ int cmd_install(int argc, char *argv[]) {
     ElmJson *elm_json = elm_json_read(ELM_JSON_PATH);
     if (!elm_json) {
         log_error("Could not read elm.json");
-        log_error("Have you run 'elm init' or 'wrap init'?");
+        log_error("Have you run 'elm init' or '%s init'?", global_context_program_name());
         install_env_free(env);
         return 1;
     }
