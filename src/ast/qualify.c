@@ -13,6 +13,7 @@
 #include "canonicalize.h"
 #include "util.h"
 #include "../alloc.h"
+#include "../constants.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -913,7 +914,7 @@ char *qualify_and_canonicalize_type_node(TSNode node, const char *source_code, Q
         return arena_strdup("");
     }
 
-    size_t max_len = 65536;  /* 64KB - large records can exceed 4KB */
+    size_t max_len = MAX_LARGE_BUFFER_LENGTH;  /* 64KB - large records can exceed 4KB */
     char *buffer = arena_malloc(max_len);
     size_t pos = 0;
     buffer[0] = '\0';
@@ -1164,7 +1165,7 @@ char *qualify_type_node(TSNode node, const char *source_code, QualifyContext *ct
         return arena_strdup("");
     }
 
-    size_t max_len = 65536;  /* 64KB - large records can exceed 4KB */
+    size_t max_len = MAX_LARGE_BUFFER_LENGTH;  /* 64KB - large records can exceed 4KB */
     char *buffer = arena_malloc(max_len);
     size_t pos = 0;
     buffer[0] = '\0';

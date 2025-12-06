@@ -8,6 +8,7 @@
 #include "install_local_dev.h"
 #include "package_common.h"
 #include "../../alloc.h"
+#include "../../constants.h"
 #include "../../log.h"
 #include "../../fileutil.h"
 #include "../../env_defaults.h"
@@ -41,7 +42,7 @@
 
 /* Simple hash function for path -> filename */
 static unsigned long hash_path(const char *str) {
-    unsigned long hash = 5381;
+    unsigned long hash = DJB2_HASH_INIT;
     int c;
     while ((c = *str++)) {
         hash = ((hash << 5) + hash) + c;
@@ -87,7 +88,7 @@ static bool ensure_path_exists(const char *path) {
             mutable_path[i] = '\0';
             struct stat st;
             if (stat(mutable_path, &st) != 0) {
-                if (mkdir(mutable_path, 0755) != 0 && errno != EEXIST) {
+                if (mkdir(mutable_path, DIR_PERMISSIONS) != 0 && errno != EEXIST) {
                     log_error("Failed to create directory: %s", mutable_path);
                     ok = false;
                 }
@@ -99,7 +100,7 @@ static bool ensure_path_exists(const char *path) {
     if (ok) {
         struct stat st;
         if (stat(mutable_path, &st) != 0) {
-            if (mkdir(mutable_path, 0755) != 0 && errno != EEXIST) {
+            if (mkdir(mutable_path, DIR_PERMISSIONS) != 0 && errno != EEXIST) {
                 log_error("Failed to create directory: %s", mutable_path);
                 ok = false;
             }

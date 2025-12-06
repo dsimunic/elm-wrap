@@ -1,5 +1,6 @@
 #include "elm_compiler.h"
 #include "alloc.h"
+#include "constants.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -74,7 +75,7 @@ char* elm_compiler_get_version(void) {
         return NULL;
     }
 
-    char buffer[256];
+    char buffer[MAX_PACKAGE_NAME_LENGTH];
     char *version = NULL;
     if (fgets(buffer, sizeof(buffer), fp) != NULL) {
         /* Remove trailing newline */

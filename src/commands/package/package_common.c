@@ -1,6 +1,7 @@
 #include "package_common.h"
 #include "../../alloc.h"
 #include "../../cache.h"
+#include "../../constants.h"
 #include "../../fileutil.h"
 #include <stdio.h>
 #include <string.h>
@@ -120,7 +121,7 @@ static bool ensure_path_exists(const char *path) {
             mutable_path[i] = '\0';
             struct stat st;
             if (mutable_path[0] != '\0' && stat(mutable_path, &st) != 0) {
-                if (mkdir(mutable_path, 0755) != 0) {
+                if (mkdir(mutable_path, DIR_PERMISSIONS) != 0) {
                     ok = false;
                 }
             }
@@ -131,7 +132,7 @@ static bool ensure_path_exists(const char *path) {
     if (ok) {
         struct stat st;
         if (stat(mutable_path, &st) != 0) {
-            if (mkdir(mutable_path, 0755) != 0) {
+            if (mkdir(mutable_path, DIR_PERMISSIONS) != 0) {
                 ok = false;
             }
         }

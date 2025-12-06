@@ -9,6 +9,7 @@
 #include "install.h"
 #include "../elm_json.h"
 #include "../cache.h"
+#include "../constants.h"
 #include "../log.h"
 #include "../alloc.h"
 #include "../fileutil.h"
@@ -199,7 +200,7 @@ int v1_show_package_dependencies(const char *author, const char *name, const cha
             printf("Dependencies (%d):\n", deps->count);
             for (int i = 0; i < deps->count; i++) {
                 Package *pkg = &deps->packages[i];
-                char pkg_name[256];
+                char pkg_name[MAX_PACKAGE_NAME_LENGTH];
                 snprintf(pkg_name, sizeof(pkg_name), "%s/%s", pkg->author, pkg->name);
                 printf("  %-*s    %s\n", max_width, pkg_name, pkg->version);
             }
@@ -226,7 +227,7 @@ int v1_show_package_dependencies(const char *author, const char *name, const cha
             printf("\nTest Dependencies (%d):\n", test_deps->count);
             for (int i = 0; i < test_deps->count; i++) {
                 Package *pkg = &test_deps->packages[i];
-                char pkg_name[256];
+                char pkg_name[MAX_PACKAGE_NAME_LENGTH];
                 snprintf(pkg_name, sizeof(pkg_name), "%s/%s", pkg->author, pkg->name);
                 printf("  %-*s    %s\n", max_width, pkg_name, pkg->version);
             }
@@ -317,7 +318,7 @@ int v1_show_package_dependencies(const char *author, const char *name, const cha
             printf("\nPackages in elm.json that depend on %s/%s (%d):\n", author, name, reverse_deps->count);
             for (int i = 0; i < reverse_deps->count; i++) {
                 Package *pkg = &reverse_deps->packages[i];
-                char pkg_name[256];
+                char pkg_name[MAX_PACKAGE_NAME_LENGTH];
                 snprintf(pkg_name, sizeof(pkg_name), "%s/%s", pkg->author, pkg->name);
                 printf("  %-*s    %s\n", max_width, pkg_name, pkg->version);
             }

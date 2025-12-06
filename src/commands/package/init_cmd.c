@@ -3,6 +3,7 @@
 #include "../../install_env.h"
 #include "../../global_context.h"
 #include "../../alloc.h"
+#include "../../constants.h"
 #include "../../log.h"
 #include "../../embedded_archive.h"
 #include "../../fileutil.h"
@@ -83,7 +84,7 @@ static bool ensure_directory_exists(const char *path) {
         return false;
     }
 
-    if (mkdir(path, 0755) != 0 && errno != EEXIST) {
+    if (mkdir(path, DIR_PERMISSIONS) != 0 && errno != EEXIST) {
         return false;
     }
 

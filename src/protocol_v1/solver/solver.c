@@ -4,6 +4,7 @@
 #include "../../pgsolver/pg_elm.h"
 #include "../../pgsolver/solver_common.h"
 #include "../../cache.h"
+#include "../../constants.h"
 #include "../../log.h"
 #include <stdlib.h>
 #include <string.h>
@@ -511,7 +512,7 @@ SolverResult run_with_strategy_v1(
         return SOLVER_NO_SOLUTION;
     }
 
-    char selected_version[32];
+    char selected_version[MAX_VERSION_STRING_LENGTH];
     snprintf(selected_version, sizeof(selected_version),
              "%d.%d.%d",
              chosen.major,
@@ -533,7 +534,7 @@ SolverResult run_with_strategy_v1(
         PgPackageId pkg_id = (PgPackageId)i;
         PgVersion selected_ver;
         if (pg_solver_get_selected_version(pg_solver, pkg_id, &selected_ver)) {
-            char version_str[32];
+            char version_str[MAX_VERSION_STRING_LENGTH];
             snprintf(version_str, sizeof(version_str), "%d.%d.%d",
                      selected_ver.major, selected_ver.minor, selected_ver.patch);
 
@@ -703,7 +704,7 @@ SolverResult solver_upgrade_all_v1(
         PgPackageId pkg_id = (PgPackageId)i;
         PgVersion selected_ver;
         if (pg_solver_get_selected_version(pg_solver, pkg_id, &selected_ver)) {
-            char version_str[32];
+            char version_str[MAX_VERSION_STRING_LENGTH];
             snprintf(version_str, sizeof(version_str), "%d.%d.%d",
                      selected_ver.major, selected_ver.minor, selected_ver.patch);
 

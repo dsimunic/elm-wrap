@@ -10,6 +10,7 @@
 #include "../../protocol_v2/solver/v2_registry.h"
 #include "../../http_client.h"
 #include "../../alloc.h"
+#include "../../constants.h"
 #include "../../log.h"
 #include "../../fileutil.h"
 #include <stdio.h>
@@ -631,7 +632,7 @@ int cmd_install(int argc, char *argv[]) {
 
         if (from_url) {
             snprintf(temp_dir_buf, sizeof(temp_dir_buf), "/tmp/wrap_temp_%s_%s", author, name);
-            mkdir(temp_dir_buf, 0755);
+            mkdir(temp_dir_buf, DIR_PERMISSIONS);
 
             char temp_file[1024];
             snprintf(temp_file, sizeof(temp_file), "%s/package.zip", temp_dir_buf);

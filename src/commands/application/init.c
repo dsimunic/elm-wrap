@@ -10,6 +10,7 @@
 #include "../../global_context.h"
 #include "../../elm_json.h"
 #include "../../alloc.h"
+#include "../../constants.h"
 #include "../../log.h"
 #include "../wrappers/init_v1.h"
 #include "../wrappers/init_v2.h"
@@ -100,7 +101,7 @@ static bool create_src_directory(void) {
     }
 
     // Create directory
-    if (mkdir("src", 0755) != 0) {
+    if (mkdir("src", DIR_PERMISSIONS) != 0) {
         log_error("Failed to create 'src' directory");
         return false;
     }

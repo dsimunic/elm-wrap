@@ -3,6 +3,7 @@
 #include "../install_env.h"
 #include "../cache.h"
 #include "../alloc.h"
+#include "../constants.h"
 #include "../vendor/cJSON.h"
 #include "../vendor/sha1.h"
 #include "../log.h"
@@ -141,7 +142,7 @@ static bool compute_file_sha1(const char *filepath, BYTE hash[SHA1_BLOCK_SIZE]) 
     SHA1_CTX ctx;
     sha1_init(&ctx);
 
-    BYTE buffer[4096];
+    BYTE buffer[MAX_PATH_LENGTH];
     size_t bytes_read;
 
     while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
@@ -181,7 +182,7 @@ bool ensure_directory_recursive(const char *path) {
 
     arena_free(path_copy);
 
-    return mkdir(path, 0755) == 0 || errno == EEXIST;
+    return mkdir(path, DIR_PERMISSIONS) == 0 || errno == EEXIST;
 }
 
 bool verify_file_sha1(const char *filepath, const char *expected_hex) {

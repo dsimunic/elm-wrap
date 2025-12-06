@@ -25,6 +25,8 @@
 /*
  * Initial capacity constants for dynamic arrays
  */
+#define INITIAL_TINY_CAPACITY 4
+#define INITIAL_MINIMAL_CAPACITY 8
 #define INITIAL_SMALL_CAPACITY 16
 #define INITIAL_MEDIUM_CAPACITY 64
 #define INITIAL_LARGE_CAPACITY 256
@@ -81,5 +83,15 @@
  */
 #define PG_DECISION_VERSION_BUFFER 128
 #define PG_DEPENDENCY_BUFFER 128
+
+/*
+ * Large buffer constants
+ */
+#define MAX_LARGE_BUFFER_LENGTH 65536  /* 64KB for large records/data */
+
+/*
+ * Hash algorithm constants
+ */
+#define DJB2_HASH_INIT 5381  /* Initial value for djb2 hash algorithm */
 
 #endif /* CONSTANTS_H */

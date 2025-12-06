@@ -8,6 +8,7 @@
 #include "skeleton.h"
 #include "util.h"
 #include "../alloc.h"
+#include "../constants.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -67,29 +68,29 @@ SkeletonModule *skeleton_parse_string(const char *source_code, const char *filep
     mod->tree = tree;
 
     /* Initialize dynamic arrays */
-    mod->imports_capacity = 16;
+    mod->imports_capacity = INITIAL_SMALL_CAPACITY;
     mod->imports = arena_malloc(mod->imports_capacity * sizeof(SkeletonImport));
 
-    mod->type_annotations_capacity = 32;
+    mod->type_annotations_capacity = INITIAL_CONNECTION_CAPACITY;
     mod->type_annotations = arena_malloc(mod->type_annotations_capacity * sizeof(SkeletonTypeAnnotation));
 
-    mod->type_aliases_capacity = 16;
+    mod->type_aliases_capacity = INITIAL_SMALL_CAPACITY;
     mod->type_aliases = arena_malloc(mod->type_aliases_capacity * sizeof(SkeletonTypeAlias));
 
-    mod->union_types_capacity = 16;
+    mod->union_types_capacity = INITIAL_SMALL_CAPACITY;
     mod->union_types = arena_malloc(mod->union_types_capacity * sizeof(SkeletonUnionType));
 
-    mod->infixes_capacity = 8;
+    mod->infixes_capacity = INITIAL_MINIMAL_CAPACITY;
     mod->infixes = arena_malloc(mod->infixes_capacity * sizeof(SkeletonInfix));
 
-    mod->local_types_capacity = 16;
+    mod->local_types_capacity = INITIAL_SMALL_CAPACITY;
     mod->local_types = arena_malloc(mod->local_types_capacity * sizeof(char*));
 
-    mod->exports.values_capacity = 32;
+    mod->exports.values_capacity = INITIAL_CONNECTION_CAPACITY;
     mod->exports.values = arena_malloc(mod->exports.values_capacity * sizeof(char*));
-    mod->exports.types_capacity = 16;
+    mod->exports.types_capacity = INITIAL_SMALL_CAPACITY;
     mod->exports.types = arena_malloc(mod->exports.types_capacity * sizeof(char*));
-    mod->exports.types_with_constructors_capacity = 16;
+    mod->exports.types_with_constructors_capacity = INITIAL_SMALL_CAPACITY;
     mod->exports.types_with_constructors = arena_malloc(
         mod->exports.types_with_constructors_capacity * sizeof(char*));
 
@@ -451,11 +452,11 @@ static void parse_import_declaration(TSNode node, const char *source, SkeletonMo
             }
         } else if (strcmp(type, "exposing_list") == 0) {
             /* Parse exposing */
-            imp->exposed_values_capacity = 16;
+            imp->exposed_values_capacity = INITIAL_SMALL_CAPACITY;
             imp->exposed_values = arena_malloc(imp->exposed_values_capacity * sizeof(char*));
-            imp->exposed_types_capacity = 16;
+            imp->exposed_types_capacity = INITIAL_SMALL_CAPACITY;
             imp->exposed_types = arena_malloc(imp->exposed_types_capacity * sizeof(char*));
-            imp->exposed_types_with_constructors_capacity = 16;
+            imp->exposed_types_with_constructors_capacity = INITIAL_SMALL_CAPACITY;
             imp->exposed_types_with_constructors = arena_malloc(imp->exposed_types_with_constructors_capacity * sizeof(char*));
 
             uint32_t exp_count = ts_node_child_count(child);
@@ -553,7 +554,7 @@ static void parse_type_alias_declaration(TSNode node, const char *source, Skelet
     SkeletonTypeAlias *alias = &mod->type_aliases[mod->type_aliases_count++];
     memset(alias, 0, sizeof(SkeletonTypeAlias));
 
-    alias->type_params_capacity = 8;
+    alias->type_params_capacity = INITIAL_MINIMAL_CAPACITY;
     alias->type_params = arena_malloc(alias->type_params_capacity * sizeof(char*));
 
     uint32_t child_count = ts_node_child_count(node);
@@ -588,7 +589,7 @@ static void parse_type_declaration(TSNode node, const char *source, SkeletonModu
     SkeletonUnionType *ut = &mod->union_types[mod->union_types_count++];
     memset(ut, 0, sizeof(SkeletonUnionType));
 
-    ut->type_params_capacity = 8;
+    ut->type_params_capacity = INITIAL_MINIMAL_CAPACITY;
     ut->type_params = arena_malloc(ut->type_params_capacity * sizeof(char*));
 
     /* Count constructors first */

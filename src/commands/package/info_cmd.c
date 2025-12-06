@@ -13,6 +13,7 @@
 #include "info_v2.h"
 #include "../../global_context.h"
 #include "../../alloc.h"
+#include "../../constants.h"
 #include "../../log.h"
 #include "../../fileutil.h"
 #include <stdio.h>
@@ -377,8 +378,8 @@ static int show_package_info_from_registry(const char *package_name, const char 
                 for (size_t i = 0; i < entry->version_count; i++) {
                     V2PackageVersion *v = &entry->versions[i];
                     if (v->status == V2_STATUS_VALID) {
-                        allocated_version = arena_malloc(32);
-                        snprintf(allocated_version, 32, "%u.%u.%u", v->major, v->minor, v->patch);
+                        allocated_version = arena_malloc(MAX_VERSION_STRING_LENGTH);
+                        snprintf(allocated_version, MAX_VERSION_STRING_LENGTH, "%u.%u.%u", v->major, v->minor, v->patch);
                         version_to_use = allocated_version;
                         version_found = true;
                         break;

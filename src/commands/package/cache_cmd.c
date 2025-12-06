@@ -7,6 +7,7 @@
 #include "../../registry.h"
 #include "../../http_client.h"
 #include "../../alloc.h"
+#include "../../constants.h"
 #include "../../log.h"
 #include "../../fileutil.h"
 #include "../../commands/cache/check/cache_check.h"
@@ -58,9 +59,9 @@ static void cache_download_list_add(CacheDownloadList *list, const char *author,
         list->packages = new_packages;
     }
 
-    char *entry = arena_malloc(512);
+    char *entry = arena_malloc(MAX_TEMP_BUFFER_LENGTH);
     if (entry) {
-        snprintf(entry, 512, "%s/%s@%s", author, name, version);
+        snprintf(entry, MAX_TEMP_BUFFER_LENGTH, "%s/%s@%s", author, name, version);
         list->packages[list->count++] = entry;
     }
 }
@@ -323,7 +324,7 @@ int cmd_cache(int argc, char *argv[]) {
 
         if (from_url) {
             snprintf(temp_dir_buf, sizeof(temp_dir_buf), "/tmp/wrap_cache_%s_%s", author, name);
-            mkdir(temp_dir_buf, 0755);
+            mkdir(temp_dir_buf, DIR_PERMISSIONS);
 
             char temp_file[1024];
             snprintf(temp_file, sizeof(temp_file), "%s/package.zip", temp_dir_buf);

@@ -1,6 +1,7 @@
 #include "pg_core.h"
 #include "solver_common.h"
 #include "../alloc.h"
+#include "../constants.h"
 #include "../log.h"
 
 #include <limits.h>
@@ -2175,7 +2176,7 @@ static void pg_error_writer_appendf(PgErrorWriter *w, const char *fmt, ...) {
         return;
     }
 
-    char temp[1024];
+    char temp[MAX_TEMP_PATH_LENGTH];
     va_list args;
     va_start(args, fmt);
     vsnprintf(temp, sizeof(temp), fmt, args);
@@ -2289,8 +2290,8 @@ static void pg_format_version_range(
     }
 
     /* Generic range */
-    char lower_str[64] = "";
-    char upper_str[64] = "";
+    char lower_str[MAX_VERSION_STRING_MEDIUM_LENGTH] = "";
+    char upper_str[MAX_VERSION_STRING_MEDIUM_LENGTH] = "";
 
     if (!range.lower.unbounded) {
         snprintf(lower_str, sizeof(lower_str), "%s%d.%d.%d",
@@ -2327,7 +2328,7 @@ static void pg_format_term(
     size_t out_size
 ) {
     const char *pkg_name = name_resolver(name_ctx, term->pkg);
-    char range_str[128];
+    char range_str[MAX_RANGE_STRING_LENGTH];
     bool is_any;
     pg_format_version_range(term->range, range_str, sizeof(range_str), &is_any);
 
@@ -2383,15 +2384,15 @@ static void pg_explain_dependency_inline(
         return;
     }
 
-    char pkg_str[256];
-    char dep_str[256];
+    char pkg_str[MAX_TERM_STRING_LENGTH];
+    char dep_str[MAX_TERM_STRING_LENGTH];
 
     PgTerm depender = inc->terms[0];
     PgTerm dependency = inc->terms[1];
 
     /* Format depender */
     const char *depender_name = name_resolver(name_ctx, depender.pkg);
-    char depender_range[128];
+    char depender_range[MAX_RANGE_STRING_LENGTH];
     bool depender_is_any;
     pg_format_version_range(depender.range, depender_range, sizeof(depender_range), &depender_is_any);
 
@@ -2430,7 +2431,7 @@ static void pg_explain_external_inline(
     }
 
     if (inc->reason == PG_REASON_NO_VERSIONS && inc->term_count > 0) {
-        char term_str[256];
+        char term_str[MAX_TERM_STRING_LENGTH];
         PgTerm term = inc->terms[0];
         if (!term.positive) {
             term.positive = true;
@@ -2438,7 +2439,7 @@ static void pg_explain_external_inline(
         pg_format_term(&term, name_resolver, name_ctx, term_str, sizeof(term_str));
 
         /* Try to show the required range and current pinned version (if available) */
-        char range_str[128];
+        char range_str[MAX_RANGE_STRING_LENGTH];
         bool is_any = false;
         pg_format_version_range(term.range, range_str, sizeof(range_str), &is_any);
 
@@ -2498,7 +2499,7 @@ static void pg_explain_conclusion(
 
     /* For other derived incompatibilities, format as "X requires Y" or "X is forbidden" */
     if (inc->term_count == 1) {
-        char term_str[256];
+        char term_str[MAX_TERM_STRING_LENGTH];
         /* Flip to show what's required/forbidden */
         PgTerm flipped = inc->terms[0];
         flipped.positive = !flipped.positive;
@@ -2518,8 +2519,8 @@ static void pg_explain_conclusion(
 
     /* For multi-term conclusions */
     if (inc->term_count == 2) {
-        char term1_str[256];
-        char term2_str[256];
+        char term1_str[MAX_TERM_STRING_LENGTH];
+        char term2_str[MAX_TERM_STRING_LENGTH];
 
         PgTerm t1 = inc->terms[0];
         PgTerm t2 = inc->terms[1];
@@ -2850,7 +2851,7 @@ static void pg_explain_incompatibility(
 
     if (inc->reason == PG_REASON_NO_VERSIONS) {
         if (inc->term_count > 0) {
-            char term_str[256];
+            char term_str[MAX_TERM_STRING_LENGTH];
             PgTerm term = inc->terms[0];
             /* Flip negative to positive for display */
             if (!term.positive) {
@@ -2914,7 +2915,7 @@ bool pg_solver_explain_failure(
 
         if (solver->root_incompatibility->reason == PG_REASON_NO_VERSIONS) {
             if (solver->root_incompatibility->term_count > 0) {
-                char term_str[256];
+                char term_str[MAX_TERM_STRING_LENGTH];
                 PgTerm term = solver->root_incompatibility->terms[0];
                 pg_format_term(&term, name_resolver, name_ctx, term_str, sizeof(term_str));
                 pg_error_writer_appendf(&writer, "No versions of %s satisfy the constraints.\n", term_str);

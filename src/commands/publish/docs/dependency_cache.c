@@ -1,6 +1,7 @@
 #include "dependency_cache.h"
 #include "path_util.h"
 #include "../../../alloc.h"
+#include "../../../constants.h"
 #include "../../../elm_json.h"
 #include "../../../cache.h"
 #include "../../../vendor/cJSON.h"
@@ -104,8 +105,8 @@ static char *resolve_version_from_filesystem(const char *elm_home, const char *a
         /* Not a constraint, might be exact version - just return it */
         matched = sscanf(constraint, "%d.%d.%d", &lower_major, &lower_minor, &lower_patch);
         if (matched == 3) {
-            char *result = arena_malloc(32);
-            snprintf(result, 32, "%d.%d.%d", lower_major, lower_minor, lower_patch);
+            char *result = arena_malloc(MAX_VERSION_STRING_LENGTH);
+            snprintf(result, MAX_VERSION_STRING_LENGTH, "%d.%d.%d", lower_major, lower_minor, lower_patch);
             return result;
         }
         return NULL;
@@ -305,7 +306,7 @@ static CachedModuleExports *parse_module_exports_from_docs_json(const char *docs
     exports->module_name = arena_strdup(module_name);
     exports->parsed = true;
 
-    int capacity = 16;
+    int capacity = INITIAL_SMALL_CAPACITY;
     exports->exported_types = arena_malloc(capacity * sizeof(char*));
     exports->exported_types_arity = arena_malloc(capacity * sizeof(int));
     exports->exported_types_count = 0;
@@ -431,7 +432,7 @@ static CachedModuleExports *parse_module_exports(const char *module_path, const 
     exports->parsed = true;
 
     /* Allocate array for exported types */
-    int capacity = 16;
+    int capacity = INITIAL_SMALL_CAPACITY;
     exports->exported_types = arena_malloc(capacity * sizeof(char*));
     exports->exported_types_arity = arena_malloc(capacity * sizeof(int));
 
@@ -443,9 +444,9 @@ static CachedModuleExports *parse_module_exports(const char *module_path, const 
         char *name;
         int arity;
     } TypeInfo;
-    TypeInfo *type_infos = arena_malloc(64 * sizeof(TypeInfo));
+    TypeInfo *type_infos = arena_malloc(INITIAL_MEDIUM_CAPACITY * sizeof(TypeInfo));
     int type_infos_count = 0;
-    int type_infos_capacity = 64;
+    int type_infos_capacity = INITIAL_MEDIUM_CAPACITY;
 
     for (uint32_t i = 0; i < child_count; i++) {
         TSNode child = ts_node_child(root_node, i);
@@ -585,9 +586,9 @@ struct DependencyCache* dependency_cache_create(const char *elm_home, const char
 
     cache->elm_home = arena_strdup(effective_elm_home);
     cache->package_path = arena_strdup(package_path);
-    cache->modules = arena_malloc(32 * sizeof(CachedModuleExports));
+    cache->modules = arena_malloc(INITIAL_CONNECTION_CAPACITY * sizeof(CachedModuleExports));
     cache->modules_count = 0;
-    cache->modules_capacity = 32;
+    cache->modules_capacity = INITIAL_CONNECTION_CAPACITY;
 
     return cache;
 }

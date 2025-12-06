@@ -7,6 +7,7 @@
 
 #include "repository.h"
 #include "../../alloc.h"
+#include "../../constants.h"
 #include "../../global_context.h"
 #include "../../env_defaults.h"
 #include "../../elm_compiler.h"
@@ -160,7 +161,7 @@ static int mkdir_p(const char *path) {
     arena_free(parent_copy);
 
     /* Create this directory */
-    if (mkdir(path, 0755) != 0 && errno != EEXIST) {
+    if (mkdir(path, DIR_PERMISSIONS) != 0 && errno != EEXIST) {
         return -1;
     }
 
@@ -871,7 +872,7 @@ static int clear_package_tracking(const char *package_name, const char *version)
  * Simple hash function for path -> filename.
  */
 static unsigned long hash_path_local(const char *str) {
-    unsigned long hash = 5381;
+    unsigned long hash = DJB2_HASH_INIT;
     int c;
     while ((c = *str++)) {
         hash = ((hash << 5) + hash) + c;

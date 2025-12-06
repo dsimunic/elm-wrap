@@ -8,6 +8,7 @@
 #include "canonicalize.h"
 #include "util.h"
 #include "../alloc.h"
+#include "../constants.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -311,7 +312,7 @@ void canonicalize_type_to_buffer(TSNode node, const char *source_code,
 }
 
 char *canonicalize_type_node(TSNode node, const char *source_code) {
-    size_t max_len = 65536;  /* 64KB - large records can exceed 4KB */
+    size_t max_len = MAX_LARGE_BUFFER_LENGTH;  /* 64KB - large records can exceed 4KB */
     char *buffer = arena_malloc(max_len);
     size_t pos = 0;
     buffer[0] = '\0';
