@@ -22,6 +22,10 @@
 #define FEATURE_POLICY_DEFAULT 0
 #endif
 
+#ifndef FEATURE_CACHE_DEFAULT
+#define FEATURE_CACHE_DEFAULT 0
+#endif
+
 /*
  * Check environment variable for feature flag override.
  * Returns: 1 if enabled, 0 if disabled, -1 if not set (use default).
@@ -70,4 +74,12 @@ bool feature_policy_enabled(void) {
         return env_value == 1;
     }
     return FEATURE_POLICY_DEFAULT != 0;
+}
+
+bool feature_cache_enabled(void) {
+    int env_value = check_env_flag("WRAP_FEATURE_CACHE");
+    if (env_value >= 0) {
+        return env_value == 1;
+    }
+    return FEATURE_CACHE_DEFAULT != 0;
 }

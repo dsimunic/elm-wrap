@@ -13,9 +13,9 @@
 #include <ctype.h>
 
 static void print_docs_usage(void) {
-    printf("Usage: %s publish docs PATH\n", global_context_program_name());
+    printf("Usage: %s package docs PATH\n", global_context_program_name());
     printf("\n");
-    printf("Generate documentation JSON for an Elm package.\n");
+    printf("Generate json documentation for an Elm package.\n");
     printf("\n");
     printf("Arguments:\n");
     printf("  PATH               Path to package directory containing elm.json and src/\n");

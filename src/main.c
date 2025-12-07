@@ -123,7 +123,9 @@ void print_package_usage(const char *prog) {
         printf("  publish PATH                   Show files that would be published from a package\n");
     }
     printf("  docs    PATH                   Generate documentation JSON for a package\n");
-    printf("  cache   PACKAGE                Download package to ELM_HOME without adding it to elm.json\n");
+    if (feature_cache_enabled()) {
+        printf("  cache   PACKAGE                Download package to ELM_HOME without adding it to elm.json\n");
+    }
     printf("\nOptions:\n");
     printf("  -y, --yes            Automatically confirm changes\n");
     printf("  -v, --verbose        Show detailed logging output\n");
@@ -154,6 +156,10 @@ int cmd_package(int argc, char *argv[], const char *prog) {
     }
 
     if (strcmp(subcmd, "cache") == 0) {
+        if (!feature_cache_enabled()) {
+            fprintf(stderr, "Error: Subcommand 'cache' is not available in this build.\n");
+            return 1;
+        }
         // Pass remaining args to cache command
         return cmd_cache(argc - 1, argv + 1);
     }
