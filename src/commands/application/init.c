@@ -7,6 +7,7 @@
 
 #include "application.h"
 #include "../../install_env.h"
+#include "../../install.h"
 #include "../../global_context.h"
 #include "../../elm_json.h"
 #include "../../alloc.h"
@@ -32,8 +33,9 @@ static void print_application_init_usage(void) {
     printf("Initialize a new Elm application project by creating an elm.json file.\n");
     printf("\n");
     printf("Options:\n");
-    printf("  -y, --yes    Skip confirmation prompt and create elm.json immediately\n");
-    printf("  -h, --help   Show this help message\n");
+    printf("  -y, --yes         Skip confirmation prompt and create elm.json immediately\n");
+    printf("  -q, --no-report   Skip printing application info after initialization\n");
+    printf("  -h, --help        Show this help message\n");
     printf("\n");
     printf("Example:\n");
     printf("  %s application init       # Create a new elm.json with prompt\n", global_context_program_name());
@@ -124,6 +126,7 @@ static bool solve_init_dependencies(InstallEnv *env, PackageMap **direct_deps, P
 
 int cmd_application_init(int argc, char *argv[]) {
     bool skip_prompt = false;
+    bool no_report = false;
 
     // Check for flags
     for (int i = 1; i < argc; i++) {
@@ -132,6 +135,8 @@ int cmd_application_init(int argc, char *argv[]) {
             return 0;
         } else if (strcmp(argv[i], "--yes") == 0 || strcmp(argv[i], "-y") == 0) {
             skip_prompt = true;
+        } else if (strcmp(argv[i], "--no-report") == 0 || strcmp(argv[i], "-q") == 0) {
+            no_report = true;
         } else {
             fprintf(stderr, "Unknown option: %s\n", argv[i]);
             print_application_init_usage();
@@ -216,11 +221,20 @@ int cmd_application_init(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("\nOkay, I created it. Now read that link!\n");
+    // Show success message only in interactive mode
+    if (!skip_prompt) {
+        printf("\nOkay, I created it. Now read that link!\n");
+    }
 
     // Cleanup
     elm_json_free(elm_json);
     install_env_free(env);
+
+    // Show application info unless --no-report was specified
+    if (!no_report) {
+        char *info_argv[] = { argv[0], NULL };
+        cmd_info(1, info_argv);
+    }
 
     return 0;
 }

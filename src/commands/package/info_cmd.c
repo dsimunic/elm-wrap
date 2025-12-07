@@ -21,10 +21,75 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <dirent.h>
+#include <unistd.h>
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
+
+/**
+ * Get the last path segment (directory or file name) from a path.
+ * Returns arena-allocated string.
+ */
+static char *get_last_path_segment(const char *path) {
+    if (!path || path[0] == '\0') {
+        return arena_strdup(".");
+    }
+
+    /* Get absolute path */
+    char abs_path[PATH_MAX];
+    if (realpath(path, abs_path) == NULL) {
+        /* If realpath fails, just use the original */
+        strncpy(abs_path, path, PATH_MAX - 1);
+        abs_path[PATH_MAX - 1] = '\0';
+    }
+
+    /* Find the last non-trailing slash */
+    size_t len = strlen(abs_path);
+    while (len > 1 && abs_path[len - 1] == '/') {
+        abs_path[--len] = '\0';
+    }
+
+    /* Find the last slash */
+    const char *last_slash = strrchr(abs_path, '/');
+    if (last_slash && last_slash[1] != '\0') {
+        return arena_strdup(last_slash + 1);
+    } else if (last_slash == abs_path) {
+        return arena_strdup("/");
+    }
+
+    return arena_strdup(abs_path);
+}
+
+/**
+ * Get the directory path from an elm.json path.
+ * Returns arena-allocated absolute path string.
+ */
+static char *get_project_dir(const char *elm_json_path) {
+    char abs_path[PATH_MAX];
+
+    /* Get the directory containing elm.json */
+    if (strcmp(elm_json_path, ELM_JSON_PATH) == 0) {
+        /* Current directory */
+        if (getcwd(abs_path, PATH_MAX) == NULL) {
+            return arena_strdup(".");
+        }
+        return arena_strdup(abs_path);
+    }
+
+    /* Get absolute path of the elm.json file */
+    if (realpath(elm_json_path, abs_path) == NULL) {
+        return arena_strdup(".");
+    }
+
+    /* Remove /elm.json suffix if present */
+    char *elm_json_suffix = strstr(abs_path, "/elm.json");
+    if (elm_json_suffix && elm_json_suffix[9] == '\0') {
+        *elm_json_suffix = '\0';
+    }
+
+    return arena_strdup(abs_path);
+}
 
 static void print_info_usage(void) {
     printf("Usage: %s package info [PATH | <author/package> [VERSION]]\n", global_context_program_name());
@@ -662,26 +727,27 @@ int cmd_info(int argc, char *argv[]) {
     ElmJson *elm_json = elm_json_read(elm_json_path);
 
     if (elm_json) {
+        /* Get project directory info for header */
+        char *project_dir = get_project_dir(elm_json_path);
+        char *project_name = get_last_path_segment(project_dir);
 
+        printf("\n%s\n", project_name);
+        printf("-------------------\n");
         printf("\n");
+
         int total_packages = 0;
         if (elm_json->type == ELM_PROJECT_APPLICATION) {
             total_packages = elm_json->dependencies_direct->count +
                            elm_json->dependencies_indirect->count +
                            elm_json->dependencies_test_direct->count +
                            elm_json->dependencies_test_indirect->count;
-            printf("Application\n");
-            printf("-------------------\n");
-            printf("Installed packages:\n");
-            printf("  Direct dependencies:   %4d\n", elm_json->dependencies_direct->count);
-            printf("  Indirect dependencies: %4d\n", elm_json->dependencies_indirect->count);
-            printf("  Test direct:           %4d\n", elm_json->dependencies_test_direct->count);
-            printf("  Test indirect:         %4d\n", elm_json->dependencies_test_indirect->count);
+            printf("Type: Application\n");
+            printf("Path: %s\n", project_dir);
         } else {
             total_packages = elm_json->package_dependencies->count +
                            elm_json->package_test_dependencies->count;
-            printf("Package\n");
-            printf("-------------------\n");
+            printf("Type: Package\n");
+            printf("Path: %s\n", project_dir);
 
             /* Show package metadata */
             if (elm_json->package_name) {
@@ -702,12 +768,10 @@ int cmd_info(int argc, char *argv[]) {
                 }
                 arena_free(exposed_modules);
             }
-
-            printf("\n");
-            printf("Dependencies:           %4d\n", elm_json->package_dependencies->count);
-            printf("Test dependencies:      %4d\n", elm_json->package_test_dependencies->count);
         }
-        printf("Total:                  %4d\n", total_packages);
+
+        arena_free(project_name);
+        arena_free(project_dir);
 
         size_t max_name_len = 0;
         if (global_context_is_v2() && v2_registry) {
@@ -762,7 +826,7 @@ int cmd_info(int argc, char *argv[]) {
             }
         }
 
-        printf("\nInstalled Package Versions:\n\n");
+        printf("\nDependencies:\n\n");
         if (elm_json->type == ELM_PROJECT_APPLICATION) {
             for (int i = 0; i < elm_json->dependencies_direct->count; i++) {
                 Package *pkg = &elm_json->dependencies_direct->packages[i];
@@ -824,6 +888,8 @@ int cmd_info(int argc, char *argv[]) {
             }
         }
 
+        /* Print total dependencies aligned with version column */
+        printf("\n%-*s  %d\n", (int)(max_name_len + 2), "  Total:", total_packages);
         printf("\n");
 
         if (global_context_is_v2() && v2_registry) {
