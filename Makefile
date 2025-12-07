@@ -487,8 +487,8 @@ $(BUILDDIR)/debug.o: $(SRCDIR)/commands/debug/debug.c $(SRCDIR)/commands/debug/d
 $(BUILDDIR)/application.o: $(SRCDIR)/commands/application/application.c $(SRCDIR)/commands/application/application.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/app_init.o: $(SRCDIR)/commands/application/init.c $(SRCDIR)/commands/application/application.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/commands/wrappers/init_v1.h $(SRCDIR)/commands/wrappers/init_v2.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILDDIR)/app_init.o: $(SRCDIR)/commands/application/init.c $(SRCDIR)/commands/application/application.h $(SRCDIR)/install_env.h $(SRCDIR)/global_context.h $(SRCDIR)/elm_compiler.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/embedded_archive.h $(SRCDIR)/fileutil.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/commands/review/reporter.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
 
 $(BUILDDIR)/app_info.o: $(SRCDIR)/commands/application/info.c $(SRCDIR)/commands/application/application.h $(SRCDIR)/install.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@

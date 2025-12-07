@@ -10,4 +10,7 @@ int cmd_application_init(int argc, char *argv[]);
 /* Subcommand: info - display application information */
 int cmd_application_info(int argc, char *argv[]);
 
+/* Subcommand: list-templates - list available application templates */
+int cmd_application_list_templates(int argc, char *argv[]);
+
 #endif /* APPLICATION_H */

@@ -826,7 +826,7 @@ int refresh_local_dev_dependents(InstallEnv *env) {
 }
 
 int register_local_dev_package(const char *source_path, const char *package_name,
-                               InstallEnv *env, bool auto_yes) {
+                               InstallEnv *env, bool auto_yes, bool quiet) {
     struct stat st;
     char resolved_source[PATH_MAX];
 
@@ -910,17 +910,18 @@ int register_local_dev_package(const char *source_path, const char *package_name
               version, strcmp(version, LOCAL_DEV_VERSION_EXISTS) == 0 ? "exists" : "not found");
 
     /* Show plan */
-    printf("Here is my plan:\n");
-    printf("  \n");
-    printf("  Register (local-dev):\n");
-    printf("    %s/%s    %s (local)\n", actual_author, actual_name, version);
-    printf("  \n");
-    printf("  Source: %s\n", resolved_source);
-    printf("  \n");
-    printf("Note: This only registers the package in the cache.\n");
-    printf("To use it in an application, run from the application directory:\n");
-    printf("    wrap package install --local-dev --from-path %s\n", resolved_source);
-    printf("  \n");
+    if (!quiet) {
+        printf("Here is my plan:\n");
+        printf("  \n");
+        printf("  Register (local-dev):\n");
+        printf("    %s/%s    %s (local)\n", actual_author, actual_name, version);
+        printf("  \n");
+        printf("  Source: %s\n", resolved_source);
+        printf("  \n");
+        printf("To use this package in an application, run from the application directory:\n");
+        printf("    %s package install %s/%s\n", actual_author, actual_name, global_context_program_name());
+        printf("  \n");
+    }
 
     if (!auto_yes) {
         printf("\nWould you like me to proceed? [Y/n]: ");
@@ -952,7 +953,9 @@ int register_local_dev_package(const char *source_path, const char *package_name
         /* Continue anyway - the symlink was created successfully */
     }
 
-    printf("Successfully registered %s/%s %s (local)!\n", actual_author, actual_name, version);
+    if (!quiet) {
+        printf("Successfully registered %s/%s %s (local)!\n", actual_author, actual_name, version);
+    }
 
     arena_free(actual_author);
     arena_free(actual_name);

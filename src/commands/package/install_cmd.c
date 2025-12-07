@@ -645,7 +645,7 @@ int cmd_install(int argc, char *argv[]) {
          */
         if (!from_path && elm_json->type == ELM_PROJECT_PACKAGE) {
             /* Register-only mode: just put in cache and registry */
-            result = register_local_dev_package(source_path, package_name, env, auto_yes);
+            result = register_local_dev_package(source_path, package_name, env, auto_yes, false);
             elm_json_free(elm_json);
             install_env_free(env);
             log_set_level(original_level);

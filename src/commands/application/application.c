@@ -16,8 +16,9 @@ static void print_application_usage(void) {
     printf("Application management commands.\n");
     printf("\n");
     printf("Subcommands:\n");
-    printf("  init               Initialize a new Elm application\n");
+    printf("  init [TEMPLATE]    Initialize a new Elm application (default: application)\n");
     printf("  info [PATH]        Display application information and upgrades\n");
+    printf("  list-templates     List available application templates\n");
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help         Show this help message\n");
@@ -42,6 +43,10 @@ int cmd_application(int argc, char *argv[]) {
 
     if (strcmp(subcmd, "info") == 0) {
         return cmd_application_info(argc - 1, argv + 1);
+    }
+
+    if (strcmp(subcmd, "list-templates") == 0) {
+        return cmd_application_list_templates(argc - 1, argv + 1);
     }
 
     fprintf(stderr, "Error: Unknown application subcommand '%s'\n", subcmd);

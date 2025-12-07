@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <libgen.h>
 #include <errno.h>
+#include <unistd.h>
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
@@ -21,11 +22,12 @@
 #define TEMPLATE_PREFIX "templates/package/init"
 
 static void print_package_init_usage(void) {
-    printf("Usage: %s package init [--no-local-dev] PACKAGE\n", global_context_program_name());
+    printf("Usage: %s package init [OPTIONS] PACKAGE\n", global_context_program_name());
     printf("\n");
     printf("Initialize a new Elm package from embedded templates.\n");
     printf("\nOptions:\n");
     printf("  --no-local-dev  Skip registering the package in the local-dev registry\n");
+    printf("  -y, --yes       Skip confirmation prompt\n");
     printf("  -h, --help      Show this help message\n");
 }
 
@@ -331,8 +333,44 @@ static bool extract_templates(const char *package_name) {
     return true;
 }
 
+static bool show_init_plan_and_confirm(const char *package_name, const char *resolved_source,
+                                       bool will_register_local_dev, bool auto_yes) {
+    printf("Here is my plan:\n");
+    printf("  \n");
+    printf("  Create new elm.json for the package:\n");
+    printf("    %s    0.0.0 (local)\n", package_name);
+    printf("  \n");
+    printf("  Source: %s\n", resolved_source);
+    printf("  \n");
+
+    if (will_register_local_dev) {
+        printf("  Also, I will register the package for local development. To prevent that,\n");
+        printf("  run this command again and specify --no-local-dev flag.\n");
+        printf("\n");
+        printf("\n");
+        printf("To use this package in an application, run from the application directory:\n");
+        printf("    %s package install %s\n", package_name, global_context_program_name());
+        printf("  \n");
+    }
+
+    if (!auto_yes) {
+        printf("\nWould you like me to proceed? [Y/n]: ");
+        fflush(stdout);
+
+        char response[10];
+        if (!fgets(response, sizeof(response), stdin) ||
+            (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n')) {
+            printf("Aborted.\n");
+            return false;
+        }
+    }
+
+    return true;
+}
+
 int cmd_package_init(int argc, char *argv[]) {
     bool no_local_dev = false;
+    bool auto_yes = false;
     const char *package_name = NULL;
 
     for (int i = 1; i < argc; i++) {
@@ -341,6 +379,8 @@ int cmd_package_init(int argc, char *argv[]) {
             return 0;
         } else if (strcmp(argv[i], "--no-local-dev") == 0) {
             no_local_dev = true;
+        } else if (strcmp(argv[i], "-y") == 0 || strcmp(argv[i], "--yes") == 0) {
+            auto_yes = true;
         } else if (argv[i][0] == '-') {
             fprintf(stderr, "Error: Unknown option %s\n", argv[i]);
             print_package_init_usage();
@@ -386,11 +426,24 @@ int cmd_package_init(int argc, char *argv[]) {
         return 1;
     }
 
+    /* Get current directory for display */
+    char cwd[PATH_MAX];
+    if (!getcwd(cwd, sizeof(cwd))) {
+        fprintf(stderr, "Error: Failed to get current directory\n");
+        return 1;
+    }
+
+    /* Show plan and get confirmation */
+    if (!show_init_plan_and_confirm(package_name, cwd, !no_local_dev, auto_yes)) {
+        return 0;
+    }
+
     if (!extract_templates(package_name)) {
         return 1;
     }
 
     if (no_local_dev) {
+        printf("Successfully created elm.json for %s!\n", package_name);
         return 0;
     }
 
@@ -406,8 +459,12 @@ int cmd_package_init(int argc, char *argv[]) {
         return 1;
     }
 
-    int result = register_local_dev_package(".", package_name, env, true);
+    int result = register_local_dev_package(".", package_name, env, true, true);
     install_env_free(env);
+
+    if (result == 0) {
+        printf("Successfully created and registered %s 0.0.0 (local)!\n", package_name);
+    }
 
     return result;
 }

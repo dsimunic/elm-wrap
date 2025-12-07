@@ -34,10 +34,11 @@ int install_local_dev(const char *source_path, const char *package_name,
  * @param package_name  Package name in "author/name" format (optional, read from elm.json if NULL)
  * @param env           Install environment
  * @param auto_yes      Skip confirmation prompts
+ * @param quiet         Suppress plan output and success message (caller handles UI)
  * @return 0 on success, non-zero on failure
  */
 int register_local_dev_package(const char *source_path, const char *package_name,
-                               InstallEnv *env, bool auto_yes);
+                               InstallEnv *env, bool auto_yes, bool quiet);
 
 /**
  * Check if we're inside a package directory being developed and refresh
