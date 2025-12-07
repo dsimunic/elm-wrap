@@ -80,8 +80,8 @@ void print_usage(const char *prog) {
             printf("  reactor            Start the Elm Reactor development server\n");
             printf("  make ELM_FILE      Compile Elm code to JavaScript or HTML\n");
             printf("  install PACKAGE    Install packages for your Elm project\n");
-            printf("  bump               Bump version based on API changes\n");
-            printf("  diff [VERSION]     Show API differences between versions\n");
+//            printf("  bump               Bump version based on API changes\n");
+//            printf("  diff [VERSION]     Show API differences between versions\n");
             break;
     }
 
