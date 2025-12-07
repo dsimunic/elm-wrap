@@ -23,4 +23,20 @@
 int v2_show_package_dependencies(const char *author, const char *name, const char *version,
                                  V2Registry *registry);
 
+/**
+ * Check if a package depends on another package using V2 registry data.
+ * All data is available in the registry index - no downloads needed.
+ *
+ * @param pkg_author Package author to check
+ * @param pkg_name Package name to check
+ * @param pkg_version Package version string (e.g., "1.0.0")
+ * @param target_author Dependency target author
+ * @param target_name Dependency target name
+ * @param registry V2 registry with package data
+ * @return true if pkg depends on target, false otherwise
+ */
+bool v2_package_depends_on(const char *pkg_author, const char *pkg_name, const char *pkg_version,
+                           const char *target_author, const char *target_name,
+                           V2Registry *registry);
+
 #endif /* PROTOCOL_V2_INSTALL_H */

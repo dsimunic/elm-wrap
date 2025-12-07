@@ -3,6 +3,9 @@
 #include "../../cache.h"
 #include "../../constants.h"
 #include "../../fileutil.h"
+#include "../../registry.h"
+#include "../../protocol_v2/solver/v2_registry.h"
+#include "../../log.h"
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -278,4 +281,43 @@ char* find_package_elm_json(const char *pkg_path) {
 
     closedir(dir);
     return found_path;
+}
+
+bool package_exists_in_registry(InstallEnv *env, const char *author, const char *name,
+                                 size_t *out_version_count) {
+    size_t version_count = 0;
+
+    if (env->protocol_mode == PROTOCOL_V2) {
+        if (!env->v2_registry) {
+            log_error("V2 protocol active but registry is not loaded");
+            if (out_version_count) *out_version_count = 0;
+            return false;
+        }
+
+        V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
+        if (!entry) {
+            if (out_version_count) *out_version_count = 0;
+            return false;
+        }
+
+        /* Count valid versions */
+        for (size_t i = 0; i < entry->version_count; i++) {
+            if (entry->versions[i].status == V2_STATUS_VALID) {
+                version_count++;
+            }
+        }
+
+        if (out_version_count) *out_version_count = version_count;
+        return (version_count > 0);
+    } else {
+        RegistryEntry *registry_entry = registry_find(env->registry, author, name);
+        if (!registry_entry) {
+            if (out_version_count) *out_version_count = 0;
+            return false;
+        }
+
+        version_count = registry_entry->version_count;
+        if (out_version_count) *out_version_count = version_count;
+        return true;
+    }
 }

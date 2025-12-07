@@ -7,9 +7,11 @@
 
 #include "install.h"
 #include "../log.h"
+#include "../constants.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 int v2_show_package_dependencies(const char *author, const char *name, const char *version,
                                  V2Registry *registry) {
@@ -58,4 +60,44 @@ int v2_show_package_dependencies(const char *author, const char *name, const cha
 
     printf("\n");
     return 0;
+}
+
+bool v2_package_depends_on(const char *pkg_author, const char *pkg_name, const char *pkg_version,
+                           const char *target_author, const char *target_name,
+                           V2Registry *registry) {
+    if (!registry || !pkg_author || !pkg_name || !pkg_version ||
+        !target_author || !target_name) {
+        return false;
+    }
+
+    /* Parse the version string */
+    int major, minor, patch;
+    if (sscanf(pkg_version, "%d.%d.%d", &major, &minor, &patch) != 3) {
+        log_debug("Invalid version format: %s", pkg_version);
+        return false;
+    }
+
+    /* Find the specific version in the registry */
+    V2PackageVersion *version = v2_registry_find_version(registry, pkg_author, pkg_name,
+                                                          (uint16_t)major, (uint16_t)minor, (uint16_t)patch);
+    if (!version) {
+        log_debug("Version %s not found for %s/%s in V2 registry", pkg_version, pkg_author, pkg_name);
+        return false;
+    }
+
+    /* Build the target package name for comparison */
+    char target_full_name[MAX_PACKAGE_NAME_LENGTH];
+    snprintf(target_full_name, sizeof(target_full_name), "%s/%s", target_author, target_name);
+
+    /* Check if any dependency matches the target */
+    for (size_t i = 0; i < version->dependency_count; i++) {
+        V2Dependency *dep = &version->dependencies[i];
+        if (dep && dep->package_name) {
+            if (strcmp(dep->package_name, target_full_name) == 0) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }

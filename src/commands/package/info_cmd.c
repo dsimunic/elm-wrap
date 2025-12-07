@@ -9,8 +9,6 @@
 #include "../../protocol_v1/install.h"
 #include "../../protocol_v2/install.h"
 #include "../../protocol_v2/solver/v2_registry.h"
-#include "info_v1.h"
-#include "info_v2.h"
 #include "../../global_context.h"
 #include "../../alloc.h"
 #include "../../constants.h"

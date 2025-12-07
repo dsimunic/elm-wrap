@@ -1,6 +1,15 @@
 CC = gcc
 AR = ar
+
+# Feature flags: 0=hidden, 1=visible (can be overridden at runtime via env vars)
+FEATURE_CODE ?= 0
+FEATURE_PUBLISH ?= 0
+FEATURE_REVIEW ?= 0
+FEATURE_POLICY ?= 0
+
 CFLAGS = -Wall -Wextra -Werror -std=c99 -D_POSIX_C_SOURCE=200809L -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -O2 -flto
+CFLAGS += -DFEATURE_CODE_DEFAULT=$(FEATURE_CODE) -DFEATURE_PUBLISH_DEFAULT=$(FEATURE_PUBLISH)
+CFLAGS += -DFEATURE_REVIEW_DEFAULT=$(FEATURE_REVIEW) -DFEATURE_POLICY_DEFAULT=$(FEATURE_POLICY)
 
 # Detect operating system
 UNAME_S := $(shell uname -s)
@@ -77,6 +86,7 @@ TARGET_FILE = wrap
 SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/alloc.c \
           $(SRCDIR)/log.c \
+          $(SRCDIR)/features.c \
           $(SRCDIR)/embedded_archive.c \
           $(SRCDIR)/commands/wrappers/init.c \
           $(SRCDIR)/commands/wrappers/init_v1.c \
@@ -114,6 +124,8 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/package/remove_cmd.c \
           $(SRCDIR)/commands/package/info_cmd.c \
           $(SRCDIR)/commands/package/upgrade_cmd.c \
+          $(SRCDIR)/commands/package/upgrade_v1.c \
+          $(SRCDIR)/commands/package/upgrade_v2.c \
           $(SRCDIR)/commands/application/application.c \
           $(SRCDIR)/commands/application/init.c \
           $(SRCDIR)/commands/application/info.c \
@@ -164,6 +176,7 @@ BUILDINFO_SRC = $(BUILDDIR)/buildinfo.c
 OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/alloc.o \
           $(BUILDDIR)/log.o \
+          $(BUILDDIR)/features.o \
           $(BUILDDIR)/embedded_archive.o \
           $(BUILDDIR)/init.o \
           $(BUILDDIR)/init_v1.o \
@@ -201,6 +214,8 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/remove_cmd.o \
           $(BUILDDIR)/info_cmd.o \
           $(BUILDDIR)/upgrade_cmd.o \
+          $(BUILDDIR)/upgrade_v1.o \
+          $(BUILDDIR)/upgrade_v2.o \
           $(BUILDDIR)/application.o \
           $(BUILDDIR)/app_init.o \
           $(BUILDDIR)/app_info.o \
@@ -344,6 +359,10 @@ $(BUILDDIR)/alloc.o: $(SRCDIR)/alloc.c $(SRCDIR)/alloc.h $(SRCDIR)/larena.h | $(
 
 # Build log object
 $(BUILDDIR)/log.o: $(SRCDIR)/log.c $(SRCDIR)/log.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build features object
+$(BUILDDIR)/features.o: $(SRCDIR)/features.c $(SRCDIR)/features.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build embedded_archive object
@@ -514,7 +533,7 @@ $(BUILDDIR)/ts_elm_scanner.o: $(SRCDIR)/vendor/tree-sitter-elm/scanner.c | $(BUI
 	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build package command objects
-$(BUILDDIR)/package_common.o: $(SRCDIR)/commands/package/package_common.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/alloc.h $(SRCDIR)/cache.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+$(BUILDDIR)/package_common.o: $(SRCDIR)/commands/package/package_common.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/alloc.h $(SRCDIR)/cache.h $(SRCDIR)/fileutil.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/log.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILDDIR)/install_cmd.o: $(SRCDIR)/commands/package/install_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/http_client.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
@@ -535,7 +554,13 @@ $(BUILDDIR)/remove_cmd.o: $(SRCDIR)/commands/package/remove_cmd.c $(SRCDIR)/comm
 $(BUILDDIR)/info_cmd.o: $(SRCDIR)/commands/package/info_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/install_check.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/protocol_v2/install.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/upgrade_cmd.o: $(SRCDIR)/commands/package/upgrade_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h | $(BUILDDIR)
+$(BUILDDIR)/upgrade_cmd.o: $(SRCDIR)/commands/package/upgrade_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/upgrade_v1.h $(SRCDIR)/commands/package/upgrade_v2.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/global_context.h $(SRCDIR)/log.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/upgrade_v1.o: $(SRCDIR)/commands/package/upgrade_v1.c $(SRCDIR)/commands/package/upgrade_v1.h $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/solver.h $(SRCDIR)/constants.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/upgrade_v2.o: $(SRCDIR)/commands/package/upgrade_v2.c $(SRCDIR)/commands/package/upgrade_v2.h $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/protocol_v2/install.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/solver.h $(SRCDIR)/constants.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build install_check object

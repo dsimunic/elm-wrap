@@ -26,6 +26,7 @@
 #include "commands/repository/repository.h"
 #include "alloc.h"
 #include "log.h"
+#include "features.h"
 #include "rulr/builtin_rules.h"
 #include "global_context.h"
 #include "embedded_archive.h"
@@ -89,9 +90,15 @@ void print_usage(const char *prog) {
     printf("  application SUBCOMMAND    Application management commands\n");
     printf("  package SUBCOMMAND        Package management commands\n");
     printf("  repository SUBCOMMAND     Repository management commands\n");
-    printf("  code SUBCOMMAND           Code analysis and transformation commands\n");
-    printf("  policy SUBCOMMAND         View and manage rulr policy rules\n");
-    printf("  review SUBCOMMAND         Run review rules against Elm files\n");
+    if (feature_code_enabled()) {
+        printf("  code SUBCOMMAND           Code analysis and transformation commands\n");
+    }
+    if (feature_policy_enabled()) {
+        printf("  policy SUBCOMMAND         View and manage rulr policy rules\n");
+    }
+    if (feature_review_enabled()) {
+        printf("  review SUBCOMMAND         Run review rules against Elm files\n");
+    }
     printf("  debug SUBCOMMAND          Diagnostic tools for development\n");
     printf("\nOptions:\n");
     printf("  -v, --verbose      Show detailed logging output\n");
@@ -112,7 +119,9 @@ void print_package_usage(const char *prog) {
     printf("  info    [ PATH                 Display package information and upgrades\n");
     printf("          | PACKAGE [VERSION]\n");
     printf("          ]\n");
-    printf("  publish PATH                   Show files that would be published from a package\n");
+    if (feature_publish_enabled()) {
+        printf("  publish PATH                   Show files that would be published from a package\n");
+    }
     printf("  docs    PATH                   Generate documentation JSON for a package\n");
     printf("  cache   PACKAGE                Download package to ELM_HOME without adding it to elm.json\n");
     printf("\nOptions:\n");
@@ -165,6 +174,10 @@ int cmd_package(int argc, char *argv[], const char *prog) {
     }
 
     if (strcmp(subcmd, "publish") == 0) {
+        if (!feature_publish_enabled()) {
+            fprintf(stderr, "Error: Subcommand 'publish' is not available in this build.\n");
+            return 1;
+        }
         // Pass remaining args to package publish command
         return cmd_package_publish(argc - 1, argv + 1);
     }
@@ -323,6 +336,10 @@ int main(int argc, char *argv[]) {
         }
 
         if (strcmp(argv[1], "publish") == 0) {
+            if (!feature_publish_enabled()) {
+                fprintf(stderr, "Error: Command 'publish' is not available in this build.\n");
+                return 1;
+            }
             return cmd_publish(argc - 1, argv + 1);
         }
 
@@ -331,14 +348,26 @@ int main(int argc, char *argv[]) {
         }
 
         if (strcmp(argv[1], "code") == 0) {
+            if (!feature_code_enabled()) {
+                fprintf(stderr, "Error: Command 'code' is not available in this build.\n");
+                return 1;
+            }
             return cmd_code(argc - 1, argv + 1);
         }
 
         if (strcmp(argv[1], "policy") == 0) {
+            if (!feature_policy_enabled()) {
+                fprintf(stderr, "Error: Command 'policy' is not available in this build.\n");
+                return 1;
+            }
             return cmd_policy(argc - 1, argv + 1);
         }
 
         if (strcmp(argv[1], "review") == 0) {
+            if (!feature_review_enabled()) {
+                fprintf(stderr, "Error: Command 'review' is not available in this build.\n");
+                return 1;
+            }
             return cmd_review(argc - 1, argv + 1);
         }
 

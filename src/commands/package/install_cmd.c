@@ -265,53 +265,15 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
 
     size_t available_versions = 0;
 
-    if (env->protocol_mode == PROTOCOL_V2) {
-        if (!env->v2_registry) {
-            log_error("V2 protocol active but registry is not loaded");
-            arena_free(author);
-            arena_free(name);
-            return 1;
-        }
-
-        V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
-        if (!entry) {
-            log_error("I cannot find package '%s/%s' in V2 registry", author, name);
-            log_error("Make sure the package name is correct");
-            arena_free(author);
-            arena_free(name);
-            return 1;
-        }
-
-        for (size_t i = 0; i < entry->version_count; i++) {
-            if (entry->versions[i].status == V2_STATUS_VALID) {
-                available_versions++;
-            }
-        }
-
-        if (available_versions == 0) {
-            log_error("Package '%s/%s' has no valid versions in V2 registry", author, name);
-            arena_free(author);
-            arena_free(name);
-            return 1;
-        }
-
-        log_debug("Found package in V2 registry with %zu valid version(s) (%zu total)", 
-                  available_versions, entry->version_count);
-    } else {
-        RegistryEntry *registry_entry = registry_find(env->registry, author, name);
-
-        if (!registry_entry) {
-            log_error("I cannot find package '%s/%s'", author, name);
-            log_error("Make sure the package name is correct");
-
-            arena_free(author);
-            arena_free(name);
-            return 1;
-        }
-
-        available_versions = registry_entry->version_count;
-        log_debug("Found package in registry with %zu version(s)", registry_entry->version_count);
+    if (!package_exists_in_registry(env, author, name, &available_versions)) {
+        log_error("I cannot find package '%s/%s'", author, name);
+        log_error("Make sure the package name is correct");
+        arena_free(author);
+        arena_free(name);
+        return 1;
     }
+
+    log_debug("Found package in registry with %zu version(s)", available_versions);
 
     SolverState *solver = solver_init(env, true);
     if (!solver) {
