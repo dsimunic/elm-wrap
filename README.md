@@ -287,6 +287,7 @@ brew upgrade elm-wrap
 ```
 curl -L https://github.com/OWNER/REPO/releases/latest/download/elm-wrap-macos-arm64 -o wrap
 chmod +x wrap
+xattr -d com.apple.quarantine wrap
 mv wrap ~/.local/bin 
 or
 sudo mv wrap /usr/local/bin/
