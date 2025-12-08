@@ -753,6 +753,74 @@ static bool refresh_app_indirect_deps(const char *app_elm_json_path, InstallEnv 
     return true;
 }
 
+/**
+ * Prune orphaned indirect dependencies from an application that depends on a local-dev package.
+ *
+ * This function detects indirect dependencies that are no longer reachable from any direct
+ * dependency and removes them from the application's elm.json.
+ *
+ * @param app_elm_json_path Path to the application's elm.json
+ * @param cache             Cache config for looking up package elm.json files
+ * @return true on success, false on error
+ */
+static bool prune_app_orphaned_deps(const char *app_elm_json_path, CacheConfig *cache) {
+    log_debug("Pruning orphaned dependencies for: %s", app_elm_json_path);
+
+    /* Read the application's elm.json */
+    ElmJson *app_json = elm_json_read(app_elm_json_path);
+    if (!app_json) {
+        log_error("Failed to read application elm.json: %s", app_elm_json_path);
+        return false;
+    }
+
+    if (app_json->type != ELM_PROJECT_APPLICATION) {
+        log_debug("Skipping non-application project: %s", app_elm_json_path);
+        elm_json_free(app_json);
+        return true;
+    }
+
+    /* Use the shared orphan detection function (no exclusions) */
+    PackageMap *orphaned = NULL;
+    if (!find_orphaned_packages(app_json, cache, NULL, NULL, &orphaned)) {
+        elm_json_free(app_json);
+        return false;
+    }
+
+    /* Remove orphaned packages from elm.json */
+    bool changed = false;
+    if (orphaned && orphaned->count > 0) {
+        for (int i = 0; i < orphaned->count; i++) {
+            Package *pkg = &orphaned->packages[i];
+            log_debug("Removing orphaned: %s/%s", pkg->author, pkg->name);
+
+            /* Remove from indirect dependencies */
+            if (app_json->dependencies_indirect &&
+                package_map_find(app_json->dependencies_indirect, pkg->author, pkg->name)) {
+                package_map_remove(app_json->dependencies_indirect, pkg->author, pkg->name);
+                changed = true;
+            }
+            if (app_json->dependencies_test_indirect &&
+                package_map_find(app_json->dependencies_test_indirect, pkg->author, pkg->name)) {
+                package_map_remove(app_json->dependencies_test_indirect, pkg->author, pkg->name);
+                changed = true;
+            }
+        }
+        package_map_free(orphaned);
+    }
+
+    if (changed) {
+        if (!elm_json_write(app_json, app_elm_json_path)) {
+            log_error("Failed to write updated elm.json: %s", app_elm_json_path);
+            elm_json_free(app_json);
+            return false;
+        }
+        printf("Pruned orphaned dependencies in: %s\n", app_elm_json_path);
+    }
+
+    elm_json_free(app_json);
+    return true;
+}
+
 int refresh_local_dev_dependents(InstallEnv *env) {
     /* Check if we're in a package directory that's being tracked */
     char *author = NULL;
@@ -785,6 +853,50 @@ int refresh_local_dev_dependents(InstallEnv *env) {
         /* We're in the local package directory, so elm.json is right here */
         if (!refresh_app_indirect_deps(dep_paths[i], env, author, name, "elm.json")) {
             log_error("Failed to refresh: %s", dep_paths[i]);
+            failed++;
+        }
+        arena_free(dep_paths[i]);
+    }
+    arena_free(dep_paths);
+
+    arena_free(author);
+    arena_free(name);
+    arena_free(version);
+
+    return failed > 0 ? 1 : 0;
+}
+
+int prune_local_dev_dependents(CacheConfig *cache) {
+    /* Check if we're in a package directory that's being tracked */
+    char *author = NULL;
+    char *name = NULL;
+    char *version = NULL;
+
+    if (!find_local_dev_package_info("elm.json", &author, &name, &version)) {
+        /* Not a tracked local-dev package, nothing to do */
+        return 0;
+    }
+
+    log_debug("Found local-dev package: %s/%s %s", author, name, version);
+
+    /* Get all dependent applications */
+    int dep_count = 0;
+    char **dep_paths = get_dependent_app_paths(author, name, version, &dep_count);
+
+    if (dep_count == 0) {
+        log_debug("No dependent applications to prune");
+        arena_free(author);
+        arena_free(name);
+        arena_free(version);
+        return 0;
+    }
+
+    printf("Pruning orphaned dependencies in %d dependent application(s)...\n", dep_count);
+
+    int failed = 0;
+    for (int i = 0; i < dep_count; i++) {
+        if (!prune_app_orphaned_deps(dep_paths[i], cache)) {
+            log_error("Failed to prune orphaned deps: %s", dep_paths[i]);
             failed++;
         }
         arena_free(dep_paths[i]);

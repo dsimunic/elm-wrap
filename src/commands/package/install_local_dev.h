@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "../../install_env.h"
 #include "../../elm_json.h"
+#include "../../cache.h"
 
 /**
  * Install a package for local development using symlinks.
@@ -50,6 +51,19 @@ int register_local_dev_package(const char *source_path, const char *package_name
  * @return 0 on success, non-zero on failure
  */
 int refresh_local_dev_dependents(InstallEnv *env);
+
+/**
+ * Check if we're inside a package directory being developed and prune
+ * orphaned indirect dependencies from all dependent applications.
+ *
+ * Called after removing a dependency from a package under development.
+ * This detects indirect dependencies that are no longer reachable from
+ * any direct dependency and removes them.
+ *
+ * @param cache Cache configuration for looking up package elm.json files
+ * @return 0 on success, non-zero on failure
+ */
+int prune_local_dev_dependents(CacheConfig *cache);
 
 /**
  * Get the local-dev dependency tracking directory path.

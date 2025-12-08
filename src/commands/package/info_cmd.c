@@ -257,93 +257,179 @@ static void print_package_tracking_info(const char *author, const char *name, co
 }
 
 /**
- * Helper to check if a package has a local-dev version and add it to the list.
+ * Structure to hold tracked package information.
  */
-static bool add_local_dev_package_to_list(Package *pkg, char ***packages, int *count, int *capacity) {
-    if (!pkg || !pkg->version) return true;
-
-    int major, minor, patch;
-    if (sscanf(pkg->version, "%d.%d.%d", &major, &minor, &patch) == 3) {
-        if (is_local_dev_version(major, minor, patch)) {
-            if (*count >= *capacity) {
-                *capacity *= 2;
-                *packages = arena_realloc(*packages, (*capacity) * sizeof(char *));
-                if (!*packages) return false;
-            }
-
-            /* Format: "author/name version" */
-            size_t len = strlen(pkg->author) + strlen(pkg->name) + strlen(pkg->version) + 10;
-            char *pkg_str = arena_malloc(len);
-            if (pkg_str) {
-                snprintf(pkg_str, len, "%s/%s %s", pkg->author, pkg->name, pkg->version);
-                (*packages)[(*count)++] = pkg_str;
-            }
-        }
-    }
-    return true;
-}
+typedef struct {
+    char *author;
+    char *name;
+    char *version;
+} TrackedPackage;
 
 /**
  * Get list of packages being tracked for local development by an application.
- * Returns arena-allocated array of "author/name version" strings.
+ * Returns arena-allocated array of TrackedPackage structs.
  */
-static char **get_tracked_packages(const char *elm_json_path, int *out_count) {
+static TrackedPackage *get_tracked_packages(const char *elm_json_path, int *out_count) {
     *out_count = 0;
 
-    ElmJson *elm_json = elm_json_read(elm_json_path);
-    if (!elm_json || elm_json->type != ELM_PROJECT_APPLICATION) {
-        if (elm_json) elm_json_free(elm_json);
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
         return NULL;
     }
 
-    /* Collect packages with local-dev versions */
-    int capacity = 16;
+    /* Get absolute path of the elm.json to match against tracking files */
+    char abs_elm_json_path[MAX_PATH_LENGTH];
+    if (realpath(elm_json_path, abs_elm_json_path) == NULL) {
+        /* If realpath fails, use the original path */
+        strncpy(abs_elm_json_path, elm_json_path, MAX_PATH_LENGTH - 1);
+        abs_elm_json_path[MAX_PATH_LENGTH - 1] = '\0';
+    }
+
+    int capacity = INITIAL_SMALL_CAPACITY;
     int count = 0;
-    char **packages = arena_malloc(capacity * sizeof(char *));
+    TrackedPackage *packages = arena_malloc(capacity * sizeof(TrackedPackage));
     if (!packages) {
-        elm_json_free(elm_json);
+        arena_free(tracking_dir);
         return NULL;
     }
 
-    /* Check all dependency maps */
-    if (elm_json->dependencies_direct) {
-        for (int i = 0; i < elm_json->dependencies_direct->count; i++) {
-            if (!add_local_dev_package_to_list(&elm_json->dependencies_direct->packages[i],
-                                               &packages, &count, &capacity)) {
-                elm_json_free(elm_json);
-                return NULL;
-            }
-        }
-    }
-    if (elm_json->dependencies_indirect) {
-        for (int i = 0; i < elm_json->dependencies_indirect->count; i++) {
-            if (!add_local_dev_package_to_list(&elm_json->dependencies_indirect->packages[i],
-                                               &packages, &count, &capacity)) {
-                elm_json_free(elm_json);
-                return NULL;
-            }
-        }
-    }
-    if (elm_json->dependencies_test_direct) {
-        for (int i = 0; i < elm_json->dependencies_test_direct->count; i++) {
-            if (!add_local_dev_package_to_list(&elm_json->dependencies_test_direct->packages[i],
-                                               &packages, &count, &capacity)) {
-                elm_json_free(elm_json);
-                return NULL;
-            }
-        }
-    }
-    if (elm_json->dependencies_test_indirect) {
-        for (int i = 0; i < elm_json->dependencies_test_indirect->count; i++) {
-            if (!add_local_dev_package_to_list(&elm_json->dependencies_test_indirect->packages[i],
-                                               &packages, &count, &capacity)) {
-                elm_json_free(elm_json);
-                return NULL;
-            }
-        }
+    /* Scan tracking directory structure: tracking_dir/author/name/version/<hash> */
+    DIR *author_dir = opendir(tracking_dir);
+    if (!author_dir) {
+        arena_free(tracking_dir);
+        arena_free(packages);
+        return NULL;
     }
 
-    elm_json_free(elm_json);
+    struct dirent *author_entry;
+    while ((author_entry = readdir(author_dir)) != NULL) {
+        if (author_entry->d_name[0] == '.') continue;
+
+        size_t author_path_len = strlen(tracking_dir) + strlen(author_entry->d_name) + 2;
+        char *author_path = arena_malloc(author_path_len);
+        if (!author_path) continue;
+        snprintf(author_path, author_path_len, "%s/%s", tracking_dir, author_entry->d_name);
+
+        struct stat st;
+        if (stat(author_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+            arena_free(author_path);
+            continue;
+        }
+
+        DIR *name_dir = opendir(author_path);
+        if (!name_dir) {
+            arena_free(author_path);
+            continue;
+        }
+
+        struct dirent *name_entry;
+        while ((name_entry = readdir(name_dir)) != NULL) {
+            if (name_entry->d_name[0] == '.') continue;
+
+            size_t name_path_len = strlen(author_path) + strlen(name_entry->d_name) + 2;
+            char *name_path = arena_malloc(name_path_len);
+            if (!name_path) continue;
+            snprintf(name_path, name_path_len, "%s/%s", author_path, name_entry->d_name);
+
+            if (stat(name_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+                arena_free(name_path);
+                continue;
+            }
+
+            DIR *version_dir_handle = opendir(name_path);
+            if (!version_dir_handle) {
+                arena_free(name_path);
+                continue;
+            }
+
+            struct dirent *version_entry;
+            while ((version_entry = readdir(version_dir_handle)) != NULL) {
+                if (version_entry->d_name[0] == '.') continue;
+
+                size_t version_path_len = strlen(name_path) + strlen(version_entry->d_name) + 2;
+                char *version_path = arena_malloc(version_path_len);
+                if (!version_path) continue;
+                snprintf(version_path, version_path_len, "%s/%s", name_path, version_entry->d_name);
+
+                if (stat(version_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+                    arena_free(version_path);
+                    continue;
+                }
+
+                /* Check all tracking files in this version directory */
+                DIR *tracking_files = opendir(version_path);
+                if (!tracking_files) {
+                    arena_free(version_path);
+                    continue;
+                }
+
+                bool found_match = false;
+                struct dirent *tracking_entry;
+                while ((tracking_entry = readdir(tracking_files)) != NULL) {
+                    if (tracking_entry->d_name[0] == '.') continue;
+
+                    size_t tracking_file_len = strlen(version_path) + strlen(tracking_entry->d_name) + 2;
+                    char *tracking_file = arena_malloc(tracking_file_len);
+                    if (!tracking_file) continue;
+                    snprintf(tracking_file, tracking_file_len, "%s/%s", version_path, tracking_entry->d_name);
+
+                    char *content = file_read_contents(tracking_file);
+                    arena_free(tracking_file);
+                    if (!content) continue;
+
+                    /* Strip trailing newline */
+                    size_t content_len = strlen(content);
+                    if (content_len > 0 && content[content_len - 1] == '\n') {
+                        content[content_len - 1] = '\0';
+                    }
+
+                    /* Compare with our elm.json path */
+                    if (strcmp(content, abs_elm_json_path) == 0) {
+                        found_match = true;
+                        arena_free(content);
+                        break;
+                    }
+                    arena_free(content);
+                }
+
+                closedir(tracking_files);
+
+                /* If we found a match, add this package to the list */
+                if (found_match) {
+                    if (count >= capacity) {
+                        capacity *= 2;
+                        packages = arena_realloc(packages, capacity * sizeof(TrackedPackage));
+                        if (!packages) {
+                            arena_free(version_path);
+                            closedir(version_dir_handle);
+                            arena_free(name_path);
+                            closedir(name_dir);
+                            arena_free(author_path);
+                            closedir(author_dir);
+                            arena_free(tracking_dir);
+                            return NULL;
+                        }
+                    }
+
+                    packages[count].author = arena_strdup(author_entry->d_name);
+                    packages[count].name = arena_strdup(name_entry->d_name);
+                    packages[count].version = arena_strdup(version_entry->d_name);
+                    count++;
+                }
+
+                arena_free(version_path);
+            }
+
+            closedir(version_dir_handle);
+            arena_free(name_path);
+        }
+
+        closedir(name_dir);
+        arena_free(author_path);
+    }
+
+    closedir(author_dir);
+    arena_free(tracking_dir);
 
     *out_count = count;
     return count > 0 ? packages : NULL;
@@ -354,15 +440,18 @@ static char **get_tracked_packages(const char *elm_json_path, int *out_count) {
  */
 static void print_application_tracking_info(const char *elm_json_path) {
     int pkg_count = 0;
-    char **packages = get_tracked_packages(elm_json_path, &pkg_count);
+    TrackedPackage *packages = get_tracked_packages(elm_json_path, &pkg_count);
 
     if (pkg_count > 0 && packages) {
-        printf("\nTracking local dev packages:\n");
+        printf("\nTracking local dev packages:\n\n");
         for (int i = 0; i < pkg_count; i++) {
-            printf("  %s (local)\n", packages[i]);
-            arena_free(packages[i]);
+            printf("  %s/%s %s\n", packages[i].author, packages[i].name, packages[i].version);
+            arena_free(packages[i].author);
+            arena_free(packages[i].name);
+            arena_free(packages[i].version);
         }
         arena_free(packages);
+        printf("\n");
     }
 }
 

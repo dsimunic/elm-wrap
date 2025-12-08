@@ -552,25 +552,44 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
         }
     }
     
-    // Create JSON object
-    cJSON *json = cJSON_CreateObject();
-    if (!json) return false;
+    // Read the existing file to preserve all fields
+    FILE *file = fopen(filepath, "r");
+    if (!file) {
+        fprintf(stderr, "Error: Could not open %s for reading\n", filepath);
+        return false;
+    }
     
-    // Add type
-    const char *type_str = (elm_json->type == ELM_PROJECT_APPLICATION) ? "application" : "package";
-    cJSON_AddStringToObject(json, "type", type_str);
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
     
+    char *file_content = arena_malloc(file_size + 1);
+    if (!file_content) {
+        fclose(file);
+        return false;
+    }
+    
+    size_t bytes_read = fread(file_content, 1, file_size, file);
+    file_content[bytes_read] = '\0';
+    fclose(file);
+    
+    // Parse the existing JSON
+    cJSON *json = cJSON_Parse(file_content);
+    arena_free(file_content);
+    
+    if (!json) {
+        fprintf(stderr, "Error: Failed to parse existing elm.json\n");
+        return false;
+    }
+    
+    // Update only the dependency fields based on project type
     if (elm_json->type == ELM_PROJECT_APPLICATION) {
-        // Add source-directories (TODO: preserve from original)
-        cJSON *src_dirs = cJSON_CreateArray();
-        cJSON_AddItemToArray(src_dirs, cJSON_CreateString("src"));
-        cJSON_AddItemToObject(json, "source-directories", src_dirs);
-        
-        // Add elm-version
-        cJSON_AddStringToObject(json, "elm-version", elm_json->elm_version);
-        
-        // Add dependencies
-        cJSON *deps = cJSON_CreateObject();
+        // Update dependencies object
+        cJSON *deps = cJSON_GetObjectItem(json, "dependencies");
+        if (deps) {
+            cJSON_DeleteItemFromObject(json, "dependencies");
+        }
+        deps = cJSON_CreateObject();
         
         // Add direct dependencies
         cJSON *direct = cJSON_CreateObject();
@@ -594,8 +613,12 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
         
         cJSON_AddItemToObject(json, "dependencies", deps);
         
-        // Add test-dependencies
-        cJSON *test_deps = cJSON_CreateObject();
+        // Update test-dependencies object
+        cJSON *test_deps = cJSON_GetObjectItem(json, "test-dependencies");
+        if (test_deps) {
+            cJSON_DeleteItemFromObject(json, "test-dependencies");
+        }
+        test_deps = cJSON_CreateObject();
         
         // Add test direct dependencies
         cJSON *test_direct = cJSON_CreateObject();
@@ -619,20 +642,13 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
         
         cJSON_AddItemToObject(json, "test-dependencies", test_deps);
     } else if (elm_json->type == ELM_PROJECT_PACKAGE) {
-        // Add package name and version
-        if (elm_json->package_name) {
-            cJSON_AddStringToObject(json, "name", elm_json->package_name);
-        }
-        if (elm_json->package_version) {
-            cJSON_AddStringToObject(json, "version", elm_json->package_version);
-        }
-        
-        // Add elm-version
-        cJSON_AddStringToObject(json, "elm-version", elm_json->elm_version);
-        
-        // Add dependencies
+        // Update dependencies object
         if (elm_json->package_dependencies) {
-            cJSON *deps = cJSON_CreateObject();
+            cJSON *deps = cJSON_GetObjectItem(json, "dependencies");
+            if (deps) {
+                cJSON_DeleteItemFromObject(json, "dependencies");
+            }
+            deps = cJSON_CreateObject();
             for (int i = 0; i < elm_json->package_dependencies->count; i++) {
                 Package *pkg = &elm_json->package_dependencies->packages[i];
                 char key[MAX_KEY_LENGTH];
@@ -642,9 +658,13 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
             cJSON_AddItemToObject(json, "dependencies", deps);
         }
         
-        // Add test-dependencies
+        // Update test-dependencies object
         if (elm_json->package_test_dependencies) {
-            cJSON *test_deps = cJSON_CreateObject();
+            cJSON *test_deps = cJSON_GetObjectItem(json, "test-dependencies");
+            if (test_deps) {
+                cJSON_DeleteItemFromObject(json, "test-dependencies");
+            }
+            test_deps = cJSON_CreateObject();
             for (int i = 0; i < elm_json->package_test_dependencies->count; i++) {
                 Package *pkg = &elm_json->package_test_dependencies->packages[i];
                 char key[MAX_KEY_LENGTH];
