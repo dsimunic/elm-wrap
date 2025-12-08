@@ -1,0 +1,735 @@
+#!/usr/bin/env bash
+#
+# dep_sync - Test script for local package development and dependency synchronization
+#
+# This script exercises all features described in the REVIEWERS_GUIDE_0.5.0-preview.1.md
+# "Local package development" section.
+#
+# It creates a test folder structure:
+#   $TEST_ROOT/
+#     ├── pkg1/        - Package initialized with 'wrap package init'
+#     ├── pkg2/        - Package initialized with 'wrap package init --no-local-dev'
+#     ├── pkg3/        - Package that depends on pkg4 (cascade test)
+#     ├── pkg4/        - Base package in cascade (gets elm-pages dependency)
+#     ├── app1/        - Application that will install pkg1 normally
+#     ├── app2/        - Application that will install pkg2 with --local-dev --from-path
+#     └── app3/        - Application that depends on pkg3 (cascade test)
+#
+# Cascade test (steps 14-20):
+#   pkg4 -> pkg3 -> app3
+#   When dillonkearns/elm-pages is added to pkg4, the dependency updates cascade
+#   through pkg3 to app3, demonstrating transitive local-dev dependency sync.
+#
+# Usage:
+#   ./dep_sync                    # Run tests and compare against expected outputs
+#   ./dep_sync --update-expected  # Update the expected outputs file
+#   ./dep_sync --clean            # Clean up test directory
+#
+
+set -euo pipefail
+
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+WRAP_BIN="$PROJECT_ROOT/bin/wrap"
+
+# Test configuration
+TEST_ROOT="${TEST_ROOT:-/tmp/elm-wrap-dep-sync-test}"
+EXPECTED_OUTPUT_FILE="$SCRIPT_DIR/dep_sync.expected"
+ACTUAL_OUTPUT_FILE="$SCRIPT_DIR/dep_sync.actual"
+
+# Use a temporary ELM_HOME to isolate tests from user's main Elm setup
+# This prevents test drift as more packages get installed over time
+TEST_ELM_HOME="${TEST_ELM_HOME:-$TEST_ROOT/elm_home}"
+export ELM_HOME="$TEST_ELM_HOME"
+
+# Use a temporary WRAP_HOME to isolate tests from user's development workflow
+# This prevents local-dev tracking from mixing with normal development
+TEST_WRAP_HOME="${TEST_WRAP_HOME:-$TEST_ROOT/wrap_home}"
+export WRAP_HOME="$TEST_WRAP_HOME"
+
+# Package names for testing
+PKG1_NAME="testauthor/pkg-one"
+PKG2_NAME="testauthor/pkg-two"
+PKG3_NAME="testauthor/pkg-three"
+PKG4_NAME="testauthor/pkg-four"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Logging functions
+log() {
+    echo -e "${CYAN}[INFO]${NC} $*"
+}
+
+log_success() {
+    echo -e "${GREEN}[PASS]${NC} $*"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARN]${NC} $*"
+}
+
+log_error() {
+    echo -e "${RED}[FAIL]${NC} $*"
+}
+
+log_step() {
+    echo ""
+    echo -e "${YELLOW}========================================${NC}"
+    echo -e "${YELLOW}STEP: $*${NC}"
+    echo -e "${YELLOW}========================================${NC}"
+}
+
+# Output capture - writes to both stdout and the output file
+# Uses markers to identify test outputs for later comparison
+capture_output() {
+    local marker="$1"
+    shift
+    echo "=== BEGIN $marker ===" >> "$ACTUAL_OUTPUT_FILE"
+    "$@" 2>&1 | tee -a "$ACTUAL_OUTPUT_FILE"
+    local exit_code="${PIPESTATUS[0]}"
+    echo "=== END $marker ===" >> "$ACTUAL_OUTPUT_FILE"
+    echo "" >> "$ACTUAL_OUTPUT_FILE"
+    return "$exit_code"
+}
+
+# Capture a file's content to output
+capture_file() {
+    local marker="$1"
+    local file="$2"
+    echo "=== BEGIN $marker ===" >> "$ACTUAL_OUTPUT_FILE"
+    if [ -f "$file" ]; then
+        cat "$file" >> "$ACTUAL_OUTPUT_FILE"
+    else
+        echo "[FILE NOT FOUND: $file]" >> "$ACTUAL_OUTPUT_FILE"
+    fi
+    echo "=== END $marker ===" >> "$ACTUAL_OUTPUT_FILE"
+    echo "" >> "$ACTUAL_OUTPUT_FILE"
+}
+
+# Capture command output with expected exit code handling
+capture_command() {
+    local marker="$1"
+    local expected_exit="${2:-0}"
+    shift 2
+    
+    local actual_exit=0
+    local cmd_output
+    cmd_output=$("$@" 2>&1) || actual_exit=$?
+    
+    {
+        echo "=== BEGIN $marker ==="
+        echo "Command: $*"
+        echo "---"
+        echo "$cmd_output"
+        echo "---"
+        echo "Exit code: $actual_exit (expected: $expected_exit)"
+        echo "=== END $marker ==="
+        echo ""
+    } >> "$ACTUAL_OUTPUT_FILE"
+    
+    if [ "$actual_exit" -ne "$expected_exit" ]; then
+        log_error "Command '$*' exited with $actual_exit, expected $expected_exit"
+        return 1
+    fi
+    return 0
+}
+
+# Extract dependency list from elm.json (sorted for consistent comparison)
+extract_deps() {
+    local elm_json="$1"
+    local section="$2"
+    if [ -f "$elm_json" ]; then
+        # Extract direct or indirect dependencies and sort them
+        jq -r ".dependencies.$section | keys[]" "$elm_json" 2>/dev/null | sort || echo "(no deps)"
+    else
+        echo "(file not found)"
+    fi
+}
+
+# Capture dependencies from elm.json in a consistent format
+capture_deps() {
+    local marker="$1"
+    local elm_json="$2"
+    
+    {
+        echo "=== BEGIN $marker ==="
+        echo "File: $elm_json"
+        echo "---"
+        
+        if [ -f "$elm_json" ]; then
+            local app_type
+            app_type=$(jq -r '.type' "$elm_json" 2>/dev/null || echo "unknown")
+            echo "Type: $app_type"
+            
+            if [ "$app_type" = "application" ]; then
+                echo "Direct dependencies:"
+                jq -r '.dependencies.direct | to_entries | sort_by(.key) | .[] | "  \(.key): \(.value)"' "$elm_json" 2>/dev/null || echo "  (none)"
+                echo "Indirect dependencies:"
+                jq -r '.dependencies.indirect | to_entries | sort_by(.key) | .[] | "  \(.key): \(.value)"' "$elm_json" 2>/dev/null || echo "  (none)"
+            elif [ "$app_type" = "package" ]; then
+                echo "Dependencies:"
+                jq -r '.dependencies | to_entries | sort_by(.key) | .[] | "  \(.key): \(.value)"' "$elm_json" 2>/dev/null || echo "  (none)"
+            fi
+        else
+            echo "(file not found)"
+        fi
+        
+        echo "=== END $marker ==="
+        echo ""
+    } >> "$ACTUAL_OUTPUT_FILE"
+}
+
+# Usage message
+usage() {
+    echo "Usage: $(basename "$0") [OPTIONS]"
+    echo ""
+    echo "Test script for local package development and dependency synchronization."
+    echo ""
+    echo "Options:"
+    echo "  --update-expected    Update the expected outputs file after running tests"
+    echo "  --clean              Clean up test directory and exit"
+    echo "  --keep               Keep test directory after completion (for debugging)"
+    echo "  --help               Show this help message"
+    echo ""
+    echo "Environment variables:"
+    echo "  TEST_ROOT            Override the test directory (default: /tmp/elm-wrap-dep-sync-test)"
+    echo "  TEST_ELM_HOME        Override the isolated ELM_HOME (default: \$TEST_ROOT/elm_home)"
+    echo "  TEST_WRAP_HOME       Override the isolated WRAP_HOME (default: \$TEST_ROOT/wrap_home)"
+    exit 0
+}
+
+# Clean up test directory
+cleanup() {
+    if [ -d "$TEST_ROOT" ]; then
+        log "Cleaning up test directory: $TEST_ROOT"
+        rm -rf "$TEST_ROOT"
+    fi
+}
+
+# Initialize test environment
+init_test_env() {
+    log "Initializing test environment at $TEST_ROOT"
+    
+    # Clean up any previous test run
+    cleanup
+    
+    # Create test directory structure
+    mkdir -p "$TEST_ROOT"/{pkg1,pkg2,pkg3,pkg4,app1,app2,app3}
+    
+    # Create isolated ELM_HOME directory
+    mkdir -p "$TEST_ELM_HOME"
+    log "Using isolated ELM_HOME: $TEST_ELM_HOME"
+    
+    # Create isolated WRAP_HOME directory
+    mkdir -p "$TEST_WRAP_HOME"
+    log "Using isolated WRAP_HOME: $TEST_WRAP_HOME"
+    
+    # Prime the package cache to get a fresh copy of the package index
+    log "Priming package cache..."
+    WRAP_FEATURE_CACHE=1 "$WRAP_BIN" package cache elm/core >/dev/null 2>&1 || {
+        log_warning "Failed to prime package cache, tests may be affected"
+    }
+    
+    # Initialize output file
+    {
+        echo "# elm-wrap dep_sync test output"
+        echo "# Generated: $(date -Iseconds)"
+        echo "# wrap version: $("$WRAP_BIN" --version 2>/dev/null || echo 'unknown')"
+        echo "# ELM_HOME: $TEST_ELM_HOME"
+        echo "# WRAP_HOME: $TEST_WRAP_HOME"
+        echo ""
+    } > "$ACTUAL_OUTPUT_FILE"
+}
+
+# Create a minimal Elm application
+create_app() {
+    local app_dir="$1"
+    local app_name="$2"
+    
+    log "Creating application: $app_name in $app_dir"
+    
+    mkdir -p "$app_dir"
+    
+    cd "$app_dir"
+
+    "$WRAP_BIN" application init --yes 
+}
+
+# ============================================================================
+# TEST STEPS
+# ============================================================================
+
+test_step_01_init_pkg1_with_local_dev() {
+    log_step "1. Initialize pkg1 with 'wrap package init' (local dev enabled)"
+    
+    cd "$TEST_ROOT/pkg1"
+    
+    # This creates a local-dev package
+    capture_command "pkg1_init" 0 "$WRAP_BIN" package init --yes "$PKG1_NAME"
+    
+    # Verify elm.json was created
+    capture_file "pkg1_elm_json_after_init" "$TEST_ROOT/pkg1/elm.json"
+    
+    # Show package info
+    capture_command "pkg1_info_after_init" 0 "$WRAP_BIN" package info "$PKG1_NAME"
+}
+
+test_step_02_init_pkg2_without_local_dev() {
+    log_step "2. Initialize pkg2 with 'wrap package init --no-local-dev' (local dev disabled)"
+    
+    cd "$TEST_ROOT/pkg2"
+    
+    # This creates a package without local dev features
+    capture_command "pkg2_init" 0 "$WRAP_BIN" package init --yes --no-local-dev "$PKG2_NAME"
+    
+    # Verify elm.json was created
+    capture_file "pkg2_elm_json_after_init" "$TEST_ROOT/pkg2/elm.json"
+}
+
+test_step_03_create_applications() {
+    log_step "3. Create test applications app1 and app2"
+    
+    create_app "$TEST_ROOT/app1" "app1"
+    create_app "$TEST_ROOT/app2" "app2"
+    
+    # Capture initial state
+    capture_file "app1_elm_json_initial" "$TEST_ROOT/app1/elm.json"
+    capture_file "app2_elm_json_initial" "$TEST_ROOT/app2/elm.json"
+}
+
+test_step_04_install_pkg1_into_app1() {
+    log_step "4. Install pkg1 into app1 (normal install as per guide)"
+    
+    # As the guide says: the package is already in local registry from init,
+    # so we can install it without special flags
+    cd "$TEST_ROOT/app1"
+    
+    capture_command "app1_install_pkg1" 0 "$WRAP_BIN" package install --yes "$PKG1_NAME"
+    
+    # Show result
+    capture_deps "app1_deps_after_pkg1_install" "$TEST_ROOT/app1/elm.json"
+    
+    # Show app info to verify local dev tracking
+    capture_command "app1_info_after_pkg1" 0 "$WRAP_BIN" application info
+}
+
+test_step_05_install_pkg2_into_app2_with_local_dev() {
+    log_step "5. Install pkg2 into app2 with --local-dev --from-path"
+    
+    # This exercises the code path for existing packages
+    # that weren't initialized with local-dev
+    cd "$TEST_ROOT/app2"
+    
+    capture_command "app2_install_pkg2" 0 "$WRAP_BIN" package install --yes --local-dev --from-path "$TEST_ROOT/pkg2" "$PKG2_NAME"
+    
+    # Show result
+    capture_deps "app2_deps_after_pkg2_install" "$TEST_ROOT/app2/elm.json"
+    
+    # Show app info to verify local dev tracking
+    capture_command "app2_info_after_pkg2" 0 "$WRAP_BIN" application info
+}
+
+test_step_06_verify_local_dev_registry() {
+    log_step "6. Verify local-dev registry state"
+    
+    # Check all local-dev packages and their applications
+    capture_command "repository_local_dev" 0 "$WRAP_BIN" repository local-dev
+}
+
+test_step_07_add_simple_dep_to_pkg1() {
+    log_step "7. Add elm/random to pkg1 (simple dependency)"
+    
+    cd "$TEST_ROOT/pkg1"
+    
+    capture_command "pkg1_install_random" 0 "$WRAP_BIN" package install --yes elm/random
+    
+    # Verify package elm.json was updated
+    capture_file "pkg1_elm_json_after_random" "$TEST_ROOT/pkg1/elm.json"
+    
+    # Check if app1's indirect deps were updated (dependency sync)
+    capture_deps "app1_deps_after_pkg1_random" "$TEST_ROOT/app1/elm.json"
+}
+
+test_step_08_add_wolfadex_to_pkg1() {
+    log_step "8. Add wolfadex/elm-ansi to pkg1 (package with dependencies)"
+    
+    cd "$TEST_ROOT/pkg1"
+    
+    capture_command "pkg1_install_ansi" 0 "$WRAP_BIN" package install --yes wolfadex/elm-ansi
+    
+    # Verify package elm.json
+    capture_file "pkg1_elm_json_after_ansi" "$TEST_ROOT/pkg1/elm.json"
+    
+    # Check app1's dependencies
+    capture_deps "app1_deps_after_pkg1_ansi" "$TEST_ROOT/app1/elm.json"
+}
+
+test_step_09_add_simple_dep_to_pkg2() {
+    log_step "9. Add elm/random to pkg2"
+    
+    cd "$TEST_ROOT/pkg2"
+    
+    capture_command "pkg2_install_random" 0 "$WRAP_BIN" package install --yes elm/random
+    
+    # Verify package elm.json was updated
+    capture_file "pkg2_elm_json_after_random" "$TEST_ROOT/pkg2/elm.json"
+    
+    # Check if app2's indirect deps were updated (dependency sync)
+    capture_deps "app2_deps_after_pkg2_random" "$TEST_ROOT/app2/elm.json"
+}
+
+test_step_10_add_mega_package_to_pkg2() {
+    log_step "10. Add dillonkearns/elm-pages to pkg2 (mega-package with 30+ deps)"
+    
+    cd "$TEST_ROOT/pkg2"
+    
+    # This is a large package - might take a while
+    capture_command "pkg2_install_elm_pages" 0 "$WRAP_BIN" package install --yes dillonkearns/elm-pages
+    
+    # Verify package elm.json (will have many dependencies)
+    capture_file "pkg2_elm_json_after_elm_pages" "$TEST_ROOT/pkg2/elm.json"
+    
+    # Check app2's dependencies (should have all the transitive deps)
+    capture_deps "app2_deps_after_pkg2_elm_pages" "$TEST_ROOT/app2/elm.json"
+}
+
+test_step_11_cross_install_pkg2_into_app1() {
+    log_step "11. Install pkg2 into app1 (cross-installation test)"
+    
+    cd "$TEST_ROOT/app1"
+    
+    # Since pkg2 was registered with --local-dev --from-path, it should be
+    # available for normal installation in other apps
+    capture_command "app1_install_pkg2" 0 "$WRAP_BIN" package install --yes "$PKG2_NAME"
+    
+    # Check app1's dependencies
+    capture_deps "app1_deps_after_pkg2_install" "$TEST_ROOT/app1/elm.json"
+    
+    # Verify local dev registry shows both apps
+    capture_command "repository_local_dev_after_cross" 0 "$WRAP_BIN" repository local-dev
+}
+
+test_step_12_remove_dep_from_pkg1() {
+    log_step "12. Remove wolfadex/elm-ansi from pkg1"
+    
+    cd "$TEST_ROOT/pkg1"
+    
+    capture_command "pkg1_uninstall_ansi" 0 "$WRAP_BIN" package uninstall --yes wolfadex/elm-ansi
+    
+    # Verify package elm.json
+    capture_file "pkg1_elm_json_after_uninstall_ansi" "$TEST_ROOT/pkg1/elm.json"
+    
+    # Check if app1's deps were updated (should remove ansi deps if not needed)
+    capture_deps "app1_deps_after_pkg1_uninstall_ansi" "$TEST_ROOT/app1/elm.json"
+}
+
+test_step_13_remove_mega_package_from_pkg2() {
+    log_step "13. Remove dillonkearns/elm-pages from pkg2"
+    
+    cd "$TEST_ROOT/pkg2"
+    
+    capture_command "pkg2_uninstall_elm_pages" 0 "$WRAP_BIN" package uninstall --yes dillonkearns/elm-pages
+    
+    # Verify package elm.json
+    capture_file "pkg2_elm_json_after_uninstall_elm_pages" "$TEST_ROOT/pkg2/elm.json"
+    
+    # Check app2's dependencies
+    capture_deps "app2_deps_after_pkg2_uninstall_elm_pages" "$TEST_ROOT/app2/elm.json"
+    
+    # Also check app1 which had pkg2 installed
+    capture_deps "app1_deps_after_pkg2_uninstall_elm_pages" "$TEST_ROOT/app1/elm.json"
+}
+
+# ============================================================================
+# CASCADE UPDATE TESTS (pkg4 -> pkg3 -> app3)
+# ============================================================================
+# These tests demonstrate that packages depending on other local-dev packages
+# form a cascade of updates. When pkg4's dependencies change, the updates
+# propagate through pkg3 to app3.
+
+test_step_14_init_pkg4() {
+    log_step "14. Initialize pkg4 (base package in cascade)"
+    
+    cd "$TEST_ROOT/pkg4"
+    
+    # Create pkg4 - this will be the base of our cascade
+    capture_command "pkg4_init" 0 "$WRAP_BIN" package init --yes "$PKG4_NAME"
+    
+    # Verify elm.json was created
+    capture_file "pkg4_elm_json_after_init" "$TEST_ROOT/pkg4/elm.json"
+    
+    # Show package info
+    capture_command "pkg4_info_after_init" 0 "$WRAP_BIN" package info "$PKG4_NAME"
+}
+
+test_step_15_init_pkg3() {
+    log_step "15. Initialize pkg3 (depends on pkg4)"
+    
+    cd "$TEST_ROOT/pkg3"
+    
+    # Create pkg3
+    capture_command "pkg3_init" 0 "$WRAP_BIN" package init --yes "$PKG3_NAME"
+    
+    # Verify elm.json was created
+    capture_file "pkg3_elm_json_after_init" "$TEST_ROOT/pkg3/elm.json"
+    
+    # Show package info
+    capture_command "pkg3_info_after_init" 0 "$WRAP_BIN" package info "$PKG3_NAME"
+}
+
+test_step_16_pkg3_depends_on_pkg4() {
+    log_step "16. Make pkg3 depend on pkg4"
+    
+    cd "$TEST_ROOT/pkg3"
+    
+    # Install pkg4 as a dependency of pkg3
+    capture_command "pkg3_install_pkg4" 0 "$WRAP_BIN" package install --yes "$PKG4_NAME"
+    
+    # Verify package elm.json
+    capture_file "pkg3_elm_json_after_pkg4" "$TEST_ROOT/pkg3/elm.json"
+    
+    # Show package info
+    capture_command "pkg3_info_after_pkg4" 0 "$WRAP_BIN" package info "$PKG3_NAME"
+}
+
+test_step_17_create_app3() {
+    log_step "17. Create app3 and install pkg3"
+    
+    create_app "$TEST_ROOT/app3" "app3"
+    
+    # Capture initial state
+    capture_file "app3_elm_json_initial" "$TEST_ROOT/app3/elm.json"
+    
+    cd "$TEST_ROOT/app3"
+    
+    # Install pkg3 into app3
+    capture_command "app3_install_pkg3" 0 "$WRAP_BIN" package install --yes "$PKG3_NAME"
+    
+    # Show result
+    capture_deps "app3_deps_after_pkg3_install" "$TEST_ROOT/app3/elm.json"
+    
+    # Show app info to verify local dev tracking
+    capture_command "app3_info_after_pkg3" 0 "$WRAP_BIN" application info
+}
+
+test_step_18_verify_cascade_registry() {
+    log_step "18. Verify local-dev registry state before cascade test"
+    
+    # Check all local-dev packages and their applications
+    capture_command "repository_local_dev_before_cascade" 0 "$WRAP_BIN" repository local-dev
+}
+
+test_step_19_add_mega_package_to_pkg4() {
+    log_step "19. Add dillonkearns/elm-pages to pkg4 (trigger cascade update)"
+    
+    cd "$TEST_ROOT/pkg4"
+    
+    # This is the key test: adding a dependency to pkg4 should cascade through pkg3 to app3
+    capture_command "pkg4_install_elm_pages" 0 "$WRAP_BIN" package install --yes dillonkearns/elm-pages
+    
+    # Verify pkg4's elm.json (will have many dependencies)
+    capture_file "pkg4_elm_json_after_elm_pages" "$TEST_ROOT/pkg4/elm.json"
+    
+    # Check pkg3's dependencies (should be updated via cascade)
+    capture_file "pkg3_elm_json_after_cascade" "$TEST_ROOT/pkg3/elm.json"
+    
+    # Check app3's dependencies (should have all the transitive deps from the cascade)
+    capture_deps "app3_deps_after_pkg4_elm_pages" "$TEST_ROOT/app3/elm.json"
+}
+
+test_step_20_verify_cascade_completed() {
+    log_step "20. Verify cascade update completed successfully"
+    
+    # Show package info for all packages in the cascade
+    capture_command "pkg4_info_after_cascade" 0 "$WRAP_BIN" package info "$PKG4_NAME"
+    capture_command "pkg3_info_after_cascade" 0 "$WRAP_BIN" package info "$PKG3_NAME"
+    
+    # Show app3 info
+    cd "$TEST_ROOT/app3"
+    capture_command "app3_info_after_cascade" 0 "$WRAP_BIN" application info
+    
+    # Verify local-dev registry shows the cascade
+    capture_command "repository_local_dev_after_cascade" 0 "$WRAP_BIN" repository local-dev
+}
+
+test_step_21_final_state_verification() {
+    log_step "21. Final state verification"
+    
+    # Show final package info for all packages
+    capture_command "pkg1_info_final" 0 "$WRAP_BIN" package info "$PKG1_NAME"
+    capture_command "pkg2_info_final" 0 "$WRAP_BIN" package info "$PKG2_NAME"
+    capture_command "pkg3_info_final" 0 "$WRAP_BIN" package info "$PKG3_NAME"
+    capture_command "pkg4_info_final" 0 "$WRAP_BIN" package info "$PKG4_NAME"
+    
+    # Show final app info for all apps
+    cd "$TEST_ROOT/app1"
+    capture_command "app1_info_final" 0 "$WRAP_BIN" application info
+    
+    cd "$TEST_ROOT/app2"
+    capture_command "app2_info_final" 0 "$WRAP_BIN" application info
+    
+    cd "$TEST_ROOT/app3"
+    capture_command "app3_info_final" 0 "$WRAP_BIN" application info
+    
+    # Final local-dev registry state
+    capture_command "repository_local_dev_final" 0 "$WRAP_BIN" repository local-dev
+}
+
+# ============================================================================
+# COMPARISON
+# ============================================================================
+
+compare_outputs() {
+    log_step "Comparing outputs"
+    
+    if [ ! -f "$EXPECTED_OUTPUT_FILE" ]; then
+        log_warning "No expected output file found at $EXPECTED_OUTPUT_FILE"
+        log_warning "Run with --update-expected to create it"
+        return 1
+    fi
+    
+    # Use diff to compare, but filter out timestamps and version numbers
+    # that might change between runs
+    local filtered_actual
+    local filtered_expected
+    
+    filtered_actual=$(sed -E \
+        -e 's/^# Generated: .*/# Generated: [TIMESTAMP]/' \
+        -e 's/^# wrap version: .*/# wrap version: [VERSION]/' \
+        -e 's/^# ELM_HOME: .*/# ELM_HOME: [ELM_HOME]/' \
+        -e 's/^# WRAP_HOME: .*/# WRAP_HOME: [WRAP_HOME]/' \
+        -e 's|/private/tmp/|/tmp/|g' \
+        "$ACTUAL_OUTPUT_FILE")
+    
+    filtered_expected=$(sed -E \
+        -e 's/^# Generated: .*/# Generated: [TIMESTAMP]/' \
+        -e 's/^# wrap version: .*/# wrap version: [VERSION]/' \
+        -e 's/^# ELM_HOME: .*/# ELM_HOME: [ELM_HOME]/' \
+        -e 's/^# WRAP_HOME: .*/# WRAP_HOME: [WRAP_HOME]/' \
+        -e 's|/private/tmp/|/tmp/|g' \
+        "$EXPECTED_OUTPUT_FILE")
+    
+    if diff -u <(echo "$filtered_expected") <(echo "$filtered_actual") > /dev/null 2>&1; then
+        log_success "Outputs match expected!"
+        return 0
+    else
+        log_error "Outputs differ from expected!"
+        echo ""
+        echo "Differences:"
+        diff -u <(echo "$filtered_expected") <(echo "$filtered_actual") || true
+        echo ""
+        log_warning "Run with --update-expected to update the expected output file"
+        return 1
+    fi
+}
+
+# ============================================================================
+# MAIN
+# ============================================================================
+
+main() {
+    local update_expected=false
+    local keep_dir=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --update-expected)
+                update_expected=true
+                shift
+                ;;
+            --clean)
+                cleanup
+                log "Cleanup complete"
+                exit 0
+                ;;
+            --keep)
+                keep_dir=true
+                shift
+                ;;
+            --help)
+                usage
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                usage
+                ;;
+        esac
+    done
+    
+    # Check prerequisites
+    if [ ! -x "$WRAP_BIN" ]; then
+        log_error "wrap binary not found at $WRAP_BIN"
+        log "Please build the project first: make clean all install-user"
+        exit 1
+    fi
+    
+    if ! command -v jq &> /dev/null; then
+        log_error "jq is required but not installed"
+        exit 1
+    fi
+    
+    # Initialize test environment
+    init_test_env
+    
+    # Record start time
+    local start_time
+    start_time=$(date +%s)
+    
+    # Run all test steps
+    test_step_01_init_pkg1_with_local_dev
+    test_step_02_init_pkg2_without_local_dev
+    test_step_03_create_applications
+    test_step_04_install_pkg1_into_app1
+    test_step_05_install_pkg2_into_app2_with_local_dev
+    test_step_06_verify_local_dev_registry
+    test_step_07_add_simple_dep_to_pkg1
+    test_step_08_add_wolfadex_to_pkg1
+    test_step_09_add_simple_dep_to_pkg2
+    test_step_10_add_mega_package_to_pkg2
+    test_step_11_cross_install_pkg2_into_app1
+    test_step_12_remove_dep_from_pkg1
+    test_step_13_remove_mega_package_from_pkg2
+    test_step_14_init_pkg4
+    test_step_15_init_pkg3
+    test_step_16_pkg3_depends_on_pkg4
+    test_step_17_create_app3
+    test_step_18_verify_cascade_registry
+    test_step_19_add_mega_package_to_pkg4
+    test_step_20_verify_cascade_completed
+    test_step_21_final_state_verification
+    
+    # Calculate elapsed time
+    local end_time
+    end_time=$(date +%s)
+    local elapsed=$((end_time - start_time))
+    
+    echo ""
+    log "Test completed in ${elapsed}s"
+    log "Actual output saved to: $ACTUAL_OUTPUT_FILE"
+    
+    # Update or compare expected outputs
+    if [ "$update_expected" = true ]; then
+        cp "$ACTUAL_OUTPUT_FILE" "$EXPECTED_OUTPUT_FILE"
+        log_success "Expected output file updated: $EXPECTED_OUTPUT_FILE"
+    else
+        compare_outputs || true
+    fi
+    
+    # Cleanup unless --keep was specified
+    if [ "$keep_dir" = false ]; then
+        cleanup
+    else
+        log "Test directory preserved at: $TEST_ROOT"
+    fi
+    
+    log_success "All test steps completed successfully!"
+}
+
+main "$@"

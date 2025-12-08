@@ -1,0 +1,1602 @@
+# elm-wrap dep_sync test output
+# Generated: 2025-12-08T15:01:29+01:00
+# wrap version: Version: 0.5.0-preview.1@main-HEAD
+  Base version: 0.5.0-preview.1
+  Commit: 894aae7b1e886e1724fe2d1aab0d4aed3a59e7a9
+  Built: 2025-12-08T12:19:24Z
+  Compiler: Apple clang version 17.0.0 (clang-1700.4.4.1)
+  Platform: Darwin/arm64
+# ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home
+# WRAP_HOME: /tmp/elm-wrap-dep-sync-test/wrap_home
+
+=== BEGIN pkg1_init ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package init --yes testauthor/pkg-one
+---
+Here is my plan:
+  
+  Create new elm.json for the package:
+    testauthor/pkg-one    (version from template)
+  
+  Source: /private/tmp/elm-wrap-dep-sync-test/pkg1
+  
+  Also, I will register the package for local development. To prevent that,
+  run this command again and specify --no-local-dev flag.
+
+
+To use this package in an application, run from the application directory:
+    wrap package install testauthor/pkg-one
+  
+Successfully created and registered testauthor/pkg-one 1.0.0 (local)!
+---
+Exit code: 0 (expected: 0)
+=== END pkg1_init ===
+
+=== BEGIN pkg1_elm_json_after_init ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-one",
+    "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [],
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.5 <= v < 2.0.0"
+    },
+    "test-dependencies": {}
+}=== END pkg1_elm_json_after_init ===
+
+=== BEGIN pkg1_info_after_init ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package info testauthor/pkg-one
+---
+
+Package: testauthor/pkg-one
+Version: 1.0.0
+Total versions: 1
+
+
+Package: testauthor/pkg-one 1.0.0
+========================================
+
+Dependencies (1):
+  elm/core    1.0.5 <= v < 2.0.0
+---
+Exit code: 0 (expected: 0)
+=== END pkg1_info_after_init ===
+
+=== BEGIN pkg2_init ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package init --yes --no-local-dev testauthor/pkg-two
+---
+Here is my plan:
+  
+  Create new elm.json for the package:
+    testauthor/pkg-two    (version from template)
+  
+  Source: /private/tmp/elm-wrap-dep-sync-test/pkg2
+  
+Successfully created elm.json for testauthor/pkg-two 1.0.0!
+---
+Exit code: 0 (expected: 0)
+=== END pkg2_init ===
+
+=== BEGIN pkg2_elm_json_after_init ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-two",
+    "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [],
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.5 <= v < 2.0.0"
+    },
+    "test-dependencies": {}
+}=== END pkg2_elm_json_after_init ===
+
+=== BEGIN app1_elm_json_initial ===
+{
+    "type": "application",
+    "source-directories": [
+        "src"
+    ],
+    "elm-version": "0.19.1",
+    "dependencies": {
+        "direct": {
+            "elm/browser": "1.0.2",
+            "elm/core": "1.0.5",
+            "elm/html": "1.0.1",
+            "elm/url": "1.0.0"
+        },
+        "indirect": {
+            "elm/json": "1.1.4",
+            "elm/time": "1.0.0",
+            "elm/virtual-dom": "1.0.5"
+        }
+    },
+    "test-dependencies": {
+        "direct": {},
+        "indirect": {}
+    }
+}
+=== END app1_elm_json_initial ===
+
+=== BEGIN app2_elm_json_initial ===
+{
+    "type": "application",
+    "source-directories": [
+        "src"
+    ],
+    "elm-version": "0.19.1",
+    "dependencies": {
+        "direct": {
+            "elm/browser": "1.0.2",
+            "elm/core": "1.0.5",
+            "elm/html": "1.0.1",
+            "elm/url": "1.0.0"
+        },
+        "indirect": {
+            "elm/json": "1.1.4",
+            "elm/time": "1.0.0",
+            "elm/virtual-dom": "1.0.5"
+        }
+    },
+    "test-dependencies": {
+        "direct": {},
+        "indirect": {}
+    }
+}
+=== END app2_elm_json_initial ===
+
+=== BEGIN app1_install_pkg1 ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package install --yes testauthor/pkg-one
+---
+Here is my plan:
+  
+  Add:
+    testauthor/pkg-one    1.0.0
+  
+Saving elm.json...
+Successfully installed testauthor/pkg-one!
+---
+Exit code: 0 (expected: 0)
+=== END app1_install_pkg1 ===
+
+=== BEGIN app1_deps_after_pkg1_install ===
+File: /tmp/elm-wrap-dep-sync-test/app1/elm.json
+---
+Type: application
+Direct dependencies:
+  elm/browser: 1.0.2
+  elm/core: 1.0.5
+  elm/html: 1.0.1
+  elm/url: 1.0.0
+  testauthor/pkg-one: 1.0.0
+Indirect dependencies:
+  elm/json: 1.1.4
+  elm/time: 1.0.0
+  elm/virtual-dom: 1.0.5
+=== END app1_deps_after_pkg1_install ===
+
+=== BEGIN app1_info_after_pkg1 ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap application info
+---
+
+app1
+-------------------
+
+Type: Application
+Path: /private/tmp/elm-wrap-dep-sync-test/app1
+
+Dependencies:
+
+  elm/browser         1.0.2
+  elm/core            1.0.5
+  elm/html            1.0.1
+  elm/url             1.0.0
+  testauthor/pkg-one  1.0.0
+
+  elm/json            1.1.4 (indirect)
+  elm/time            1.0.0 (indirect)
+  elm/virtual-dom     1.0.5 (indirect)
+
+  Total:              8
+
+No upgrades available. All packages at their latest version
+
+
+
+ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
+
+Registry Cache:
+  Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
+  Packages: 2951
+  Versions: 16475
+
+Registry URL: https://package.elm-lang.org
+  Status: Connected
+---
+Exit code: 0 (expected: 0)
+=== END app1_info_after_pkg1 ===
+
+=== BEGIN app2_install_pkg2 ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package install --yes --local-dev --from-path /tmp/elm-wrap-dep-sync-test/pkg2 testauthor/pkg-two
+---
+Here is my plan:
+  
+  Add (local):
+    testauthor/pkg-two    1.0.0 (local)
+  
+  Source: /private/tmp/elm-wrap-dep-sync-test/pkg2
+  
+Saving elm.json...
+Successfully installed testauthor/pkg-two 1.0.0 (local)!
+---
+Exit code: 0 (expected: 0)
+=== END app2_install_pkg2 ===
+
+=== BEGIN app2_deps_after_pkg2_install ===
+File: /tmp/elm-wrap-dep-sync-test/app2/elm.json
+---
+Type: application
+Direct dependencies:
+  elm/browser: 1.0.2
+  elm/core: 1.0.5
+  elm/html: 1.0.1
+  elm/url: 1.0.0
+  testauthor/pkg-two: 1.0.0
+Indirect dependencies:
+  elm/json: 1.1.4
+  elm/time: 1.0.0
+  elm/virtual-dom: 1.0.5
+=== END app2_deps_after_pkg2_install ===
+
+=== BEGIN app2_info_after_pkg2 ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap application info
+---
+
+app2
+-------------------
+
+Type: Application
+Path: /private/tmp/elm-wrap-dep-sync-test/app2
+
+Dependencies:
+
+  elm/browser         1.0.2
+  elm/core            1.0.5
+  elm/html            1.0.1
+  elm/url             1.0.0
+  testauthor/pkg-two  1.0.0
+
+  elm/json            1.1.4 (indirect)
+  elm/time            1.0.0 (indirect)
+  elm/virtual-dom     1.0.5 (indirect)
+
+  Total:              8
+
+No upgrades available. All packages at their latest version
+
+
+
+ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
+
+Registry Cache:
+  Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
+  Packages: 2952
+  Versions: 16476
+
+Registry URL: https://package.elm-lang.org
+  Status: Connected
+---
+Exit code: 0 (expected: 0)
+=== END app2_info_after_pkg2 ===
+
+=== BEGIN repository_local_dev ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap repository local-dev
+---
+Tracked local-dev packages:
+
+  testauthor/pkg-one 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
+
+  testauthor/pkg-two 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app2/elm.json
+---
+Exit code: 0 (expected: 0)
+=== END repository_local_dev ===
+
+=== BEGIN pkg1_install_random ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package install --yes elm/random
+---
+Here is my plan:
+  
+  Add:
+    elm/random    1.0.0 <= v < 2.0.0
+  
+Saving elm.json...
+Successfully installed elm/random!
+Refreshing 1 dependent application(s)...
+Updated indirect dependencies in: /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
+---
+Exit code: 0 (expected: 0)
+=== END pkg1_install_random ===
+
+=== BEGIN pkg1_elm_json_after_random ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-one",
+    "version": "1.0.0",
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.5 <= v < 2.0.0",
+        "elm/random": "1.0.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {
+    }
+}
+=== END pkg1_elm_json_after_random ===
+
+=== BEGIN app1_deps_after_pkg1_random ===
+File: /tmp/elm-wrap-dep-sync-test/app1/elm.json
+---
+Type: application
+Direct dependencies:
+  elm/browser: 1.0.2
+  elm/core: 1.0.5
+  elm/html: 1.0.1
+  elm/url: 1.0.0
+  testauthor/pkg-one: 1.0.0
+Indirect dependencies:
+  elm/json: 1.1.4
+  elm/random: 1.0.0
+  elm/time: 1.0.0
+  elm/virtual-dom: 1.0.5
+=== END app1_deps_after_pkg1_random ===
+
+=== BEGIN pkg1_install_ansi ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package install --yes wolfadex/elm-ansi
+---
+Here is my plan:
+  
+  Add:
+    wolfadex/elm-ansi    3.0.0 <= v < 4.0.0
+  
+Saving elm.json...
+Successfully installed wolfadex/elm-ansi!
+Refreshing 1 dependent application(s)...
+Updated indirect dependencies in: /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
+---
+Exit code: 0 (expected: 0)
+=== END pkg1_install_ansi ===
+
+=== BEGIN pkg1_elm_json_after_ansi ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-one",
+    "version": "1.0.0",
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.5 <= v < 2.0.0",
+        "elm/random": "1.0.0 <= v < 2.0.0",
+        "wolfadex/elm-ansi": "3.0.0 <= v < 4.0.0"
+    },
+    "test-dependencies": {
+    }
+}
+=== END pkg1_elm_json_after_ansi ===
+
+=== BEGIN app1_deps_after_pkg1_ansi ===
+File: /tmp/elm-wrap-dep-sync-test/app1/elm.json
+---
+Type: application
+Direct dependencies:
+  elm/browser: 1.0.2
+  elm/core: 1.0.5
+  elm/html: 1.0.1
+  elm/url: 1.0.0
+  testauthor/pkg-one: 1.0.0
+Indirect dependencies:
+  avh4/elm-color: 1.0.0
+  elm/json: 1.1.4
+  elm/random: 1.0.0
+  elm/regex: 1.0.0
+  elm/time: 1.0.0
+  elm/virtual-dom: 1.0.5
+  wolfadex/elm-ansi: 3.0.0
+=== END app1_deps_after_pkg1_ansi ===
+
+=== BEGIN pkg2_install_random ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package install --yes elm/random
+---
+Here is my plan:
+  
+  Add:
+    elm/random    1.0.0 <= v < 2.0.0
+  
+Saving elm.json...
+Successfully installed elm/random!
+Refreshing 1 dependent application(s)...
+Updated indirect dependencies in: /private/tmp/elm-wrap-dep-sync-test/app2/elm.json
+---
+Exit code: 0 (expected: 0)
+=== END pkg2_install_random ===
+
+=== BEGIN pkg2_elm_json_after_random ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-two",
+    "version": "1.0.0",
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.5 <= v < 2.0.0",
+        "elm/random": "1.0.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {
+    }
+}
+=== END pkg2_elm_json_after_random ===
+
+=== BEGIN app2_deps_after_pkg2_random ===
+File: /tmp/elm-wrap-dep-sync-test/app2/elm.json
+---
+Type: application
+Direct dependencies:
+  elm/browser: 1.0.2
+  elm/core: 1.0.5
+  elm/html: 1.0.1
+  elm/url: 1.0.0
+  testauthor/pkg-two: 1.0.0
+Indirect dependencies:
+  elm/json: 1.1.4
+  elm/random: 1.0.0
+  elm/time: 1.0.0
+  elm/virtual-dom: 1.0.5
+=== END app2_deps_after_pkg2_random ===
+
+=== BEGIN pkg2_install_elm_pages ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package install --yes dillonkearns/elm-pages
+---
+Here is my plan:
+  
+  Add:
+    dillonkearns/elm-pages    10.2.2 <= v < 11.0.0
+  
+Saving elm.json...
+Successfully installed dillonkearns/elm-pages!
+Refreshing 1 dependent application(s)...
+Updated indirect dependencies in: /private/tmp/elm-wrap-dep-sync-test/app2/elm.json
+---
+Exit code: 0 (expected: 0)
+=== END pkg2_install_elm_pages ===
+
+=== BEGIN pkg2_elm_json_after_elm_pages ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-two",
+    "version": "1.0.0",
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "dillonkearns/elm-pages": "10.2.2 <= v < 11.0.0",
+        "elm/core": "1.0.5 <= v < 2.0.0",
+        "elm/random": "1.0.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {
+    }
+}
+=== END pkg2_elm_json_after_elm_pages ===
+
+=== BEGIN app2_deps_after_pkg2_elm_pages ===
+File: /tmp/elm-wrap-dep-sync-test/app2/elm.json
+---
+Type: application
+Direct dependencies:
+  elm/browser: 1.0.2
+  elm/core: 1.0.5
+  elm/html: 1.0.1
+  elm/url: 1.0.0
+  testauthor/pkg-two: 1.0.0
+Indirect dependencies:
+  Chadtech/elm-bool-extra: 2.4.2
+  avh4/elm-color: 1.0.0
+  danfishgold/base64-bytes: 1.1.0
+  danyx23/elm-mimetype: 4.0.1
+  dillonkearns/elm-bcp47-language-tag: 2.0.0
+  dillonkearns/elm-cli-options-parser: 3.2.0
+  dillonkearns/elm-date-or-date-time: 2.0.0
+  dillonkearns/elm-form: 3.0.1
+  dillonkearns/elm-pages: 10.2.2
+  elm-community/basics-extra: 4.1.0
+  elm-community/list-extra: 8.7.0
+  elm-community/maybe-extra: 5.3.0
+  elm/bytes: 1.0.8
+  elm/file: 1.0.5
+  elm/http: 2.0.0
+  elm/json: 1.1.4
+  elm/parser: 1.1.0
+  elm/random: 1.0.0
+  elm/regex: 1.0.0
+  elm/time: 1.0.0
+  elm/virtual-dom: 1.0.5
+  fredcy/elm-parseint: 2.0.1
+  jluckyiv/elm-utc-date-strings: 1.0.0
+  justinmimbs/date: 4.1.0
+  mdgriffith/elm-codegen: 5.2.0
+  miniBill/elm-codec: 2.3.0
+  miniBill/elm-unicode: 1.1.1
+  noahzgordon/elm-color-extra: 1.0.2
+  robinheghan/fnv1a: 1.0.0
+  robinheghan/murmur3: 1.0.0
+  rtfeldman/elm-css: 18.0.0
+  rtfeldman/elm-hex: 1.0.0
+  rtfeldman/elm-iso8601-date-strings: 1.1.4
+  stil4m/elm-syntax: 7.3.9
+  stil4m/structured-writer: 1.0.3
+  the-sett/elm-pretty-printer: 3.1.2
+  the-sett/elm-syntax-dsl: 6.0.3
+  wolfadex/elm-ansi: 3.0.0
+=== END app2_deps_after_pkg2_elm_pages ===
+
+=== BEGIN app1_install_pkg2 ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package install --yes testauthor/pkg-two
+---
+Here is my plan:
+  
+  Add:
+    Chadtech/elm-bool-extra                2.4.2
+    danfishgold/base64-bytes               1.1.0
+    danyx23/elm-mimetype                   4.0.1
+    dillonkearns/elm-bcp47-language-tag    2.0.0
+    dillonkearns/elm-cli-options-parser    3.2.0
+    dillonkearns/elm-date-or-date-time     2.0.0
+    dillonkearns/elm-form                  3.0.1
+    dillonkearns/elm-pages                 10.2.2
+    elm/bytes                              1.0.8
+    elm/file                               1.0.5
+    elm/http                               2.0.0
+    elm/parser                             1.1.0
+    elm-community/basics-extra             4.1.0
+    elm-community/list-extra               8.7.0
+    elm-community/maybe-extra              5.3.0
+    fredcy/elm-parseint                    2.0.1
+    jluckyiv/elm-utc-date-strings          1.0.0
+    justinmimbs/date                       4.1.0
+    mdgriffith/elm-codegen                 5.2.0
+    miniBill/elm-codec                     2.3.0
+    miniBill/elm-unicode                   1.1.1
+    noahzgordon/elm-color-extra            1.0.2
+    robinheghan/fnv1a                      1.0.0
+    robinheghan/murmur3                    1.0.0
+    rtfeldman/elm-css                      18.0.0
+    rtfeldman/elm-hex                      1.0.0
+    rtfeldman/elm-iso8601-date-strings     1.1.4
+    stil4m/elm-syntax                      7.3.9
+    stil4m/structured-writer               1.0.3
+    testauthor/pkg-two                     1.0.0
+    the-sett/elm-pretty-printer            3.1.2
+    the-sett/elm-syntax-dsl                6.0.3
+  
+Saving elm.json...
+Successfully installed testauthor/pkg-two!
+---
+Exit code: 0 (expected: 0)
+=== END app1_install_pkg2 ===
+
+=== BEGIN app1_deps_after_pkg2_install ===
+File: /tmp/elm-wrap-dep-sync-test/app1/elm.json
+---
+Type: application
+Direct dependencies:
+  elm/browser: 1.0.2
+  elm/core: 1.0.5
+  elm/html: 1.0.1
+  elm/url: 1.0.0
+  testauthor/pkg-one: 1.0.0
+  testauthor/pkg-two: 1.0.0
+Indirect dependencies:
+  Chadtech/elm-bool-extra: 2.4.2
+  avh4/elm-color: 1.0.0
+  danfishgold/base64-bytes: 1.1.0
+  danyx23/elm-mimetype: 4.0.1
+  dillonkearns/elm-bcp47-language-tag: 2.0.0
+  dillonkearns/elm-cli-options-parser: 3.2.0
+  dillonkearns/elm-date-or-date-time: 2.0.0
+  dillonkearns/elm-form: 3.0.1
+  dillonkearns/elm-pages: 10.2.2
+  elm-community/basics-extra: 4.1.0
+  elm-community/list-extra: 8.7.0
+  elm-community/maybe-extra: 5.3.0
+  elm/bytes: 1.0.8
+  elm/file: 1.0.5
+  elm/http: 2.0.0
+  elm/json: 1.1.4
+  elm/parser: 1.1.0
+  elm/random: 1.0.0
+  elm/regex: 1.0.0
+  elm/time: 1.0.0
+  elm/virtual-dom: 1.0.5
+  fredcy/elm-parseint: 2.0.1
+  jluckyiv/elm-utc-date-strings: 1.0.0
+  justinmimbs/date: 4.1.0
+  mdgriffith/elm-codegen: 5.2.0
+  miniBill/elm-codec: 2.3.0
+  miniBill/elm-unicode: 1.1.1
+  noahzgordon/elm-color-extra: 1.0.2
+  robinheghan/fnv1a: 1.0.0
+  robinheghan/murmur3: 1.0.0
+  rtfeldman/elm-css: 18.0.0
+  rtfeldman/elm-hex: 1.0.0
+  rtfeldman/elm-iso8601-date-strings: 1.1.4
+  stil4m/elm-syntax: 7.3.9
+  stil4m/structured-writer: 1.0.3
+  the-sett/elm-pretty-printer: 3.1.2
+  the-sett/elm-syntax-dsl: 6.0.3
+  wolfadex/elm-ansi: 3.0.0
+=== END app1_deps_after_pkg2_install ===
+
+=== BEGIN repository_local_dev_after_cross ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap repository local-dev
+---
+Tracked local-dev packages:
+
+  testauthor/pkg-one 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
+
+  testauthor/pkg-two 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
+    -> /private/tmp/elm-wrap-dep-sync-test/app2/elm.json
+---
+Exit code: 0 (expected: 0)
+=== END repository_local_dev_after_cross ===
+
+=== BEGIN pkg1_uninstall_ansi ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package uninstall --yes wolfadex/elm-ansi
+---
+Here is my plan:
+  
+  Remove:
+    wolfadex/elm-ansi    3.0.0 <= v < 4.0.0
+  
+Saving elm.json...
+Successfully removed wolfadex/elm-ansi!
+---
+Exit code: 0 (expected: 0)
+=== END pkg1_uninstall_ansi ===
+
+=== BEGIN pkg1_elm_json_after_uninstall_ansi ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-one",
+    "version": "1.0.0",
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.5 <= v < 2.0.0",
+        "elm/random": "1.0.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {
+    }
+}
+=== END pkg1_elm_json_after_uninstall_ansi ===
+
+=== BEGIN app1_deps_after_pkg1_uninstall_ansi ===
+File: /tmp/elm-wrap-dep-sync-test/app1/elm.json
+---
+Type: application
+Direct dependencies:
+  elm/browser: 1.0.2
+  elm/core: 1.0.5
+  elm/html: 1.0.1
+  elm/url: 1.0.0
+  testauthor/pkg-one: 1.0.0
+  testauthor/pkg-two: 1.0.0
+Indirect dependencies:
+  Chadtech/elm-bool-extra: 2.4.2
+  avh4/elm-color: 1.0.0
+  danfishgold/base64-bytes: 1.1.0
+  danyx23/elm-mimetype: 4.0.1
+  dillonkearns/elm-bcp47-language-tag: 2.0.0
+  dillonkearns/elm-cli-options-parser: 3.2.0
+  dillonkearns/elm-date-or-date-time: 2.0.0
+  dillonkearns/elm-form: 3.0.1
+  dillonkearns/elm-pages: 10.2.2
+  elm-community/basics-extra: 4.1.0
+  elm-community/list-extra: 8.7.0
+  elm-community/maybe-extra: 5.3.0
+  elm/bytes: 1.0.8
+  elm/file: 1.0.5
+  elm/http: 2.0.0
+  elm/json: 1.1.4
+  elm/parser: 1.1.0
+  elm/random: 1.0.0
+  elm/regex: 1.0.0
+  elm/time: 1.0.0
+  elm/virtual-dom: 1.0.5
+  fredcy/elm-parseint: 2.0.1
+  jluckyiv/elm-utc-date-strings: 1.0.0
+  justinmimbs/date: 4.1.0
+  mdgriffith/elm-codegen: 5.2.0
+  miniBill/elm-codec: 2.3.0
+  miniBill/elm-unicode: 1.1.1
+  noahzgordon/elm-color-extra: 1.0.2
+  robinheghan/fnv1a: 1.0.0
+  robinheghan/murmur3: 1.0.0
+  rtfeldman/elm-css: 18.0.0
+  rtfeldman/elm-hex: 1.0.0
+  rtfeldman/elm-iso8601-date-strings: 1.1.4
+  stil4m/elm-syntax: 7.3.9
+  stil4m/structured-writer: 1.0.3
+  the-sett/elm-pretty-printer: 3.1.2
+  the-sett/elm-syntax-dsl: 6.0.3
+  wolfadex/elm-ansi: 3.0.0
+=== END app1_deps_after_pkg1_uninstall_ansi ===
+
+=== BEGIN pkg2_uninstall_elm_pages ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package uninstall --yes dillonkearns/elm-pages
+---
+Here is my plan:
+  
+  Remove:
+    dillonkearns/elm-pages    10.2.2 <= v < 11.0.0
+  
+Saving elm.json...
+Successfully removed dillonkearns/elm-pages!
+---
+Exit code: 0 (expected: 0)
+=== END pkg2_uninstall_elm_pages ===
+
+=== BEGIN pkg2_elm_json_after_uninstall_elm_pages ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-two",
+    "version": "1.0.0",
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.5 <= v < 2.0.0",
+        "elm/random": "1.0.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {
+    }
+}
+=== END pkg2_elm_json_after_uninstall_elm_pages ===
+
+=== BEGIN app2_deps_after_pkg2_uninstall_elm_pages ===
+File: /tmp/elm-wrap-dep-sync-test/app2/elm.json
+---
+Type: application
+Direct dependencies:
+  elm/browser: 1.0.2
+  elm/core: 1.0.5
+  elm/html: 1.0.1
+  elm/url: 1.0.0
+  testauthor/pkg-two: 1.0.0
+Indirect dependencies:
+  Chadtech/elm-bool-extra: 2.4.2
+  avh4/elm-color: 1.0.0
+  danfishgold/base64-bytes: 1.1.0
+  danyx23/elm-mimetype: 4.0.1
+  dillonkearns/elm-bcp47-language-tag: 2.0.0
+  dillonkearns/elm-cli-options-parser: 3.2.0
+  dillonkearns/elm-date-or-date-time: 2.0.0
+  dillonkearns/elm-form: 3.0.1
+  dillonkearns/elm-pages: 10.2.2
+  elm-community/basics-extra: 4.1.0
+  elm-community/list-extra: 8.7.0
+  elm-community/maybe-extra: 5.3.0
+  elm/bytes: 1.0.8
+  elm/file: 1.0.5
+  elm/http: 2.0.0
+  elm/json: 1.1.4
+  elm/parser: 1.1.0
+  elm/random: 1.0.0
+  elm/regex: 1.0.0
+  elm/time: 1.0.0
+  elm/virtual-dom: 1.0.5
+  fredcy/elm-parseint: 2.0.1
+  jluckyiv/elm-utc-date-strings: 1.0.0
+  justinmimbs/date: 4.1.0
+  mdgriffith/elm-codegen: 5.2.0
+  miniBill/elm-codec: 2.3.0
+  miniBill/elm-unicode: 1.1.1
+  noahzgordon/elm-color-extra: 1.0.2
+  robinheghan/fnv1a: 1.0.0
+  robinheghan/murmur3: 1.0.0
+  rtfeldman/elm-css: 18.0.0
+  rtfeldman/elm-hex: 1.0.0
+  rtfeldman/elm-iso8601-date-strings: 1.1.4
+  stil4m/elm-syntax: 7.3.9
+  stil4m/structured-writer: 1.0.3
+  the-sett/elm-pretty-printer: 3.1.2
+  the-sett/elm-syntax-dsl: 6.0.3
+  wolfadex/elm-ansi: 3.0.0
+=== END app2_deps_after_pkg2_uninstall_elm_pages ===
+
+=== BEGIN app1_deps_after_pkg2_uninstall_elm_pages ===
+File: /tmp/elm-wrap-dep-sync-test/app1/elm.json
+---
+Type: application
+Direct dependencies:
+  elm/browser: 1.0.2
+  elm/core: 1.0.5
+  elm/html: 1.0.1
+  elm/url: 1.0.0
+  testauthor/pkg-one: 1.0.0
+  testauthor/pkg-two: 1.0.0
+Indirect dependencies:
+  Chadtech/elm-bool-extra: 2.4.2
+  avh4/elm-color: 1.0.0
+  danfishgold/base64-bytes: 1.1.0
+  danyx23/elm-mimetype: 4.0.1
+  dillonkearns/elm-bcp47-language-tag: 2.0.0
+  dillonkearns/elm-cli-options-parser: 3.2.0
+  dillonkearns/elm-date-or-date-time: 2.0.0
+  dillonkearns/elm-form: 3.0.1
+  dillonkearns/elm-pages: 10.2.2
+  elm-community/basics-extra: 4.1.0
+  elm-community/list-extra: 8.7.0
+  elm-community/maybe-extra: 5.3.0
+  elm/bytes: 1.0.8
+  elm/file: 1.0.5
+  elm/http: 2.0.0
+  elm/json: 1.1.4
+  elm/parser: 1.1.0
+  elm/random: 1.0.0
+  elm/regex: 1.0.0
+  elm/time: 1.0.0
+  elm/virtual-dom: 1.0.5
+  fredcy/elm-parseint: 2.0.1
+  jluckyiv/elm-utc-date-strings: 1.0.0
+  justinmimbs/date: 4.1.0
+  mdgriffith/elm-codegen: 5.2.0
+  miniBill/elm-codec: 2.3.0
+  miniBill/elm-unicode: 1.1.1
+  noahzgordon/elm-color-extra: 1.0.2
+  robinheghan/fnv1a: 1.0.0
+  robinheghan/murmur3: 1.0.0
+  rtfeldman/elm-css: 18.0.0
+  rtfeldman/elm-hex: 1.0.0
+  rtfeldman/elm-iso8601-date-strings: 1.1.4
+  stil4m/elm-syntax: 7.3.9
+  stil4m/structured-writer: 1.0.3
+  the-sett/elm-pretty-printer: 3.1.2
+  the-sett/elm-syntax-dsl: 6.0.3
+  wolfadex/elm-ansi: 3.0.0
+=== END app1_deps_after_pkg2_uninstall_elm_pages ===
+
+=== BEGIN pkg4_init ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package init --yes testauthor/pkg-four
+---
+Here is my plan:
+  
+  Create new elm.json for the package:
+    testauthor/pkg-four    (version from template)
+  
+  Source: /private/tmp/elm-wrap-dep-sync-test/pkg4
+  
+  Also, I will register the package for local development. To prevent that,
+  run this command again and specify --no-local-dev flag.
+
+
+To use this package in an application, run from the application directory:
+    wrap package install testauthor/pkg-four
+  
+Successfully created and registered testauthor/pkg-four 1.0.0 (local)!
+---
+Exit code: 0 (expected: 0)
+=== END pkg4_init ===
+
+=== BEGIN pkg4_elm_json_after_init ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-four",
+    "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [],
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.5 <= v < 2.0.0"
+    },
+    "test-dependencies": {}
+}=== END pkg4_elm_json_after_init ===
+
+=== BEGIN pkg4_info_after_init ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package info testauthor/pkg-four
+---
+
+Package: testauthor/pkg-four
+Version: 1.0.0
+Total versions: 1
+
+
+Package: testauthor/pkg-four 1.0.0
+========================================
+
+Dependencies (1):
+  elm/core    1.0.5 <= v < 2.0.0
+---
+Exit code: 0 (expected: 0)
+=== END pkg4_info_after_init ===
+
+=== BEGIN pkg3_init ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package init --yes testauthor/pkg-three
+---
+Here is my plan:
+  
+  Create new elm.json for the package:
+    testauthor/pkg-three    (version from template)
+  
+  Source: /private/tmp/elm-wrap-dep-sync-test/pkg3
+  
+  Also, I will register the package for local development. To prevent that,
+  run this command again and specify --no-local-dev flag.
+
+
+To use this package in an application, run from the application directory:
+    wrap package install testauthor/pkg-three
+  
+Successfully created and registered testauthor/pkg-three 1.0.0 (local)!
+---
+Exit code: 0 (expected: 0)
+=== END pkg3_init ===
+
+=== BEGIN pkg3_elm_json_after_init ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-three",
+    "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [],
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.5 <= v < 2.0.0"
+    },
+    "test-dependencies": {}
+}=== END pkg3_elm_json_after_init ===
+
+=== BEGIN pkg3_info_after_init ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package info testauthor/pkg-three
+---
+
+Package: testauthor/pkg-three
+Version: 1.0.0
+Total versions: 1
+
+
+Package: testauthor/pkg-three 1.0.0
+========================================
+
+Dependencies (1):
+  elm/core    1.0.5 <= v < 2.0.0
+---
+Exit code: 0 (expected: 0)
+=== END pkg3_info_after_init ===
+
+=== BEGIN pkg3_install_pkg4 ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package install --yes testauthor/pkg-four
+---
+Here is my plan:
+  
+  Add:
+    testauthor/pkg-four    1.0.0 <= v < 2.0.0
+  
+Saving elm.json...
+Successfully installed testauthor/pkg-four!
+---
+Exit code: 0 (expected: 0)
+=== END pkg3_install_pkg4 ===
+
+=== BEGIN pkg3_elm_json_after_pkg4 ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-three",
+    "version": "1.0.0",
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.5 <= v < 2.0.0",
+        "testauthor/pkg-four": "1.0.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {
+    }
+}
+=== END pkg3_elm_json_after_pkg4 ===
+
+=== BEGIN pkg3_info_after_pkg4 ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package info testauthor/pkg-three
+---
+
+Package: testauthor/pkg-three
+Version: 1.0.0
+Total versions: 1
+
+
+Package: testauthor/pkg-three 1.0.0
+========================================
+
+Dependencies (2):
+  elm/core               1.0.5 <= v < 2.0.0
+  testauthor/pkg-four    1.0.0 <= v < 2.0.0
+---
+Exit code: 0 (expected: 0)
+=== END pkg3_info_after_pkg4 ===
+
+=== BEGIN app3_elm_json_initial ===
+{
+    "type": "application",
+    "source-directories": [
+        "src"
+    ],
+    "elm-version": "0.19.1",
+    "dependencies": {
+        "direct": {
+            "elm/browser": "1.0.2",
+            "elm/core": "1.0.5",
+            "elm/html": "1.0.1",
+            "elm/url": "1.0.0"
+        },
+        "indirect": {
+            "elm/json": "1.1.4",
+            "elm/time": "1.0.0",
+            "elm/virtual-dom": "1.0.5"
+        }
+    },
+    "test-dependencies": {
+        "direct": {},
+        "indirect": {}
+    }
+}
+=== END app3_elm_json_initial ===
+
+=== BEGIN app3_install_pkg3 ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package install --yes testauthor/pkg-three
+---
+Here is my plan:
+  
+  Add:
+    testauthor/pkg-four     1.0.0
+    testauthor/pkg-three    1.0.0
+  
+Saving elm.json...
+Successfully installed testauthor/pkg-three!
+---
+Exit code: 0 (expected: 0)
+=== END app3_install_pkg3 ===
+
+=== BEGIN app3_deps_after_pkg3_install ===
+File: /tmp/elm-wrap-dep-sync-test/app3/elm.json
+---
+Type: application
+Direct dependencies:
+  elm/browser: 1.0.2
+  elm/core: 1.0.5
+  elm/html: 1.0.1
+  elm/url: 1.0.0
+  testauthor/pkg-three: 1.0.0
+Indirect dependencies:
+  elm/json: 1.1.4
+  elm/time: 1.0.0
+  elm/virtual-dom: 1.0.5
+  testauthor/pkg-four: 1.0.0
+=== END app3_deps_after_pkg3_install ===
+
+=== BEGIN app3_info_after_pkg3 ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap application info
+---
+
+app3
+-------------------
+
+Type: Application
+Path: /private/tmp/elm-wrap-dep-sync-test/app3
+
+Dependencies:
+
+  elm/browser           1.0.2
+  elm/core              1.0.5
+  elm/html              1.0.1
+  elm/url               1.0.0
+  testauthor/pkg-three  1.0.0
+
+  elm/json              1.1.4 (indirect)
+  elm/time              1.0.0 (indirect)
+  elm/virtual-dom       1.0.5 (indirect)
+  testauthor/pkg-four   1.0.0 (indirect)
+
+  Total:                9
+
+No upgrades available. All packages at their latest version
+
+
+
+ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
+
+Registry Cache:
+  Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
+  Packages: 2954
+  Versions: 16478
+
+Registry URL: https://package.elm-lang.org
+  Status: Connected
+---
+Exit code: 0 (expected: 0)
+=== END app3_info_after_pkg3 ===
+
+=== BEGIN repository_local_dev_before_cascade ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap repository local-dev
+---
+Tracked local-dev packages:
+
+  testauthor/pkg-one 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
+
+  testauthor/pkg-two 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
+    -> /private/tmp/elm-wrap-dep-sync-test/app2/elm.json
+
+  testauthor/pkg-four 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app3/elm.json
+
+  testauthor/pkg-three 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app3/elm.json
+
+Pruning 1 stale local-dev connection:
+Cleared tracking for /private/tmp/elm-wrap-dep-sync-test/app3/elm.json in testauthor/pkg-four 1.0.0
+---
+Exit code: 0 (expected: 0)
+=== END repository_local_dev_before_cascade ===
+
+=== BEGIN pkg4_install_elm_pages ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package install --yes dillonkearns/elm-pages
+---
+Here is my plan:
+  
+  Add:
+    dillonkearns/elm-pages    10.2.2 <= v < 11.0.0
+  
+Saving elm.json...
+Successfully installed dillonkearns/elm-pages!
+---
+Exit code: 0 (expected: 0)
+=== END pkg4_install_elm_pages ===
+
+=== BEGIN pkg4_elm_json_after_elm_pages ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-four",
+    "version": "1.0.0",
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "dillonkearns/elm-pages": "10.2.2 <= v < 11.0.0",
+        "elm/core": "1.0.5 <= v < 2.0.0"
+    },
+    "test-dependencies": {
+    }
+}
+=== END pkg4_elm_json_after_elm_pages ===
+
+=== BEGIN pkg3_elm_json_after_cascade ===
+{
+    "type": "package",
+    "name": "testauthor/pkg-three",
+    "version": "1.0.0",
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.5 <= v < 2.0.0",
+        "testauthor/pkg-four": "1.0.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {
+    }
+}
+=== END pkg3_elm_json_after_cascade ===
+
+=== BEGIN app3_deps_after_pkg4_elm_pages ===
+File: /tmp/elm-wrap-dep-sync-test/app3/elm.json
+---
+Type: application
+Direct dependencies:
+  elm/browser: 1.0.2
+  elm/core: 1.0.5
+  elm/html: 1.0.1
+  elm/url: 1.0.0
+  testauthor/pkg-three: 1.0.0
+Indirect dependencies:
+  elm/json: 1.1.4
+  elm/time: 1.0.0
+  elm/virtual-dom: 1.0.5
+  testauthor/pkg-four: 1.0.0
+=== END app3_deps_after_pkg4_elm_pages ===
+
+=== BEGIN pkg4_info_after_cascade ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package info testauthor/pkg-four
+---
+
+Package: testauthor/pkg-four
+Version: 1.0.0
+Total versions: 1
+
+
+Package: testauthor/pkg-four 1.0.0
+========================================
+
+Dependencies (2):
+  dillonkearns/elm-pages    10.2.2 <= v < 11.0.0
+  elm/core                  1.0.5 <= v < 2.0.0
+---
+Exit code: 0 (expected: 0)
+=== END pkg4_info_after_cascade ===
+
+=== BEGIN pkg3_info_after_cascade ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package info testauthor/pkg-three
+---
+
+Package: testauthor/pkg-three
+Version: 1.0.0
+Total versions: 1
+
+
+Package: testauthor/pkg-three 1.0.0
+========================================
+
+Dependencies (2):
+  elm/core               1.0.5 <= v < 2.0.0
+  testauthor/pkg-four    1.0.0 <= v < 2.0.0
+---
+Exit code: 0 (expected: 0)
+=== END pkg3_info_after_cascade ===
+
+=== BEGIN app3_info_after_cascade ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap application info
+---
+
+app3
+-------------------
+
+Type: Application
+Path: /private/tmp/elm-wrap-dep-sync-test/app3
+
+Dependencies:
+
+  elm/browser           1.0.2
+  elm/core              1.0.5
+  elm/html              1.0.1
+  elm/url               1.0.0
+  testauthor/pkg-three  1.0.0
+
+  elm/json              1.1.4 (indirect)
+  elm/time              1.0.0 (indirect)
+  elm/virtual-dom       1.0.5 (indirect)
+  testauthor/pkg-four   1.0.0 (indirect)
+
+  Total:                9
+
+No upgrades available. All packages at their latest version
+
+
+
+ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
+
+Registry Cache:
+  Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
+  Packages: 2954
+  Versions: 16478
+
+Registry URL: https://package.elm-lang.org
+  Status: Connected
+---
+Exit code: 0 (expected: 0)
+=== END app3_info_after_cascade ===
+
+=== BEGIN repository_local_dev_after_cascade ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap repository local-dev
+---
+Tracked local-dev packages:
+
+  testauthor/pkg-one 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
+
+  testauthor/pkg-two 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
+    -> /private/tmp/elm-wrap-dep-sync-test/app2/elm.json
+
+  testauthor/pkg-four 1.0.0
+
+  testauthor/pkg-three 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app3/elm.json
+---
+Exit code: 0 (expected: 0)
+=== END repository_local_dev_after_cascade ===
+
+=== BEGIN pkg1_info_final ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package info testauthor/pkg-one
+---
+
+Package: testauthor/pkg-one
+Version: 1.0.0
+Total versions: 1
+
+
+Package: testauthor/pkg-one 1.0.0
+========================================
+
+Dependencies (2):
+  elm/core      1.0.5 <= v < 2.0.0
+  elm/random    1.0.0 <= v < 2.0.0
+---
+Exit code: 0 (expected: 0)
+=== END pkg1_info_final ===
+
+=== BEGIN pkg2_info_final ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package info testauthor/pkg-two
+---
+
+Package: testauthor/pkg-two
+Version: 1.0.0
+Total versions: 1
+
+
+Package: testauthor/pkg-two 1.0.0
+========================================
+
+Dependencies (2):
+  elm/core      1.0.5 <= v < 2.0.0
+  elm/random    1.0.0 <= v < 2.0.0
+---
+Exit code: 0 (expected: 0)
+=== END pkg2_info_final ===
+
+=== BEGIN pkg3_info_final ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package info testauthor/pkg-three
+---
+
+Package: testauthor/pkg-three
+Version: 1.0.0
+Total versions: 1
+
+
+Package: testauthor/pkg-three 1.0.0
+========================================
+
+Dependencies (2):
+  elm/core               1.0.5 <= v < 2.0.0
+  testauthor/pkg-four    1.0.0 <= v < 2.0.0
+---
+Exit code: 0 (expected: 0)
+=== END pkg3_info_final ===
+
+=== BEGIN pkg4_info_final ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap package info testauthor/pkg-four
+---
+
+Package: testauthor/pkg-four
+Version: 1.0.0
+Total versions: 1
+
+
+Package: testauthor/pkg-four 1.0.0
+========================================
+
+Dependencies (2):
+  dillonkearns/elm-pages    10.2.2 <= v < 11.0.0
+  elm/core                  1.0.5 <= v < 2.0.0
+
+Packages in elm.json that depend on testauthor/pkg-four (1):
+  testauthor/pkg-three    1.0.0
+---
+Exit code: 0 (expected: 0)
+=== END pkg4_info_final ===
+
+=== BEGIN app1_info_final ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap application info
+---
+
+app1
+-------------------
+
+Type: Application
+Path: /private/tmp/elm-wrap-dep-sync-test/app1
+
+Dependencies:
+
+  elm/browser                          1.0.2
+  elm/core                             1.0.5
+  elm/html                             1.0.1
+  elm/url                              1.0.0
+  testauthor/pkg-one                   1.0.0
+  testauthor/pkg-two                   1.0.0
+
+  Chadtech/elm-bool-extra              2.4.2 (indirect)
+  avh4/elm-color                       1.0.0 (indirect)
+  danfishgold/base64-bytes             1.1.0 (indirect)
+  danyx23/elm-mimetype                 4.0.1 (indirect)
+  dillonkearns/elm-bcp47-language-tag  2.0.0 (indirect)
+  dillonkearns/elm-cli-options-parser  3.2.0 (indirect)
+  dillonkearns/elm-date-or-date-time   2.0.0 (indirect)
+  dillonkearns/elm-form                3.0.1 (indirect)
+  dillonkearns/elm-pages               10.2.2 (indirect)
+  elm/bytes                            1.0.8 (indirect)
+  elm/file                             1.0.5 (indirect)
+  elm/http                             2.0.0 (indirect)
+  elm/json                             1.1.4 (indirect)
+  elm/parser                           1.1.0 (indirect)
+  elm/random                           1.0.0 (indirect)
+  elm/regex                            1.0.0 (indirect)
+  elm/time                             1.0.0 (indirect)
+  elm/virtual-dom                      1.0.5 (indirect)
+  elm-community/basics-extra           4.1.0 (indirect)
+  elm-community/list-extra             8.7.0 (indirect)
+  elm-community/maybe-extra            5.3.0 (indirect)
+  fredcy/elm-parseint                  2.0.1 (indirect)
+  jluckyiv/elm-utc-date-strings        1.0.0 (indirect)
+  justinmimbs/date                     4.1.0 (indirect)
+  mdgriffith/elm-codegen               5.2.0 (indirect)
+  miniBill/elm-codec                   2.3.0 (indirect)
+  miniBill/elm-unicode                 1.1.1 (indirect)
+  noahzgordon/elm-color-extra          1.0.2 (indirect)
+  robinheghan/fnv1a                    1.0.0 (indirect)
+  robinheghan/murmur3                  1.0.0 (indirect)
+  rtfeldman/elm-css                    18.0.0 (indirect)
+  rtfeldman/elm-hex                    1.0.0 (indirect)
+  rtfeldman/elm-iso8601-date-strings   1.1.4 (indirect)
+  stil4m/elm-syntax                    7.3.9 (indirect)
+  stil4m/structured-writer             1.0.3 (indirect)
+  the-sett/elm-pretty-printer          3.1.2 (indirect)
+  the-sett/elm-syntax-dsl              6.0.3 (indirect)
+  wolfadex/elm-ansi                    3.0.0 (indirect)
+
+  Total:                               44
+
+No upgrades available. All packages at their latest version
+
+
+
+ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
+
+Registry Cache:
+  Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
+  Packages: 2954
+  Versions: 16478
+
+Registry URL: https://package.elm-lang.org
+  Status: Connected
+---
+Exit code: 0 (expected: 0)
+=== END app1_info_final ===
+
+=== BEGIN app2_info_final ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap application info
+---
+
+app2
+-------------------
+
+Type: Application
+Path: /private/tmp/elm-wrap-dep-sync-test/app2
+
+Dependencies:
+
+  elm/browser                          1.0.2
+  elm/core                             1.0.5
+  elm/html                             1.0.1
+  elm/url                              1.0.0
+  testauthor/pkg-two                   1.0.0
+
+  Chadtech/elm-bool-extra              2.4.2 (indirect)
+  avh4/elm-color                       1.0.0 (indirect)
+  danfishgold/base64-bytes             1.1.0 (indirect)
+  danyx23/elm-mimetype                 4.0.1 (indirect)
+  dillonkearns/elm-bcp47-language-tag  2.0.0 (indirect)
+  dillonkearns/elm-cli-options-parser  3.2.0 (indirect)
+  dillonkearns/elm-date-or-date-time   2.0.0 (indirect)
+  dillonkearns/elm-form                3.0.1 (indirect)
+  dillonkearns/elm-pages               10.2.2 (indirect)
+  elm/bytes                            1.0.8 (indirect)
+  elm/file                             1.0.5 (indirect)
+  elm/http                             2.0.0 (indirect)
+  elm/json                             1.1.4 (indirect)
+  elm/parser                           1.1.0 (indirect)
+  elm/random                           1.0.0 (indirect)
+  elm/regex                            1.0.0 (indirect)
+  elm/time                             1.0.0 (indirect)
+  elm/virtual-dom                      1.0.5 (indirect)
+  elm-community/basics-extra           4.1.0 (indirect)
+  elm-community/list-extra             8.7.0 (indirect)
+  elm-community/maybe-extra            5.3.0 (indirect)
+  fredcy/elm-parseint                  2.0.1 (indirect)
+  jluckyiv/elm-utc-date-strings        1.0.0 (indirect)
+  justinmimbs/date                     4.1.0 (indirect)
+  mdgriffith/elm-codegen               5.2.0 (indirect)
+  miniBill/elm-codec                   2.3.0 (indirect)
+  miniBill/elm-unicode                 1.1.1 (indirect)
+  noahzgordon/elm-color-extra          1.0.2 (indirect)
+  robinheghan/fnv1a                    1.0.0 (indirect)
+  robinheghan/murmur3                  1.0.0 (indirect)
+  rtfeldman/elm-css                    18.0.0 (indirect)
+  rtfeldman/elm-hex                    1.0.0 (indirect)
+  rtfeldman/elm-iso8601-date-strings   1.1.4 (indirect)
+  stil4m/elm-syntax                    7.3.9 (indirect)
+  stil4m/structured-writer             1.0.3 (indirect)
+  the-sett/elm-pretty-printer          3.1.2 (indirect)
+  the-sett/elm-syntax-dsl              6.0.3 (indirect)
+  wolfadex/elm-ansi                    3.0.0 (indirect)
+
+  Total:                               43
+
+No upgrades available. All packages at their latest version
+
+
+
+ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
+
+Registry Cache:
+  Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
+  Packages: 2954
+  Versions: 16478
+
+Registry URL: https://package.elm-lang.org
+  Status: Connected
+---
+Exit code: 0 (expected: 0)
+=== END app2_info_final ===
+
+=== BEGIN app3_info_final ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap application info
+---
+
+app3
+-------------------
+
+Type: Application
+Path: /private/tmp/elm-wrap-dep-sync-test/app3
+
+Dependencies:
+
+  elm/browser           1.0.2
+  elm/core              1.0.5
+  elm/html              1.0.1
+  elm/url               1.0.0
+  testauthor/pkg-three  1.0.0
+
+  elm/json              1.1.4 (indirect)
+  elm/time              1.0.0 (indirect)
+  elm/virtual-dom       1.0.5 (indirect)
+  testauthor/pkg-four   1.0.0 (indirect)
+
+  Total:                9
+
+No upgrades available. All packages at their latest version
+
+
+
+ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
+
+Registry Cache:
+  Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
+  Packages: 2954
+  Versions: 16478
+
+Registry URL: https://package.elm-lang.org
+  Status: Connected
+---
+Exit code: 0 (expected: 0)
+=== END app3_info_final ===
+
+=== BEGIN repository_local_dev_final ===
+Command: /Volumes/Devel/Projects/elm-wrap/bin/wrap repository local-dev
+---
+Tracked local-dev packages:
+
+  testauthor/pkg-one 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
+
+  testauthor/pkg-two 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
+    -> /private/tmp/elm-wrap-dep-sync-test/app2/elm.json
+
+  testauthor/pkg-four 1.0.0
+
+  testauthor/pkg-three 1.0.0
+    -> /private/tmp/elm-wrap-dep-sync-test/app3/elm.json
+---
+Exit code: 0 (expected: 0)
+=== END repository_local_dev_final ===
+
