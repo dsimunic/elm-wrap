@@ -94,4 +94,10 @@
  */
 #define DJB2_HASH_INIT 5381  /* Initial value for djb2 hash algorithm */
 
+/*
+ * Local development tracking constants
+ */
+#define LOCAL_DEV_TRACKING_DIR "_local-dev"  /* Directory under WRAP_HOME for dependency tracking */
+#define REGISTRY_LOCAL_DEV_DAT "registry-local-dev.dat"  /* Text registry file for local-dev packages */
+
 #endif /* CONSTANTS_H */

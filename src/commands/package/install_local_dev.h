@@ -58,4 +58,32 @@ int refresh_local_dev_dependents(InstallEnv *env);
  */
 char *get_local_dev_tracking_dir(void);
 
+/**
+ * Unregister a package from local development tracking.
+ *
+ * This removes the package from the local-dev tracking directory,
+ * equivalent to running `wrap repository local-dev clear PACKAGE VERSION`.
+ * Should be called from within the package directory.
+ *
+ * @param env Install environment (may be NULL if not needed for basic removal)
+ * @return 0 on success, non-zero on failure
+ */
+int unregister_local_dev_package(InstallEnv *env);
+
+/**
+ * Check if a package is in the local-dev registry and register tracking if so.
+ *
+ * This is called after a regular `wrap install` command successfully installs
+ * a package, to ensure that if the package is a local-dev package, the
+ * application gets registered for tracking updates.
+ *
+ * @param author            Package author
+ * @param name              Package name  
+ * @param version           Package version
+ * @param app_elm_json_path Path to the application's elm.json
+ * @return true on success (or if package is not local-dev), false on error
+ */
+bool register_local_dev_tracking_if_needed(const char *author, const char *name,
+                                           const char *version, const char *app_elm_json_path);
+
 #endif /* INSTALL_LOCAL_DEV_H */

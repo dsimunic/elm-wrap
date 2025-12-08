@@ -138,6 +138,7 @@ static void print_install_usage(void) {
     printf("  --from-url URL PACKAGE             # Install from URL (skips V1 installer SHA check)\n");
     printf("  --local-dev [--from-path PATH] [PACKAGE]\n");
     printf("                                     # Install package for local development\n");
+    printf("  --remove-local-dev                 # Remove package from local-dev tracking\n");
     // printf("  --pin                              # Create PIN file with package version\n");
     printf("  -v, --verbose                      # Show progress reports (registry, connectivity)\n");
     printf("  -q, --quiet                        # Suppress progress reports\n");
@@ -558,6 +559,17 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
         return 1;
     }
 
+    /* Register local-dev tracking for all installed packages (if they are local-dev) */
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        for (int i = 0; i < out_plan->count; i++) {
+            PackageChange *change = &out_plan->changes[i];
+            if (change->new_version) {
+                register_local_dev_tracking_if_needed(change->author, change->name,
+                                                      change->new_version, ELM_JSON_PATH);
+            }
+        }
+    }
+
     printf("Successfully installed %s/%s!\n", author, name);
 
     install_plan_free(out_plan);
@@ -575,6 +587,7 @@ int cmd_install(int argc, char *argv[]) {
     bool cmd_quiet = false;
     bool pin_flag = false;
     bool local_dev = false;
+    bool remove_local_dev = false;
     const char *package_name = NULL;
     const char *major_package_name = NULL;
     const char *from_file_path = NULL;
@@ -631,6 +644,8 @@ int cmd_install(int argc, char *argv[]) {
             }
         } else if (strcmp(argv[i], "--local-dev") == 0) {
             local_dev = true;
+        } else if (strcmp(argv[i], "--remove-local-dev") == 0) {
+            remove_local_dev = true;
         } else if (strcmp(argv[i], "--from-path") == 0) {
             if (i + 1 < argc) {
                 i++;
@@ -673,6 +688,11 @@ int cmd_install(int argc, char *argv[]) {
 
     if (local_dev && (from_file_path || from_url)) {
         fprintf(stderr, "Error: Cannot use --local-dev with --from-file or --from-url\n");
+        return 1;
+    }
+
+    if (remove_local_dev && (from_file_path || from_url || local_dev || from_path)) {
+        fprintf(stderr, "Error: --remove-local-dev cannot be combined with other install options\n");
         return 1;
     }
 
@@ -720,6 +740,15 @@ int cmd_install(int argc, char *argv[]) {
     }
 
     int result = 0;
+
+    if (remove_local_dev) {
+        /* Handle --remove-local-dev: unregister package from local-dev tracking */
+        elm_json_free(elm_json);
+        result = unregister_local_dev_package(env);
+        install_env_free(env);
+        log_set_level(original_level);
+        return result;
+    }
 
     if (local_dev) {
         /* Handle --local-dev installation */

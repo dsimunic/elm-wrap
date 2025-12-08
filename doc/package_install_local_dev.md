@@ -27,7 +27,7 @@ The command behaves as follows:
 - Once the symlinks are intalled, the process should continue the same as for `--from-path`, after the point it installed the package into `ELM_HOME`. 
 
 - If the installation succeeded, register the app path in dependency-track
-    - Create a folder in `WRAP_REPOSITORY_LOCAL_PATH/local-dev-dependency-track/author/name/version` and add a file containing the path to the elm.json we are adding the package to.
+    - Create a folder in `WRAP_HOME/_local-dev/packages/author/name/version` and add a file containing the path to the elm.json we are adding the package to.
 
 - Exit at this point as usual.
 

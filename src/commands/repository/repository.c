@@ -6,6 +6,7 @@
  */
 
 #include "repository.h"
+#include "../package/install_local_dev.h"
 #include "../../alloc.h"
 #include "../../constants.h"
 #include "../../global_context.h"
@@ -14,6 +15,7 @@
 #include "../../elm_json.h"
 #include "../../log.h"
 #include "../../protocol_v2/index_fetch.h"
+#include "../../protocol_v2/solver/v2_registry.h"
 #include "../../rulr/rulr.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"
@@ -358,7 +360,7 @@ int cmd_repository_list(int argc, char *argv[]) {
 
     if (!effective_root || effective_root[0] == '\0') {
         fprintf(stderr, "Error: Could not determine repository root path\n");
-        fprintf(stderr, "Set WRAP_REPOSITORY_LOCAL_PATH or provide a path argument\n");
+        fprintf(stderr, "Set WRAP_HOME or provide a path argument\n");
         return 1;
     }
 
@@ -465,9 +467,6 @@ int cmd_repository_list(int argc, char *argv[]) {
  * Local-dev Subcommand
  * ========================================================================== */
 
-/* Tracking directory name under WRAP_REPOSITORY_LOCAL_PATH */
-#define LOCAL_DEV_TRACKING_DIR "_local-dev-dependency-track"
-
 typedef struct {
     char *author;
     char *name;
@@ -476,26 +475,6 @@ typedef struct {
 } LocalDevConnection;
 
 static void prune_stale_local_dev_connections(LocalDevConnection *connections, int connection_count);
-
-/**
- * Get the local-dev tracking directory path.
- */
-static char *get_tracking_dir(void) {
-    char *repo_path = env_get_repository_local_path();
-    if (!repo_path) {
-        return NULL;
-    }
-
-    size_t len = strlen(repo_path) + strlen("/") + strlen(LOCAL_DEV_TRACKING_DIR) + 1;
-    char *tracking_dir = arena_malloc(len);
-    if (!tracking_dir) {
-        arena_free(repo_path);
-        return NULL;
-    }
-    snprintf(tracking_dir, len, "%s/%s", repo_path, LOCAL_DEV_TRACKING_DIR);
-    arena_free(repo_path);
-    return tracking_dir;
-}
 
 static bool has_processed_app_path(LocalDevConnection *connections, int index) {
     if (!connections || index <= 0) {
@@ -586,33 +565,126 @@ static bool remove_directory_recursive_local(const char *path) {
 }
 
 /**
- * List all tracked packages and their dependent applications.
+ * Get the path to the local-dev registry file.
+ * Uses the tracking directory (V2-independent) as the base location.
+ */
+static char *get_local_dev_registry_path(void) {
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        return NULL;
+    }
+    
+    /* Build path: tracking_dir/registry-local-dev.dat */
+    size_t path_len = strlen(tracking_dir) + strlen("/") + strlen(REGISTRY_LOCAL_DEV_DAT) + 1;
+    char *reg_path = arena_malloc(path_len);
+    if (reg_path) {
+        snprintf(reg_path, path_len, "%s/%s", tracking_dir, REGISTRY_LOCAL_DEV_DAT);
+    }
+    arena_free(tracking_dir);
+    
+    return reg_path;
+}
+
+/**
+ * List tracking entries for a specific package version.
+ * Returns the count of tracking entries found.
+ */
+static int list_tracking_for_package(const char *tracking_dir, const char *author, const char *name,
+                                     const char *version, LocalDevConnection **connections,
+                                     int *connection_count, int *connection_capacity,
+                                     bool *connection_tracking_enabled) {
+    struct stat st;
+    int found_count = 0;
+
+    /* Build path: tracking_dir/author/name/version */
+    size_t version_path_len = strlen(tracking_dir) + strlen(author) + strlen(name) + strlen(version) + 4;
+    char *version_path = arena_malloc(version_path_len);
+    if (!version_path) return 0;
+    snprintf(version_path, version_path_len, "%s/%s/%s/%s", tracking_dir, author, name, version);
+
+    if (stat(version_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        arena_free(version_path);
+        return 0;
+    }
+
+    DIR *track_files_handle = opendir(version_path);
+    if (!track_files_handle) {
+        arena_free(version_path);
+        return 0;
+    }
+
+    struct dirent *track_entry;
+    while ((track_entry = readdir(track_files_handle)) != NULL) {
+        if (track_entry->d_name[0] == '.') continue;
+
+        size_t track_file_len = strlen(version_path) + strlen(track_entry->d_name) + 2;
+        char *track_file = arena_malloc(track_file_len);
+        if (!track_file) continue;
+        snprintf(track_file, track_file_len, "%s/%s", version_path, track_entry->d_name);
+
+        FILE *f = fopen(track_file, "r");
+        if (f) {
+            char path_buf[PATH_MAX];
+            if (fgets(path_buf, sizeof(path_buf), f)) {
+                size_t len = strlen(path_buf);
+                while (len > 0 && (path_buf[len - 1] == '\n' || path_buf[len - 1] == '\r')) {
+                    path_buf[--len] = '\0';
+                }
+                printf("    -> %s\n", path_buf);
+                found_count++;
+
+                if (*connection_tracking_enabled && connections && connection_count && connection_capacity) {
+                    if (*connection_count >= *connection_capacity) {
+                        int new_capacity = *connection_capacity * 2;
+                        LocalDevConnection *new_connections =
+                            arena_realloc(*connections, new_capacity * sizeof(LocalDevConnection));
+                        if (!new_connections) {
+                            *connection_tracking_enabled = false;
+                            log_error("Out of memory tracking local-dev connections; automatic pruning disabled.");
+                        } else {
+                            *connections = new_connections;
+                            *connection_capacity = new_capacity;
+                        }
+                    }
+
+                    if (*connection_tracking_enabled) {
+                        char *author_copy = arena_strdup(author);
+                        char *name_copy = arena_strdup(name);
+                        char *version_copy = arena_strdup(version);
+                        char *path_copy = arena_strdup(path_buf);
+                        if (!author_copy || !name_copy || !version_copy || !path_copy) {
+                            *connection_tracking_enabled = false;
+                            log_error("Out of memory copying local-dev tracking data; automatic pruning disabled.");
+                        } else {
+                            LocalDevConnection *conn = &(*connections)[(*connection_count)++];
+                            conn->author = author_copy;
+                            conn->name = name_copy;
+                            conn->version = version_copy;
+                            conn->app_path = path_copy;
+                        }
+                    }
+                }
+            }
+            fclose(f);
+        }
+        arena_free(track_file);
+    }
+    closedir(track_files_handle);
+    arena_free(version_path);
+
+    return found_count;
+}
+
+/**
+ * List all registered local-dev packages and their dependent applications.
  */
 static int list_local_dev_tracking(void) {
-    char *tracking_dir = get_tracking_dir();
-    if (!tracking_dir) {
-        fprintf(stderr, "Error: Could not determine tracking directory\n");
-        return 1;
-    }
+    char *tracking_dir = get_local_dev_tracking_dir();
+    char *registry_path = get_local_dev_registry_path();
 
-    struct stat st;
-    if (stat(tracking_dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
-        printf("No local-dev packages are being tracked.\n");
-        arena_free(tracking_dir);
-        return 0;
-    }
-
-    DIR *author_dir_handle = opendir(tracking_dir);
-    if (!author_dir_handle) {
-        printf("No local-dev packages are being tracked.\n");
-        arena_free(tracking_dir);
-        return 0;
-    }
-
-    int connection_capacity = 32;
+    int connection_capacity = INITIAL_CONNECTION_CAPACITY;
     int connection_count = 0;
     bool connection_tracking_enabled = true;
-    bool connection_oom_logged = false;
     LocalDevConnection *connections = arena_malloc(connection_capacity * sizeof(LocalDevConnection));
     if (!connections) {
         connection_tracking_enabled = false;
@@ -620,145 +692,159 @@ static int list_local_dev_tracking(void) {
     }
 
     int found_any = 0;
-    struct dirent *author_entry;
-    while ((author_entry = readdir(author_dir_handle)) != NULL) {
-        if (author_entry->d_name[0] == '.') continue;
 
-        size_t author_path_len = strlen(tracking_dir) + strlen(author_entry->d_name) + 2;
-        char *author_path = arena_malloc(author_path_len);
-        if (!author_path) continue;
-        snprintf(author_path, author_path_len, "%s/%s", tracking_dir, author_entry->d_name);
+    /* Load the local-dev registry to get all registered packages */
+    V2Registry *local_dev_registry = NULL;
+    if (registry_path) {
+        struct stat st;
+        if (stat(registry_path, &st) == 0 && S_ISREG(st.st_mode)) {
+            local_dev_registry = v2_registry_load_from_text(registry_path);
+        }
+    }
 
-        if (stat(author_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
-            arena_free(author_path);
-            continue;
+    if (local_dev_registry && local_dev_registry->entry_count > 0) {
+        printf("Tracked local-dev packages:\n\n");
+        found_any = 1;
+
+        /* Iterate over all packages in the registry */
+        for (size_t i = 0; i < local_dev_registry->entry_count; i++) {
+            V2PackageEntry *entry = &local_dev_registry->entries[i];
+
+            /* Iterate over all versions */
+            for (size_t j = 0; j < entry->version_count; j++) {
+                V2PackageVersion *ver = &entry->versions[j];
+                char version_str[MAX_VERSION_STRING_LENGTH];
+                snprintf(version_str, sizeof(version_str), "%u.%u.%u", ver->major, ver->minor, ver->patch);
+
+                printf("  %s/%s %s\n", entry->author, entry->name, version_str);
+
+                /* Show tracking entries for this package version if tracking_dir exists */
+                if (tracking_dir) {
+                    list_tracking_for_package(tracking_dir, entry->author, entry->name, version_str,
+                                              &connections, &connection_count, &connection_capacity,
+                                              &connection_tracking_enabled);
+                }
+                printf("\n");
+            }
         }
 
-        DIR *name_dir_handle = opendir(author_path);
-        if (!name_dir_handle) {
-            arena_free(author_path);
-            continue;
-        }
+        v2_registry_free(local_dev_registry);
+    }
 
-        struct dirent *name_entry;
-        while ((name_entry = readdir(name_dir_handle)) != NULL) {
-            if (name_entry->d_name[0] == '.') continue;
+    /* Also check for packages in tracking directory that might not be in the registry
+     * (e.g., if registry was manually edited or corrupted) */
+    if (tracking_dir) {
+        struct stat st;
+        if (stat(tracking_dir, &st) == 0 && S_ISDIR(st.st_mode)) {
+            DIR *author_dir_handle = opendir(tracking_dir);
+            if (author_dir_handle) {
+                struct dirent *author_entry;
+                while ((author_entry = readdir(author_dir_handle)) != NULL) {
+                    if (author_entry->d_name[0] == '.') continue;
 
-            size_t name_path_len = strlen(author_path) + strlen(name_entry->d_name) + 2;
-            char *name_path = arena_malloc(name_path_len);
-            if (!name_path) continue;
-            snprintf(name_path, name_path_len, "%s/%s", author_path, name_entry->d_name);
+                    size_t author_path_len = strlen(tracking_dir) + strlen(author_entry->d_name) + 2;
+                    char *author_path = arena_malloc(author_path_len);
+                    if (!author_path) continue;
+                    snprintf(author_path, author_path_len, "%s/%s", tracking_dir, author_entry->d_name);
 
-            if (stat(name_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
-                arena_free(name_path);
-                continue;
-            }
+                    if (stat(author_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+                        arena_free(author_path);
+                        continue;
+                    }
 
-            DIR *version_dir_handle = opendir(name_path);
-            if (!version_dir_handle) {
-                arena_free(name_path);
-                continue;
-            }
+                    DIR *name_dir_handle = opendir(author_path);
+                    if (!name_dir_handle) {
+                        arena_free(author_path);
+                        continue;
+                    }
 
-            struct dirent *version_entry;
-            while ((version_entry = readdir(version_dir_handle)) != NULL) {
-                if (version_entry->d_name[0] == '.') continue;
+                    struct dirent *name_entry;
+                    while ((name_entry = readdir(name_dir_handle)) != NULL) {
+                        if (name_entry->d_name[0] == '.') continue;
 
-                size_t version_path_len = strlen(name_path) + strlen(version_entry->d_name) + 2;
-                char *version_path = arena_malloc(version_path_len);
-                if (!version_path) continue;
-                snprintf(version_path, version_path_len, "%s/%s", name_path, version_entry->d_name);
+                        size_t name_path_len = strlen(author_path) + strlen(name_entry->d_name) + 2;
+                        char *name_path = arena_malloc(name_path_len);
+                        if (!name_path) continue;
+                        snprintf(name_path, name_path_len, "%s/%s", author_path, name_entry->d_name);
 
-                if (stat(version_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
-                    arena_free(version_path);
-                    continue;
-                }
+                        if (stat(name_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+                            arena_free(name_path);
+                            continue;
+                        }
 
-                if (!found_any) {
-                    printf("Tracked local-dev packages:\n\n");
-                }
-                found_any = 1;
+                        DIR *version_dir_handle = opendir(name_path);
+                        if (!version_dir_handle) {
+                            arena_free(name_path);
+                            continue;
+                        }
 
-                printf("  %s/%s %s\n", author_entry->d_name, name_entry->d_name, version_entry->d_name);
+                        struct dirent *version_entry;
+                        while ((version_entry = readdir(version_dir_handle)) != NULL) {
+                            if (version_entry->d_name[0] == '.') continue;
 
-                /* List tracking files (dependent applications) */
-                DIR *track_files_handle = opendir(version_path);
-                if (track_files_handle) {
-                    struct dirent *track_entry;
-                    while ((track_entry = readdir(track_files_handle)) != NULL) {
-                        if (track_entry->d_name[0] == '.') continue;
-
-                        size_t track_file_len = strlen(version_path) + strlen(track_entry->d_name) + 2;
-                        char *track_file = arena_malloc(track_file_len);
-                        if (!track_file) continue;
-                        snprintf(track_file, track_file_len, "%s/%s", version_path, track_entry->d_name);
-
-                        FILE *f = fopen(track_file, "r");
-                        if (f) {
-                            char path_buf[PATH_MAX];
-                            if (fgets(path_buf, sizeof(path_buf), f)) {
-                                size_t len = strlen(path_buf);
-                                while (len > 0 && (path_buf[len - 1] == '\n' || path_buf[len - 1] == '\r')) {
-                                    path_buf[--len] = '\0';
-                                }
-                                printf("    -> %s\n", path_buf);
-
-                                if (connection_tracking_enabled) {
-                                    if (connection_count >= connection_capacity) {
-                                        int new_capacity = connection_capacity * 2;
-                                        LocalDevConnection *new_connections =
-                                            arena_realloc(connections, new_capacity * sizeof(LocalDevConnection));
-                                        if (!new_connections) {
-                                            connection_tracking_enabled = false;
-                                            if (!connection_oom_logged) {
-                                                log_error("Out of memory tracking local-dev connections; automatic pruning disabled.");
-                                                connection_oom_logged = true;
+                            /* Check if this package/version was already shown from the registry */
+                            bool already_shown = false;
+                            if (local_dev_registry) {
+                                V2PackageEntry *reg_entry = v2_registry_find(local_dev_registry,
+                                                                              author_entry->d_name,
+                                                                              name_entry->d_name);
+                                if (reg_entry) {
+                                    /* Parse version string */
+                                    unsigned major = 0, minor = 0, patch = 0;
+                                    if (sscanf(version_entry->d_name, "%u.%u.%u", &major, &minor, &patch) == 3) {
+                                        for (size_t v = 0; v < reg_entry->version_count; v++) {
+                                            if (reg_entry->versions[v].major == major &&
+                                                reg_entry->versions[v].minor == minor &&
+                                                reg_entry->versions[v].patch == patch) {
+                                                already_shown = true;
+                                                break;
                                             }
-                                        } else {
-                                            connections = new_connections;
-                                            connection_capacity = new_capacity;
-                                        }
-                                    }
-
-                                    if (connection_tracking_enabled) {
-                                        char *author_copy = arena_strdup(author_entry->d_name);
-                                        char *name_copy = arena_strdup(name_entry->d_name);
-                                        char *version_copy = arena_strdup(version_entry->d_name);
-                                        char *path_copy = arena_strdup(path_buf);
-                                        if (!author_copy || !name_copy || !version_copy || !path_copy) {
-                                            connection_tracking_enabled = false;
-                                            if (!connection_oom_logged) {
-                                                log_error("Out of memory copying local-dev tracking data; automatic pruning disabled.");
-                                                connection_oom_logged = true;
-                                            }
-                                        } else {
-                                            LocalDevConnection *conn = &connections[connection_count++];
-                                            conn->author = author_copy;
-                                            conn->name = name_copy;
-                                            conn->version = version_copy;
-                                            conn->app_path = path_copy;
                                         }
                                     }
                                 }
                             }
-                            fclose(f);
-                        }
-                        arena_free(track_file);
-                    }
-                    closedir(track_files_handle);
-                }
-                printf("\n");
 
-                arena_free(version_path);
+                            if (!already_shown) {
+                                size_t version_path_len = strlen(name_path) + strlen(version_entry->d_name) + 2;
+                                char *version_path = arena_malloc(version_path_len);
+                                if (!version_path) continue;
+                                snprintf(version_path, version_path_len, "%s/%s", name_path, version_entry->d_name);
+
+                                if (stat(version_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+                                    if (!found_any) {
+                                        printf("Tracked local-dev packages:\n\n");
+                                        found_any = 1;
+                                    }
+
+                                    printf("  %s/%s %s\n", author_entry->d_name, name_entry->d_name,
+                                           version_entry->d_name);
+
+                                    list_tracking_for_package(tracking_dir, author_entry->d_name,
+                                                              name_entry->d_name, version_entry->d_name,
+                                                              &connections, &connection_count, &connection_capacity,
+                                                              &connection_tracking_enabled);
+                                    printf("\n");
+                                }
+                                arena_free(version_path);
+                            }
+                        }
+                        closedir(version_dir_handle);
+                        arena_free(name_path);
+                    }
+                    closedir(name_dir_handle);
+                    arena_free(author_path);
+                }
+                closedir(author_dir_handle);
             }
-            closedir(version_dir_handle);
-            arena_free(name_path);
         }
-        closedir(name_dir_handle);
-        arena_free(author_path);
     }
-    closedir(author_dir_handle);
-    arena_free(tracking_dir);
+
+    if (tracking_dir) {
+        arena_free(tracking_dir);
+    }
+    if (registry_path) {
+        arena_free(registry_path);
+    }
 
     if (connection_tracking_enabled && connection_count > 0) {
         prune_stale_local_dev_connections(connections, connection_count);
@@ -775,7 +861,7 @@ static int list_local_dev_tracking(void) {
  * Clear all local-dev tracking.
  */
 static int clear_all_tracking(void) {
-    char *tracking_dir = get_tracking_dir();
+    char *tracking_dir = get_local_dev_tracking_dir();
     if (!tracking_dir) {
         fprintf(stderr, "Error: Could not determine tracking directory\n");
         return 1;
@@ -822,7 +908,7 @@ static int clear_package_tracking(const char *package_name, const char *version)
         return 1;
     }
 
-    char *tracking_dir = get_tracking_dir();
+    char *tracking_dir = get_local_dev_tracking_dir();
     if (!tracking_dir) {
         arena_free(author);
         arena_free(name);
@@ -903,7 +989,7 @@ static int clear_path_tracking(const char *package_name, const char *version, co
         return 1;
     }
 
-    char *tracking_dir = get_tracking_dir();
+    char *tracking_dir = get_local_dev_tracking_dir();
     if (!tracking_dir) {
         arena_free(author);
         arena_free(name);

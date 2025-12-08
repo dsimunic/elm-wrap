@@ -273,11 +273,13 @@ ENV_DEFAULTS_FILE = ENV_DEFAULTS
 
 # Parse ENV_DEFAULTS file (format: KEY=VALUE, one per line)
 # Default values if file doesn't exist
+ENV_DEFAULT_WRAP_HOME ?= ~/.elm-wrap
 ENV_DEFAULT_REGISTRY_V2_FULL_INDEX_URL ?= 
-ENV_DEFAULT_REPOSITORY_LOCAL_PATH ?= ~/.elm-wrap/repository
+ENV_DEFAULT_REPOSITORY_LOCAL_PATH ?= repository
 
 ifneq ($(wildcard $(ENV_DEFAULTS_FILE)),)
   # Read each line from ENV_DEFAULTS and set corresponding make variables
+  ENV_DEFAULT_WRAP_HOME := $(shell grep '^WRAP_HOME=' $(ENV_DEFAULTS_FILE) 2>/dev/null | cut -d= -f2-)
   ENV_DEFAULT_REGISTRY_V2_FULL_INDEX_URL := $(shell grep '^WRAP_REGISTRY_V2_FULL_INDEX_URL=' $(ENV_DEFAULTS_FILE) 2>/dev/null | cut -d= -f2-)
   ENV_DEFAULT_REPOSITORY_LOCAL_PATH := $(shell grep '^WRAP_REPOSITORY_LOCAL_PATH=' $(ENV_DEFAULTS_FILE) 2>/dev/null | cut -d= -f2-)
 endif
@@ -344,6 +346,7 @@ $(BUILDINFO_SRC): buildinfo.mk $(VERSION_FILE) $(wildcard $(ENV_DEFAULTS_FILE))
 		TARGET_FILE=$(TARGET_FILE) \
 		CC=$(CC)
 	@echo "/* Environment variable defaults (project-specific) */" >> $(BUILDDIR)/buildinfo.c
+	@echo "const char *env_default_wrap_home = \"$(ENV_DEFAULT_WRAP_HOME)\";" >> $(BUILDDIR)/buildinfo.c
 	@echo "const char *env_default_registry_v2_full_index_url = \"$(ENV_DEFAULT_REGISTRY_V2_FULL_INDEX_URL)\";" >> $(BUILDDIR)/buildinfo.c
 	@echo "const char *env_default_repository_local_path = \"$(ENV_DEFAULT_REPOSITORY_LOCAL_PATH)\";" >> $(BUILDDIR)/buildinfo.c
 

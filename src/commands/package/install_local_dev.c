@@ -32,9 +32,6 @@
 #define PATH_MAX 4096
 #endif
 
-/* Tracking directory name under WRAP_REPOSITORY_LOCAL_PATH */
-#define LOCAL_DEV_TRACKING_DIR "_local-dev-dependency-track"
-
 /* Simple hash function for path -> filename */
 static unsigned long hash_path(const char *str) {
     unsigned long hash = DJB2_HASH_INIT;
@@ -46,20 +43,20 @@ static unsigned long hash_path(const char *str) {
 }
 
 char *get_local_dev_tracking_dir(void) {
-    char *repo_path = env_get_repository_local_path();
-    if (!repo_path) {
-        log_error("WRAP_REPOSITORY_LOCAL_PATH is not configured");
+    char *wrap_home = env_get_wrap_home();
+    if (!wrap_home) {
+        log_error("WRAP_HOME is not configured");
         return NULL;
     }
 
-    size_t len = strlen(repo_path) + strlen("/") + strlen(LOCAL_DEV_TRACKING_DIR) + 1;
+    size_t len = strlen(wrap_home) + strlen("/") + strlen(LOCAL_DEV_TRACKING_DIR) + 1;
     char *tracking_dir = arena_malloc(len);
     if (!tracking_dir) {
-        arena_free(repo_path);
+        arena_free(wrap_home);
         return NULL;
     }
-    snprintf(tracking_dir, len, "%s/%s", repo_path, LOCAL_DEV_TRACKING_DIR);
-    arena_free(repo_path);
+    snprintf(tracking_dir, len, "%s/%s", wrap_home, LOCAL_DEV_TRACKING_DIR);
+    arena_free(wrap_home);
     return tracking_dir;
 }
 
@@ -238,9 +235,6 @@ static bool register_dependency_tracking(const char *author, const char *name, c
     return true;
 }
 
-/* Registry local-dev dat file name */
-#define REGISTRY_LOCAL_DEV_DAT "registry-local-dev.dat"
-
 static bool ensure_local_dev_in_registry_dat(InstallEnv *env, const char *author, const char *name,
                                              const char *version) {
     if (!env || !env->cache || !env->cache->registry_path) {
@@ -292,20 +286,40 @@ static bool ensure_local_dev_in_registry_dat(InstallEnv *env, const char *author
     return true;
 }
 
+/**
+ * Register the local-dev package in the text registry file.
+ * This file is used to track all local-dev packages regardless of protocol mode.
+ * The file is stored in the local-dev tracking directory, not the V2 repository.
+ */
 static bool register_local_dev_v2_text_registry(InstallEnv *env, const char *author, const char *name,
                                                 const char *version, const char *source_elm_json_path) {
     (void)env;
 
-    GlobalContext *ctx = global_context_get();
-    if (!ctx || !ctx->repository_path) {
-        log_error("V2 mode but no repository path available");
-        return false;
+    /* Get the tracking directory (V2-independent) */
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        log_debug("No tracking directory available for local-dev registry");
+        return true; /* Not an error - just skip tracking in registry file */
     }
-
-    size_t path_len = strlen(ctx->repository_path) + strlen("/") + strlen(REGISTRY_LOCAL_DEV_DAT) + 1;
+    
+    /* Create the tracking directory if it doesn't exist */
+    if (!ensure_path_exists(tracking_dir)) {
+        log_debug("Could not create local-dev tracking directory: %s", tracking_dir);
+        arena_free(tracking_dir);
+        return true; /* Not a fatal error - skip tracking */
+    }
+    
+    /* Build path: tracking_dir/registry-local-dev.dat */
+    size_t path_len = strlen(tracking_dir) + strlen("/") + strlen(REGISTRY_LOCAL_DEV_DAT) + 1;
     char *reg_path = arena_malloc(path_len);
-    if (!reg_path) return false;
-    snprintf(reg_path, path_len, "%s/%s", ctx->repository_path, REGISTRY_LOCAL_DEV_DAT);
+    if (!reg_path) {
+        arena_free(tracking_dir);
+        return true; /* Not a fatal error - skip tracking */
+    }
+    snprintf(reg_path, path_len, "%s/%s", tracking_dir, REGISTRY_LOCAL_DEV_DAT);
+    arena_free(tracking_dir);
+    
+    GlobalContext *ctx = global_context_get();
 
     ElmJson *pkg_json = elm_json_read(source_elm_json_path);
     if (!pkg_json) {
@@ -318,11 +332,11 @@ static bool register_local_dev_v2_text_registry(InstallEnv *env, const char *aut
     bool entry_exists = false;
 
     if (existing_content) {
-        char search_pattern[256];
+        char search_pattern[MAX_PACKAGE_NAME_LENGTH];
         snprintf(search_pattern, sizeof(search_pattern), "package: %s/%s", author, name);
         char *pkg_pos = strstr(existing_content, search_pattern);
         if (pkg_pos) {
-            char version_pattern[64];
+            char version_pattern[MAX_VERSION_STRING_MEDIUM_LENGTH];
             snprintf(version_pattern, sizeof(version_pattern), "version: %s", version);
             char *next_pkg = strstr(pkg_pos + 1, "package: ");
             if (next_pkg) {
@@ -348,6 +362,23 @@ static bool register_local_dev_v2_text_registry(InstallEnv *env, const char *aut
         return true;
     }
 
+    /* Ensure parent directory exists before creating the file */
+    char *parent_dir = arena_strdup(reg_path);
+    if (parent_dir) {
+        char *last_slash = strrchr(parent_dir, '/');
+        if (last_slash) {
+            *last_slash = '\0';
+            if (!ensure_path_exists(parent_dir)) {
+                log_debug("Could not create directory for registry-local-dev.dat: %s", parent_dir);
+                arena_free(parent_dir);
+                elm_json_free(pkg_json);
+                arena_free(reg_path);
+                return true; /* Not a fatal error - skip tracking */
+            }
+        }
+        arena_free(parent_dir);
+    }
+
     FILE *f = fopen(reg_path, "a");
     if (!f) {
         log_error("Failed to open %s for appending", reg_path);
@@ -359,9 +390,10 @@ static bool register_local_dev_v2_text_registry(InstallEnv *env, const char *aut
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
     if (fsize == 0) {
+        const char *compiler_name = (ctx && ctx->compiler_name) ? ctx->compiler_name : "elm";
+        const char *compiler_version = (ctx && ctx->compiler_version) ? ctx->compiler_version : "0.19.1";
         fprintf(f, "format 2\n");
-        fprintf(f, "%s %s\n\n", ctx->compiler_name ? ctx->compiler_name : "elm",
-                ctx->compiler_version ? ctx->compiler_version : "0.19.1");
+        fprintf(f, "%s %s\n\n", compiler_name, compiler_version);
     }
 
     fprintf(f, "package: %s/%s\n", author, name);
@@ -380,7 +412,7 @@ static bool register_local_dev_v2_text_registry(InstallEnv *env, const char *aut
     fprintf(f, "\n");
 
     fclose(f);
-    log_debug("Registered %s/%s %s in registry-local-dev.dat (V2)", author, name, version);
+    log_debug("Registered %s/%s %s in registry-local-dev.dat", author, name, version);
 
     elm_json_free(pkg_json);
     arena_free(reg_path);
@@ -389,16 +421,16 @@ static bool register_local_dev_v2_text_registry(InstallEnv *env, const char *aut
 
 /**
  * Register the local-dev package so solvers can discover it.
- * Updates the V2-local text registry when applicable and always
- * appends the package into the canonical V1 registry.dat.
+ * Always creates registry-local-dev.dat to track local-dev packages (used by
+ * `wrap repository local-dev` to list packages). In V2 mode, this is also used
+ * by the solver. In V1 mode, the solver uses registry.dat instead.
  */
 static bool register_in_local_dev_registry(InstallEnv *env, const char *author, const char *name,
                                            const char *version, const char *source_elm_json_path) {
-    bool v2_result = true;
-    if (env->protocol_mode == PROTOCOL_V2) {
-        v2_result = register_local_dev_v2_text_registry(env, author, name, version, source_elm_json_path);
-    }
+    /* Always create/update registry-local-dev.dat for tracking purposes */
+    bool v2_result = register_local_dev_v2_text_registry(env, author, name, version, source_elm_json_path);
 
+    /* Also update V1 registry.dat so the solver can find it */
     bool registry_dat_result = ensure_local_dev_in_registry_dat(env, author, name, version);
     return v2_result && registry_dat_result;
 }
@@ -1263,4 +1295,178 @@ int install_local_dev(const char *source_path, const char *package_name,
     arena_free(plan_changes);
 
     return 0;
+}
+
+int unregister_local_dev_package(InstallEnv *env) {
+    (void)env; /* Not needed for basic removal */
+
+    /* Read the current directory's elm.json to get package info */
+    ElmJson *pkg_json = elm_json_read("elm.json");
+    if (!pkg_json) {
+        log_error("Could not read elm.json in current directory");
+        return 1;
+    }
+
+    if (pkg_json->type != ELM_PROJECT_PACKAGE) {
+        log_error("Current directory is not an Elm package");
+        elm_json_free(pkg_json);
+        return 1;
+    }
+
+    if (!pkg_json->package_name) {
+        log_error("Package name not found in elm.json");
+        elm_json_free(pkg_json);
+        return 1;
+    }
+
+    char *author = NULL;
+    char *name = NULL;
+    if (!parse_package_name(pkg_json->package_name, &author, &name)) {
+        log_error("Invalid package name in elm.json: %s", pkg_json->package_name);
+        elm_json_free(pkg_json);
+        return 1;
+    }
+
+    const char *version = pkg_json->package_version ? pkg_json->package_version : "1.0.0";
+
+    /* Get the tracking directory */
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        log_error("Could not determine tracking directory");
+        arena_free(author);
+        arena_free(name);
+        elm_json_free(pkg_json);
+        return 1;
+    }
+
+    /* Build path: tracking_dir/author/name/version */
+    size_t path_len = strlen(tracking_dir) + strlen(author) + strlen(name) + strlen(version) + 4;
+    char *pkg_path = arena_malloc(path_len);
+    if (!pkg_path) {
+        arena_free(tracking_dir);
+        arena_free(author);
+        arena_free(name);
+        elm_json_free(pkg_json);
+        return 1;
+    }
+    snprintf(pkg_path, path_len, "%s/%s/%s/%s", tracking_dir, author, name, version);
+
+    struct stat st;
+    if (stat(pkg_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        printf("No local-dev tracking found for %s/%s %s\n", author, name, version);
+        arena_free(pkg_path);
+        arena_free(tracking_dir);
+        arena_free(author);
+        arena_free(name);
+        elm_json_free(pkg_json);
+        return 0;
+    }
+
+    if (remove_directory_recursive(pkg_path)) {
+        printf("Removed local-dev tracking for %s/%s %s\n", author, name, version);
+        arena_free(pkg_path);
+        arena_free(tracking_dir);
+        arena_free(author);
+        arena_free(name);
+        elm_json_free(pkg_json);
+        return 0;
+    } else {
+        log_error("Failed to remove tracking for %s/%s %s", author, name, version);
+        arena_free(pkg_path);
+        arena_free(tracking_dir);
+        arena_free(author);
+        arena_free(name);
+        elm_json_free(pkg_json);
+        return 1;
+    }
+}
+
+/**
+ * Check if a package version is registered in the local-dev registry.
+ * If so, register the application as a dependent for tracking.
+ *
+ * This is called after a regular `wrap install` command successfully installs
+ * a package, to ensure that if the package is a local-dev package, the
+ * application gets registered for tracking updates.
+ *
+ * @param author            Package author
+ * @param name              Package name
+ * @param version           Package version
+ * @param app_elm_json_path Path to the application's elm.json
+ * @return true on success (or if package is not local-dev), false on error
+ */
+bool register_local_dev_tracking_if_needed(const char *author, const char *name,
+                                           const char *version, const char *app_elm_json_path) {
+    if (!author || !name || !version || !app_elm_json_path) {
+        return true; /* Not an error - just nothing to do */
+    }
+
+    /* Get the local-dev registry path */
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        return true; /* No tracking dir means no local-dev packages */
+    }
+
+    /* Build path to registry-local-dev.dat */
+    size_t reg_path_len = strlen(tracking_dir) + strlen("/") + strlen(REGISTRY_LOCAL_DEV_DAT) + 1;
+    char *reg_path = arena_malloc(reg_path_len);
+    if (!reg_path) {
+        arena_free(tracking_dir);
+        return true; /* Not a fatal error */
+    }
+    snprintf(reg_path, reg_path_len, "%s/%s", tracking_dir, REGISTRY_LOCAL_DEV_DAT);
+
+    /* Check if the registry file exists */
+    struct stat st;
+    if (stat(reg_path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        arena_free(reg_path);
+        arena_free(tracking_dir);
+        return true; /* No local-dev registry - nothing to do */
+    }
+
+    /* Load the local-dev registry */
+    V2Registry *local_dev_registry = v2_registry_load_from_text(reg_path);
+    arena_free(reg_path);
+
+    if (!local_dev_registry) {
+        arena_free(tracking_dir);
+        return true; /* Failed to load registry - not a fatal error */
+    }
+
+    /* Parse version string */
+    unsigned int major = 0, minor = 0, patch = 0;
+    if (sscanf(version, "%u.%u.%u", &major, &minor, &patch) != 3) {
+        v2_registry_free(local_dev_registry);
+        arena_free(tracking_dir);
+        return true; /* Invalid version format - not a fatal error */
+    }
+
+    /* Check if this package/version is in the local-dev registry */
+    V2PackageVersion *pkg_version = v2_registry_find_version(local_dev_registry, author, name,
+                                                              (uint16_t)major, (uint16_t)minor,
+                                                              (uint16_t)patch);
+    if (!pkg_version) {
+        v2_registry_free(local_dev_registry);
+        arena_free(tracking_dir);
+        return true; /* Package not in local-dev registry - nothing to do */
+    }
+
+    v2_registry_free(local_dev_registry);
+
+    /* Package is in local-dev registry - register the tracking */
+    log_debug("Package %s/%s %s is a local-dev package, registering tracking for %s",
+              author, name, version, app_elm_json_path);
+
+    bool result = register_dependency_tracking(author, name, version, app_elm_json_path);
+    arena_free(tracking_dir);
+
+    if (result) {
+        log_debug("Registered local-dev tracking for %s/%s %s -> %s",
+                  author, name, version, app_elm_json_path);
+    } else {
+        log_debug("Failed to register local-dev tracking for %s/%s %s",
+                  author, name, version);
+    }
+
+    return result;
 }

@@ -38,6 +38,7 @@ void print_sbom_info(void);
 void print_sbom_full(void);
 
 /* Environment variable defaults (from ENV_DEFAULTS file at build time) */
+extern const char *env_default_wrap_home;
 extern const char *env_default_registry_v2_full_index_url;
 extern const char *env_default_repository_local_path;
 

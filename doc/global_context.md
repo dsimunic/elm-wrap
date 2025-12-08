@@ -33,7 +33,7 @@ The protocol mode is determined at startup in `global_context_init()`:
 
 ```
 1. Get repository root path
-   - Check WRAP_REPOSITORY_LOCAL_PATH environment variable
+   - Check path defined by `WRAP_HOME/WRAP_REPOSITORY_LOCAL_PATH` environment variables
    - Fall back to compiled default (~/.elm-wrap/repository)
 
 2. Determine compiler name
