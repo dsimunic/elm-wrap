@@ -6,7 +6,7 @@ This document guides you through the features of **elm-wrap** version 0.5.0-prev
 
 Release `0.5.0` focuses on developer experience improvements, particularly for package authors. Key highlights include:
 
-- **Local package development**: install local packages from the filesystem into applications and synchronize depdenencies during development.
+- **Local package development**: install local packages from the filesystem into applications and synchronize dependencies during development.
 
 - **Package and application templates**: `application init` and `package init` commands work from built-in templates, allowing quickly starting
     new Elm package projects or Elm and Lamdera projects of all supported kinds.
@@ -14,12 +14,12 @@ Release `0.5.0` focuses on developer experience improvements, particularly for p
 
 ## Feedback sought
 
-The goal of this preview release is to gather feedback on the usability and functionality of local package development workflows. This is our _beachead_
+The goal of this preview release is to gather feedback on the usability and functionality of local package development workflows. This is our _beachhead_
 feature for developer acceptance of **elm-wrap** in real-world scenarios. Hence the initial effort to appease the Elm compiler's expectations about package
 management and dependency resolution. The mantra of this release is "it just works with your usual finger memory."
 
 Due to this compiler appeasement angle, some rough edges and limitations exist. We could gain a bit more robustness and polish if we could support only 
-"run it with `wrap`, always" workflows, but that would be a harder sell for existing Elm developers. At leas for now, anyway, until we fortify this beachead.
+"run it with `wrap`, always" workflows, but that would be a harder sell for existing Elm developers. At least for now anyway, until we fortify this beachhead.
 
 The most useful feedback you can provide is your experience going through the workflows described below, and any rough edges you encounter. The ideal case is
 that you either conclude "Yes, this works as expected, and I can use it in my daily development!" or "No, this doesn't work for me because of REASONS." Both 
@@ -27,8 +27,8 @@ answers are equally useful. Technical issues are inevitable and expected in a pr
 steps in this guide were verified manually several times, so there's confidence in the basics, at least.
 
 For this review, the feedback channels are:
-- "Incremental elm" discord, channel #elm-wrap
-- Private message on "incremental elm" Discord to @Damir.
+- "Incremental Elm" Discord, channel #elm-wrap
+- Private message on "Incremental Elm" Discord to @Damir.
 
 The hope is we'll turn this `preview.1` quickly, maybe go into `preview.2` if needed, and then release `0.5.0` proper.
 
@@ -53,8 +53,8 @@ WRAP_FEATURE_CACHE=1 wrap package cache elm/core --prime the package cache; this
 
 Export `ELM_HOME` variable in your shell to point to this new location for the duration of your review session.
 
-All flows in this guide asssume you have a working Elm compiler (version 0.19.1) or Lamdera (version 0.19.1) installed. No additional installation/initalization is required,
-and the actions here should not upset your existing setup or projects. You may stop at any time wihothout side effects. Created projects and package source can be published
+All flows in this guide assume you have a working Elm compiler (version 0.19.1) or Lamdera (version 0.19.1) installed. No additional installation/initialization is required,
+and the actions here should not upset your existing setup or projects. You may stop at any time without side effects. Created projects and package source can be published
 on the canonical Elm package registry if desired without any special steps. **elm-wrap** doesn't require any special changes to the source code, nor does it require any new 
 files or settings to be tracked in your version control.
 
@@ -72,7 +72,7 @@ as well as developing a new version of an already published package.
 
 Differences between fresh and existing package scenarios are:
 
-- Fresh package requres running `wrap package init <author/package-name>`, so you are exercising this feature as well.
+- Fresh package requires running `wrap package init <author/package-name>`, so you are exercising this feature as well.
 - Existing package requires removing any local source directories from `elm.json` of consuming applications.
 - The interaction with the package cache is different: the registry index is aware of published package's versions, so installing an existing package will pick up the latest 
 published version as the base for local development. Hence you must ensure that the local package's version is higher than the latest published version to avoid confusion.
@@ -95,7 +95,7 @@ The package starts at version `1.0.0` and only has `elm/core` as a dependency.
 
 The license is hard-coded to `BSD-3-Clause` for now.
 
-Install the pacakge in an application as any other published package:
+Install the package in an application as any other published package:
 
 ```bash
 cd ../example-app
@@ -121,7 +121,7 @@ Remove the local source directory from `elm.json` and run the following command 
 wrap package install --local-dev --from-path ../path-to-local-package  <author/package-name>
 ```
 
-Be aware that `<author/package-name>` must match the name in the package's `elm.json`.
+`<author/package-name>` must match the name in the package's `elm.json`.
 
 This will install the local package into the application, adding it to `elm.json` dependencies as usual. Additionally, it
 will set up dependency synchronization.
@@ -135,19 +135,19 @@ It is not necessary to pass `--local-dev` or `--from-path` again, as the local p
 ### Info
 
 Running `wrap package info <author/package-name>` for the  local package will show the paths to all applications that will be notified 
-about the depencency changes.
+about the dependency changes.
 
 The same applies to `wrap package application info` command: the report shows the section "Tracking local dev packages:" if it is receiving
-depenency updates from any local packages in development.
+dependency updates from any local packages in development.
 
 There's also `wrap info` that will show either an application or package info depending on the current folder. It's an alias for the above commands.
 
 To see all tracked combinations of packages/applications, run `wrap repository local-dev`.
 
 
-### Depencency synchronization
+### Dependency synchronization
 
-Go to back to the local pacakge's folder and add a new dependency:
+Go to back to the local package's folder and add a new dependency:
 
 ```bash
 wrap package install elm/random
@@ -155,7 +155,7 @@ wrap package install elm/random
 
 This will proceed as usual, updating the package's `elm.json` file with new dependency with correct version constraints.
 
-On the bottom of the ouput of this command, notice:
+On the bottom of the output of this command, notice:
 
 ```
 Refreshing 1 dependent application(s)...
@@ -184,17 +184,17 @@ Why does this work? Local application development inserts the local package into
 
 **packages that depend on packages** in local development form a cascade of updates. For example, if package A depends on local package B, and application C depends on package A, then updating dependencies in package B will also update C's indirect dependencies accordingly.
 
-This scenario is NOT supported in this preview release: only direct applications of local packages are updated.
+This scenario is NOT supported in this preview release: only updates to directly linked packages update an application's indirect dependencies. 
 
 ### Removing local-dev tracking
 
 To stop tracking a package for local development, uninstall it from all applications that depend on it, and then run `wrap repository local-dev` to prune any stale tracking combinations.
 
-Alternatively, you can run this command in an application to stop tracking a specific package for local development:
+Alternatively, you can run this command to stop tracking a specific package for local development:
 
 ```bash
 wrap registry local-dev remove <author/package-name> VERSION
-``
+```
 
 You may also remove the package tracking for an app only, by also adding a path to the application folder
 as reported by `wrap repository local-dev` command.
