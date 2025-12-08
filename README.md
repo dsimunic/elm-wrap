@@ -258,11 +258,27 @@ As expected, tests are behind. `make check` just runs a couple of tests. The rea
 
 ## Installation
 
-For macOS and Linux, download a github release. It's a single binary on macOS. Linux should also be statically linked into a single binary.
 
-To make your own, clone and run `make all install`. Then call with `wrap`.
+### Homebrew
 
-Once you are happy with it, rename to `elm` to keep using it without re-training your muscle memory.
+```bash
+brew tap dsimunic/elm-wrap
+brew install elm-wrap
+```
+
+Note the binary command is called `wrap`.
+
+You can confirm you have the latest version with:
+
+```bash
+wrap --version
+```
+
+Later updates:
+
+```bash
+brew upgrade elm-wrap
+```
 
 ### Download Pre-built Binaries
 
@@ -276,19 +292,15 @@ or
 sudo mv wrap /usr/local/bin/
 ```
 
-**Linux (x86_64)**: [elm-wrap-linux-amd64](https://github.com/OWNER/REPO/releases/latest/download/elm-wrap-linux-amd64)
+### Linux
 
-For whatever reason, Linux build turned out to be a major pain. I don't know how others do it. I had GitHub build a statically linked binary on Alpine; that works correctly, however it is freakin' huge at 25mb! (Compared to 290K on macOS build, thanks to libcurl shipping in the base system).
+Sadly, for now you'll need to make your own. Get the source from the release page:
 
-I've also instructed it to build a dynamically linked binary on Ubuntu, after a major painful back-and forth with everything working locally and failing in GH actions. Presumably if you are on Linux and benefit from `elm-watch` then likely know how to get that working on your machine.
+**Build from source**: [Source code (tar.gz)](https://github.com/dsimunic/elm-wrap/archive/refs/tags/v0.5.0-preview.1.tar.gz)
 
+Then unpack and build with `make all install` or `make all install-user` as appropriate.
 
-```bash
-# Linux (x86_64)
-curl -L https://github.com/OWNER/REPO/releases/latest/download/elm-wrap-linux-amd64 -o wrap
-chmod +x wrap
-sudo mv wrap /usr/local/bin/
-```
+You'll probably need to install a few dependencies first.
 
 ### Docker development environment.
 
