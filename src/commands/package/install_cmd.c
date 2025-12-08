@@ -24,6 +24,29 @@
 #define ANSI_DULL_YELLOW "\033[33m"
 #define ANSI_RESET "\033[0m"
 
+/**
+ * Convert a pinned version (e.g., "1.0.0") to an Elm package constraint
+ * (e.g., "1.0.0 <= v < 2.0.0").
+ * Returns arena-allocated string, or NULL on failure.
+ */
+static char* version_to_constraint(const char *version) {
+    if (!version) return NULL;
+
+    int major, minor, patch;
+    if (sscanf(version, "%d.%d.%d", &major, &minor, &patch) != 3) {
+        return NULL;
+    }
+
+    /* Format: "X.Y.Z <= v < (X+1).0.0" */
+    char *constraint = arena_malloc(MAX_RANGE_STRING_LENGTH);
+    if (!constraint) return NULL;
+
+    snprintf(constraint, MAX_RANGE_STRING_LENGTH, "%d.%d.%d <= v < %d.0.0",
+             major, minor, patch, major + 1);
+
+    return constraint;
+}
+
 /* Helper functions for placing package changes into the correct dependency map */
 static PackageMap* find_existing_app_map(ElmJson *elm_json, const char *author, const char *name) {
     if (!elm_json || elm_json->type != ELM_PROJECT_APPLICATION) {
@@ -72,14 +95,8 @@ static PackageMap* find_existing_package_map(ElmJson *elm_json, const char *auth
     return NULL;
 }
 
-static void remove_from_all_package_maps(ElmJson *elm_json, const char *author, const char *name) {
-    if (!elm_json || elm_json->type != ELM_PROJECT_PACKAGE) {
-        return;
-    }
-
-    package_map_remove(elm_json->package_dependencies, author, name);
-    package_map_remove(elm_json->package_test_dependencies, author, name);
-}
+/* Note: remove_from_all_package_maps was removed because packages now only
+ * add new dependencies and never modify existing ones (preserving constraints). */
 
 static void print_install_what(const char *elm_home) {
     fprintf(stderr, "%s-- INSTALL WHAT? ---------------------------------------------------------------%s\n\n",
@@ -331,30 +348,64 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
     int change_count = 0;
     int max_width = 0;
 
+    /*
+     * For packages (type=package), the plan display is simpler:
+     * - Only show the requested package being added
+     * - Show version as constraint (X.Y.Z <= v < (X+1).0.0)
+     * - Don't show "changes" - existing dependencies aren't modified
+     *
+     * For applications, show all adds and changes with pinned versions.
+     */
+    bool is_package = (elm_json->type == ELM_PROJECT_PACKAGE);
+
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
+
+        /* For packages, only count the requested package */
+        if (is_package) {
+            if (strcmp(change->author, author) != 0 || strcmp(change->name, name) != 0) {
+                continue;
+            }
+            /* For packages, an existing dependency is not a "change" - we preserve it */
+            if (find_existing_package_map(elm_json, change->author, change->name)) {
+                continue;
+            }
+        }
+
         int pkg_len = strlen(change->author) + 1 + strlen(change->name);
 
         if (!change->old_version) {
             add_count++;
-        } else {
+        } else if (!is_package) {
+            /* Only count as "change" for applications */
             change_count++;
         }
 
         if (pkg_len > max_width) max_width = pkg_len;
     }
 
-    PackageChange *adds = arena_malloc(sizeof(PackageChange) * add_count);
-    PackageChange *changes = arena_malloc(sizeof(PackageChange) * change_count);
+    PackageChange *adds = arena_malloc(sizeof(PackageChange) * (add_count > 0 ? add_count : 1));
+    PackageChange *changes = arena_malloc(sizeof(PackageChange) * (change_count > 0 ? change_count : 1));
 
     int add_idx = 0;
     int change_idx = 0;
 
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
+
+        /* For packages, only include the requested package */
+        if (is_package) {
+            if (strcmp(change->author, author) != 0 || strcmp(change->name, name) != 0) {
+                continue;
+            }
+            if (find_existing_package_map(elm_json, change->author, change->name)) {
+                continue;
+            }
+        }
+
         if (!change->old_version) {
             adds[add_idx++] = *change;
-        } else {
+        } else if (!is_package) {
             changes[change_idx++] = *change;
         }
     }
@@ -368,10 +419,19 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
     if (add_count > 0) {
         printf("  Add:\n");
         for (int i = 0; i < add_count; i++) {
-            PackageChange *change = &adds[i];
+            PackageChange *c = &adds[i];
             char pkg_name[256];
-            snprintf(pkg_name, sizeof(pkg_name), "%s/%s", change->author, change->name);
-            printf("    %-*s    %s\n", max_width, pkg_name, change->new_version);
+            snprintf(pkg_name, sizeof(pkg_name), "%s/%s", c->author, c->name);
+
+            /* For packages, display as constraint; for applications, as pinned version */
+            if (is_package) {
+                char *constraint = version_to_constraint(c->new_version);
+                printf("    %-*s    %s\n", max_width, pkg_name,
+                       constraint ? constraint : c->new_version);
+                if (constraint) arena_free(constraint);
+            } else {
+                printf("    %-*s    %s\n", max_width, pkg_name, c->new_version);
+            }
         }
         printf("  \n");
     }
@@ -379,11 +439,11 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
     if (change_count > 0) {
         printf("  Change:\n");
         for (int i = 0; i < change_count; i++) {
-            PackageChange *change = &changes[i];
+            PackageChange *c = &changes[i];
             char pkg_name[256];
-            snprintf(pkg_name, sizeof(pkg_name), "%s/%s", change->author, change->name);
+            snprintf(pkg_name, sizeof(pkg_name), "%s/%s", c->author, c->name);
             printf("    %-*s    %s => %s\n", max_width, pkg_name,
-                   change->old_version, change->new_version);
+                   c->old_version, c->new_version);
         }
     }
 
@@ -431,19 +491,50 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
             /* Ensure stale entries do not linger in other maps */
             remove_from_all_app_maps(elm_json, change->author, change->name);
         } else {
-            PackageMap *existing_map = find_existing_package_map(elm_json, change->author, change->name);
+            /*
+             * For packages (type=package), we handle dependencies differently:
+             * - Only add the REQUESTED package (not transitive dependencies)
+             * - Existing dependencies are already constraints; don't modify them
+             * - New dependencies should be added as constraints, not pinned versions
+             *
+             * Packages don't have direct/indirect dependencies in elm.json - they
+             * only list their direct dependencies with version constraints. The
+             * Elm compiler resolves transitive dependencies at build time.
+             */
 
-            if (existing_map) {
-                target_map = existing_map;
-            } else {
-                target_map = is_test ? elm_json->package_test_dependencies : elm_json->package_dependencies;
+            /* Skip transitive dependencies - only process the requested package */
+            if (strcmp(change->author, author) != 0 || strcmp(change->name, name) != 0) {
+                continue;
             }
 
-            remove_from_all_package_maps(elm_json, change->author, change->name);
+            PackageMap *existing_map = find_existing_package_map(elm_json, change->author, change->name);
+
+            /* If the package already exists, don't modify it (preserve existing constraint) */
+            if (existing_map) {
+                log_debug("Package %s/%s already exists in elm.json, skipping", change->author, change->name);
+                continue;
+            }
+
+            target_map = is_test ? elm_json->package_test_dependencies : elm_json->package_dependencies;
         }
-        
+
         if (target_map) {
-            added = package_map_add(target_map, change->author, change->name, change->new_version);
+            const char *version_to_add = change->new_version;
+            char *constraint = NULL;
+
+            /* For packages, convert pinned version to constraint */
+            if (elm_json->type == ELM_PROJECT_PACKAGE) {
+                constraint = version_to_constraint(change->new_version);
+                if (constraint) {
+                    version_to_add = constraint;
+                }
+            }
+
+            added = package_map_add(target_map, change->author, change->name, version_to_add);
+
+            if (constraint) {
+                arena_free(constraint);
+            }
         }
 
         if (!target_map || !added) {

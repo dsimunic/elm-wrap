@@ -115,7 +115,7 @@ void print_package_usage(const char *prog) {
     printf("  install PACKAGE                Add a dependency to current elm.json\n");
     printf("  init PACKAGE                   Initialize a package\n");
     printf("  upgrade PACKAGE                Upgrade packages to latest versions\n");
-    printf("  remove   PACKAGE               Remove a package from elm.json\n");
+    printf("  remove | uninstall  PACKAGE    Remove a package from elm.json\n");
     printf("  info    [ PATH                 Display package information and upgrades\n");
     printf("          | PACKAGE [VERSION]\n");
     printf("          ]\n");
@@ -164,7 +164,7 @@ int cmd_package(int argc, char *argv[], const char *prog) {
         return cmd_cache(argc - 1, argv + 1);
     }
 
-    if (strcmp(subcmd, "remove") == 0) {
+    if (strcmp(subcmd, "remove") == 0 || strcmp(subcmd, "uninstall") == 0) {
         // Pass remaining args to remove command
         return cmd_remove(argc - 1, argv + 1);
     }

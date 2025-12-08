@@ -132,47 +132,6 @@ static bool write_file_contents(const char *path, const void *data, size_t size)
     return true;
 }
 
-static cJSON* rebuild_with_name(cJSON *root, const char *package_name) {
-    if (!root || !cJSON_IsObject(root) || !package_name) {
-        return NULL;
-    }
-
-    cJSON *type_item = cJSON_DetachItemFromObjectCaseSensitive(root, "type");
-    cJSON_DeleteItemFromObjectCaseSensitive(root, "name");
-
-    cJSON *new_root = cJSON_CreateObject();
-    if (!new_root) {
-        if (type_item) {
-            cJSON_AddItemToObject(root, "type", type_item);
-        }
-        return NULL;
-    }
-
-    if (type_item) {
-        cJSON_AddItemToObject(new_root, "type", type_item);
-    }
-
-    cJSON *name_item = cJSON_CreateString(package_name);
-    if (!name_item) {
-        cJSON_Delete(new_root);
-        if (type_item) {
-            cJSON_Delete(type_item);
-        }
-        return NULL;
-    }
-    cJSON_AddItemToObject(new_root, "name", name_item);
-
-    while (root->child) {
-        cJSON *detached = cJSON_DetachItemFromObjectCaseSensitive(root, root->child->string);
-        if (detached) {
-            cJSON_AddItemToObject(new_root, detached->string, detached);
-        }
-    }
-
-    cJSON_Delete(root);
-    return new_root;
-}
-
 static bool write_elm_json_with_name(const char *path, const char *package_name, void *data, size_t size) {
     char *json_text = arena_malloc(size + 1);
     if (!json_text) {
@@ -183,6 +142,7 @@ static bool write_elm_json_with_name(const char *path, const char *package_name,
     memcpy(json_text, data, size);
     json_text[size] = '\0';
 
+    /* Validate JSON structure before modifying */
     cJSON *root = cJSON_Parse(json_text);
     if (!root) {
         fprintf(stderr, "Error: Failed to parse template elm.json\n");
@@ -201,54 +161,69 @@ static bool write_elm_json_with_name(const char *path, const char *package_name,
         cJSON_Delete(root);
         return false;
     }
+    cJSON_Delete(root);
 
-    cJSON *updated = rebuild_with_name(root, package_name);
-    if (!updated) {
-        fprintf(stderr, "Error: Failed to inject package name into elm.json\n");
-        cJSON_Delete(root);
+    /* Insert name field after "type": "package" line using string manipulation
+     * to preserve the exact formatting of the template */
+    const char *type_line_end = strstr(json_text, "\"type\": \"package\",\n");
+    if (!type_line_end) {
+        fprintf(stderr, "Error: Could not find type field in expected format\n");
         return false;
     }
 
-    char *printed = cJSON_PrintBuffered(updated, 256, 1);
-    if (!printed) {
-        fprintf(stderr, "Error: Failed to serialize elm.json\n");
-        cJSON_Delete(updated);
+    /* Find the end of the type line */
+    const char *insert_pos = strchr(type_line_end, '\n');
+    if (!insert_pos) {
+        fprintf(stderr, "Error: Malformed template elm.json\n");
+        return false;
+    }
+    insert_pos++; /* Move past the newline */
+
+    /* Build the name line with proper indentation (4 spaces to match template) */
+    char name_line[256];
+    int name_line_len = snprintf(name_line, sizeof(name_line),
+                                  "    \"name\": \"%s\",\n", package_name);
+    if (name_line_len < 0 || name_line_len >= (int)sizeof(name_line)) {
+        fprintf(stderr, "Error: Package name too long\n");
         return false;
     }
 
-    size_t printed_len = strlen(printed);
+    /* Calculate positions and sizes */
+    size_t prefix_len = (size_t)(insert_pos - json_text);
+    size_t suffix_len = size - prefix_len;
+    size_t new_size = size + (size_t)name_line_len;
+
+    char *new_json = arena_malloc(new_size + 1);
+    if (!new_json) {
+        fprintf(stderr, "Error: Out of memory while preparing elm.json\n");
+        return false;
+    }
+
+    /* Assemble: prefix + name_line + suffix */
+    memcpy(new_json, json_text, prefix_len);
+    memcpy(new_json + prefix_len, name_line, (size_t)name_line_len);
+    memcpy(new_json + prefix_len + (size_t)name_line_len, insert_pos, suffix_len);
+    new_json[new_size] = '\0';
 
     if (!ensure_parent_directories(path)) {
         fprintf(stderr, "Error: Failed to create parent directories for %s\n", path);
-        cJSON_free(printed);
-        cJSON_Delete(updated);
         return false;
     }
 
     FILE *out = fopen(path, "w");
     if (!out) {
         fprintf(stderr, "Error: Could not open %s for writing\n", path);
-        cJSON_free(printed);
-        cJSON_Delete(updated);
         return false;
     }
 
-    size_t written = fwrite(printed, 1, printed_len, out);
-    if (written != printed_len) {
+    size_t written = fwrite(new_json, 1, new_size, out);
+    if (written != new_size) {
         fprintf(stderr, "Error: Failed to write %s\n", path);
         fclose(out);
-        cJSON_free(printed);
-        cJSON_Delete(updated);
         return false;
     }
 
-    if (printed_len == 0 || printed[printed_len - 1] != '\n') {
-        fputc('\n', out);
-    }
     fclose(out);
-
-    cJSON_free(printed);
-    cJSON_Delete(updated);
     return true;
 }
 
@@ -338,7 +313,7 @@ static bool show_init_plan_and_confirm(const char *package_name, const char *res
     printf("Here is my plan:\n");
     printf("  \n");
     printf("  Create new elm.json for the package:\n");
-    printf("    %s    0.0.0 (local)\n", package_name);
+    printf("    %s    (version from template)\n", package_name);
     printf("  \n");
     printf("  Source: %s\n", resolved_source);
     printf("  \n");
@@ -442,20 +417,38 @@ int cmd_package_init(int argc, char *argv[]) {
         return 1;
     }
 
+    /* Read actual version from the newly created elm.json */
+    char *pkg_author = NULL;
+    char *pkg_name = NULL;
+    char *pkg_version = NULL;
+    if (!read_package_info_from_elm_json("elm.json", &pkg_author, &pkg_name, &pkg_version)) {
+        log_error("Failed to read package info from newly created elm.json");
+        return 1;
+    }
+
     if (no_local_dev) {
-        printf("Successfully created elm.json for %s!\n", package_name);
+        printf("Successfully created elm.json for %s %s!\n", package_name, pkg_version);
+        arena_free(pkg_author);
+        arena_free(pkg_name);
+        arena_free(pkg_version);
         return 0;
     }
 
     InstallEnv *env = install_env_create();
     if (!env) {
         log_error("Failed to create install environment");
+        arena_free(pkg_author);
+        arena_free(pkg_name);
+        arena_free(pkg_version);
         return 1;
     }
 
     if (!install_env_init(env)) {
         log_error("Failed to initialize install environment");
         install_env_free(env);
+        arena_free(pkg_author);
+        arena_free(pkg_name);
+        arena_free(pkg_version);
         return 1;
     }
 
@@ -463,8 +456,12 @@ int cmd_package_init(int argc, char *argv[]) {
     install_env_free(env);
 
     if (result == 0) {
-        printf("Successfully created and registered %s 0.0.0 (local)!\n", package_name);
+        printf("Successfully created and registered %s %s (local)!\n", package_name, pkg_version);
     }
+
+    arena_free(pkg_author);
+    arena_free(pkg_name);
+    arena_free(pkg_version);
 
     return result;
 }

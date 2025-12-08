@@ -275,21 +275,11 @@ int v1_show_package_dependencies(const char *author, const char *name, const cha
             }
         }
 
-        if (current_elm_json->package_dependencies) {
-            for (int i = 0; i < current_elm_json->package_dependencies->count; i++) {
-                Package *pkg = &current_elm_json->package_dependencies->packages[i];
-                package_map_add(all_deps, pkg->author, pkg->name, pkg->version);
-            }
-        }
-
-        if (current_elm_json->package_test_dependencies) {
-            for (int i = 0; i < current_elm_json->package_test_dependencies->count; i++) {
-                Package *pkg = &current_elm_json->package_test_dependencies->packages[i];
-                if (!package_map_find(all_deps, pkg->author, pkg->name)) {
-                    package_map_add(all_deps, pkg->author, pkg->name, pkg->version);
-                }
-            }
-        }
+        /* Note: We skip package_dependencies and package_test_dependencies here because
+         * package elm.json files contain version ranges (e.g., "1.0.5 <= v < 2.0.0")
+         * rather than concrete versions. We can only check reverse dependencies for
+         * concrete versions that can be downloaded from the registry.
+         */
 
         PackageMap *reverse_deps = package_map_create();
 

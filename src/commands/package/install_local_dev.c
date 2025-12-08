@@ -32,11 +32,6 @@
 #define PATH_MAX 4096
 #endif
 
-/* Local dev version when package exists in registry */
-#define LOCAL_DEV_VERSION_EXISTS "999.0.0"
-/* Local dev version when package does not exist in registry */
-#define LOCAL_DEV_VERSION_NEW "0.0.0"
-
 /* Tracking directory name under WRAP_REPOSITORY_LOCAL_PATH */
 #define LOCAL_DEV_TRACKING_DIR "_local-dev-dependency-track"
 
@@ -109,60 +104,6 @@ static bool ensure_path_exists(const char *path) {
 
     arena_free(mutable_path);
     return ok;
-}
-
-/**
- * Determine the version to use for the local-dev package.
- * Returns "999.0.0" if package exists in the MAIN registry (published), "0.0.0" otherwise.
- * 
- * We need to distinguish between:
- * - Package published in main registry → use 999.0.0 (higher than any published version)
- * - Package only in local-dev registry (or not at all) → use 0.0.0
- * 
- * Since env->registry includes merged local-dev packages, we check if the only
- * versions are 0.0.0 or 999.0.0 (local-dev versions), which means it's not published.
- */
-static const char *get_local_dev_version(InstallEnv *env, const char *author, const char *name) {
-    if (env->protocol_mode == PROTOCOL_V2) {
-        if (env->v2_registry) {
-            V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
-            if (entry && entry->version_count > 0) {
-                /* Check if any version is NOT a local-dev version (not 0.0.0 or 999.0.0) */
-                for (size_t i = 0; i < entry->version_count; i++) {
-                    int major = entry->versions[i].major;
-                    int minor = entry->versions[i].minor;
-                    int patch = entry->versions[i].patch;
-                    /* Skip local-dev versions */
-                    if ((major == 0 && minor == 0 && patch == 0) ||
-                        (major == 999 && minor == 0 && patch == 0)) {
-                        continue;
-                    }
-                    /* Found a real published version */
-                    return LOCAL_DEV_VERSION_EXISTS;
-                }
-            }
-        }
-    } else {
-        if (env->registry) {
-            RegistryEntry *entry = registry_find(env->registry, author, name);
-            if (entry && entry->version_count > 0) {
-                /* Check if any version is NOT a local-dev version */
-                for (size_t i = 0; i < entry->version_count; i++) {
-                    int major = entry->versions[i].major;
-                    int minor = entry->versions[i].minor;
-                    int patch = entry->versions[i].patch;
-                    /* Skip local-dev versions */
-                    if ((major == 0 && minor == 0 && patch == 0) ||
-                        (major == 999 && minor == 0 && patch == 0)) {
-                        continue;
-                    }
-                    /* Found a real published version */
-                    return LOCAL_DEV_VERSION_EXISTS;
-                }
-            }
-        }
-    }
-    return LOCAL_DEV_VERSION_NEW;
 }
 
 /**
@@ -904,10 +845,9 @@ int register_local_dev_package(const char *source_path, const char *package_name
         arena_free(spec_name);
     }
 
-    /* Determine version to use */
-    const char *version = get_local_dev_version(env, actual_author, actual_name);
-    log_debug("Using local-dev version: %s (package %s in registry)",
-              version, strcmp(version, LOCAL_DEV_VERSION_EXISTS) == 0 ? "exists" : "not found");
+    /* Use version from elm.json */
+    const char *version = actual_version;
+    log_debug("Using local-dev version from elm.json: %s", version);
 
     /* Show plan */
     if (!quiet) {
@@ -1024,10 +964,9 @@ int install_local_dev(const char *source_path, const char *package_name,
         arena_free(spec_name);
     }
 
-    /* Determine version to use */
-    const char *version = get_local_dev_version(env, actual_author, actual_name);
-    log_debug("Using local-dev version: %s (package %s in registry)",
-              version, strcmp(version, LOCAL_DEV_VERSION_EXISTS) == 0 ? "exists" : "not found");
+    /* Use version from elm.json */
+    const char *version = actual_version;
+    log_debug("Using local-dev version from elm.json: %s", version);
 
     /* Read target application's elm.json */
     ElmJson *app_json = elm_json_read(target_elm_json);
