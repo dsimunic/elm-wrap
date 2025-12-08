@@ -859,7 +859,7 @@ int register_local_dev_package(const char *source_path, const char *package_name
         printf("  Source: %s\n", resolved_source);
         printf("  \n");
         printf("To use this package in an application, run from the application directory:\n");
-        printf("    %s package install %s/%s\n", actual_author, actual_name, global_context_program_name());
+        printf("    %s package install %s/%s\n", global_context_program_name(), actual_author, actual_name);
         printf("  \n");
     }
 

@@ -324,7 +324,7 @@ static bool show_init_plan_and_confirm(const char *package_name, const char *res
         printf("\n");
         printf("\n");
         printf("To use this package in an application, run from the application directory:\n");
-        printf("    %s package install %s\n", package_name, global_context_program_name());
+        printf("    %s package install %s\n", global_context_program_name(), package_name);
         printf("  \n");
     }
 
