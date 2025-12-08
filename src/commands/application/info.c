@@ -40,5 +40,5 @@ int cmd_application_info(int argc, char *argv[]) {
     }
 
     // Delegate to the same code path as `package info`
-    return cmd_info(argc, argv);
+    return cmd_info(argc, argv, "application info");
 }

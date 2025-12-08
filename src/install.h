@@ -16,7 +16,7 @@ int cmd_remove(int argc, char *argv[]);
 int cmd_package_init(int argc, char *argv[]);
 
 /* Info command entry point */
-int cmd_info(int argc, char *argv[]);
+int cmd_info(int argc, char *argv[], const char *invocation);
 
 /* Upgrade command entry point */
 int cmd_upgrade(int argc, char *argv[]);

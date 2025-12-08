@@ -24,6 +24,7 @@
 #include "commands/publish/package/package_publish.h"
 #include "commands/publish/docs/docs.h"
 #include "commands/repository/repository.h"
+#include "commands/info/info.h"
 #include "alloc.h"
 #include "log.h"
 #include "features.h"
@@ -87,6 +88,7 @@ void print_usage(const char *prog) {
 
     printf("\n");
     printf("  config                    Display current configuration\n");
+    printf("  info [PATH | PACKAGE [VERSION]]  Display package or application info\n");
     printf("  application SUBCOMMAND    Application management commands\n");
     printf("  package SUBCOMMAND        Package management commands\n");
     printf("  repository SUBCOMMAND     Repository management commands\n");
@@ -176,7 +178,7 @@ int cmd_package(int argc, char *argv[], const char *prog) {
 
     if (strcmp(subcmd, "info") == 0) {
         // Pass remaining args to info command
-        return cmd_info(argc - 1, argv + 1);
+        return cmd_info(argc - 1, argv + 1, "package info");
     }
 
     if (strcmp(subcmd, "publish") == 0) {
@@ -319,6 +321,10 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "install") == 0) {
             return cmd_install(argc - 1, argv + 1);
+        }
+
+        if (strcmp(argv[1], "info") == 0) {
+            return cmd_info_command(argc - 1, argv + 1);
         }
 
         if (strcmp(argv[1], "package") == 0) {

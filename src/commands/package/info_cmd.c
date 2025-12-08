@@ -91,8 +91,10 @@ static char *get_project_dir(const char *elm_json_path) {
     return arena_strdup(abs_path);
 }
 
-static void print_info_usage(void) {
-    printf("Usage: %s package info [PATH | <author/package> [VERSION]]\n", global_context_program_name());
+static void print_info_usage(const char *invocation) {
+    const char *command_label = invocation ? invocation : "package info";
+
+    printf("Usage: %s %s [PATH | <author/package> [VERSION]]\n", global_context_program_name(), command_label);
     printf("\n");
     printf("Display package management information.\n");
     printf("\n");
@@ -109,10 +111,10 @@ static void print_info_usage(void) {
     printf("  - If VERSION specified: uses that specific version\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s package info                  # Show general package info\n", global_context_program_name());
-    printf("  %s package info ./path/to/dir    # Show info for elm.json at path\n", global_context_program_name());
-    printf("  %s package info elm/core         # Show info for elm/core package\n", global_context_program_name());
-    printf("  %s package info elm/http 2.0.0   # Show info for elm/http 2.0.0\n", global_context_program_name());
+    printf("  %s %s                  # Show general package info\n", global_context_program_name(), command_label);
+    printf("  %s %s ./path/to/dir    # Show info for elm.json at path\n", global_context_program_name(), command_label);
+    printf("  %s %s elm/core         # Show info for elm/core package\n", global_context_program_name(), command_label);
+    printf("  %s %s elm/http 2.0.0   # Show info for elm/http 2.0.0\n", global_context_program_name(), command_label);
     printf("\n");
     printf("Note: Package name format (author/package) takes priority over paths.\n");
     printf("      Use './package/author' to treat as a path instead.\n");
@@ -705,17 +707,17 @@ static int show_package_info_from_registry(const char *package_name, const char 
     return result;
 }
 
-int cmd_info(int argc, char *argv[]) {
+int cmd_info(int argc, char *argv[], const char *invocation) {
     const char *arg = NULL;
     const char *version_arg = NULL;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            print_info_usage();
+            print_info_usage(invocation);
             return 0;
         } else if (argv[i][0] == '-') {
             fprintf(stderr, "Error: Unknown option: %s\n", argv[i]);
-            print_info_usage();
+            print_info_usage(invocation);
             return 1;
         } else {
             if (!arg) {
@@ -724,7 +726,7 @@ int cmd_info(int argc, char *argv[]) {
                 version_arg = argv[i];
             } else {
                 fprintf(stderr, "Error: Too many arguments\n");
-                print_info_usage();
+                print_info_usage(invocation);
                 return 1;
             }
         }
@@ -739,7 +741,7 @@ int cmd_info(int argc, char *argv[]) {
         } else {
             if (version_arg) {
                 fprintf(stderr, "Error: Version argument is only valid with package name (author/package)\n");
-                print_info_usage();
+                print_info_usage(invocation);
                 return 1;
             }
             struct stat st;
