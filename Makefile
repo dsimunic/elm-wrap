@@ -750,12 +750,12 @@ clean:
 
 pg_core_test: $(PG_CORE_TEST)
 
-$(PG_CORE_TEST): $(BUILDDIR)/pg_core_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o | $(BINDIR)
+$(PG_CORE_TEST): $(BUILDDIR)/pg_core_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o | $(BINDIR)
 	$(CC) $(CFLAGS) $^ -o $@
 
 pg_file_test: $(PG_FILE_TEST)
 
-$(PG_FILE_TEST): $(BUILDDIR)/pg_file_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o | $(BINDIR)
+$(PG_FILE_TEST): $(BUILDDIR)/pg_file_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o | $(BINDIR)
 	$(CC) $(CFLAGS) $^ -o $@
 
 test: pg_core_test pg_file_test
