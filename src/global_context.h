@@ -110,6 +110,13 @@ bool global_context_is_lamdera(void);
 bool global_context_is_wrapc(void);
 
 /**
+ * Get the compiler name.
+ *
+ * @return The compiler name, or "elm" if not initialized
+ */
+const char *global_context_compiler_name(void);
+
+/**
  * Get the program name (from argv[0]).
  *
  * This returns the actual executable name that was used to invoke the program,

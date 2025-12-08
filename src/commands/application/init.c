@@ -396,7 +396,7 @@ int cmd_application_init(int argc, char *argv[]) {
     }
 
     GlobalContext *ctx = global_context_get();
-    const char *compiler_name = ctx && ctx->compiler_name ? ctx->compiler_name : "elm";
+    const char *compiler_name = global_context_compiler_name();
     const char *compiler_version = ctx && ctx->compiler_version ? ctx->compiler_version : NULL;
 
     if (!compiler_version) {
@@ -470,7 +470,7 @@ int cmd_application_list_templates(int argc, char *argv[]) {
     }
 
     GlobalContext *ctx = global_context_get();
-    const char *compiler_name = ctx && ctx->compiler_name ? ctx->compiler_name : "elm";
+    const char *compiler_name = global_context_compiler_name();
     const char *compiler_version = ctx && ctx->compiler_version ? ctx->compiler_version : NULL;
 
     if (!compiler_version) {

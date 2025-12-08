@@ -390,7 +390,7 @@ static bool register_local_dev_v2_text_registry(InstallEnv *env, const char *aut
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
     if (fsize == 0) {
-        const char *compiler_name = (ctx && ctx->compiler_name) ? ctx->compiler_name : "elm";
+        const char *compiler_name = global_context_compiler_name();
         const char *compiler_version = (ctx && ctx->compiler_version) ? ctx->compiler_version : "0.19.1";
         fprintf(f, "format 2\n");
         fprintf(f, "%s %s\n\n", compiler_name, compiler_version);

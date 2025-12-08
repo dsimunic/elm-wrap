@@ -78,29 +78,30 @@ int cmd_make(int argc, char *argv[]) {
     }
 
     // Now call elm make with all the arguments
-    printf("\nAll dependencies cached. Running elm make...\n\n");
+    const char *compiler_name = global_context_compiler_name();
+    printf("\nAll dependencies cached. Running %s make...\n\n", compiler_name);
 
     // Get elm compiler path
     char *elm_path = elm_compiler_get_path();
     if (!elm_path) {
-        log_error("Could not find elm binary");
-        log_error("Please install elm or set the WRAP_ELM_COMPILER_PATH environment variable");
+        log_error("Could not find %s binary", compiler_name);
+        log_error("Please install %s or set the WRAP_ELM_COMPILER_PATH environment variable", compiler_name);
         return 1;
     }
 
-    log_debug("Using elm compiler at: %s", elm_path);
+    log_debug("Using %s compiler at: %s", compiler_name, elm_path);
 
     // Build environment with https_proxy for offline mode
     char **elm_env = build_elm_environment();
     if (!elm_env) {
-        log_error("Failed to build environment for elm");
+        log_error("Failed to build environment for %s", compiler_name);
         return 1;
     }
 
     // Build elm make command
     // We need to pass all arguments except "make" to elm
     char **elm_args = arena_malloc(sizeof(char*) * (argc + 2));
-    elm_args[0] = "elm";
+    elm_args[0] = (char*)compiler_name;
     elm_args[1] = "make";
 
     // Copy remaining arguments
@@ -113,7 +114,7 @@ int cmd_make(int argc, char *argv[]) {
     execve(elm_path, elm_args, elm_env);
 
     // If execve returns, it failed
-    log_error("Failed to execute elm compiler at: %s", elm_path);
+    log_error("Failed to execute %s compiler at: %s", compiler_name, elm_path);
     if (getenv("WRAP_ELM_COMPILER_PATH")) {
         log_error("The compiler was not found at the path specified in WRAP_ELM_COMPILER_PATH");
     }

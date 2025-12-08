@@ -225,6 +225,13 @@ bool global_context_is_wrapc(void) {
     return g_context->compiler_type == COMPILER_WRAPC;
 }
 
+const char *global_context_compiler_name(void) {
+    if (!g_context || !g_context->compiler_name) {
+        return "elm";
+    }
+    return g_context->compiler_name;
+}
+
 const char *global_context_program_name(void) {
     if (!g_context || !g_context->program_name) {
         return build_program_name;
