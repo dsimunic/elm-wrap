@@ -1,6 +1,7 @@
 #include "http_client.h"
 #include "alloc.h"
 #include "http_constants.h"
+#include "log.h"
 #include <curl/curl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -145,7 +146,7 @@ bool curl_session_can_connect(CurlSession *session, const char *test_url) {
         const char *error_msg = strlen(session->error_buffer) > 0 
             ? session->error_buffer 
             : curl_easy_strerror(res);
-        fprintf(stderr, "DEBUG: Connection test failed: %s (code %d)\n", error_msg, res);
+        log_debug("Connection test failed: %s (code %d)", error_msg, res);
     }
 
     /* Restore timeout */
