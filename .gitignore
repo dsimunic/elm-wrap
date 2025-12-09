@@ -20,3 +20,4 @@ rulr/doc/
 *.dlc
 www/full_index/
 test/scripts/dep_sync.actual
+test/manual-test/
