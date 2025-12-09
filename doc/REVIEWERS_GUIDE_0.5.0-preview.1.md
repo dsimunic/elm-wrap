@@ -250,6 +250,14 @@ There is currently only one package template, so no need to specify it.
 
 ## Known issues
 
+- After compiling the dependent app edits in the module under local development are not picked up by future recompilations of the dependent app.   
+
+    Workaround: delete `artifacts.dat` in the package folder. For a good measure, also delete `elm-stuff` in the package folder.
+
+    The compiler caches compiled artifacts for packages in `artifacts.dat` file as a build optimization. It correctly assumes that packages don't change unless their version changes. However, in local-dev workflow, the package source can change without reinstalling it. This leads to the compiler reusing stale compiled artifacts from `artifacts.dat`, ignoring any edits made in the local package source.
+
+- The template for `Platform.worker` is not included in `wrap application init` command.
+
 - Local package development might lead to Elm compiler skipping downloading package index updates.  
     
     Elm compiler caches package index locally and tracks its freshness based on a number of locally indexed versions. Since local-dev must insert local packages into the cached package index, Elm might request packages `/since/<count_increased_by_number_of_local_dev_packages>` and receive updates that skip that many registry versions.
