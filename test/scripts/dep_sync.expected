@@ -1,9 +1,9 @@
 # elm-wrap dep_sync test output
-# Generated: 2025-12-08T15:01:29+01:00
+# Generated: 2025-12-09T16:52:42+01:00
 # wrap version: Version: 0.5.0-preview.1@main-HEAD
   Base version: 0.5.0-preview.1
-  Commit: 894aae7b1e886e1724fe2d1aab0d4aed3a59e7a9
-  Built: 2025-12-08T12:19:24Z
+  Commit: a1fbc3e204af6ce0fee6e1c844ee5caba55756e2
+  Built: 2025-12-09T14:59:29Z
   Compiler: Apple clang version 17.0.0 (clang-1700.4.4.1)
   Platform: Darwin/arm64
 # ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home
@@ -205,13 +205,18 @@ Dependencies:
 No upgrades available. All packages at their latest version
 
 
+Tracking local dev packages:
+
+  testauthor/pkg-one 1.0.0
+
+
 
 ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
 
 Registry Cache:
   Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
   Packages: 2951
-  Versions: 16475
+  Versions: 16476
 
 Registry URL: https://package.elm-lang.org
   Status: Connected
@@ -278,13 +283,18 @@ Dependencies:
 No upgrades available. All packages at their latest version
 
 
+Tracking local dev packages:
+
+  testauthor/pkg-two 1.0.0
+
+
 
 ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
 
 Registry Cache:
   Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
   Packages: 2952
-  Versions: 16476
+  Versions: 16477
 
 Registry URL: https://package.elm-lang.org
   Status: Connected
@@ -327,6 +337,10 @@ Exit code: 0 (expected: 0)
     "type": "package",
     "name": "testauthor/pkg-one",
     "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [
+    ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {
         "elm/core": "1.0.5 <= v < 2.0.0",
@@ -375,6 +389,10 @@ Exit code: 0 (expected: 0)
     "type": "package",
     "name": "testauthor/pkg-one",
     "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [
+    ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {
         "elm/core": "1.0.5 <= v < 2.0.0",
@@ -427,6 +445,10 @@ Exit code: 0 (expected: 0)
     "type": "package",
     "name": "testauthor/pkg-two",
     "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [
+    ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {
         "elm/core": "1.0.5 <= v < 2.0.0",
@@ -475,6 +497,10 @@ Exit code: 0 (expected: 0)
     "type": "package",
     "name": "testauthor/pkg-two",
     "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [
+    ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {
         "dillonkearns/elm-pages": "10.2.2 <= v < 11.0.0",
@@ -659,6 +685,8 @@ Here is my plan:
   
 Saving elm.json...
 Successfully removed wolfadex/elm-ansi!
+Pruning orphaned dependencies in 1 dependent application(s)...
+Pruned orphaned dependencies in: /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
 ---
 Exit code: 0 (expected: 0)
 === END pkg1_uninstall_ansi ===
@@ -668,6 +696,10 @@ Exit code: 0 (expected: 0)
     "type": "package",
     "name": "testauthor/pkg-one",
     "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [
+    ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {
         "elm/core": "1.0.5 <= v < 2.0.0",
@@ -690,44 +722,11 @@ Direct dependencies:
   testauthor/pkg-one: 1.0.0
   testauthor/pkg-two: 1.0.0
 Indirect dependencies:
-  Chadtech/elm-bool-extra: 2.4.2
-  avh4/elm-color: 1.0.0
-  danfishgold/base64-bytes: 1.1.0
-  danyx23/elm-mimetype: 4.0.1
-  dillonkearns/elm-bcp47-language-tag: 2.0.0
-  dillonkearns/elm-cli-options-parser: 3.2.0
-  dillonkearns/elm-date-or-date-time: 2.0.0
-  dillonkearns/elm-form: 3.0.1
   dillonkearns/elm-pages: 10.2.2
-  elm-community/basics-extra: 4.1.0
-  elm-community/list-extra: 8.7.0
-  elm-community/maybe-extra: 5.3.0
-  elm/bytes: 1.0.8
-  elm/file: 1.0.5
-  elm/http: 2.0.0
   elm/json: 1.1.4
-  elm/parser: 1.1.0
   elm/random: 1.0.0
-  elm/regex: 1.0.0
   elm/time: 1.0.0
   elm/virtual-dom: 1.0.5
-  fredcy/elm-parseint: 2.0.1
-  jluckyiv/elm-utc-date-strings: 1.0.0
-  justinmimbs/date: 4.1.0
-  mdgriffith/elm-codegen: 5.2.0
-  miniBill/elm-codec: 2.3.0
-  miniBill/elm-unicode: 1.1.1
-  noahzgordon/elm-color-extra: 1.0.2
-  robinheghan/fnv1a: 1.0.0
-  robinheghan/murmur3: 1.0.0
-  rtfeldman/elm-css: 18.0.0
-  rtfeldman/elm-hex: 1.0.0
-  rtfeldman/elm-iso8601-date-strings: 1.1.4
-  stil4m/elm-syntax: 7.3.9
-  stil4m/structured-writer: 1.0.3
-  the-sett/elm-pretty-printer: 3.1.2
-  the-sett/elm-syntax-dsl: 6.0.3
-  wolfadex/elm-ansi: 3.0.0
 === END app1_deps_after_pkg1_uninstall_ansi ===
 
 === BEGIN pkg2_uninstall_elm_pages ===
@@ -740,6 +739,9 @@ Here is my plan:
   
 Saving elm.json...
 Successfully removed dillonkearns/elm-pages!
+Pruning orphaned dependencies in 2 dependent application(s)...
+Pruned orphaned dependencies in: /private/tmp/elm-wrap-dep-sync-test/app1/elm.json
+Pruned orphaned dependencies in: /private/tmp/elm-wrap-dep-sync-test/app2/elm.json
 ---
 Exit code: 0 (expected: 0)
 === END pkg2_uninstall_elm_pages ===
@@ -749,6 +751,10 @@ Exit code: 0 (expected: 0)
     "type": "package",
     "name": "testauthor/pkg-two",
     "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [
+    ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {
         "elm/core": "1.0.5 <= v < 2.0.0",
@@ -770,44 +776,10 @@ Direct dependencies:
   elm/url: 1.0.0
   testauthor/pkg-two: 1.0.0
 Indirect dependencies:
-  Chadtech/elm-bool-extra: 2.4.2
-  avh4/elm-color: 1.0.0
-  danfishgold/base64-bytes: 1.1.0
-  danyx23/elm-mimetype: 4.0.1
-  dillonkearns/elm-bcp47-language-tag: 2.0.0
-  dillonkearns/elm-cli-options-parser: 3.2.0
-  dillonkearns/elm-date-or-date-time: 2.0.0
-  dillonkearns/elm-form: 3.0.1
-  dillonkearns/elm-pages: 10.2.2
-  elm-community/basics-extra: 4.1.0
-  elm-community/list-extra: 8.7.0
-  elm-community/maybe-extra: 5.3.0
-  elm/bytes: 1.0.8
-  elm/file: 1.0.5
-  elm/http: 2.0.0
   elm/json: 1.1.4
-  elm/parser: 1.1.0
   elm/random: 1.0.0
-  elm/regex: 1.0.0
   elm/time: 1.0.0
   elm/virtual-dom: 1.0.5
-  fredcy/elm-parseint: 2.0.1
-  jluckyiv/elm-utc-date-strings: 1.0.0
-  justinmimbs/date: 4.1.0
-  mdgriffith/elm-codegen: 5.2.0
-  miniBill/elm-codec: 2.3.0
-  miniBill/elm-unicode: 1.1.1
-  noahzgordon/elm-color-extra: 1.0.2
-  robinheghan/fnv1a: 1.0.0
-  robinheghan/murmur3: 1.0.0
-  rtfeldman/elm-css: 18.0.0
-  rtfeldman/elm-hex: 1.0.0
-  rtfeldman/elm-iso8601-date-strings: 1.1.4
-  stil4m/elm-syntax: 7.3.9
-  stil4m/structured-writer: 1.0.3
-  the-sett/elm-pretty-printer: 3.1.2
-  the-sett/elm-syntax-dsl: 6.0.3
-  wolfadex/elm-ansi: 3.0.0
 === END app2_deps_after_pkg2_uninstall_elm_pages ===
 
 === BEGIN app1_deps_after_pkg2_uninstall_elm_pages ===
@@ -822,44 +794,10 @@ Direct dependencies:
   testauthor/pkg-one: 1.0.0
   testauthor/pkg-two: 1.0.0
 Indirect dependencies:
-  Chadtech/elm-bool-extra: 2.4.2
-  avh4/elm-color: 1.0.0
-  danfishgold/base64-bytes: 1.1.0
-  danyx23/elm-mimetype: 4.0.1
-  dillonkearns/elm-bcp47-language-tag: 2.0.0
-  dillonkearns/elm-cli-options-parser: 3.2.0
-  dillonkearns/elm-date-or-date-time: 2.0.0
-  dillonkearns/elm-form: 3.0.1
-  dillonkearns/elm-pages: 10.2.2
-  elm-community/basics-extra: 4.1.0
-  elm-community/list-extra: 8.7.0
-  elm-community/maybe-extra: 5.3.0
-  elm/bytes: 1.0.8
-  elm/file: 1.0.5
-  elm/http: 2.0.0
   elm/json: 1.1.4
-  elm/parser: 1.1.0
   elm/random: 1.0.0
-  elm/regex: 1.0.0
   elm/time: 1.0.0
   elm/virtual-dom: 1.0.5
-  fredcy/elm-parseint: 2.0.1
-  jluckyiv/elm-utc-date-strings: 1.0.0
-  justinmimbs/date: 4.1.0
-  mdgriffith/elm-codegen: 5.2.0
-  miniBill/elm-codec: 2.3.0
-  miniBill/elm-unicode: 1.1.1
-  noahzgordon/elm-color-extra: 1.0.2
-  robinheghan/fnv1a: 1.0.0
-  robinheghan/murmur3: 1.0.0
-  rtfeldman/elm-css: 18.0.0
-  rtfeldman/elm-hex: 1.0.0
-  rtfeldman/elm-iso8601-date-strings: 1.1.4
-  stil4m/elm-syntax: 7.3.9
-  stil4m/structured-writer: 1.0.3
-  the-sett/elm-pretty-printer: 3.1.2
-  the-sett/elm-syntax-dsl: 6.0.3
-  wolfadex/elm-ansi: 3.0.0
 === END app1_deps_after_pkg2_uninstall_elm_pages ===
 
 === BEGIN pkg4_init ===
@@ -991,6 +929,10 @@ Exit code: 0 (expected: 0)
     "type": "package",
     "name": "testauthor/pkg-three",
     "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [
+    ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {
         "elm/core": "1.0.5 <= v < 2.0.0",
@@ -1107,13 +1049,19 @@ Dependencies:
 No upgrades available. All packages at their latest version
 
 
+Tracking local dev packages:
+
+  testauthor/pkg-four 1.0.0
+  testauthor/pkg-three 1.0.0
+
+
 
 ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
 
 Registry Cache:
   Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
   Packages: 2954
-  Versions: 16478
+  Versions: 16479
 
 Registry URL: https://package.elm-lang.org
   Status: Connected
@@ -1164,6 +1112,10 @@ Exit code: 0 (expected: 0)
     "type": "package",
     "name": "testauthor/pkg-four",
     "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [
+    ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {
         "dillonkearns/elm-pages": "10.2.2 <= v < 11.0.0",
@@ -1179,6 +1131,10 @@ Exit code: 0 (expected: 0)
     "type": "package",
     "name": "testauthor/pkg-three",
     "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "New development package",
+    "exposed-modules": [
+    ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {
         "elm/core": "1.0.5 <= v < 2.0.0",
@@ -1272,13 +1228,18 @@ Dependencies:
 No upgrades available. All packages at their latest version
 
 
+Tracking local dev packages:
+
+  testauthor/pkg-three 1.0.0
+
+
 
 ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
 
 Registry Cache:
   Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
   Packages: 2954
-  Versions: 16478
+  Versions: 16479
 
 Registry URL: https://package.elm-lang.org
   Status: Connected
@@ -1397,55 +1358,27 @@ Path: /private/tmp/elm-wrap-dep-sync-test/app1
 
 Dependencies:
 
-  elm/browser                          1.0.2
-  elm/core                             1.0.5
-  elm/html                             1.0.1
-  elm/url                              1.0.0
-  testauthor/pkg-one                   1.0.0
-  testauthor/pkg-two                   1.0.0
+  elm/browser         1.0.2
+  elm/core            1.0.5
+  elm/html            1.0.1
+  elm/url             1.0.0
+  testauthor/pkg-one  1.0.0
+  testauthor/pkg-two  1.0.0
 
-  Chadtech/elm-bool-extra              2.4.2 (indirect)
-  avh4/elm-color                       1.0.0 (indirect)
-  danfishgold/base64-bytes             1.1.0 (indirect)
-  danyx23/elm-mimetype                 4.0.1 (indirect)
-  dillonkearns/elm-bcp47-language-tag  2.0.0 (indirect)
-  dillonkearns/elm-cli-options-parser  3.2.0 (indirect)
-  dillonkearns/elm-date-or-date-time   2.0.0 (indirect)
-  dillonkearns/elm-form                3.0.1 (indirect)
-  dillonkearns/elm-pages               10.2.2 (indirect)
-  elm/bytes                            1.0.8 (indirect)
-  elm/file                             1.0.5 (indirect)
-  elm/http                             2.0.0 (indirect)
-  elm/json                             1.1.4 (indirect)
-  elm/parser                           1.1.0 (indirect)
-  elm/random                           1.0.0 (indirect)
-  elm/regex                            1.0.0 (indirect)
-  elm/time                             1.0.0 (indirect)
-  elm/virtual-dom                      1.0.5 (indirect)
-  elm-community/basics-extra           4.1.0 (indirect)
-  elm-community/list-extra             8.7.0 (indirect)
-  elm-community/maybe-extra            5.3.0 (indirect)
-  fredcy/elm-parseint                  2.0.1 (indirect)
-  jluckyiv/elm-utc-date-strings        1.0.0 (indirect)
-  justinmimbs/date                     4.1.0 (indirect)
-  mdgriffith/elm-codegen               5.2.0 (indirect)
-  miniBill/elm-codec                   2.3.0 (indirect)
-  miniBill/elm-unicode                 1.1.1 (indirect)
-  noahzgordon/elm-color-extra          1.0.2 (indirect)
-  robinheghan/fnv1a                    1.0.0 (indirect)
-  robinheghan/murmur3                  1.0.0 (indirect)
-  rtfeldman/elm-css                    18.0.0 (indirect)
-  rtfeldman/elm-hex                    1.0.0 (indirect)
-  rtfeldman/elm-iso8601-date-strings   1.1.4 (indirect)
-  stil4m/elm-syntax                    7.3.9 (indirect)
-  stil4m/structured-writer             1.0.3 (indirect)
-  the-sett/elm-pretty-printer          3.1.2 (indirect)
-  the-sett/elm-syntax-dsl              6.0.3 (indirect)
-  wolfadex/elm-ansi                    3.0.0 (indirect)
+  elm/json            1.1.4 (indirect)
+  elm/random          1.0.0 (indirect)
+  elm/time            1.0.0 (indirect)
+  elm/virtual-dom     1.0.5 (indirect)
 
-  Total:                               44
+  Total:              10
 
 No upgrades available. All packages at their latest version
+
+
+Tracking local dev packages:
+
+  testauthor/pkg-two 1.0.0
+  testauthor/pkg-one 1.0.0
 
 
 
@@ -1454,7 +1387,7 @@ ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
 Registry Cache:
   Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
   Packages: 2954
-  Versions: 16478
+  Versions: 16479
 
 Registry URL: https://package.elm-lang.org
   Status: Connected
@@ -1474,54 +1407,25 @@ Path: /private/tmp/elm-wrap-dep-sync-test/app2
 
 Dependencies:
 
-  elm/browser                          1.0.2
-  elm/core                             1.0.5
-  elm/html                             1.0.1
-  elm/url                              1.0.0
-  testauthor/pkg-two                   1.0.0
+  elm/browser         1.0.2
+  elm/core            1.0.5
+  elm/html            1.0.1
+  elm/url             1.0.0
+  testauthor/pkg-two  1.0.0
 
-  Chadtech/elm-bool-extra              2.4.2 (indirect)
-  avh4/elm-color                       1.0.0 (indirect)
-  danfishgold/base64-bytes             1.1.0 (indirect)
-  danyx23/elm-mimetype                 4.0.1 (indirect)
-  dillonkearns/elm-bcp47-language-tag  2.0.0 (indirect)
-  dillonkearns/elm-cli-options-parser  3.2.0 (indirect)
-  dillonkearns/elm-date-or-date-time   2.0.0 (indirect)
-  dillonkearns/elm-form                3.0.1 (indirect)
-  dillonkearns/elm-pages               10.2.2 (indirect)
-  elm/bytes                            1.0.8 (indirect)
-  elm/file                             1.0.5 (indirect)
-  elm/http                             2.0.0 (indirect)
-  elm/json                             1.1.4 (indirect)
-  elm/parser                           1.1.0 (indirect)
-  elm/random                           1.0.0 (indirect)
-  elm/regex                            1.0.0 (indirect)
-  elm/time                             1.0.0 (indirect)
-  elm/virtual-dom                      1.0.5 (indirect)
-  elm-community/basics-extra           4.1.0 (indirect)
-  elm-community/list-extra             8.7.0 (indirect)
-  elm-community/maybe-extra            5.3.0 (indirect)
-  fredcy/elm-parseint                  2.0.1 (indirect)
-  jluckyiv/elm-utc-date-strings        1.0.0 (indirect)
-  justinmimbs/date                     4.1.0 (indirect)
-  mdgriffith/elm-codegen               5.2.0 (indirect)
-  miniBill/elm-codec                   2.3.0 (indirect)
-  miniBill/elm-unicode                 1.1.1 (indirect)
-  noahzgordon/elm-color-extra          1.0.2 (indirect)
-  robinheghan/fnv1a                    1.0.0 (indirect)
-  robinheghan/murmur3                  1.0.0 (indirect)
-  rtfeldman/elm-css                    18.0.0 (indirect)
-  rtfeldman/elm-hex                    1.0.0 (indirect)
-  rtfeldman/elm-iso8601-date-strings   1.1.4 (indirect)
-  stil4m/elm-syntax                    7.3.9 (indirect)
-  stil4m/structured-writer             1.0.3 (indirect)
-  the-sett/elm-pretty-printer          3.1.2 (indirect)
-  the-sett/elm-syntax-dsl              6.0.3 (indirect)
-  wolfadex/elm-ansi                    3.0.0 (indirect)
+  elm/json            1.1.4 (indirect)
+  elm/random          1.0.0 (indirect)
+  elm/time            1.0.0 (indirect)
+  elm/virtual-dom     1.0.5 (indirect)
 
-  Total:                               43
+  Total:              9
 
 No upgrades available. All packages at their latest version
+
+
+Tracking local dev packages:
+
+  testauthor/pkg-two 1.0.0
 
 
 
@@ -1530,7 +1434,7 @@ ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
 Registry Cache:
   Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
   Packages: 2954
-  Versions: 16478
+  Versions: 16479
 
 Registry URL: https://package.elm-lang.org
   Status: Connected
@@ -1566,13 +1470,18 @@ Dependencies:
 No upgrades available. All packages at their latest version
 
 
+Tracking local dev packages:
+
+  testauthor/pkg-three 1.0.0
+
+
 
 ELM_HOME: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1
 
 Registry Cache:
   Location: /tmp/elm-wrap-dep-sync-test/elm_home/0.19.1/packages/registry.dat
   Packages: 2954
-  Versions: 16478
+  Versions: 16479
 
 Registry URL: https://package.elm-lang.org
   Status: Connected
