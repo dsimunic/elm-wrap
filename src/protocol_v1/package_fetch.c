@@ -378,7 +378,48 @@ bool fetch_package_metadata(InstallEnv *env, const char *author,
         if (result != HTTP_OK) {
             fprintf(stderr, "Error: Failed to download %s for %s/%s %s: %s\n",
                     filename, author, name, version, http_result_to_string(result));
-            success = false;
+            arena_free(url);
+            arena_free(file_path);
+            arena_free(pkg_dir);
+            return false;
+        }
+
+        /* Validate elm.json immediately after downloading */
+        if (strcmp(filename, "elm.json") == 0) {
+            FILE *test_file = fopen(file_path, "r");
+            if (test_file) {
+                fseek(test_file, 0, SEEK_END);
+                long file_size = ftell(test_file);
+                fseek(test_file, 0, SEEK_SET);
+
+                if (file_size > 0) {
+                    char *test_data = arena_malloc(file_size + 1);
+                    if (test_data) {
+                        size_t bytes_read = fread(test_data, 1, file_size, test_file);
+                        test_data[bytes_read] = '\0';
+
+                        cJSON *test_json = cJSON_Parse(test_data);
+                        if (!test_json) {
+                            fprintf(stderr, "Error: Invalid JSON in downloaded elm.json for %s/%s %s\n",
+                                    author, name, version);
+                            const char *error_ptr = cJSON_GetErrorPtr();
+                            if (error_ptr) {
+                                fprintf(stderr, "JSON parse error before: %s\n", error_ptr);
+                            }
+                            arena_free(test_data);
+                            fclose(test_file);
+                            remove(file_path);  /* Delete the corrupted file */
+                            arena_free(url);
+                            arena_free(file_path);
+                            arena_free(pkg_dir);
+                            return false;
+                        }
+                        cJSON_Delete(test_json);
+                        arena_free(test_data);
+                    }
+                }
+                fclose(test_file);
+            }
         }
 
         arena_free(url);

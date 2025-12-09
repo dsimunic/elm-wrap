@@ -87,6 +87,32 @@ static bool delete_artifacts_in_dir(const char *dir_path) {
 }
 
 /**
+ * Delete elm-stuff directory from a directory.
+ */
+static bool delete_elm_stuff_in_dir(const char *dir_path) {
+    if (!dir_path) return false;
+
+    size_t elm_stuff_len = strlen(dir_path) + strlen("/elm-stuff") + 1;
+    char *elm_stuff_path = arena_malloc(elm_stuff_len);
+    if (!elm_stuff_path) return false;
+
+    snprintf(elm_stuff_path, elm_stuff_len, "%s/elm-stuff", dir_path);
+
+    bool success = true;
+    struct stat st;
+    if (stat(elm_stuff_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+        log_debug("Deleting elm-stuff directory: %s", elm_stuff_path);
+        if (!remove_directory_recursive(elm_stuff_path)) {
+            log_debug("Failed to delete elm-stuff: %s", elm_stuff_path);
+            success = false;
+        }
+    }
+
+    arena_free(elm_stuff_path);
+    return success;
+}
+
+/**
  * Get the directory containing elm.json.
  * Returns arena-allocated absolute path string, or NULL on error.
  */
@@ -136,6 +162,16 @@ bool builder_clean_local_dev_artifacts(const char *elm_json_path, CacheConfig *c
 
         if (pkg_count > 0 && packages && cache) {
             log_debug("builder: Found %d tracked local-dev package(s)", pkg_count);
+
+            /* Delete elm-stuff in the application directory */
+            char *app_dir = get_elm_json_dir(elm_json_path);
+            if (app_dir) {
+                log_debug("builder: Cleaning elm-stuff for application at %s", app_dir);
+                if (!delete_elm_stuff_in_dir(app_dir)) {
+                    success = false;
+                }
+                arena_free(app_dir);
+            }
 
             for (int i = 0; i < pkg_count; i++) {
                 char *pkg_path = cache_get_package_path(cache,
