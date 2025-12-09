@@ -24,56 +24,8 @@
 #define ANSI_DULL_YELLOW "\033[33m"
 #define ANSI_RESET "\033[0m"
 
-/* Helper functions for placing package changes into the correct dependency map */
-static PackageMap* find_existing_app_map(ElmJson *elm_json, const char *author, const char *name) {
-    if (!elm_json || elm_json->type != ELM_PROJECT_APPLICATION) {
-        return NULL;
-    }
-
-    if (package_map_find(elm_json->dependencies_direct, author, name)) {
-        return elm_json->dependencies_direct;
-    }
-    if (package_map_find(elm_json->dependencies_indirect, author, name)) {
-        return elm_json->dependencies_indirect;
-    }
-    if (package_map_find(elm_json->dependencies_test_direct, author, name)) {
-        return elm_json->dependencies_test_direct;
-    }
-    if (package_map_find(elm_json->dependencies_test_indirect, author, name)) {
-        return elm_json->dependencies_test_indirect;
-    }
-
-    return NULL;
-}
-
-static void remove_from_all_app_maps(ElmJson *elm_json, const char *author, const char *name) {
-    if (!elm_json || elm_json->type != ELM_PROJECT_APPLICATION) {
-        return;
-    }
-
-    package_map_remove(elm_json->dependencies_direct, author, name);
-    package_map_remove(elm_json->dependencies_indirect, author, name);
-    package_map_remove(elm_json->dependencies_test_direct, author, name);
-    package_map_remove(elm_json->dependencies_test_indirect, author, name);
-}
-
-static PackageMap* find_existing_package_map(ElmJson *elm_json, const char *author, const char *name) {
-    if (!elm_json || elm_json->type != ELM_PROJECT_PACKAGE) {
-        return NULL;
-    }
-
-    if (package_map_find(elm_json->package_dependencies, author, name)) {
-        return elm_json->package_dependencies;
-    }
-    if (package_map_find(elm_json->package_test_dependencies, author, name)) {
-        return elm_json->package_test_dependencies;
-    }
-
-    return NULL;
-}
-
-/* Note: remove_from_all_package_maps was removed because packages now only
- * add new dependencies and never modify existing ones (preserving constraints). */
+/* Note: Helper functions find_package_map() and remove_from_all_app_maps() 
+ * are now in package_common.c/h */
 
 static void print_install_what(const char *elm_home) {
     fprintf(stderr, "%s-- INSTALL WHAT? ---------------------------------------------------------------%s\n\n",
@@ -345,7 +297,7 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
                 continue;
             }
             /* For packages, an existing dependency is not a "change" - we preserve it */
-            if (find_existing_package_map(elm_json, change->author, change->name)) {
+            if (find_package_map(elm_json, change->author, change->name)) {
                 continue;
             }
         }
@@ -376,7 +328,7 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
             if (strcmp(change->author, author) != 0 || strcmp(change->name, name) != 0) {
                 continue;
             }
-            if (find_existing_package_map(elm_json, change->author, change->name)) {
+            if (find_package_map(elm_json, change->author, change->name)) {
                 continue;
             }
         }
@@ -449,26 +401,13 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
             return 0;
         }
     }
-    
+
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
-        PackageMap *target_map = NULL;
-        bool added = false;
-        
-        if (elm_json->type == ELM_PROJECT_APPLICATION) {
-            PackageMap *existing_map = find_existing_app_map(elm_json, change->author, change->name);
+        bool is_requested_package = (strcmp(change->author, author) == 0 &&
+                                     strcmp(change->name, name) == 0);
 
-            if (existing_map) {
-                target_map = existing_map;
-            } else if (strcmp(change->author, author) == 0 && strcmp(change->name, name) == 0) {
-                target_map = is_test ? elm_json->dependencies_test_direct : elm_json->dependencies_direct;
-            } else {
-                target_map = is_test ? elm_json->dependencies_test_indirect : elm_json->dependencies_indirect;
-            }
-
-            /* Ensure stale entries do not linger in other maps */
-            remove_from_all_app_maps(elm_json, change->author, change->name);
-        } else {
+        if (elm_json->type == ELM_PROJECT_PACKAGE) {
             /*
              * For packages (type=package), we handle dependencies differently:
              * - Only add the REQUESTED package (not transitive dependencies)
@@ -481,41 +420,32 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
              */
 
             /* Skip transitive dependencies - only process the requested package */
-            if (strcmp(change->author, author) != 0 || strcmp(change->name, name) != 0) {
+            if (!is_requested_package) {
                 continue;
             }
 
-            PackageMap *existing_map = find_existing_package_map(elm_json, change->author, change->name);
-
             /* If the package already exists, don't modify it (preserve existing constraint) */
-            if (existing_map) {
+            if (find_existing_package(elm_json, change->author, change->name)) {
                 log_debug("Package %s/%s already exists in elm.json, skipping", change->author, change->name);
                 continue;
             }
-
-            target_map = is_test ? elm_json->package_test_dependencies : elm_json->package_dependencies;
         }
 
-        if (target_map) {
-            const char *version_to_add = change->new_version;
-            char *constraint = NULL;
-
-            /* For packages, convert pinned version to constraint */
-            if (elm_json->type == ELM_PROJECT_PACKAGE) {
-                constraint = version_to_constraint(change->new_version);
-                if (constraint) {
-                    version_to_add = constraint;
-                }
-            }
-
-            added = package_map_add(target_map, change->author, change->name, version_to_add);
-
-            if (constraint) {
-                arena_free(constraint);
+        /* For applications: determine if this is a direct or indirect dependency.
+         * If package already exists, keep it in its current map (update in place). */
+        bool is_direct = is_requested_package;
+        if (elm_json->type == ELM_PROJECT_APPLICATION) {
+            PackageMap *existing_map = find_package_map(elm_json, change->author, change->name);
+            if (existing_map) {
+                /* Keep in current map - determine if it's a direct map */
+                is_direct = (existing_map == elm_json->dependencies_direct ||
+                             existing_map == elm_json->dependencies_test_direct);
             }
         }
 
-        if (!target_map || !added) {
+        if (!add_or_update_package_in_elm_json(elm_json, change->author, change->name,
+                                               change->new_version, is_test, is_direct,
+                                               true /* remove_first for apps */)) {
             log_error("Failed to record dependency %s/%s %s in elm.json",
                       change->author,
                       change->name,
@@ -526,7 +456,7 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
             return 1;
         }
     }
-    
+
     printf("Saving elm.json...\n");
     if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
         fprintf(stderr, "Error: Failed to write elm.json\n");

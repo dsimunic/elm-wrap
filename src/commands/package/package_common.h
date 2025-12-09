@@ -12,6 +12,28 @@
 
 bool parse_package_name(const char *package, char **author, char **name);
 Package* find_existing_package(ElmJson *elm_json, const char *author, const char *name);
+
+/**
+ * Find which PackageMap contains a package (if any).
+ * Works for both applications and packages.
+ *
+ * @param elm_json   The elm.json to search
+ * @param author     Package author
+ * @param name       Package name
+ * @return The PackageMap containing the package, or NULL if not found
+ */
+PackageMap* find_package_map(ElmJson *elm_json, const char *author, const char *name);
+
+/**
+ * Remove a package from all dependency maps in an application.
+ * Only works for application projects; does nothing for package projects.
+ *
+ * @param elm_json   The elm.json to modify
+ * @param author     Package author
+ * @param name       Package name
+ */
+void remove_from_all_app_maps(ElmJson *elm_json, const char *author, const char *name);
+
 bool read_package_info_from_elm_json(const char *elm_json_path, char **out_author, char **out_name, char **out_version);
 
 /**
@@ -20,6 +42,32 @@ bool read_package_info_from_elm_json(const char *elm_json_path, char **out_autho
  * Returns arena-allocated string, or NULL on failure.
  */
 char* version_to_constraint(const char *version);
+
+/**
+ * Add or update a package in elm.json with proper version handling.
+ *
+ * For packages (type=package), converts point versions to constraints.
+ * For applications, uses point versions as-is.
+ *
+ * @param elm_json       The elm.json to modify
+ * @param author         Package author
+ * @param name           Package name
+ * @param version        Version string (will be converted to constraint if needed)
+ * @param is_test        Whether this is a test dependency
+ * @param is_direct      Whether this is a direct dependency (vs indirect)
+ * @param remove_first   If true, remove from all maps before adding (for applications)
+ * @return true on success, false on error
+ */
+bool add_or_update_package_in_elm_json(
+    ElmJson *elm_json,
+    const char *author,
+    const char *name,
+    const char *version,
+    bool is_test,
+    bool is_direct,
+    bool remove_first
+);
+
 char* find_package_elm_json(const char *pkg_path);
 bool install_from_file(const char *source_path, InstallEnv *env, const char *author, const char *name, const char *version);
 int compare_package_changes(const void *a, const void *b);

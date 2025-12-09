@@ -571,11 +571,7 @@ static bool refresh_app_indirect_deps(const char *app_elm_json_path, InstallEnv 
             Package *dep = &pkg_json->package_dependencies->packages[i];
 
             /* Skip if already present in the app (direct or indirect) */
-            bool already_present = 
-                package_map_find(app_json->dependencies_direct, dep->author, dep->name) != NULL ||
-                package_map_find(app_json->dependencies_indirect, dep->author, dep->name) != NULL ||
-                package_map_find(app_json->dependencies_test_direct, dep->author, dep->name) != NULL ||
-                package_map_find(app_json->dependencies_test_indirect, dep->author, dep->name) != NULL;
+            bool already_present = find_existing_package(app_json, dep->author, dep->name) != NULL;
             
             if (already_present) {
                 log_debug("Dependency %s/%s already present in app", dep->author, dep->name);
@@ -1093,14 +1089,7 @@ int install_local_dev(const char *source_path, const char *package_name,
             Package *dep = &pkg_json->package_dependencies->packages[i];
             
             /* Check if this dependency is already in the app */
-            bool already_present = false;
-            if (app_json->type == ELM_PROJECT_APPLICATION) {
-                already_present = 
-                    package_map_find(app_json->dependencies_direct, dep->author, dep->name) != NULL ||
-                    package_map_find(app_json->dependencies_indirect, dep->author, dep->name) != NULL ||
-                    package_map_find(app_json->dependencies_test_direct, dep->author, dep->name) != NULL ||
-                    package_map_find(app_json->dependencies_test_indirect, dep->author, dep->name) != NULL;
-            }
+            bool already_present = find_existing_package(app_json, dep->author, dep->name) != NULL;
             
             if (already_present) {
                 log_debug("Dependency %s/%s already present in app", dep->author, dep->name);
@@ -1281,48 +1270,18 @@ int install_local_dev(const char *source_path, const char *package_name,
         /* Continue anyway - the symlink was created successfully */
     }
 
-    /* Add the local-dev package to elm.json */
-    if (is_update) {
-        /* For updates, convert to constraint if it's a package */
-        if (app_json->type == ELM_PROJECT_PACKAGE) {
-            char *constraint = version_to_constraint(version);
-            if (constraint) {
-                arena_free(existing->version);
-                existing->version = constraint;
-            } else {
-                arena_free(existing->version);
-                existing->version = arena_strdup(version);
-            }
-        } else {
-            arena_free(existing->version);
-            existing->version = arena_strdup(version);
-        }
-    } else {
-        PackageMap *target_map = NULL;
-        if (app_json->type == ELM_PROJECT_APPLICATION) {
-            target_map = is_test ? app_json->dependencies_test_direct : app_json->dependencies_direct;
-        } else {
-            target_map = is_test ? app_json->package_test_dependencies : app_json->package_dependencies;
-        }
-
-        if (target_map) {
-            const char *version_to_add = version;
-            char *constraint = NULL;
-
-            /* For packages, convert pinned version to constraint */
-            if (app_json->type == ELM_PROJECT_PACKAGE) {
-                constraint = version_to_constraint(version);
-                if (constraint) {
-                    version_to_add = constraint;
-                }
-            }
-
-            package_map_add(target_map, actual_author, actual_name, version_to_add);
-
-            if (constraint) {
-                arena_free(constraint);
-            }
-        }
+    /* Add or update the local-dev package in elm.json.
+     * For packages, version_to_constraint is applied automatically.
+     * For updates, the existing entry is modified in place. */
+    if (!add_or_update_package_in_elm_json(app_json, actual_author, actual_name, version,
+                                           is_test, true /* is_direct */, false /* remove_first */)) {
+        log_error("Failed to add %s/%s to elm.json", actual_author, actual_name);
+        elm_json_free(app_json);
+        arena_free(actual_author);
+        arena_free(actual_name);
+        arena_free(actual_version);
+        arena_free(plan_changes);
+        return 1;
     }
 
     /* Write updated elm.json */

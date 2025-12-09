@@ -75,6 +75,47 @@ Package* find_existing_package(ElmJson *elm_json, const char *author, const char
     return NULL;
 }
 
+PackageMap* find_package_map(ElmJson *elm_json, const char *author, const char *name) {
+    if (!elm_json || !author || !name) {
+        return NULL;
+    }
+
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        if (package_map_find(elm_json->dependencies_direct, author, name)) {
+            return elm_json->dependencies_direct;
+        }
+        if (package_map_find(elm_json->dependencies_indirect, author, name)) {
+            return elm_json->dependencies_indirect;
+        }
+        if (package_map_find(elm_json->dependencies_test_direct, author, name)) {
+            return elm_json->dependencies_test_direct;
+        }
+        if (package_map_find(elm_json->dependencies_test_indirect, author, name)) {
+            return elm_json->dependencies_test_indirect;
+        }
+    } else {
+        if (package_map_find(elm_json->package_dependencies, author, name)) {
+            return elm_json->package_dependencies;
+        }
+        if (package_map_find(elm_json->package_test_dependencies, author, name)) {
+            return elm_json->package_test_dependencies;
+        }
+    }
+
+    return NULL;
+}
+
+void remove_from_all_app_maps(ElmJson *elm_json, const char *author, const char *name) {
+    if (!elm_json || elm_json->type != ELM_PROJECT_APPLICATION) {
+        return;
+    }
+
+    package_map_remove(elm_json->dependencies_direct, author, name);
+    package_map_remove(elm_json->dependencies_indirect, author, name);
+    package_map_remove(elm_json->dependencies_test_direct, author, name);
+    package_map_remove(elm_json->dependencies_test_indirect, author, name);
+}
+
 bool read_package_info_from_elm_json(const char *elm_json_path, char **out_author, char **out_name, char **out_version) {
     ElmJson *pkg_elm_json = elm_json_read(elm_json_path);
     if (!pkg_elm_json) {
@@ -126,6 +167,82 @@ char* version_to_constraint(const char *version) {
              major, minor, patch, major + 1);
 
     return constraint;
+}
+
+bool add_or_update_package_in_elm_json(
+    ElmJson *elm_json,
+    const char *author,
+    const char *name,
+    const char *version,
+    bool is_test,
+    bool is_direct,
+    bool remove_first
+) {
+    if (!elm_json || !author || !name || !version) {
+        return false;
+    }
+
+    /* Find existing package */
+    Package *existing = find_existing_package(elm_json, author, name);
+
+    /* Determine version to use */
+    const char *version_to_add = version;
+    char *constraint = NULL;
+
+    /* For packages, convert point version to constraint */
+    if (elm_json->type == ELM_PROJECT_PACKAGE) {
+        constraint = version_to_constraint(version);
+        if (constraint) {
+            version_to_add = constraint;
+        }
+    }
+
+    /* Handle update vs add */
+    if (existing) {
+        /* Update existing entry */
+        arena_free(existing->version);
+        existing->version = arena_strdup(version_to_add);
+        if (constraint) {
+            arena_free(constraint);
+        }
+        return existing->version != NULL;
+    }
+
+    /* Add new entry */
+    PackageMap *target_map = NULL;
+
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        /* Remove from all maps first if requested */
+        if (remove_first) {
+            remove_from_all_app_maps(elm_json, author, name);
+        }
+
+        /* Select target map based on is_test and is_direct */
+        if (is_test) {
+            target_map = is_direct ? elm_json->dependencies_test_direct
+                                   : elm_json->dependencies_test_indirect;
+        } else {
+            target_map = is_direct ? elm_json->dependencies_direct
+                                   : elm_json->dependencies_indirect;
+        }
+    } else {
+        /* Package type */
+        target_map = is_test ? elm_json->package_test_dependencies
+                             : elm_json->package_dependencies;
+    }
+
+    if (!target_map) {
+        if (constraint) arena_free(constraint);
+        return false;
+    }
+
+    bool result = package_map_add(target_map, author, name, version_to_add);
+
+    if (constraint) {
+        arena_free(constraint);
+    }
+
+    return result;
 }
 
 static bool ensure_path_exists(const char *path) {
