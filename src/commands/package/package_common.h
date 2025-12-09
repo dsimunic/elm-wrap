@@ -13,6 +13,13 @@
 bool parse_package_name(const char *package, char **author, char **name);
 Package* find_existing_package(ElmJson *elm_json, const char *author, const char *name);
 bool read_package_info_from_elm_json(const char *elm_json_path, char **out_author, char **out_name, char **out_version);
+
+/**
+ * Convert a pinned version (e.g., "1.0.0") to an Elm package constraint
+ * (e.g., "1.0.0 <= v < 2.0.0").
+ * Returns arena-allocated string, or NULL on failure.
+ */
+char* version_to_constraint(const char *version);
 char* find_package_elm_json(const char *pkg_path);
 bool install_from_file(const char *source_path, InstallEnv *env, const char *author, const char *name, const char *version);
 int compare_package_changes(const void *a, const void *b);

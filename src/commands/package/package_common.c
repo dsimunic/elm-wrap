@@ -110,6 +110,24 @@ bool read_package_info_from_elm_json(const char *elm_json_path, char **out_autho
     return true;
 }
 
+char* version_to_constraint(const char *version) {
+    if (!version) return NULL;
+
+    int major, minor, patch;
+    if (sscanf(version, "%d.%d.%d", &major, &minor, &patch) != 3) {
+        return NULL;
+    }
+
+    /* Format: "X.Y.Z <= v < (X+1).0.0" */
+    char *constraint = arena_malloc(MAX_RANGE_STRING_LENGTH);
+    if (!constraint) return NULL;
+
+    snprintf(constraint, MAX_RANGE_STRING_LENGTH, "%d.%d.%d <= v < %d.0.0",
+             major, minor, patch, major + 1);
+
+    return constraint;
+}
+
 static bool ensure_path_exists(const char *path) {
     if (!path || path[0] == '\0') {
         return false;

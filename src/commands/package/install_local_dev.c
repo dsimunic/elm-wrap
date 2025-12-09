@@ -1283,8 +1283,20 @@ int install_local_dev(const char *source_path, const char *package_name,
 
     /* Add the local-dev package to elm.json */
     if (is_update) {
-        arena_free(existing->version);
-        existing->version = arena_strdup(version);
+        /* For updates, convert to constraint if it's a package */
+        if (app_json->type == ELM_PROJECT_PACKAGE) {
+            char *constraint = version_to_constraint(version);
+            if (constraint) {
+                arena_free(existing->version);
+                existing->version = constraint;
+            } else {
+                arena_free(existing->version);
+                existing->version = arena_strdup(version);
+            }
+        } else {
+            arena_free(existing->version);
+            existing->version = arena_strdup(version);
+        }
     } else {
         PackageMap *target_map = NULL;
         if (app_json->type == ELM_PROJECT_APPLICATION) {
@@ -1294,7 +1306,22 @@ int install_local_dev(const char *source_path, const char *package_name,
         }
 
         if (target_map) {
-            package_map_add(target_map, actual_author, actual_name, version);
+            const char *version_to_add = version;
+            char *constraint = NULL;
+
+            /* For packages, convert pinned version to constraint */
+            if (app_json->type == ELM_PROJECT_PACKAGE) {
+                constraint = version_to_constraint(version);
+                if (constraint) {
+                    version_to_add = constraint;
+                }
+            }
+
+            package_map_add(target_map, actual_author, actual_name, version_to_add);
+
+            if (constraint) {
+                arena_free(constraint);
+            }
         }
     }
 

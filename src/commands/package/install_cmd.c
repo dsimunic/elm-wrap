@@ -24,29 +24,6 @@
 #define ANSI_DULL_YELLOW "\033[33m"
 #define ANSI_RESET "\033[0m"
 
-/**
- * Convert a pinned version (e.g., "1.0.0") to an Elm package constraint
- * (e.g., "1.0.0 <= v < 2.0.0").
- * Returns arena-allocated string, or NULL on failure.
- */
-static char* version_to_constraint(const char *version) {
-    if (!version) return NULL;
-
-    int major, minor, patch;
-    if (sscanf(version, "%d.%d.%d", &major, &minor, &patch) != 3) {
-        return NULL;
-    }
-
-    /* Format: "X.Y.Z <= v < (X+1).0.0" */
-    char *constraint = arena_malloc(MAX_RANGE_STRING_LENGTH);
-    if (!constraint) return NULL;
-
-    snprintf(constraint, MAX_RANGE_STRING_LENGTH, "%d.%d.%d <= v < %d.0.0",
-             major, minor, patch, major + 1);
-
-    return constraint;
-}
-
 /* Helper functions for placing package changes into the correct dependency map */
 static PackageMap* find_existing_app_map(ElmJson *elm_json, const char *author, const char *name) {
     if (!elm_json || elm_json->type != ELM_PROJECT_APPLICATION) {
