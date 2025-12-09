@@ -1,6 +1,6 @@
 # Reviewers Guide
 
-This document guides you through the features of **elm-wrap** version 0.5.0-preview.1, helping you evaluate the feature set in this release.
+This document guides you through the features of **elm-wrap** version 0.5.0-preview.2, helping you evaluate the feature set in this release.
 
 ## Release focus
 
@@ -30,7 +30,7 @@ For this review, the feedback channels are:
 - "Incremental Elm" Discord, channel #elm-wrap
 - Private message on "Incremental Elm" Discord to @Damir.
 
-The hope is we'll turn this `preview.1` quickly, maybe go into `preview.2` if needed, and then release `0.5.0` proper.
+The hope is we'll turn this `preview.2` quickly, maybe go into `preview.3` if needed, and then release `0.5.0` proper.
 
 The intent for `0.5.0` is to release a solid, production-grade, "daily driver"-quality foundation for local package development workflows, and then build on top 
 of it in future releases.
@@ -249,14 +249,6 @@ There is currently only one package template, so no need to specify it.
 - `wrap info` shows either application or package info depending on the current folder. It's an alias for `wrap package info` or `wrap package application info`.
 
 ## Known issues
-
-- After compiling the dependent app edits in the module under local development are not picked up by future recompilations of the dependent app.   
-
-    Workaround: delete `artifacts.dat` in the package folder. For a good measure, also delete `elm-stuff` in the package folder.
-
-    The compiler caches compiled artifacts for packages in `artifacts.dat` file as a build optimization. It correctly assumes that packages don't change unless their version changes. However, in local-dev workflow, the package source can change without reinstalling it. This leads to the compiler reusing stale compiled artifacts from `artifacts.dat`, ignoring any edits made in the local package source.
-
-- The template for `Platform.worker` is not included in `wrap application init` command.
 
 - Local package development might lead to Elm compiler skipping downloading package index updates.  
     
