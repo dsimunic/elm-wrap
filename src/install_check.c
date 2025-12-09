@@ -5,6 +5,7 @@
 #include "constants.h"
 #include "exit_codes.h"
 #include "terminal_colors.h"
+#include "log.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -150,7 +151,7 @@ static int check_duplicate_exposed_modules(const char *elm_json_path) {
     for (int i = 0; i < modules_count; i++) {
         for (int j = i + 1; j < modules_count; j++) {
             if (strcmp(modules[i], modules[j]) == 0) {
-                fprintf(stderr, "Warning: Duplicate exposed module '%s' in elm.json\n", modules[i]);
+                log_warn("Duplicate exposed module '%s' in elm.json", modules[i]);
                 duplicates++;
                 break;  /* Only report each duplicate once */
             }
@@ -392,14 +393,14 @@ static void check_package_constraint_upgrades(PackageMap *map, Registry *registr
 int check_all_upgrades(const char *elm_json_path, Registry *registry, size_t max_name_len) {
     // Validate registry
     if (!registry) {
-        fprintf(stderr, "Error: No registry provided\n");
+        log_error("No registry provided");
         return 1;
     }
 
     // Load elm.json
     ElmJson *elm_json = elm_json_read(elm_json_path);
     if (!elm_json) {
-        fprintf(stderr, "Error: Could not read %s\n", elm_json_path);
+        log_error("Could not read %s", elm_json_path);
         return 1;
     }
 
@@ -648,14 +649,14 @@ static void check_package_constraint_upgrades_v2(PackageMap *map, V2Registry *re
 int check_all_upgrades_v2(const char *elm_json_path, V2Registry *registry, size_t max_name_len) {
     /* Validate registry */
     if (!registry) {
-        fprintf(stderr, "Error: No V2 registry provided\n");
+        log_error("No V2 registry provided");
         return 1;
     }
 
     /* Load elm.json */
     ElmJson *elm_json = elm_json_read(elm_json_path);
     if (!elm_json) {
-        fprintf(stderr, "Error: Could not read %s\n", elm_json_path);
+        log_error("Could not read %s", elm_json_path);
         return 1;
     }
 

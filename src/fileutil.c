@@ -49,7 +49,7 @@ bool extract_zip(const char *zip_path, const char *dest_dir) {
     memset(&zip, 0, sizeof(zip));
 
     if (!mz_zip_reader_init_file(&zip, zip_path, 0)) {
-        fprintf(stderr, "Error: Failed to open ZIP file: %s\n", zip_path);
+        log_error("Failed to open ZIP file: %s", zip_path);
         return false;
     }
 
@@ -59,7 +59,7 @@ bool extract_zip(const char *zip_path, const char *dest_dir) {
     for (int i = 0; i < num_files; i++) {
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(&zip, i, &file_stat)) {
-            fprintf(stderr, "Error: Failed to get file stat for index %d\n", i);
+            log_error("Failed to get file stat for index %d", i);
             success = false;
             break;
         }
@@ -69,7 +69,7 @@ bool extract_zip(const char *zip_path, const char *dest_dir) {
 
         if (mz_zip_reader_is_file_a_directory(&zip, i)) {
             if (!ensure_directory(output_path)) {
-                fprintf(stderr, "Error: Failed to create directory: %s\n", output_path);
+                log_error("Failed to create directory: %s", output_path);
                 success = false;
                 break;
             }
@@ -81,7 +81,7 @@ bool extract_zip(const char *zip_path, const char *dest_dir) {
             }
             char *parent = dirname(output_copy);
             if (!ensure_directory(parent)) {
-                fprintf(stderr, "Error: Failed to create parent directory: %s\n", parent);
+                log_error("Failed to create parent directory: %s", parent);
                 arena_free(output_copy);
                 success = false;
                 break;
@@ -89,7 +89,7 @@ bool extract_zip(const char *zip_path, const char *dest_dir) {
             arena_free(output_copy);
 
             if (!mz_zip_reader_extract_to_file(&zip, i, output_path, 0)) {
-                fprintf(stderr, "Error: Failed to extract file: %s\n", file_stat.m_filename);
+                log_error("Failed to extract file: %s", file_stat.m_filename);
                 success = false;
                 break;
             }
@@ -127,7 +127,7 @@ bool extract_zip_selective(const char *zip_path, const char *dest_dir) {
     memset(&zip, 0, sizeof(zip));
 
     if (!mz_zip_reader_init_file(&zip, zip_path, 0)) {
-        fprintf(stderr, "Error: Failed to open ZIP file: %s\n", zip_path);
+        log_error("Failed to open ZIP file: %s", zip_path);
         return false;
     }
 
@@ -137,7 +137,7 @@ bool extract_zip_selective(const char *zip_path, const char *dest_dir) {
     for (int i = 0; i < num_files; i++) {
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(&zip, i, &file_stat)) {
-            fprintf(stderr, "Error: Failed to get file stat for index %d\n", i);
+            log_error("Failed to get file stat for index %d", i);
             success = false;
             break;
         }
@@ -155,7 +155,7 @@ bool extract_zip_selective(const char *zip_path, const char *dest_dir) {
 
         if (mz_zip_reader_is_file_a_directory(&zip, i)) {
             if (!ensure_directory(output_path)) {
-                fprintf(stderr, "Error: Failed to create directory: %s\n", output_path);
+                log_error("Failed to create directory: %s", output_path);
                 success = false;
                 break;
             }
@@ -175,7 +175,7 @@ bool extract_zip_selective(const char *zip_path, const char *dest_dir) {
             }
             char *parent = dirname(output_copy);
             if (!ensure_directory(parent)) {
-                fprintf(stderr, "Error: Failed to create parent directory: %s\n", parent);
+                log_error("Failed to create parent directory: %s", parent);
                 arena_free(output_copy);
                 success = false;
                 break;
@@ -183,7 +183,7 @@ bool extract_zip_selective(const char *zip_path, const char *dest_dir) {
             arena_free(output_copy);
 
             if (!mz_zip_reader_extract_to_file(&zip, i, output_path, 0)) {
-                fprintf(stderr, "Error: Failed to extract file: %s\n", file_stat.m_filename);
+                log_error("Failed to extract file: %s", file_stat.m_filename);
                 success = false;
                 break;
             }

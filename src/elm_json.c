@@ -174,10 +174,10 @@ ElmJson* elm_json_read(const char *filepath) {
     arena_free(data);
     
     if (!json) {
-        fprintf(stderr, "Error: Failed to parse JSON in %s\n", filepath);
+        log_error("Failed to parse JSON in %s", filepath);
         const char *error_ptr = cJSON_GetErrorPtr();
         if (error_ptr) {
-            fprintf(stderr, "Error before: %s\n", error_ptr);
+            log_error("Error before: %s", error_ptr);
         }
         return NULL;
     }
@@ -192,7 +192,7 @@ ElmJson* elm_json_read(const char *filepath) {
     // Parse project type
     cJSON *type_item = cJSON_GetObjectItem(json, "type");
     if (!type_item || !cJSON_IsString(type_item)) {
-        fprintf(stderr, "Error: No 'type' field in %s\n", filepath);
+        log_error("No 'type' field in %s", filepath);
         cJSON_Delete(json);
         arena_free(elm_json);
         return NULL;
@@ -203,7 +203,7 @@ ElmJson* elm_json_read(const char *filepath) {
     } else if (strcmp(type_item->valuestring, "package") == 0) {
         elm_json->type = ELM_PROJECT_PACKAGE;
     } else {
-        fprintf(stderr, "Error: Invalid project type: %s\n", type_item->valuestring);
+        log_error("Invalid project type: %s", type_item->valuestring);
         arena_free(elm_json);
         cJSON_Delete(json);
         return NULL;
@@ -419,7 +419,7 @@ static void package_map_sort(PackageMap *map) {
 static bool write_elm_json_formatted(cJSON *json, const char *filepath) {
     FILE *file = fopen(filepath, "w");
     if (!file) {
-        fprintf(stderr, "Error: Could not open %s for writing\n", filepath);
+        log_error("Could not open %s for writing", filepath);
         return false;
     }
     
@@ -555,7 +555,7 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
     // Read the existing file to preserve all fields
     FILE *file = fopen(filepath, "r");
     if (!file) {
-        fprintf(stderr, "Error: Could not open %s for reading\n", filepath);
+        log_error("Could not open %s for reading", filepath);
         return false;
     }
     
@@ -578,7 +578,7 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
     arena_free(file_content);
     
     if (!json) {
-        fprintf(stderr, "Error: Failed to parse existing elm.json\n");
+        log_error("Failed to parse existing elm.json");
         return false;
     }
     

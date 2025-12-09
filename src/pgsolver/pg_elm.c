@@ -328,9 +328,7 @@ static int pg_elm_provider_get_dependencies(
     }
 
     if (!elm_json) {
-        fprintf(stderr,
-                "[PgElm] Failed to load elm.json for %s/%s %s\n",
-                author, name, version_str);
+        log_error("[PgElm] Failed to load elm.json for %s/%s %s", author, name, version_str);
         return 0;
     }
 

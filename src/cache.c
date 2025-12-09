@@ -271,7 +271,7 @@ bool cache_ensure_directories(CacheConfig *config) {
 /* Download package using InstallEnv (actual implementation) */
 bool cache_download_package_with_env(struct InstallEnv *env, const char *author, const char *name, const char *version) {
     if (!env) {
-        fprintf(stderr, "Error: InstallEnv is NULL in cache_download_package_with_env\n");
+        log_error("InstallEnv is NULL in cache_download_package_with_env");
         return false;
     }
 

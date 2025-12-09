@@ -7,13 +7,14 @@
 
 #include "publish.h"
 #include "../../global_context.h"
+#include "../../log.h"
 #include <stdio.h>
 
 int cmd_publish(int argc, char *argv[]) {
     (void)argc;  // Unused
     (void)argv;  // Unused
 
-    fprintf(stderr, "%s uses a new publishing flow.\n", global_context_program_name());
-    fprintf(stderr, "Please use %s package publish\n", global_context_program_name());
+    log_error("%s uses a new publishing flow.", global_context_program_name());
+    log_error("Please use %s package publish", global_context_program_name());
     return 100;
 }

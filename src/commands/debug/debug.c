@@ -1,6 +1,7 @@
 #include "debug.h"
 #include "../../alloc.h"
 #include "../../global_context.h"
+#include "../../log.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -43,7 +44,7 @@ int cmd_debug(int argc, char *argv[]) {
         return cmd_debug_registry_v1(argc - 1, argv + 1);
     }
 
-    fprintf(stderr, "Error: Unknown debug subcommand '%s'\n", subcmd);
-    fprintf(stderr, "Run '%s debug --help' for usage information.\n", global_context_program_name());
+    log_error("Unknown debug subcommand '%s'", subcmd);
+    log_error("Run '%s debug --help' for usage information.", global_context_program_name());
     return 1;
 }

@@ -40,16 +40,16 @@ static bool delete_file_if_exists(const char *path) {
     }
 
     if (!S_ISREG(st.st_mode)) {
-        log_debug("Not a regular file, skipping: %s", path);
+        log_debug("builder: Not a regular file, skipping: %s", path);
         return true;
     }
 
     if (unlink(path) != 0) {
-        log_debug("Failed to delete: %s", path);
+        log_debug("builder: Failed to delete: %s", path);
         return false;
     }
 
-    log_debug("Deleted artifact: %s", path);
+    log_debug("builder: Deleted artifact: %s", path);
     return true;
 }
 
@@ -101,9 +101,9 @@ static bool delete_elm_stuff_in_dir(const char *dir_path) {
     bool success = true;
     struct stat st;
     if (stat(elm_stuff_path, &st) == 0 && S_ISDIR(st.st_mode)) {
-        log_debug("Deleting elm-stuff directory: %s", elm_stuff_path);
+        log_debug("builder: Deleting elm-stuff directory: %s", elm_stuff_path);
         if (!remove_directory_recursive(elm_stuff_path)) {
-            log_debug("Failed to delete elm-stuff: %s", elm_stuff_path);
+            log_debug("builder: Failed to delete elm-stuff: %s", elm_stuff_path);
             success = false;
         }
     }

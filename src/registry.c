@@ -1,6 +1,7 @@
 #include "registry.h"
 #include "alloc.h"
 #include "constants.h"
+#include "log.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -189,7 +190,7 @@ Registry* registry_load_from_dat(const char *path, size_t *known_count) {
     /* Read header: total version count */
     uint64_t total_versions;
     if (!read_u64_be(f, &total_versions)) {
-        fprintf(stderr, "Error: Failed to read registry header from %s\n", path);
+        log_error("Failed to read registry header from %s", path);
         registry_free(registry);
         fclose(f);
         return NULL;
@@ -203,7 +204,7 @@ Registry* registry_load_from_dat(const char *path, size_t *known_count) {
     /* Read entry count */
     uint64_t entry_count;
     if (!read_u64_be(f, &entry_count)) {
-        fprintf(stderr, "Error: Failed to read registry entry count from %s\n", path);
+        log_error("Failed to read registry entry count from %s", path);
         registry_free(registry);
         fclose(f);
         return NULL;
@@ -226,7 +227,7 @@ Registry* registry_load_from_dat(const char *path, size_t *known_count) {
         /* Read author */
         uint8_t author_len;
         if (!read_u8(f, &author_len)) {
-            fprintf(stderr, "Error: Failed to read author length at entry %llu\n", (unsigned long long)i);
+            log_error("Failed to read author length at entry %llu", (unsigned long long)i);
             registry_free(registry);
             fclose(f);
             return NULL;
@@ -244,7 +245,7 @@ Registry* registry_load_from_dat(const char *path, size_t *known_count) {
         /* Read project name */
         uint8_t name_len;
         if (!read_u8(f, &name_len)) {
-            fprintf(stderr, "Error: Failed to read name length at entry %llu\n", (unsigned long long)i);
+            log_error("Failed to read name length at entry %llu", (unsigned long long)i);
             arena_free(author);
             registry_free(registry);
             fclose(f);
@@ -264,7 +265,7 @@ Registry* registry_load_from_dat(const char *path, size_t *known_count) {
         /* Read newest version */
         Version newest;
         if (!read_version(f, &newest)) {
-            fprintf(stderr, "Error: Failed to read newest version for %s/%s\n", author, name);
+            log_error("Failed to read newest version for %s/%s", author, name);
             arena_free(author);
             arena_free(name);
             registry_free(registry);
@@ -275,7 +276,7 @@ Registry* registry_load_from_dat(const char *path, size_t *known_count) {
         /* Read previous versions count */
         uint64_t prev_count;
         if (!read_u64_be(f, &prev_count)) {
-            fprintf(stderr, "Error: Failed to read previous version count for %s/%s\n", author, name);
+            log_error("Failed to read previous version count for %s/%s", author, name);
             arena_free(author);
             arena_free(name);
             registry_free(registry);
@@ -299,7 +300,7 @@ Registry* registry_load_from_dat(const char *path, size_t *known_count) {
         /* Read previous versions */
         for (uint64_t j = 0; j < prev_count; j++) {
             if (!read_version(f, &versions[1 + j])) {
-                fprintf(stderr, "Error: Failed to read version %llu for %s/%s\n", (unsigned long long)j, author, name);
+                log_error("Failed to read version %llu for %s/%s", (unsigned long long)j, author, name);
                 arena_free(author);
                 arena_free(name);
                 arena_free(versions);
@@ -334,13 +335,13 @@ bool registry_dat_write(const Registry *registry, const char *path) {
 
     FILE *f = fopen(tmp_path, "wb");
     if (!f) {
-        fprintf(stderr, "Error: Failed to open %s for writing: %s\n", tmp_path, strerror(errno));
+        log_error("Failed to open %s for writing: %s", tmp_path, strerror(errno));
         return false;
     }
 
     /* Write header: total version count */
     if (!write_u64_be(f, registry->total_versions)) {
-        fprintf(stderr, "Error: Failed to write registry header\n");
+        log_error("Failed to write registry header");
         fclose(f);
         unlink(tmp_path);
         return false;
@@ -348,7 +349,7 @@ bool registry_dat_write(const Registry *registry, const char *path) {
 
     /* Write entry count */
     if (!write_u64_be(f, registry->entry_count)) {
-        fprintf(stderr, "Error: Failed to write entry count\n");
+        log_error("Failed to write entry count");
         fclose(f);
         unlink(tmp_path);
         return false;
@@ -361,7 +362,7 @@ bool registry_dat_write(const Registry *registry, const char *path) {
         /* Write author */
         uint8_t author_len = (uint8_t)strlen(entry->author);
         if (!write_u8(f, author_len) || fwrite(entry->author, 1, author_len, f) != author_len) {
-            fprintf(stderr, "Error: Failed to write author for entry %zu\n", i);
+            log_error("Failed to write author for entry %zu", i);
             fclose(f);
             unlink(tmp_path);
             return false;
@@ -370,7 +371,7 @@ bool registry_dat_write(const Registry *registry, const char *path) {
         /* Write name */
         uint8_t name_len = (uint8_t)strlen(entry->name);
         if (!write_u8(f, name_len) || fwrite(entry->name, 1, name_len, f) != name_len) {
-            fprintf(stderr, "Error: Failed to write name for entry %zu\n", i);
+            log_error("Failed to write name for entry %zu", i);
             fclose(f);
             unlink(tmp_path);
             return false;
@@ -378,14 +379,14 @@ bool registry_dat_write(const Registry *registry, const char *path) {
 
         /* Write newest version (first in array) */
         if (entry->version_count == 0) {
-            fprintf(stderr, "Error: Entry %zu has no versions\n", i);
+            log_error("Entry %zu has no versions", i);
             fclose(f);
             unlink(tmp_path);
             return false;
         }
 
         if (!write_version(f, &entry->versions[0])) {
-            fprintf(stderr, "Error: Failed to write newest version for entry %zu\n", i);
+            log_error("Failed to write newest version for entry %zu", i);
             fclose(f);
             unlink(tmp_path);
             return false;
@@ -394,7 +395,7 @@ bool registry_dat_write(const Registry *registry, const char *path) {
         /* Write previous versions count */
         uint64_t prev_count = entry->version_count - 1;
         if (!write_u64_be(f, prev_count)) {
-            fprintf(stderr, "Error: Failed to write previous version count for entry %zu\n", i);
+            log_error("Failed to write previous version count for entry %zu", i);
             fclose(f);
             unlink(tmp_path);
             return false;
@@ -403,7 +404,7 @@ bool registry_dat_write(const Registry *registry, const char *path) {
         /* Write previous versions */
         for (size_t j = 1; j < entry->version_count; j++) {
             if (!write_version(f, &entry->versions[j])) {
-                fprintf(stderr, "Error: Failed to write version %zu for entry %zu\n", j, i);
+                log_error("Failed to write version %zu for entry %zu", j, i);
                 fclose(f);
                 unlink(tmp_path);
                 return false;
@@ -418,7 +419,7 @@ bool registry_dat_write(const Registry *registry, const char *path) {
 
     /* Atomic rename */
     if (rename(tmp_path, path) != 0) {
-        fprintf(stderr, "Error: Failed to rename %s to %s: %s\n", tmp_path, path, strerror(errno));
+        log_error("Failed to rename %s to %s: %s", tmp_path, path, strerror(errno));
         unlink(tmp_path);
         return false;
     }

@@ -159,7 +159,7 @@ int cmd_package(int argc, char *argv[], const char *prog) {
 
     if (strcmp(subcmd, "cache") == 0) {
         if (!feature_cache_enabled()) {
-            fprintf(stderr, "Error: Subcommand 'cache' is not available in this build.\n");
+            log_error("Subcommand 'cache' is not available in this build.");
             return 1;
         }
         // Pass remaining args to cache command
@@ -183,7 +183,7 @@ int cmd_package(int argc, char *argv[], const char *prog) {
 
     if (strcmp(subcmd, "publish") == 0) {
         if (!feature_publish_enabled()) {
-            fprintf(stderr, "Error: Subcommand 'publish' is not available in this build.\n");
+            log_error("Subcommand 'publish' is not available in this build.");
             return 1;
         }
         // Pass remaining args to package publish command
@@ -195,8 +195,8 @@ int cmd_package(int argc, char *argv[], const char *prog) {
         return cmd_publish_docs(argc - 1, argv + 1);
     }
 
-    fprintf(stderr, "Error: Unknown package subcommand '%s'\n", subcmd);
-    fprintf(stderr, "Run '%s package --help' for usage information.\n", prog);
+    log_error("Unknown package subcommand '%s'", subcmd);
+    log_error("Run '%s package --help' for usage information.", prog);
     return 1;
 }
 
@@ -349,7 +349,7 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "publish") == 0) {
             if (!feature_publish_enabled()) {
-                fprintf(stderr, "Error: Command 'publish' is not available in this build.\n");
+                log_error("Command 'publish' is not available in this build.");
                 return 1;
             }
             return cmd_publish(argc - 1, argv + 1);
@@ -361,7 +361,7 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "code") == 0) {
             if (!feature_code_enabled()) {
-                fprintf(stderr, "Error: Command 'code' is not available in this build.\n");
+                log_error("Command 'code' is not available in this build.");
                 return 1;
             }
             return cmd_code(argc - 1, argv + 1);
@@ -369,7 +369,7 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "policy") == 0) {
             if (!feature_policy_enabled()) {
-                fprintf(stderr, "Error: Command 'policy' is not available in this build.\n");
+                log_error("Command 'policy' is not available in this build.");
                 return 1;
             }
             return cmd_policy(argc - 1, argv + 1);
@@ -377,7 +377,7 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "review") == 0) {
             if (!feature_review_enabled()) {
-                fprintf(stderr, "Error: Command 'review' is not available in this build.\n");
+                log_error("Command 'review' is not available in this build.");
                 return 1;
             }
             return cmd_review(argc - 1, argv + 1);
@@ -392,8 +392,8 @@ int main(int argc, char *argv[]) {
         }
 
         // Unknown command
-        fprintf(stderr, "Error: Unknown command '%s'\n", argv[1]);
-        fprintf(stderr, "Run '%s --help' for usage information.\n", global_context_program_name());
+        log_error("Unknown command '%s'", argv[1]);
+        log_error("Run '%s --help' for usage information.", global_context_program_name());
         return 1;
     }
 
