@@ -549,6 +549,8 @@ int cmd_application_list_templates(int argc, char *argv[]) {
                 desc = "Browser.element for embedding in HTML";
             } else if (strcmp(found_templates[i], "sandbox") == 0) {
                 desc = "Browser.sandbox for simple programs";
+            } else if (strcmp(found_templates[i], "worker") == 0) {
+                desc = "Platform.worker for background processing";
             }
             printf("  %-15s %s\n", found_templates[i], desc);
             
