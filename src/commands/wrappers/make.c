@@ -1,4 +1,5 @@
 #include "make.h"
+#include "builder.h"
 #include "../../elm_json.h"
 #include "../../global_context.h"
 #include "elm_cmd_common.h"
@@ -68,14 +69,19 @@ int cmd_make(int argc, char *argv[]) {
     // Download all packages
     int result = download_all_packages(elm_json, env);
 
+    if (result != 0) {
+        log_error("Failed to download all dependencies");
+        elm_json_free(elm_json);
+        install_env_free(env);
+        return result;
+    }
+
+    // Clean local-dev artifacts before compilation
+    builder_clean_local_dev_artifacts(ELM_JSON_PATH, env->cache);
+
     // Cleanup
     elm_json_free(elm_json);
     install_env_free(env);
-
-    if (result != 0) {
-        log_error("Failed to download all dependencies");
-        return result;
-    }
 
     // Now call elm make with all the arguments
     const char *compiler_name = global_context_compiler_name();

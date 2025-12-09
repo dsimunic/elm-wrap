@@ -7,6 +7,7 @@
 
 #include "install_local_dev.h"
 #include "package_common.h"
+#include "../../local_dev/local_dev_tracking.h"
 #include "../../alloc.h"
 #include "../../constants.h"
 #include "../../log.h"
@@ -520,89 +521,6 @@ static bool find_local_dev_package_info(const char *package_elm_json_path,
     return true;
 }
 
-/**
- * Get list of dependent application elm.json paths for a local-dev package.
- */
-static char **get_dependent_app_paths(const char *author, const char *name, const char *version,
-                                      int *out_count) {
-    *out_count = 0;
-
-    char *tracking_dir = get_local_dev_tracking_dir();
-    if (!tracking_dir) {
-        return NULL;
-    }
-
-    /* Build path: tracking_dir/author/name/version */
-    size_t dir_len = strlen(tracking_dir) + strlen(author) + strlen(name) + strlen(version) + 4;
-    char *version_dir = arena_malloc(dir_len);
-    if (!version_dir) {
-        arena_free(tracking_dir);
-        return NULL;
-    }
-    snprintf(version_dir, dir_len, "%s/%s/%s/%s", tracking_dir, author, name, version);
-    arena_free(tracking_dir);
-
-    DIR *dir = opendir(version_dir);
-    if (!dir) {
-        arena_free(version_dir);
-        return NULL;
-    }
-
-    /* Count entries first */
-    int capacity = 16;
-    int count = 0;
-    char **paths = arena_malloc(capacity * sizeof(char *));
-    if (!paths) {
-        closedir(dir);
-        arena_free(version_dir);
-        return NULL;
-    }
-
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_name[0] == '.') continue;
-
-        /* Read the tracking file to get the app elm.json path */
-        size_t file_len = strlen(version_dir) + strlen(entry->d_name) + 2;
-        char *tracking_file = arena_malloc(file_len);
-        if (!tracking_file) continue;
-        snprintf(tracking_file, file_len, "%s/%s", version_dir, entry->d_name);
-
-        char *content = file_read_contents(tracking_file);
-        arena_free(tracking_file);
-        if (!content) continue;
-
-        /* Strip trailing newline */
-        size_t content_len = strlen(content);
-        if (content_len > 0 && content[content_len - 1] == '\n') {
-            content[content_len - 1] = '\0';
-        }
-
-        /* Check if the elm.json still exists */
-        struct stat st;
-        if (stat(content, &st) != 0) {
-            arena_free(content);
-            continue;
-        }
-
-        /* Add to list */
-        if (count >= capacity) {
-            capacity *= 2;
-            paths = arena_realloc(paths, capacity * sizeof(char *));
-            if (!paths) {
-                arena_free(content);
-                break;
-            }
-        }
-        paths[count++] = content;
-    }
-
-    closedir(dir);
-    arena_free(version_dir);
-
-    *out_count = count;
-    return paths;
-}
 
 /**
  * Refresh indirect dependencies for an application that depends on a local-dev package.
@@ -836,9 +754,9 @@ int refresh_local_dev_dependents(InstallEnv *env) {
 
     /* Get all dependent applications */
     int dep_count = 0;
-    char **dep_paths = get_dependent_app_paths(author, name, version, &dep_count);
+    char **dep_paths = local_dev_get_tracking_apps(author, name, version, &dep_count);
 
-    if (dep_count == 0) {
+    if (dep_count == 0 || !dep_paths) {
         log_debug("No dependent applications to refresh");
         arena_free(author);
         arena_free(name);
@@ -881,9 +799,9 @@ int prune_local_dev_dependents(CacheConfig *cache) {
 
     /* Get all dependent applications */
     int dep_count = 0;
-    char **dep_paths = get_dependent_app_paths(author, name, version, &dep_count);
+    char **dep_paths = local_dev_get_tracking_apps(author, name, version, &dep_count);
 
-    if (dep_count == 0) {
+    if (dep_count == 0 || !dep_paths) {
         log_debug("No dependent applications to prune");
         arena_free(author);
         arena_free(name);
