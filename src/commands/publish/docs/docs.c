@@ -87,9 +87,13 @@ static bool parse_elm_json(const char *elm_json_path, ExposedModules *em) {
         return false;
     }
 
-    fread(content, 1, fsize, f);
-    content[fsize] = 0;
+    size_t bytes_read = fread(content, 1, fsize, f);
     fclose(f);
+    if (bytes_read != (size_t)fsize) {
+        arena_free(content);
+        return false;
+    }
+    content[fsize] = 0;
 
     /* Find "exposed-modules" key */
     char *exposed = strstr(content, "\"exposed-modules\"");
