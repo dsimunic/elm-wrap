@@ -314,11 +314,11 @@ BINDIR_INSTALL = $(PREFIX)/bin
 USER_PREFIX = $(HOME)/.local
 USER_BINDIR = $(USER_PREFIX)/bin
 
-.PHONY: all clean pg_core_test pg_file_test indexmaker mkpkg test check dist distcheck install install-user uninstall uninstall-user rulrc compile-builtin-rules
+.PHONY: all clean pg_core_test pg_file_test indexmaker mkpkg help-report-html-gen test check dist distcheck install install-user uninstall uninstall-user rulrc compile-builtin-rules
 
 .DEFAULT_GOAL := all
 
-all: $(TARGET) append-builtin-rules
+all: $(TARGET) append-builtin-rules $(PG_CORE_TEST) $(PG_FILE_TEST) $(INDEXMAKER) $(MKPKG) $(HELP_REPORT_HTML_GEN)
 
 rulrc: $(RULRC)
 
@@ -785,7 +785,7 @@ $(PG_CORE_TEST): $(BUILDDIR)/pg_core_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/el
 
 pg_file_test: $(PG_FILE_TEST)
 
-$(PG_FILE_TEST): $(BUILDDIR)/pg_file_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o | $(TOOLSDIR)
+$(PG_FILE_TEST): $(BUILDDIR)/pg_file_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/package_common.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/cJSON.o | $(TOOLSDIR)
 	$(CC) $(CFLAGS) $^ -o $@
 
 indexmaker: $(INDEXMAKER)
