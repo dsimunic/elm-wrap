@@ -3,6 +3,7 @@
 #include "../install_env.h"
 #include "../alloc.h"
 #include "../log.h"
+#include "../commands/package/package_common.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -167,15 +168,7 @@ void constraint_free(Constraint *constraint) {
 }
 
 /* Version comparison helper */
-static void parse_version(const char *version, int *major, int *minor, int *patch) {
-    *major = 0;
-    *minor = 0;
-    *patch = 0;
-
-    if (version) {
-        sscanf(version, "%d.%d.%d", major, minor, patch);
-    }
-}
+/* Removed local parse_version - now using version_parse_safe from package_common.h */
 
 bool version_satisfies(const char *version, Constraint *constraint) {
     if (!version || !constraint) return false;
@@ -185,29 +178,25 @@ bool version_satisfies(const char *version, Constraint *constraint) {
             return strcmp(version, constraint->exact_version) == 0;
 
         case CONSTRAINT_UNTIL_NEXT_MINOR: {
-            int major, minor, patch;
-            int req_major, req_minor, req_patch;
-
-            parse_version(version, &major, &minor, &patch);
-            parse_version(constraint->exact_version, &req_major, &req_minor, &req_patch);
+            Version v, req;
+            if (!version_parse_safe(version, &v)) return false;
+            if (!version_parse_safe(constraint->exact_version, &req)) return false;
 
             /* Must have same major and minor, but patch can be higher */
-            return (major == req_major &&
-                    minor == req_minor &&
-                    patch >= req_patch);
+            return (v.major == req.major &&
+                    v.minor == req.minor &&
+                    v.patch >= req.patch);
         }
 
         case CONSTRAINT_UNTIL_NEXT_MAJOR: {
-            int major, minor, patch;
-            int req_major, req_minor, req_patch;
-
-            parse_version(version, &major, &minor, &patch);
-            parse_version(constraint->exact_version, &req_major, &req_minor, &req_patch);
+            Version v, req;
+            if (!version_parse_safe(version, &v)) return false;
+            if (!version_parse_safe(constraint->exact_version, &req)) return false;
 
             /* Must have same major, but minor and patch can be higher */
-            if (major != req_major) return false;
-            if (minor < req_minor) return false;
-            if (minor == req_minor && patch < req_patch) return false;
+            if (v.major != req.major) return false;
+            if (v.minor < req.minor) return false;
+            if (v.minor == req.minor && v.patch < req.patch) return false;
             return true;
         }
 

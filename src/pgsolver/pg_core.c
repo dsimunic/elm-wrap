@@ -1150,17 +1150,12 @@ bool pg_version_parse(const char *s, PgVersion *out) {
         return false;
     }
 
-    int major = 0;
-    int minor = 0;
-    int patch = 0;
-
-    if (sscanf(s, "%d.%d.%d", &major, &minor, &patch) != 3) {
+    Version v;
+    if (!version_parse_safe(s, &v)) {
         return false;
     }
 
-    out->major = major;
-    out->minor = minor;
-    out->patch = patch;
+    *out = pg_version_from_version(v);
     return true;
 }
 
@@ -2258,66 +2253,20 @@ static void pg_format_version_range(
     size_t out_size,
     bool *out_is_any
 ) {
-    /* Check if it's "any" (unbounded on both ends) */
-    if (range.lower.unbounded && range.upper.unbounded) {
-        snprintf(out, out_size, "any");
-        if (out_is_any) *out_is_any = true;
-        return;
+    /* Convert PgVersionRange to VersionRange and use unified version_range_to_string */
+    VersionRange vr = pg_range_to_version_range(range);
+    char *str = version_range_to_string(&vr);
+
+    if (out_is_any) {
+        *out_is_any = (vr.lower.unbounded && vr.upper.unbounded);
     }
 
-    if (out_is_any) *out_is_any = false;
-
-    /* Check if it's an exact version */
-    if (!range.lower.unbounded && !range.upper.unbounded &&
-        range.lower.inclusive && range.upper.inclusive &&
-        pg_version_cmp_internal(&range.lower.v, &range.upper.v) == 0) {
-        snprintf(out, out_size, "%d.%d.%d",
-                 range.lower.v.major,
-                 range.lower.v.minor,
-                 range.lower.v.patch);
-        return;
-    }
-
-    /* Check for caret ranges (^X.Y.Z = >=X.Y.Z <X+1.0.0) */
-    if (!range.lower.unbounded && !range.upper.unbounded &&
-        range.lower.inclusive && !range.upper.inclusive &&
-        range.upper.v.minor == 0 && range.upper.v.patch == 0 &&
-        range.upper.v.major == range.lower.v.major + 1) {
-        snprintf(out, out_size, "^%d.%d.%d",
-                 range.lower.v.major,
-                 range.lower.v.minor,
-                 range.lower.v.patch);
-        return;
-    }
-
-    /* Generic range */
-    char lower_str[MAX_VERSION_STRING_MEDIUM_LENGTH] = "";
-    char upper_str[MAX_VERSION_STRING_MEDIUM_LENGTH] = "";
-
-    if (!range.lower.unbounded) {
-        snprintf(lower_str, sizeof(lower_str), "%s%d.%d.%d",
-                 range.lower.inclusive ? ">=" : ">",
-                 range.lower.v.major,
-                 range.lower.v.minor,
-                 range.lower.v.patch);
-    }
-
-    if (!range.upper.unbounded) {
-        snprintf(upper_str, sizeof(upper_str), "%s%d.%d.%d",
-                 range.upper.inclusive ? "<=" : "<",
-                 range.upper.v.major,
-                 range.upper.v.minor,
-                 range.upper.v.patch);
-    }
-
-    if (lower_str[0] && upper_str[0]) {
-        snprintf(out, out_size, "%s %s", lower_str, upper_str);
-    } else if (lower_str[0]) {
-        snprintf(out, out_size, "%s", lower_str);
-    } else if (upper_str[0]) {
-        snprintf(out, out_size, "%s", upper_str);
+    if (str) {
+        strncpy(out, str, out_size - 1);
+        out[out_size - 1] = '\0';
+        arena_free(str);
     } else {
-        snprintf(out, out_size, "any");
+        snprintf(out, out_size, "(error)");
     }
 }
 
