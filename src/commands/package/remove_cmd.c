@@ -60,7 +60,7 @@ static bool find_orphaned_dependencies_multi(
         log_debug("Finding orphaned dependencies after removing %s/%s", authors[i], names[i]);
 
         PackageMap *orphaned = NULL;
-        if (!find_orphaned_packages(elm_json, cache, authors[i], names[i], &orphaned)) {
+        if (!find_orphaned_packages(elm_json, (struct CacheConfig *)cache, authors[i], names[i], &orphaned)) {
             return false;
         }
 

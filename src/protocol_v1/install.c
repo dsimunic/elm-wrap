@@ -26,7 +26,7 @@
  * Helper function to find elm.json in a package directory.
  * Handles both cases: elm.json at root and elm.json in a subdirectory.
  */
-static char* find_package_elm_json(const char *pkg_path) {
+static char* v1_find_package_elm_json(const char *pkg_path) {
     /* Try direct path first */
     size_t direct_len = strlen(pkg_path) + strlen("/elm.json") + 1;
     char *direct_path = arena_malloc(direct_len);
@@ -85,7 +85,7 @@ bool v1_package_depends_on(const char *pkg_author, const char *pkg_name, const c
         return false;
     }
 
-    char *elm_json_path = find_package_elm_json(pkg_path);
+    char *elm_json_path = v1_find_package_elm_json(pkg_path);
     ElmJson *pkg_elm_json = NULL;
 
     if (elm_json_path) {
@@ -95,7 +95,7 @@ bool v1_package_depends_on(const char *pkg_author, const char *pkg_name, const c
 
     if (!pkg_elm_json) {
         if (cache_download_package_with_env(env, pkg_author, pkg_name, pkg_version)) {
-            elm_json_path = find_package_elm_json(pkg_path);
+            elm_json_path = v1_find_package_elm_json(pkg_path);
             if (elm_json_path) {
                 pkg_elm_json = elm_json_read(elm_json_path);
                 arena_free(elm_json_path);
@@ -137,7 +137,7 @@ int v1_show_package_dependencies(const char *author, const char *name, const cha
         return 1;
     }
 
-    char *elm_json_path = find_package_elm_json(pkg_path);
+    char *elm_json_path = v1_find_package_elm_json(pkg_path);
 
     ElmJson *elm_json = NULL;
     if (elm_json_path) {

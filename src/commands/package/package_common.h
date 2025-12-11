@@ -3,12 +3,133 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include "../../elm_json.h"
-#include "../../install_env.h"
-#include "../../solver.h"
-#include "../../cache.h"
 
 #define ELM_JSON_PATH "elm.json"
+
+/* Forward declarations for opaque types used in function signatures */
+struct InstallEnv;
+struct CacheConfig;
+
+/*
+ * Unified version representation.
+ * Used across all version parsing, comparison, and formatting operations.
+ */
+typedef struct {
+    uint16_t major;
+    uint16_t minor;
+    uint16_t patch;
+} Version;
+
+/*
+ * Version range bound.
+ */
+typedef struct {
+    Version v;
+    bool inclusive;   /* true = >=/<= , false = >/< */
+    bool unbounded;   /* true = no bound in this direction */
+} VersionBound;
+
+/*
+ * Version range for constraints like "1.0.0 <= v < 2.0.0".
+ */
+typedef struct {
+    VersionBound lower;
+    VersionBound upper;
+    bool is_empty;
+} VersionRange;
+
+/*
+ * Version parsing and formatting
+ */
+
+/* Parse "X.Y.Z" string into Version struct.
+ * Returns Version with all zeros if parsing fails.
+ * Use version_parse_safe() to check if parsing succeeded for non-zero versions. */
+Version version_parse(const char *version_str);
+
+/* Parse "X.Y.Z" string into Version struct with success indicator.
+ * Returns true on success, false on failure.
+ * Preferred over version_parse() when you need to distinguish 0.0.0 from parse failure. */
+bool version_parse_safe(const char *version_str, Version *out);
+
+/* Format Version struct to "X.Y.Z" string.
+ * Returns arena-allocated string. Caller should arena_free when done. */
+char *version_to_string(const Version *v);
+
+/* Format Version components directly to "X.Y.Z" string.
+ * Convenience function when you have separate major/minor/patch values.
+ * Returns arena-allocated string. */
+char *version_format(uint16_t major, uint16_t minor, uint16_t patch);
+
+/*
+ * Version comparison
+ */
+
+/* Compare two Version structs.
+ * Returns: negative if a < b, zero if a == b, positive if a > b */
+int version_compare(const Version *a, const Version *b);
+
+/* Check if two versions are equal. */
+bool version_equals(const Version *a, const Version *b);
+
+/*
+ * Version constraints
+ */
+
+/* Check if a version string is a constraint (contains "<=" or "<") vs exact version. */
+bool version_is_constraint(const char *version_str);
+
+/* Parse Elm-style constraint "X.Y.Z <= v < A.B.C" into VersionRange.
+ * Returns true on success. For exact versions, both bounds are set to that version. */
+bool version_parse_constraint(const char *constraint, VersionRange *out);
+
+/* Check if a version falls within a range. */
+bool version_in_range(const Version *v, const VersionRange *range);
+
+/* Format VersionRange to human-readable string.
+ * Returns arena-allocated string.
+ * Formats: "X.Y.Z" (exact), "^X.Y.Z" (caret), ">=X.Y.Z <A.B.C" (general) */
+char *version_range_to_string(const VersionRange *range);
+
+/*
+ * Package specification parsing
+ */
+
+/* Parse "author/name@version" into components.
+ * Returns true on success.
+ * out_author, out_name: arena-allocated strings (caller frees)
+ * out_version: Version struct */
+bool parse_package_with_version(const char *spec, char **out_author, char **out_name, Version *out_version);
+
+/* Parse "author/name@X.Y.Z" keeping version as string.
+ * Returns true on success.
+ * out_author, out_name, out_version: arena-allocated strings (caller frees) */
+bool parse_package_spec(const char *spec, char **out_author, char **out_name, char **out_version);
+
+/*
+ * Constraint utilities
+ */
+
+/* Create constraint string "X.Y.Z <= v < (X+1).0.0" from exact version.
+ * Returns arena-allocated string. */
+char *version_to_major_constraint(const char *version);
+
+/* Create exact VersionRange for a single version. */
+VersionRange version_range_exact(Version v);
+
+/* Create VersionRange allowing any version within same major (^X.Y.Z). */
+VersionRange version_range_until_next_major(Version v);
+
+/* Create VersionRange allowing any version within same minor. */
+VersionRange version_range_until_next_minor(Version v);
+
+/* Create unbounded VersionRange (matches any version). */
+VersionRange version_range_any(void);
+
+/* Compute intersection of two ranges. */
+VersionRange version_range_intersect(VersionRange a, VersionRange b);
 
 bool parse_package_name(const char *package, char **author, char **name);
 Package* find_existing_package(ElmJson *elm_json, const char *author, const char *name);
@@ -69,7 +190,7 @@ bool add_or_update_package_in_elm_json(
 );
 
 char* find_package_elm_json(const char *pkg_path);
-bool install_from_file(const char *source_path, InstallEnv *env, const char *author, const char *name, const char *version);
+bool install_from_file(const char *source_path, struct InstallEnv *env, const char *author, const char *name, const char *version);
 int compare_package_changes(const void *a, const void *b);
 
 /**
@@ -82,7 +203,7 @@ int compare_package_changes(const void *a, const void *b);
  * @param out_version_count Output: number of available versions (can be NULL)
  * @return true if package exists with at least one valid version, false otherwise
  */
-bool package_exists_in_registry(InstallEnv *env, const char *author, const char *name,
+bool package_exists_in_registry(struct InstallEnv *env, const char *author, const char *name,
                                  size_t *out_version_count);
 
 /**
@@ -100,7 +221,7 @@ bool package_exists_in_registry(InstallEnv *env, const char *author, const char 
  */
 bool find_orphaned_packages(
     const ElmJson *elm_json,
-    CacheConfig *cache,
+    struct CacheConfig *cache,
     const char *exclude_author,
     const char *exclude_name,
     PackageMap **out_orphaned

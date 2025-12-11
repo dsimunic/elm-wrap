@@ -177,18 +177,6 @@ static void parse_version(const char *version, int *major, int *minor, int *patc
     }
 }
 
-int version_compare(const char *v1, const char *v2) {
-    int major1, minor1, patch1;
-    int major2, minor2, patch2;
-
-    parse_version(v1, &major1, &minor1, &patch1);
-    parse_version(v2, &major2, &minor2, &patch2);
-
-    if (major1 != major2) return major1 - major2;
-    if (minor1 != minor2) return minor1 - minor2;
-    return patch1 - patch2;
-}
-
 bool version_satisfies(const char *version, Constraint *constraint) {
     if (!version || !constraint) return false;
 

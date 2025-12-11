@@ -40,7 +40,6 @@ Constraint* constraint_create_any(void);
 void constraint_free(Constraint *constraint);
 
 /* Version comparison */
-int version_compare(const char *v1, const char *v2);
 bool version_satisfies(const char *version, Constraint *constraint);
 
 /* Package removal */

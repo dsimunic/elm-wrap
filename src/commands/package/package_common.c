@@ -3,7 +3,9 @@
 #include "../../cache.h"
 #include "../../constants.h"
 #include "../../fileutil.h"
+#include "../../install_env.h"
 #include "../../registry.h"
+#include "../../solver.h"
 #include "../../protocol_v2/solver/v2_registry.h"
 #include "../../log.h"
 #include "../../rulr/rulr.h"
@@ -20,6 +22,517 @@
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
+
+/* ========================================================================
+ * Version Parsing and Formatting
+ * ======================================================================== */
+
+Version version_parse(const char *version_str) {
+    Version v = {0, 0, 0};
+    if (!version_str) {
+        return v;
+    }
+
+    int major = 0;
+    int minor = 0;
+    int patch = 0;
+
+    if (sscanf(version_str, "%d.%d.%d", &major, &minor, &patch) == 3 &&
+        major >= 0 && minor >= 0 && patch >= 0) {
+        v.major = (uint16_t)major;
+        v.minor = (uint16_t)minor;
+        v.patch = (uint16_t)patch;
+    }
+
+    return v;
+}
+
+bool version_parse_safe(const char *version_str, Version *out) {
+    if (!version_str || !out) {
+        return false;
+    }
+
+    int major = 0;
+    int minor = 0;
+    int patch = 0;
+
+    if (sscanf(version_str, "%d.%d.%d", &major, &minor, &patch) != 3) {
+        return false;
+    }
+
+    if (major < 0 || minor < 0 || patch < 0) {
+        return false;
+    }
+
+    out->major = (uint16_t)major;
+    out->minor = (uint16_t)minor;
+    out->patch = (uint16_t)patch;
+    return true;
+}
+
+char *version_to_string(const Version *v) {
+    if (!v) {
+        return NULL;
+    }
+
+    char *str = arena_malloc(MAX_VERSION_STRING_LENGTH);
+    if (!str) {
+        return NULL;
+    }
+
+    snprintf(str, MAX_VERSION_STRING_LENGTH, "%u.%u.%u",
+             (unsigned int)v->major,
+             (unsigned int)v->minor,
+             (unsigned int)v->patch);
+    return str;
+}
+
+char *version_format(uint16_t major, uint16_t minor, uint16_t patch) {
+    Version v = {major, minor, patch};
+    return version_to_string(&v);
+}
+
+/* ========================================================================
+ * Version Comparison
+ * ======================================================================== */
+
+int version_compare(const Version *a, const Version *b) {
+    if (!a || !b) {
+        return 0;
+    }
+
+    if (a->major != b->major) {
+        return (int)a->major - (int)b->major;
+    }
+
+    if (a->minor != b->minor) {
+        return (int)a->minor - (int)b->minor;
+    }
+
+    return (int)a->patch - (int)b->patch;
+}
+
+bool version_equals(const Version *a, const Version *b) {
+    if (!a || !b) {
+        return false;
+    }
+
+    return (a->major == b->major &&
+            a->minor == b->minor &&
+            a->patch == b->patch);
+}
+
+/* ========================================================================
+ * Version Constraints
+ * ======================================================================== */
+
+bool version_is_constraint(const char *version_str) {
+    if (!version_str) {
+        return false;
+    }
+
+    return strstr(version_str, "<=") != NULL || strstr(version_str, "<") != NULL;
+}
+
+bool version_parse_constraint(const char *constraint, VersionRange *out) {
+    if (!constraint || !out) {
+        return false;
+    }
+
+    int lower_major = 0;
+    int lower_minor = 0;
+    int lower_patch = 0;
+    int upper_major = 0;
+    int upper_minor = 0;
+    int upper_patch = 0;
+
+    int matched = sscanf(
+        constraint,
+        " %d.%d.%d <= v < %d.%d.%d",
+        &lower_major,
+        &lower_minor,
+        &lower_patch,
+        &upper_major,
+        &upper_minor,
+        &upper_patch
+    );
+
+    if (matched == 6) {
+        if (lower_major < 0 || lower_minor < 0 || lower_patch < 0 ||
+            upper_major < 0 || upper_minor < 0 || upper_patch < 0) {
+            return false;
+        }
+
+        out->lower.v.major = (uint16_t)lower_major;
+        out->lower.v.minor = (uint16_t)lower_minor;
+        out->lower.v.patch = (uint16_t)lower_patch;
+        out->lower.inclusive = true;
+        out->lower.unbounded = false;
+
+        out->upper.v.major = (uint16_t)upper_major;
+        out->upper.v.minor = (uint16_t)upper_minor;
+        out->upper.v.patch = (uint16_t)upper_patch;
+        out->upper.inclusive = false;
+        out->upper.unbounded = false;
+
+        out->is_empty = false;
+        return true;
+    }
+
+    matched = sscanf(constraint, "%d.%d.%d", &lower_major, &lower_minor, &lower_patch);
+    if (matched == 3 &&
+        lower_major >= 0 && lower_minor >= 0 && lower_patch >= 0) {
+        Version v = {
+            (uint16_t)lower_major,
+            (uint16_t)lower_minor,
+            (uint16_t)lower_patch
+        };
+        *out = version_range_exact(v);
+        return true;
+    }
+
+    return false;
+}
+
+bool version_in_range(const Version *v, const VersionRange *range) {
+    if (!v || !range || range->is_empty) {
+        return false;
+    }
+
+    if (!range->lower.unbounded) {
+        int cmp = version_compare(v, &range->lower.v);
+        if (range->lower.inclusive) {
+            if (cmp < 0) {
+                return false;
+            }
+        } else if (cmp <= 0) {
+            return false;
+        }
+    }
+
+    if (!range->upper.unbounded) {
+        int cmp = version_compare(v, &range->upper.v);
+        if (range->upper.inclusive) {
+            if (cmp > 0) {
+                return false;
+            }
+        } else if (cmp >= 0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+char *version_range_to_string(const VersionRange *range) {
+    if (!range) {
+        return NULL;
+    }
+
+    char *out = arena_malloc(MAX_RANGE_STRING_LENGTH);
+    if (!out) {
+        return NULL;
+    }
+
+    if (range->is_empty) {
+        snprintf(out, MAX_RANGE_STRING_LENGTH, "(empty)");
+        return out;
+    }
+
+    if (range->lower.unbounded && range->upper.unbounded) {
+        snprintf(out, MAX_RANGE_STRING_LENGTH, "any");
+        return out;
+    }
+
+    if (!range->lower.unbounded &&
+        !range->upper.unbounded &&
+        range->lower.inclusive &&
+        range->upper.inclusive &&
+        version_equals(&range->lower.v, &range->upper.v)) {
+        snprintf(out, MAX_RANGE_STRING_LENGTH, "%u.%u.%u",
+                 (unsigned int)range->lower.v.major,
+                 (unsigned int)range->lower.v.minor,
+                 (unsigned int)range->lower.v.patch);
+        return out;
+    }
+
+    if (!range->lower.unbounded &&
+        !range->upper.unbounded &&
+        range->lower.inclusive &&
+        !range->upper.inclusive &&
+        range->upper.v.minor == 0 &&
+        range->upper.v.patch == 0 &&
+        range->upper.v.major == (uint16_t)(range->lower.v.major + 1)) {
+        snprintf(out, MAX_RANGE_STRING_LENGTH, "^%u.%u.%u",
+                 (unsigned int)range->lower.v.major,
+                 (unsigned int)range->lower.v.minor,
+                 (unsigned int)range->lower.v.patch);
+        return out;
+    }
+
+    char lower_str[MAX_VERSION_STRING_MEDIUM_LENGTH] = "";
+    char upper_str[MAX_VERSION_STRING_MEDIUM_LENGTH] = "";
+
+    if (!range->lower.unbounded) {
+        snprintf(lower_str, sizeof(lower_str), "%s%u.%u.%u",
+                 range->lower.inclusive ? ">=" : ">",
+                 (unsigned int)range->lower.v.major,
+                 (unsigned int)range->lower.v.minor,
+                 (unsigned int)range->lower.v.patch);
+    }
+
+    if (!range->upper.unbounded) {
+        snprintf(upper_str, sizeof(upper_str), "%s%u.%u.%u",
+                 range->upper.inclusive ? "<=" : "<",
+                 (unsigned int)range->upper.v.major,
+                 (unsigned int)range->upper.v.minor,
+                 (unsigned int)range->upper.v.patch);
+    }
+
+    if (lower_str[0] != '\0' && upper_str[0] != '\0') {
+        snprintf(out, MAX_RANGE_STRING_LENGTH, "%s %s", lower_str, upper_str);
+    } else if (lower_str[0] != '\0') {
+        snprintf(out, MAX_RANGE_STRING_LENGTH, "%s", lower_str);
+    } else if (upper_str[0] != '\0') {
+        snprintf(out, MAX_RANGE_STRING_LENGTH, "%s", upper_str);
+    } else {
+        snprintf(out, MAX_RANGE_STRING_LENGTH, "any");
+    }
+
+    return out;
+}
+
+/* ========================================================================
+ * Package specification parsing
+ * ======================================================================== */
+
+bool parse_package_with_version(const char *spec, char **out_author, char **out_name, Version *out_version) {
+    if (!spec || !out_author || !out_name || !out_version) {
+        return false;
+    }
+
+    const char *at_pos = strchr(spec, '@');
+    if (!at_pos) {
+        return false;
+    }
+
+    size_t pkg_len = (size_t)(at_pos - spec);
+    char *pkg_part = arena_malloc(pkg_len + 1);
+    if (!pkg_part) {
+        return false;
+    }
+
+    strncpy(pkg_part, spec, pkg_len);
+    pkg_part[pkg_len] = '\0';
+
+    if (!parse_package_name(pkg_part, out_author, out_name)) {
+        arena_free(pkg_part);
+        return false;
+    }
+
+    arena_free(pkg_part);
+
+    if (!version_parse_safe(at_pos + 1, out_version)) {
+        arena_free(*out_author);
+        arena_free(*out_name);
+        *out_author = NULL;
+        *out_name = NULL;
+        return false;
+    }
+
+    return true;
+}
+
+bool parse_package_spec(const char *spec, char **out_author, char **out_name, char **out_version) {
+    if (!spec || !out_author || !out_name || !out_version) {
+        return false;
+    }
+
+    const char *at_pos = strchr(spec, '@');
+    if (!at_pos) {
+        return false;
+    }
+
+    size_t pkg_len = (size_t)(at_pos - spec);
+    char *pkg_part = arena_malloc(pkg_len + 1);
+    if (!pkg_part) {
+        return false;
+    }
+
+    strncpy(pkg_part, spec, pkg_len);
+    pkg_part[pkg_len] = '\0';
+
+    if (!parse_package_name(pkg_part, out_author, out_name)) {
+        arena_free(pkg_part);
+        return false;
+    }
+
+    arena_free(pkg_part);
+
+    *out_version = arena_strdup(at_pos + 1);
+    if (!*out_version) {
+        arena_free(*out_author);
+        arena_free(*out_name);
+        *out_author = NULL;
+        *out_name = NULL;
+        return false;
+    }
+
+    return true;
+}
+
+/* ========================================================================
+ * Constraint utilities
+ * ======================================================================== */
+
+char *version_to_major_constraint(const char *version) {
+    Version v;
+    if (!version_parse_safe(version, &v)) {
+        return NULL;
+    }
+
+    char *constraint = arena_malloc(MAX_RANGE_STRING_LENGTH);
+    if (!constraint) {
+        return NULL;
+    }
+
+    snprintf(constraint, MAX_RANGE_STRING_LENGTH, "%u.%u.%u <= v < %u.0.0",
+             (unsigned int)v.major,
+             (unsigned int)v.minor,
+             (unsigned int)v.patch,
+             (unsigned int)(v.major + 1));
+    return constraint;
+}
+
+VersionRange version_range_exact(Version v) {
+    VersionRange range;
+    range.lower.v = v;
+    range.lower.inclusive = true;
+    range.lower.unbounded = false;
+    range.upper.v = v;
+    range.upper.inclusive = true;
+    range.upper.unbounded = false;
+    range.is_empty = false;
+    return range;
+}
+
+VersionRange version_range_until_next_major(Version v) {
+    VersionRange range;
+    range.lower.v = v;
+    range.lower.inclusive = true;
+    range.lower.unbounded = false;
+    range.upper.v.major = (uint16_t)(v.major + 1);
+    range.upper.v.minor = 0;
+    range.upper.v.patch = 0;
+    range.upper.inclusive = false;
+    range.upper.unbounded = false;
+    range.is_empty = false;
+    return range;
+}
+
+VersionRange version_range_until_next_minor(Version v) {
+    VersionRange range;
+    range.lower.v = v;
+    range.lower.inclusive = true;
+    range.lower.unbounded = false;
+    range.upper.v.major = v.major;
+    range.upper.v.minor = (uint16_t)(v.minor + 1);
+    range.upper.v.patch = 0;
+    range.upper.inclusive = false;
+    range.upper.unbounded = false;
+    range.is_empty = false;
+    return range;
+}
+
+VersionRange version_range_any(void) {
+    VersionRange range;
+    range.lower.v.major = 0;
+    range.lower.v.minor = 0;
+    range.lower.v.patch = 0;
+    range.lower.inclusive = false;
+    range.lower.unbounded = true;
+    range.upper.v.major = 0;
+    range.upper.v.minor = 0;
+    range.upper.v.patch = 0;
+    range.upper.inclusive = false;
+    range.upper.unbounded = true;
+    range.is_empty = false;
+    return range;
+}
+
+static VersionRange version_range_empty(void) {
+    VersionRange range = {0};
+    range.lower.unbounded = true;
+    range.upper.unbounded = true;
+    range.is_empty = true;
+    return range;
+}
+
+VersionRange version_range_intersect(VersionRange a, VersionRange b) {
+    if (a.is_empty || b.is_empty) {
+        return version_range_empty();
+    }
+
+    VersionRange result = version_range_any();
+    result.is_empty = false;
+
+    if (a.lower.unbounded && b.lower.unbounded) {
+        result.lower.unbounded = true;
+        result.lower.inclusive = false;
+    } else if (a.lower.unbounded) {
+        result.lower = b.lower;
+    } else if (b.lower.unbounded) {
+        result.lower = a.lower;
+    } else {
+        int cmp = version_compare(&a.lower.v, &b.lower.v);
+        if (cmp > 0) {
+            result.lower = a.lower;
+        } else if (cmp < 0) {
+            result.lower = b.lower;
+        } else {
+            result.lower.v = a.lower.v;
+            result.lower.inclusive = a.lower.inclusive && b.lower.inclusive;
+            result.lower.unbounded = false;
+        }
+    }
+
+    if (a.upper.unbounded && b.upper.unbounded) {
+        result.upper.unbounded = true;
+        result.upper.inclusive = false;
+    } else if (a.upper.unbounded) {
+        result.upper = b.upper;
+    } else if (b.upper.unbounded) {
+        result.upper = a.upper;
+    } else {
+        int cmp = version_compare(&a.upper.v, &b.upper.v);
+        if (cmp < 0) {
+            result.upper = a.upper;
+        } else if (cmp > 0) {
+            result.upper = b.upper;
+        } else {
+            result.upper.v = a.upper.v;
+            result.upper.inclusive = a.upper.inclusive && b.upper.inclusive;
+            result.upper.unbounded = false;
+        }
+    }
+
+    if (!result.lower.unbounded && !result.upper.unbounded) {
+        int cmp = version_compare(&result.lower.v, &result.upper.v);
+        if (cmp > 0) {
+            return version_range_empty();
+        }
+
+        if (cmp == 0 && (!result.lower.inclusive || !result.upper.inclusive)) {
+            return version_range_empty();
+        }
+    }
+
+    return result;
+}
+
+/* ========================================================================
+ * Existing functionality
+ * ======================================================================== */
 
 bool parse_package_name(const char *package, char **author, char **name) {
     if (!package) return false;
@@ -478,7 +991,7 @@ bool package_exists_in_registry(InstallEnv *env, const char *author, const char 
  */
 static void insert_package_dependencies_recursive(
     Rulr *rulr,
-    CacheConfig *cache,
+    struct CacheConfig *cache,
     const char *author,
     const char *name,
     const char *version,
@@ -493,7 +1006,7 @@ static void insert_package_dependencies_recursive(
     package_map_add(visited, author, name, version);
 
     /* Get the package path in cache */
-    char *pkg_path = cache_get_package_path(cache, author, name, version);
+    char *pkg_path = cache_get_package_path((CacheConfig *)cache, author, name, version);
     if (!pkg_path) {
         log_debug("Could not get cache path for %s/%s %s", author, name, version);
         return;
@@ -557,7 +1070,7 @@ static void insert_package_dependencies_recursive(
 
 bool find_orphaned_packages(
     const ElmJson *elm_json,
-    CacheConfig *cache,
+    struct CacheConfig *cache,
     const char *exclude_author,
     const char *exclude_name,
     PackageMap **out_orphaned

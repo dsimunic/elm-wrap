@@ -70,7 +70,6 @@ void constraint_free(Constraint *constraint);
 
 /* Version operations */
 bool version_satisfies(const char *version, Constraint *constraint);
-int version_compare(const char *v1, const char *v2);
 
 /* Solver functions */
 SolverResult solver_add_package(

@@ -49,37 +49,9 @@ static bool write_u64_be(FILE *f, uint64_t val) {
 }
 
 /* Version operations */
-Version version_parse(const char *version_str) {
-    Version v = {0, 0, 0};
-
-    if (!version_str) return v;
-
-    /* Parse major.minor.patch */
-    int major, minor, patch;
-    if (sscanf(version_str, "%d.%d.%d", &major, &minor, &patch) == 3) {
-        v.major = (uint16_t)major;
-        v.minor = (uint16_t)minor;
-        v.patch = (uint16_t)patch;
-    }
-
-    return v;
-}
-
-int registry_version_compare(const Version *a, const Version *b) {
-    if (a->major != b->major) return a->major - b->major;
-    if (a->minor != b->minor) return a->minor - b->minor;
-    return a->patch - b->patch;
-}
-
-char* version_to_string(const Version *v) {
-    if (!v) return NULL;
-
-    char *str = arena_malloc(MAX_VERSION_STRING_LENGTH);  /* Enough for "65535.65535.65535" */
-    if (!str) return NULL;
-
-    snprintf(str, MAX_VERSION_STRING_LENGTH, "%u.%u.%u", v->major, v->minor, v->patch);
-    return str;
-}
+/* version_parse(), version_to_string(), version_compare() (registry_version_compare),
+ * and version_is_constraint() (registry_is_version_constraint) are now implemented
+ * in commands/package/package_common.c. See registry.h for compatibility aliases. */
 
 /* Compare two registry entries by author/name alphabetically */
 static int registry_entry_compare(const void *a, const void *b) {
@@ -526,12 +498,6 @@ bool registry_add_version(Registry *registry, const char *author, const char *na
     registry->total_versions++;
 
     return true;
-}
-
-/* Check if a version string is a constraint (contains "<=" or "<") vs exact version */
-bool registry_is_version_constraint(const char *version_str) {
-    if (!version_str) return false;
-    return strstr(version_str, "<=") != NULL || strstr(version_str, "<") != NULL;
 }
 
 /* Parse Elm version constraint "1.0.0 <= v < 2.0.0" and find highest matching version */
