@@ -7,6 +7,7 @@
 #include "../../../log.h"
 #include "../../../fileutil.h"
 #include "../../../import_tree.h"
+#include "../../package/package_common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,30 +35,6 @@ typedef struct {
     bool in_registry;
 } VersionStatus;
 
-/* Parse package name into author and name components */
-static bool parse_package_name(const char *package, char **author, char **name) {
-    if (!package) return false;
-
-    const char *slash = strchr(package, '/');
-    if (!slash) {
-        fprintf(stderr, "Error: Package name must be in format 'author/package'\n");
-        return false;
-    }
-
-    size_t author_len = slash - package;
-    *author = arena_malloc(author_len + 1);
-    if (!*author) return false;
-    strncpy(*author, package, author_len);
-    (*author)[author_len] = '\0';
-
-    *name = arena_strdup(slash + 1);
-    if (!*name) {
-        arena_free(*author);
-        return false;
-    }
-
-    return true;
-}
 
 /* Check if a directory is empty */
 static bool is_directory_empty(const char *path) {

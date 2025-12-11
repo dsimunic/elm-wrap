@@ -3,6 +3,7 @@
 #include "../alloc.h"
 #include "../constants.h"
 #include "../log.h"
+#include "../commands/package/package_common.h"
 
 #include <limits.h>
 #include <stdlib.h>
@@ -2448,19 +2449,12 @@ static void pg_explain_external_inline(
         if (name_ctx && pkg_name) {
             PgExplainContext *ctx = (PgExplainContext *)name_ctx;
             if (ctx->current_packages) {
-                const char *slash = strchr(pkg_name, '/');
-                if (slash) {
-                    size_t author_len = (size_t)(slash - pkg_name);
-                    char *author = arena_malloc(author_len + 1);
-                    if (author) {
-                        memcpy(author, pkg_name, author_len);
-                        author[author_len] = '\0';
-                        const char *name = slash + 1;
-                        Package *pkg = package_map_find(ctx->current_packages, author, name);
-                        if (pkg) {
-                            current_version = pkg->version;
-                        }
-                        arena_free(author);
+                char *author = NULL;
+                char *name = NULL;
+                if (parse_package_name(pkg_name, &author, &name)) {
+                    Package *pkg = package_map_find(ctx->current_packages, author, name);
+                    if (pkg) {
+                        current_version = pkg->version;
                     }
                 }
             }

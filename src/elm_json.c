@@ -3,6 +3,7 @@
 #include "constants.h"
 #include "vendor/cJSON.h"
 #include "log.h"
+#include "commands/package/package_common.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -239,16 +240,10 @@ ElmJson* elm_json_read(const char *filepath) {
                     if (cJSON_IsString(package)) {
                         // Parse "author/name"
                         const char *full_name = package->string;
-                        const char *slash = strchr(full_name, '/');
-                        if (slash) {
-                            size_t author_len = slash - full_name;
-                            char *author = arena_malloc(author_len + 1);
-                            strncpy(author, full_name, author_len);
-                            author[author_len] = '\0';
-                            const char *name = slash + 1;
-                            
+                        char *author = NULL;
+                        char *name = NULL;
+                        if (parse_package_name(full_name, &author, &name)) {
                             package_map_add(elm_json->dependencies_direct, author, name, package->valuestring);
-                            arena_free(author);
                         }
                     }
                 }
@@ -261,16 +256,10 @@ ElmJson* elm_json_read(const char *filepath) {
                 cJSON_ArrayForEach(package, indirect) {
                     if (cJSON_IsString(package)) {
                         const char *full_name = package->string;
-                        const char *slash = strchr(full_name, '/');
-                        if (slash) {
-                            size_t author_len = slash - full_name;
-                            char *author = arena_malloc(author_len + 1);
-                            strncpy(author, full_name, author_len);
-                            author[author_len] = '\0';
-                            const char *name = slash + 1;
-                            
+                        char *author = NULL;
+                        char *name = NULL;
+                        if (parse_package_name(full_name, &author, &name)) {
                             package_map_add(elm_json->dependencies_indirect, author, name, package->valuestring);
-                            arena_free(author);
                         }
                     }
                 }
@@ -287,16 +276,10 @@ ElmJson* elm_json_read(const char *filepath) {
                 cJSON_ArrayForEach(package, test_direct) {
                     if (cJSON_IsString(package)) {
                         const char *full_name = package->string;
-                        const char *slash = strchr(full_name, '/');
-                        if (slash) {
-                            size_t author_len = slash - full_name;
-                            char *author = arena_malloc(author_len + 1);
-                            strncpy(author, full_name, author_len);
-                            author[author_len] = '\0';
-                            const char *name = slash + 1;
-                            
+                        char *author = NULL;
+                        char *name = NULL;
+                        if (parse_package_name(full_name, &author, &name)) {
                             package_map_add(elm_json->dependencies_test_direct, author, name, package->valuestring);
-                            arena_free(author);
                         }
                     }
                 }
@@ -309,16 +292,10 @@ ElmJson* elm_json_read(const char *filepath) {
                 cJSON_ArrayForEach(package, test_indirect) {
                     if (cJSON_IsString(package)) {
                         const char *full_name = package->string;
-                        const char *slash = strchr(full_name, '/');
-                        if (slash) {
-                            size_t author_len = slash - full_name;
-                            char *author = arena_malloc(author_len + 1);
-                            strncpy(author, full_name, author_len);
-                            author[author_len] = '\0';
-                            const char *name = slash + 1;
-                            
+                        char *author = NULL;
+                        char *name = NULL;
+                        if (parse_package_name(full_name, &author, &name)) {
                             package_map_add(elm_json->dependencies_test_indirect, author, name, package->valuestring);
-                            arena_free(author);
                         }
                     }
                 }
@@ -347,16 +324,10 @@ ElmJson* elm_json_read(const char *filepath) {
             cJSON_ArrayForEach(package, deps) {
                 if (cJSON_IsString(package)) {
                     const char *full_name = package->string;
-                    const char *slash = strchr(full_name, '/');
-                    if (slash) {
-                        size_t author_len = slash - full_name;
-                        char *author = arena_malloc(author_len + 1);
-                        strncpy(author, full_name, author_len);
-                        author[author_len] = '\0';
-                        const char *name = slash + 1;
-                        
+                    char *author = NULL;
+                    char *name = NULL;
+                    if (parse_package_name(full_name, &author, &name)) {
                         package_map_add(elm_json->package_dependencies, author, name, package->valuestring);
-                        arena_free(author);
                     }
                 }
             }
@@ -369,16 +340,10 @@ ElmJson* elm_json_read(const char *filepath) {
             cJSON_ArrayForEach(package, test_deps) {
                 if (cJSON_IsString(package)) {
                     const char *full_name = package->string;
-                    const char *slash = strchr(full_name, '/');
-                    if (slash) {
-                        size_t author_len = slash - full_name;
-                        char *author = arena_malloc(author_len + 1);
-                        strncpy(author, full_name, author_len);
-                        author[author_len] = '\0';
-                        const char *name = slash + 1;
-                        
+                    char *author = NULL;
+                    char *name = NULL;
+                    if (parse_package_name(full_name, &author, &name)) {
                         package_map_add(elm_json->package_test_dependencies, author, name, package->valuestring);
-                        arena_free(author);
                     }
                 }
             }

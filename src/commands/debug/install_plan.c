@@ -12,6 +12,7 @@
 #include "../../protocol_v2/solver/v2_registry.h"
 #include "../../protocol_v2/solver/pg_elm_v2.h"
 #include "../../pgsolver/pg_core.h"
+#include "../package/package_common.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -110,18 +111,11 @@ static void report_conflicts_v2(const InstallEnv *env, ElmJson *elm_json, const 
     int reported = 0;
     for (size_t i = 0; i < version->dependency_count; i++) {
         V2Dependency *dep = &version->dependencies[i];
-        const char *slash = strchr(dep->package_name, '/');
-        if (!slash) {
+        char *dep_author = NULL;
+        char *dep_name = NULL;
+        if (!parse_package_name(dep->package_name, &dep_author, &dep_name)) {
             continue;
         }
-        size_t dep_author_len = (size_t)(slash - dep->package_name);
-        char *dep_author = arena_malloc(dep_author_len + 1);
-        if (!dep_author) {
-            continue;
-        }
-        memcpy(dep_author, dep->package_name, dep_author_len);
-        dep_author[dep_author_len] = '\0';
-        const char *dep_name = slash + 1;
 
         /* Find current pinned version in any section */
         Package *cur = NULL;
@@ -271,23 +265,11 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         }
         
         // Parse package name from elm.json
-        const char *slash = strchr(pkg_json->package_name, '/');
-        if (!slash) {
+        if (!parse_package_name(pkg_json->package_name, &author, &name)) {
             fprintf(stderr, "Error: Invalid package name in elm.json: %s\n", pkg_json->package_name);
             elm_json_free(pkg_json);
             return 1;
         }
-        
-        size_t author_len = slash - pkg_json->package_name;
-        author = arena_malloc(author_len + 1);
-        name = arena_strdup(slash + 1);
-        if (!author || !name) {
-            fprintf(stderr, "Error: Out of memory\n");
-            elm_json_free(pkg_json);
-            return 1;
-        }
-        memcpy(author, pkg_json->package_name, author_len);
-        author[author_len] = '\0';
         
         // Verify package name matches if specified
         if (package_count > 0) {
@@ -519,8 +501,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
     if (package_count == 1) {
         // Single package mode - use original logic for better error messages
         const char *package = packages[0];
-        const char *slash = strchr(package, '/');
-        if (!slash) {
+        if (!parse_package_name(package, &author, &name)) {
             fprintf(stderr, "Error: Package name must be in author/name format (e.g., elm/html)\n");
             solver_free(solver);
             install_env_free(install_env);
@@ -528,20 +509,6 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
             arena_free(elm_json_path);
             return 1;
         }
-
-        size_t author_len = slash - package;
-        author = arena_malloc(author_len + 1);
-        name = arena_strdup(slash + 1);
-        if (!author || !name) {
-            fprintf(stderr, "Error: Out of memory\n");
-            solver_free(solver);
-            install_env_free(install_env);
-            elm_json_free(elm_json);
-            arena_free(elm_json_path);
-            return 1;
-        }
-        memcpy(author, package, author_len);
-        author[author_len] = '\0';
 
         result = solver_add_package(solver, elm_json, author, name, is_test, major_upgrade, false, &plan);
 

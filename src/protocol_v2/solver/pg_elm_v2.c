@@ -11,6 +11,7 @@
 #include "../../pgsolver/solver_common.h"
 #include "../../alloc.h"
 #include "../../log.h"
+#include "../../commands/package/package_common.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -332,21 +333,13 @@ static int pg_elm_v2_provider_get_dependencies(
     int written = 0;
     for (size_t i = 0; i < pv->dependency_count && written < (int)out_capacity; i++) {
         V2Dependency *dep = &pv->dependencies[i];
-        
+
         /* Parse package name (author/name format) */
-        const char *slash = strchr(dep->package_name, '/');
-        if (!slash) {
+        char *dep_author = NULL;
+        char *dep_name = NULL;
+        if (!parse_package_name(dep->package_name, &dep_author, &dep_name)) {
             continue;
         }
-        
-        size_t dep_author_len = slash - dep->package_name;
-        char *dep_author = arena_malloc(dep_author_len + 1);
-        if (!dep_author) {
-            continue;
-        }
-        memcpy(dep_author, dep->package_name, dep_author_len);
-        dep_author[dep_author_len] = '\0';
-        const char *dep_name = slash + 1;
         
         /* Parse constraint */
         PgVersionRange range;

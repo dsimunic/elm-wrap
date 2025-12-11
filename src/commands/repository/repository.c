@@ -7,6 +7,7 @@
 
 #include "repository.h"
 #include "../package/install_local_dev.h"
+#include "../package/package_common.h"
 #include "../../alloc.h"
 #include "../../constants.h"
 #include "../../global_context.h"
@@ -890,21 +891,10 @@ static int clear_all_tracking(void) {
  */
 static int clear_package_tracking(const char *package_name, const char *version) {
     /* Parse author/name */
-    const char *slash = strchr(package_name, '/');
-    if (!slash) {
+    char *author = NULL;
+    char *name = NULL;
+    if (!parse_package_name(package_name, &author, &name)) {
         fprintf(stderr, "Error: Invalid package name '%s'. Expected author/name format.\n", package_name);
-        return 1;
-    }
-
-    size_t author_len = slash - package_name;
-    char *author = arena_malloc(author_len + 1);
-    if (!author) return 1;
-    memcpy(author, package_name, author_len);
-    author[author_len] = '\0';
-
-    char *name = arena_strdup(slash + 1);
-    if (!name) {
-        arena_free(author);
         return 1;
     }
 
@@ -971,21 +961,10 @@ static unsigned long hash_path_local(const char *str) {
  */
 static int clear_path_tracking(const char *package_name, const char *version, const char *path) {
     /* Parse author/name */
-    const char *slash = strchr(package_name, '/');
-    if (!slash) {
+    char *author = NULL;
+    char *name = NULL;
+    if (!parse_package_name(package_name, &author, &name)) {
         fprintf(stderr, "Error: Invalid package name '%s'. Expected author/name format.\n", package_name);
-        return 1;
-    }
-
-    size_t author_len = slash - package_name;
-    char *author = arena_malloc(author_len + 1);
-    if (!author) return 1;
-    memcpy(author, package_name, author_len);
-    author[author_len] = '\0';
-
-    char *name = arena_strdup(slash + 1);
-    if (!name) {
-        arena_free(author);
         return 1;
     }
 

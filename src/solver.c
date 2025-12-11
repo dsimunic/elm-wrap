@@ -8,6 +8,7 @@
 #include "cache.h"
 #include "log.h"
 #include "alloc.h"
+#include "commands/package/package_common.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -156,29 +157,6 @@ void multi_package_validation_free(MultiPackageValidation *validation) {
     arena_free(validation);
 }
 
-/* Helper to parse package name (duplicated here to avoid header dependency) */
-static bool parse_package_name_internal(const char *package, char **author, char **name) {
-    if (!package) return false;
-
-    const char *slash = strchr(package, '/');
-    if (!slash) {
-        return false;
-    }
-
-    size_t author_len = slash - package;
-    *author = arena_malloc(author_len + 1);
-    if (!*author) return false;
-    strncpy(*author, package, author_len);
-    (*author)[author_len] = '\0';
-
-    *name = arena_strdup(slash + 1);
-    if (!*name) {
-        arena_free(*author);
-        return false;
-    }
-
-    return true;
-}
 
 /* Check if package exists in registry (for V1 and V2 protocols) */
 static bool package_exists_in_registry_internal(
@@ -268,7 +246,7 @@ SolverResult solver_add_packages(
         char *name = NULL;
 
         /* Parse and validate name format */
-        if (!parse_package_name_internal(packages[i], &author, &name)) {
+        if (!parse_package_name(packages[i], &author, &name)) {
             r->author = arena_strdup(packages[i]);
             r->name = NULL;
             r->valid_name = false;

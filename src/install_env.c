@@ -8,6 +8,7 @@
 #include "registry.h"
 #include "protocol_v1/package_fetch.h"
 #include "protocol_v2/solver/v2_registry.h"
+#include "commands/package/package_common.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -52,19 +53,11 @@ static bool parse_all_packages_json(const char *json_str, Registry *registry) {
         if (!package_name) continue;
 
         /* Parse author/name */
-        const char *slash = strchr(package_name, '/');
-        if (!slash) continue;
-
-        size_t author_len = slash - package_name;
-        char *author = arena_malloc(author_len + 1);
-        if (!author) {
-            cJSON_Delete(json);
-            return false;
+        char *author = NULL;
+        char *name = NULL;
+        if (!parse_package_name(package_name, &author, &name)) {
+            continue;
         }
-
-        strncpy(author, package_name, author_len);
-        author[author_len] = '\0';
-        const char *name = slash + 1;
 
         registry_add_entry(registry, author, name);
 
@@ -127,23 +120,12 @@ static bool parse_since_response(const char *json_str, Registry *registry) {
         strncpy(package_name, entry_str, package_name_len);
         package_name[package_name_len] = '\0';
 
-        const char *slash = strchr(package_name, '/');
-        if (!slash) {
+        char *author = NULL;
+        char *name = NULL;
+        if (!parse_package_name(package_name, &author, &name)) {
             arena_free(package_name);
             continue;
         }
-
-        size_t author_len = slash - package_name;
-        char *author = arena_malloc(author_len + 1);
-        if (!author) {
-            arena_free(package_name);
-            cJSON_Delete(json);
-            return false;
-        }
-
-        strncpy(author, package_name, author_len);
-        author[author_len] = '\0';
-        const char *name = slash + 1;
 
         const char *version_str = at + 1;
         Version version = version_parse(version_str);

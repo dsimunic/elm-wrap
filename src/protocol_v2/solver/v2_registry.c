@@ -10,6 +10,7 @@
 #include "../../log.h"
 #include "../../vendor/miniz.h"
 #include "../../dyn_array.h"
+#include "../../commands/package/package_common.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -136,23 +137,9 @@ static bool parse_package_line(const char *line, char **author, char **name) {
     if (strncmp(line, "package: ", 9) != 0) {
         return false;
     }
-    
+
     const char *pkg_name = line + 9;
-    const char *slash = strchr(pkg_name, '/');
-    if (!slash) {
-        return false;
-    }
-    
-    size_t author_len = slash - pkg_name;
-    *author = arena_malloc(author_len + 1);
-    if (!*author) {
-        return false;
-    }
-    memcpy(*author, pkg_name, author_len);
-    (*author)[author_len] = '\0';
-    
-    *name = arena_strdup(slash + 1);
-    return *name != NULL;
+    return parse_package_name(pkg_name, author, name);
 }
 
 /**
