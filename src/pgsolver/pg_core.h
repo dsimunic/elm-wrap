@@ -5,26 +5,13 @@
 #include <stddef.h>
 #include "../commands/package/package_common.h"
 
-/* Basic version representation */
-typedef struct {
-    int major;
-    int minor;
-    int patch;
-} PgVersion;
-
-/* Bound on a version range (may be unbounded) */
-typedef struct {
-    PgVersion v;
-    bool inclusive;
-    bool unbounded;
-} PgBound;
-
-/* Version range (possibly empty, possibly unbounded) */
-typedef struct {
-    PgBound lower;
-    PgBound upper;
-    bool is_empty;
-} PgVersionRange;
+/* Use unified version types from package_common.h
+ * These typedefs maintain the "Pg" namespace for solver code
+ * while using the standard Version/VersionBound/VersionRange types underneath.
+ */
+typedef Version PgVersion;
+typedef VersionBound PgBound;
+typedef VersionRange PgVersionRange;
 
 /* Internal package id used by the solver */
 typedef int PgPackageId;
@@ -148,49 +135,5 @@ bool pg_solver_explain_failure(
     char *out_buffer,
     size_t buffer_size
 );
-
-/* ========================================================================
- * Conversion functions between PgVersion and Version (from package_common.h)
- * ======================================================================== */
-
-static inline PgVersion pg_version_from_version(Version v) {
-    PgVersion pv;
-    pv.major = (int)v.major;
-    pv.minor = (int)v.minor;
-    pv.patch = (int)v.patch;
-    return pv;
-}
-
-static inline Version pg_version_to_version(PgVersion pv) {
-    Version v;
-    v.major = (uint16_t)(pv.major >= 0 ? pv.major : 0);
-    v.minor = (uint16_t)(pv.minor >= 0 ? pv.minor : 0);
-    v.patch = (uint16_t)(pv.patch >= 0 ? pv.patch : 0);
-    return v;
-}
-
-static inline PgVersionRange pg_range_from_version_range(VersionRange r) {
-    PgVersionRange pr;
-    pr.lower.v = pg_version_from_version(r.lower.v);
-    pr.lower.inclusive = r.lower.inclusive;
-    pr.lower.unbounded = r.lower.unbounded;
-    pr.upper.v = pg_version_from_version(r.upper.v);
-    pr.upper.inclusive = r.upper.inclusive;
-    pr.upper.unbounded = r.upper.unbounded;
-    pr.is_empty = r.is_empty;
-    return pr;
-}
-
-static inline VersionRange pg_range_to_version_range(PgVersionRange pr) {
-    VersionRange r;
-    r.lower.v = pg_version_to_version(pr.lower.v);
-    r.lower.inclusive = pr.lower.inclusive;
-    r.lower.unbounded = pr.lower.unbounded;
-    r.upper.v = pg_version_to_version(pr.upper.v);
-    r.upper.inclusive = pr.upper.inclusive;
-    r.upper.unbounded = pr.upper.unbounded;
-    r.is_empty = pr.is_empty;
-    return r;
-}
 
 #endif /* PG_CORE_H */

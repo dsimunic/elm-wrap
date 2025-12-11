@@ -1450,8 +1450,8 @@ bool register_local_dev_tracking_if_needed(const char *author, const char *name,
     }
 
     /* Parse version string */
-    unsigned int major = 0, minor = 0, patch = 0;
-    if (sscanf(version, "%u.%u.%u", &major, &minor, &patch) != 3) {
+    Version parsed_v;
+    if (!version_parse_safe(version, &parsed_v)) {
         v2_registry_free(local_dev_registry);
         arena_free(tracking_dir);
         return true; /* Invalid version format - not a fatal error */
@@ -1459,8 +1459,8 @@ bool register_local_dev_tracking_if_needed(const char *author, const char *name,
 
     /* Check if this package/version is in the local-dev registry */
     V2PackageVersion *pkg_version = v2_registry_find_version(local_dev_registry, author, name,
-                                                              (uint16_t)major, (uint16_t)minor,
-                                                              (uint16_t)patch);
+                                                              parsed_v.major, parsed_v.minor,
+                                                              parsed_v.patch);
     if (!pkg_version) {
         v2_registry_free(local_dev_registry);
         arena_free(tracking_dir);

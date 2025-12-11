@@ -221,13 +221,13 @@ static int show_package_info_from_registry(const char *package_name, const char 
         char *allocated_version = NULL;
 
         if (version_arg) {
-            int major, minor, patch;
-            if (sscanf(version_arg, "%d.%d.%d", &major, &minor, &patch) == 3) {
+            Version parsed_version;
+            if (version_parse_safe(version_arg, &parsed_version)) {
                 for (size_t i = 0; i < entry->version_count; i++) {
                     V2PackageVersion *v = &entry->versions[i];
-                    if (v->major == (uint16_t)major && 
-                        v->minor == (uint16_t)minor && 
-                        v->patch == (uint16_t)patch) {
+                    if (v->major == parsed_version.major &&
+                        v->minor == parsed_version.minor &&
+                        v->patch == parsed_version.patch) {
                         version_to_use = version_arg;
                         version_found = true;
                         break;
@@ -267,8 +267,7 @@ static int show_package_info_from_registry(const char *package_name, const char 
                 for (size_t i = 0; i < entry->version_count; i++) {
                     V2PackageVersion *v = &entry->versions[i];
                     if (v->status == V2_STATUS_VALID) {
-                        allocated_version = arena_malloc(MAX_VERSION_STRING_LENGTH);
-                        snprintf(allocated_version, MAX_VERSION_STRING_LENGTH, "%u.%u.%u", v->major, v->minor, v->patch);
+                        allocated_version = version_format(v->major, v->minor, v->patch);
                         version_to_use = allocated_version;
                         version_found = true;
                         break;
@@ -285,17 +284,17 @@ static int show_package_info_from_registry(const char *package_name, const char 
         }
 
         /* Check if this is a local-dev package */
-        int v_major, v_minor, v_patch;
         bool is_local_dev = false;
-        if (sscanf(version_to_use, "%d.%d.%d", &v_major, &v_minor, &v_patch) == 3) {
-            is_local_dev = is_local_dev_version(v_major, v_minor, v_patch);
+        Version parsed_v;
+        if (version_parse_safe(version_to_use, &parsed_v)) {
+            is_local_dev = is_local_dev_version(parsed_v.major, parsed_v.minor, parsed_v.patch);
         }
 
-        char latest_buf[32];
+        char *latest_buf = NULL;
         for (size_t i = 0; i < entry->version_count; i++) {
             V2PackageVersion *v = &entry->versions[i];
             if (v->status == V2_STATUS_VALID) {
-                snprintf(latest_buf, sizeof(latest_buf), "%u.%u.%u", v->major, v->minor, v->patch);
+                latest_buf = version_format(v->major, v->minor, v->patch);
                 break;
             }
         }
@@ -306,7 +305,7 @@ static int show_package_info_from_registry(const char *package_name, const char 
         } else {
             printf("Version: %s\n", version_to_use);
         }
-        if (strcmp(version_to_use, latest_buf) != 0) {
+        if (latest_buf && strcmp(version_to_use, latest_buf) != 0) {
             printf("Latest version: %s\n", latest_buf);
         }
         printf("Total versions: %zu\n", entry->version_count);
@@ -319,6 +318,9 @@ static int show_package_info_from_registry(const char *package_name, const char 
             print_package_tracking_info(author, name, version_to_use);
         }
 
+        if (latest_buf) {
+            arena_free(latest_buf);
+        }
         if (allocated_version) {
             arena_free(allocated_version);
         }
@@ -404,10 +406,10 @@ static int show_package_info_from_registry(const char *package_name, const char 
     }
 
     /* Check if this is a local-dev package */
-    int v_major, v_minor, v_patch;
     bool is_local_dev = false;
-    if (sscanf(version_to_use, "%d.%d.%d", &v_major, &v_minor, &v_patch) == 3) {
-        is_local_dev = is_local_dev_version(v_major, v_minor, v_patch);
+    Version parsed_v;
+    if (version_parse_safe(version_to_use, &parsed_v)) {
+        is_local_dev = is_local_dev_version(parsed_v.major, parsed_v.minor, parsed_v.patch);
     }
 
     char *latest_version = version_to_string(&registry_entry->versions[0]);
@@ -738,9 +740,9 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
                 if (parse_package_name(elm_json->package_name, &author, &name)) {
                     /* Check if this package has a local-dev version */
                     if (elm_json->package_version) {
-                        int major, minor, patch;
-                        if (sscanf(elm_json->package_version, "%d.%d.%d", &major, &minor, &patch) == 3) {
-                            if (is_local_dev_version(major, minor, patch)) {
+                        Version parsed_v;
+                        if (version_parse_safe(elm_json->package_version, &parsed_v)) {
+                            if (is_local_dev_version(parsed_v.major, parsed_v.minor, parsed_v.patch)) {
                                 print_package_tracking_info(author, name, elm_json->package_version);
                             }
                         }

@@ -6,6 +6,7 @@
 #include "../../cache.h"
 #include "../../constants.h"
 #include "../../log.h"
+#include "../../alloc.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -547,7 +548,7 @@ SolverResult run_with_strategy_v1(
 
     char selected_version[MAX_VERSION_STRING_LENGTH];
     snprintf(selected_version, sizeof(selected_version),
-             "%d.%d.%d",
+             "%u.%u.%u",
              chosen.major,
              chosen.minor,
              chosen.patch);
@@ -567,9 +568,13 @@ SolverResult run_with_strategy_v1(
         PgPackageId pkg_id = (PgPackageId)i;
         PgVersion selected_ver;
         if (pg_solver_get_selected_version(pg_solver, pkg_id, &selected_ver)) {
-            char version_str[MAX_VERSION_STRING_LENGTH];
-            snprintf(version_str, sizeof(version_str), "%d.%d.%d",
-                     selected_ver.major, selected_ver.minor, selected_ver.patch);
+            char *version_str = version_format(selected_ver.major, selected_ver.minor, selected_ver.patch);
+            if (!version_str) {
+                install_plan_free(plan);
+                pg_solver_free(pg_solver);
+                pg_elm_context_free(pg_ctx);
+                return SOLVER_INVALID_PACKAGE;
+            }
 
             const char *pkg_author = pg_ctx->authors[i];
             const char *pkg_name = pg_ctx->names[i];
@@ -584,12 +589,14 @@ SolverResult run_with_strategy_v1(
             /* Only add to plan if it's new or changed */
             if (!existing || strcmp(existing->version, version_str) != 0) {
                 if (!install_plan_add_change(plan, pkg_author, pkg_name, old_ver, version_str)) {
+                    arena_free(version_str);
                     install_plan_free(plan);
                     pg_solver_free(pg_solver);
                     pg_elm_context_free(pg_ctx);
                     return SOLVER_INVALID_PACKAGE;
                 }
             }
+            arena_free(version_str);
         }
     }
 
@@ -737,9 +744,8 @@ SolverResult solver_upgrade_all_v1(
         PgPackageId pkg_id = (PgPackageId)i;
         PgVersion selected_ver;
         if (pg_solver_get_selected_version(pg_solver, pkg_id, &selected_ver)) {
-            char version_str[MAX_VERSION_STRING_LENGTH];
-            snprintf(version_str, sizeof(version_str), "%d.%d.%d",
-                     selected_ver.major, selected_ver.minor, selected_ver.patch);
+            char *version_str = version_format(selected_ver.major, selected_ver.minor, selected_ver.patch);
+            if (!version_str) continue;
 
             const char *pkg_author = pg_ctx->authors[i];
             const char *pkg_name = pg_ctx->names[i];
@@ -754,6 +760,7 @@ SolverResult solver_upgrade_all_v1(
             /* Only add to plan if it changed */
             if (existing && strcmp(existing->version, version_str) != 0) {
                 if (!install_plan_add_change(plan, pkg_author, pkg_name, old_ver, version_str)) {
+                    arena_free(version_str);
                     install_plan_free(plan);
                     pg_solver_free(pg_solver);
                     pg_elm_context_free(pg_ctx);
@@ -761,6 +768,7 @@ SolverResult solver_upgrade_all_v1(
                     return SOLVER_INVALID_PACKAGE;
                 }
             }
+            arena_free(version_str);
         }
     }
 

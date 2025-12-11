@@ -1,6 +1,7 @@
 #include "elm_compiler.h"
 #include "alloc.h"
 #include "constants.h"
+#include "commands/package/package_common.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -86,8 +87,8 @@ char* elm_compiler_get_version(void) {
         }
 
         /* Check if it matches version pattern: X.Y.Z */
-        int major, minor, patch;
-        if (sscanf(buffer, "%d.%d.%d", &major, &minor, &patch) == 3) {
+        Version parsed_v;
+        if (version_parse_safe(buffer, &parsed_v)) {
             /* Valid version format */
             version = arena_strdup(buffer);
         }

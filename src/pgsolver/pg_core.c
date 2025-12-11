@@ -864,7 +864,7 @@ static bool pg_solver_version_is_forbidden(
             continue;
         }
         if (pg_range_contains(assignment->range, version)) {
-            log_trace("pkg=%d forbidden by range %d.%d.%d",
+            log_trace("pkg=%d forbidden by range %u.%u.%u",
                 pkg,
                 assignment->range.lower.v.major,
                 assignment->range.lower.v.minor,
@@ -934,9 +934,7 @@ static bool pg_solver_version_would_conflict(
         }
 
         if (would_satisfy && found_pkg_term) {
-            fprintf(
-                stderr,
-                "[pg_debug] pkg=%d version %d.%d.%d would satisfy incompatibility\n",
+            log_trace("pkg=%d version %u.%u.%u would satisfy incompatibility",
                 pkg,
                 version.major,
                 version.minor,
@@ -1150,13 +1148,8 @@ bool pg_version_parse(const char *s, PgVersion *out) {
         return false;
     }
 
-    Version v;
-    if (!version_parse_safe(s, &v)) {
-        return false;
-    }
-
-    *out = pg_version_from_version(v);
-    return true;
+    /* PgVersion is a typedef to Version, so we can use version_parse_safe directly */
+    return version_parse_safe(s, out);
 }
 
 static PgSolverStatus pg_unit_propagate(
@@ -1315,7 +1308,7 @@ static PgSolverStatus pg_make_decision(
     }
 
     log_trace("decision candidate pkg=%d (choices=%d)", best_pkg, best_eval.available_count);
-    log_trace("pkg=%d choose %d.%d.%d", best_pkg, best_eval.newest.major, best_eval.newest.minor, best_eval.newest.patch);
+    log_trace("pkg=%d choose %u.%u.%u", best_pkg, best_eval.newest.major, best_eval.newest.minor, best_eval.newest.patch);
 
     int prev_level = solver->current_decision_level;
     solver->current_decision_level = prev_level + 1;
@@ -1767,7 +1760,7 @@ PgVersionRange pg_range_until_next_minor(PgVersion v) {
     r.lower.unbounded = false;
 
     r.upper.v.major = v.major;
-    r.upper.v.minor = v.minor + 1;
+    r.upper.v.minor = (uint16_t)(v.minor + 1);
     r.upper.v.patch = 0;
     r.upper.inclusive = false;
     r.upper.unbounded = false;
@@ -1782,7 +1775,7 @@ PgVersionRange pg_range_until_next_major(PgVersion v) {
     r.lower.inclusive = true;
     r.lower.unbounded = false;
 
-    r.upper.v.major = v.major + 1;
+    r.upper.v.major = (uint16_t)(v.major + 1);
     r.upper.v.minor = 0;
     r.upper.v.patch = 0;
     r.upper.inclusive = false;
@@ -2253,12 +2246,11 @@ static void pg_format_version_range(
     size_t out_size,
     bool *out_is_any
 ) {
-    /* Convert PgVersionRange to VersionRange and use unified version_range_to_string */
-    VersionRange vr = pg_range_to_version_range(range);
-    char *str = version_range_to_string(&vr);
+    /* PgVersionRange is a typedef to VersionRange, so we can use it directly */
+    char *str = version_range_to_string(&range);
 
     if (out_is_any) {
-        *out_is_any = (vr.lower.unbounded && vr.upper.unbounded);
+        *out_is_any = (range.lower.unbounded && range.upper.unbounded);
     }
 
     if (str) {

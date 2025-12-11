@@ -8,6 +8,7 @@
 #include "install.h"
 #include "../log.h"
 #include "../constants.h"
+#include "../commands/package/package_common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,15 +17,15 @@
 int v2_show_package_dependencies(const char *author, const char *name, const char *version,
                                  V2Registry *registry) {
     /* Parse version string to components */
-    int major, minor, patch;
-    if (sscanf(version, "%d.%d.%d", &major, &minor, &patch) != 3) {
+    Version parsed_v;
+    if (!version_parse_safe(version, &parsed_v)) {
         log_error("Invalid version format: %s", version);
         return 1;
     }
 
     /* Find the package version in the registry */
     V2PackageVersion *pkg_version = v2_registry_find_version(registry, author, name,
-                                                             (uint16_t)major, (uint16_t)minor, (uint16_t)patch);
+                                                             parsed_v.major, parsed_v.minor, parsed_v.patch);
     if (!pkg_version) {
         log_error("Version %s not found for package %s/%s in V2 registry", version, author, name);
         return 1;
@@ -71,15 +72,15 @@ bool v2_package_depends_on(const char *pkg_author, const char *pkg_name, const c
     }
 
     /* Parse the version string */
-    int major, minor, patch;
-    if (sscanf(pkg_version, "%d.%d.%d", &major, &minor, &patch) != 3) {
+    Version parsed_v;
+    if (!version_parse_safe(pkg_version, &parsed_v)) {
         log_debug("Invalid version format: %s", pkg_version);
         return false;
     }
 
     /* Find the specific version in the registry */
     V2PackageVersion *version = v2_registry_find_version(registry, pkg_author, pkg_name,
-                                                          (uint16_t)major, (uint16_t)minor, (uint16_t)patch);
+                                                          parsed_v.major, parsed_v.minor, parsed_v.patch);
     if (!version) {
         log_debug("Version %s not found for %s/%s in V2 registry", pkg_version, pkg_author, pkg_name);
         return false;

@@ -131,7 +131,7 @@ static void report_conflicts_v2(const InstallEnv *env, ElmJson *elm_json, const 
 
         if (cur) {
             PgVersionRange constraint;
-            if (pg_elm_v2_parse_constraint(dep->constraint, &constraint)) {
+            if (version_parse_constraint(dep->constraint, &constraint)) {
                 PgVersion cur_v;
                 if (pg_version_parse(cur->version, &cur_v) && !pg_range_contains(constraint, cur_v)) {
                     printf("  - %s/%s requires %s but project pins %s\n",

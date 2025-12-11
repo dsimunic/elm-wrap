@@ -94,26 +94,13 @@ static char *resolve_version_from_registry(const char *elm_home, const char *aut
 static char *resolve_version_from_filesystem(const char *elm_home, const char *author,
                                               const char *name, const char *constraint) {
     /* Parse the constraint to get bounds */
-    int lower_major, lower_minor, lower_patch;
-    int upper_major, upper_minor, upper_patch;
-
-    int matched = sscanf(constraint, " %d.%d.%d <= v < %d.%d.%d",
-                         &lower_major, &lower_minor, &lower_patch,
-                         &upper_major, &upper_minor, &upper_patch);
-
-    if (matched != 6) {
-        /* Not a constraint, might be exact version - just return it */
-        matched = sscanf(constraint, "%d.%d.%d", &lower_major, &lower_minor, &lower_patch);
-        if (matched == 3) {
-            char *result = arena_malloc(MAX_VERSION_STRING_LENGTH);
-            snprintf(result, MAX_VERSION_STRING_LENGTH, "%d.%d.%d", lower_major, lower_minor, lower_patch);
-            return result;
-        }
-        return NULL;
+    VersionRange range;
+    if (!version_parse_constraint(constraint, &range)) {
+        return NULL;  /* version_parse_constraint handles exact versions too */
     }
 
-    Version lower_bound = {(uint16_t)lower_major, (uint16_t)lower_minor, (uint16_t)lower_patch};
-    Version upper_bound = {(uint16_t)upper_major, (uint16_t)upper_minor, (uint16_t)upper_patch};
+    Version lower_bound = range.lower.v;
+    Version upper_bound = range.upper.v;
 
     /* Scan package directory for available versions */
     char package_dir[2048];
@@ -132,9 +119,8 @@ static char *resolve_version_from_filesystem(const char *elm_home, const char *a
         if (entry->d_name[0] == '.') continue;
 
         /* Try to parse as version */
-        int maj, min, pat;
-        if (sscanf(entry->d_name, "%d.%d.%d", &maj, &min, &pat) == 3) {
-            Version v = {(uint16_t)maj, (uint16_t)min, (uint16_t)pat};
+        Version v;
+        if (version_parse_safe(entry->d_name, &v)) {
 
             /* Check if within constraint bounds */
             if (registry_version_compare(&v, &lower_bound) >= 0 &&

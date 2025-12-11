@@ -123,10 +123,18 @@ bool solve_init_dependencies_v1(InstallEnv *env, PackageMap **direct_deps, Packa
             return false;
         }
 
-        char version_str[32];
-        snprintf(version_str, sizeof(version_str), "%d.%d.%d", version.major, version.minor, version.patch);
+        char *version_str = version_format(version.major, version.minor, version.patch);
+        if (!version_str) {
+            log_error("Failed to format version for %s/%s", author, name);
+            package_map_free(*direct_deps);
+            package_map_free(*indirect_deps);
+            *direct_deps = NULL;
+            *indirect_deps = NULL;
+            return false;
+        }
 
         if (!package_map_add(*direct_deps, author, name, version_str)) {
+            arena_free(version_str);
             log_error("Failed to add %s/%s to direct dependencies", author, name);
             package_map_free(*direct_deps);
             package_map_free(*indirect_deps);
@@ -134,6 +142,7 @@ bool solve_init_dependencies_v1(InstallEnv *env, PackageMap **direct_deps, Packa
             pg_elm_context_free(pg_ctx);
             return false;
         }
+        arena_free(version_str);
     }
 
     // Get all other resolved packages and add them to indirect dependencies
@@ -162,13 +171,17 @@ bool solve_init_dependencies_v1(InstallEnv *env, PackageMap **direct_deps, Packa
         const char *author = pg_ctx->authors[pkg_id];
         const char *name = pg_ctx->names[pkg_id];
 
-        char version_str[32];
-        snprintf(version_str, sizeof(version_str), "%d.%d.%d", version.major, version.minor, version.patch);
+        char *version_str = version_format(version.major, version.minor, version.patch);
+        if (!version_str) {
+            log_error("Failed to format version for %s/%s", author, name);
+            continue; // Continue anyway
+        }
 
         if (!package_map_add(*indirect_deps, author, name, version_str)) {
             log_error("Failed to add %s/%s to indirect dependencies", author, name);
             // Continue anyway
         }
+        arena_free(version_str);
     }
 
     pg_solver_free(solver);

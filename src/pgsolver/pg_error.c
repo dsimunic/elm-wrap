@@ -175,9 +175,6 @@ static void format_range(
     size_t out_size,
     bool *out_is_any
 ) {
-    /* Access range fields directly - this is a hack since we don't have
-     * the full PgVersionRange definition here. In a real implementation,
-     * we'd pass proper types. */
     PgVersionRange *range = (PgVersionRange *)range_ptr;
 
     if (!range) {
@@ -188,66 +185,19 @@ static void format_range(
 
     /* Check if it's "any" (unbounded on both ends) */
     if (range->lower.unbounded && range->upper.unbounded) {
-        snprintf(out, out_size, "any");
         if (out_is_any) *out_is_any = true;
-        return;
-    }
-
-    if (out_is_any) *out_is_any = false;
-
-    /* Check if it's an exact version */
-    if (!range->lower.unbounded && !range->upper.unbounded &&
-        range->lower.inclusive && range->upper.inclusive &&
-        range->lower.v.major == range->upper.v.major &&
-        range->lower.v.minor == range->upper.v.minor &&
-        range->lower.v.patch == range->upper.v.patch) {
-        snprintf(out, out_size, "%d.%d.%d",
-                 range->lower.v.major,
-                 range->lower.v.minor,
-                 range->lower.v.patch);
-        return;
-    }
-
-    /* Check for caret ranges (^X.Y.Z = >=X.Y.Z <X+1.0.0) */
-    if (!range->lower.unbounded && !range->upper.unbounded &&
-        range->lower.inclusive && !range->upper.inclusive &&
-        range->upper.v.minor == 0 && range->upper.v.patch == 0 &&
-        range->upper.v.major == range->lower.v.major + 1) {
-        snprintf(out, out_size, "^%d.%d.%d",
-                 range->lower.v.major,
-                 range->lower.v.minor,
-                 range->lower.v.patch);
-        return;
-    }
-
-    /* Generic range */
-    char lower_str[64] = "";
-    char upper_str[64] = "";
-
-    if (!range->lower.unbounded) {
-        snprintf(lower_str, sizeof(lower_str), "%s%d.%d.%d",
-                 range->lower.inclusive ? ">=" : ">",
-                 range->lower.v.major,
-                 range->lower.v.minor,
-                 range->lower.v.patch);
-    }
-
-    if (!range->upper.unbounded) {
-        snprintf(upper_str, sizeof(upper_str), "%s%d.%d.%d",
-                 range->upper.inclusive ? "<=" : "<",
-                 range->upper.v.major,
-                 range->upper.v.minor,
-                 range->upper.v.patch);
-    }
-
-    if (lower_str[0] && upper_str[0]) {
-        snprintf(out, out_size, "%s %s", lower_str, upper_str);
-    } else if (lower_str[0]) {
-        snprintf(out, out_size, "%s", lower_str);
-    } else if (upper_str[0]) {
-        snprintf(out, out_size, "%s", upper_str);
     } else {
-        snprintf(out, out_size, "any");
+        if (out_is_any) *out_is_any = false;
+    }
+
+    /* PgVersionRange is a typedef to VersionRange, so we can use it directly */
+    char *formatted = version_range_to_string(range);
+    if (formatted) {
+        strncpy(out, formatted, out_size - 1);
+        out[out_size - 1] = '\0';
+        arena_free(formatted);
+    } else {
+        snprintf(out, out_size, "(error)");
     }
 }
 

@@ -23,15 +23,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-static void parse_version(const char *version, int *major, int *minor, int *patch) {
-    *major = 0;
-    *minor = 0;
-    *patch = 0;
-
-    if (version) {
-        sscanf(version, "%d.%d.%d", major, minor, patch);
-    }
-}
+/* Removed local parse_version - now using version_parse_safe from package_common.h */
 
 int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv *env,
                               bool major_upgrade, bool major_ignore_test, bool auto_yes) {
@@ -69,12 +61,17 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
             latest_version = version_to_string(&registry_entry->versions[0]);
         }
     } else {
-        int current_major, current_minor, current_patch;
-        parse_version(existing_pkg->version, &current_major, &current_minor, &current_patch);
+        Version current_version;
+        if (!version_parse_safe(existing_pkg->version, &current_version)) {
+            fprintf(stderr, "Error: Invalid version format: %s\n", existing_pkg->version);
+            arena_free(author);
+            arena_free(name);
+            return 1;
+        }
 
         for (size_t i = 0; i < registry_entry->version_count; i++) {
             Version *v = &registry_entry->versions[i];
-            if (v->major == current_major) {
+            if (v->major == current_version.major) {
                 latest_version = version_to_string(v);
                 break;
             }
@@ -99,12 +96,26 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
     }
 
     if (major_upgrade) {
-        int current_major, current_minor, current_patch;
-        int new_major, new_minor, new_patch;
-        parse_version(existing_pkg->version, &current_major, &current_minor, &current_patch);
-        parse_version(latest_version, &new_major, &new_minor, &new_patch);
+        Version current_version, new_version;
+        if (!version_parse_safe(existing_pkg->version, &current_version)) {
+            fprintf(stderr, "Error: Invalid version format: %s\n", existing_pkg->version);
+            arena_free((char*)latest_version);
+            arena_free(author);
+            arena_free(name);
+            return 1;
+        }
+        if (!version_parse_safe(latest_version, &new_version)) {
+            fprintf(stderr, "Error: Invalid version format: %s\n", latest_version);
+            arena_free((char*)latest_version);
+            arena_free(author);
+            arena_free(name);
+            return 1;
+        }
 
-        if (new_major != current_major) {
+        int current_major = current_version.major;
+        int new_major = new_version.major;
+
+        if (new_version.major != current_version.major) {
             PackageMap *all_deps = package_map_create();
 
             if (elm_json->dependencies_direct) {

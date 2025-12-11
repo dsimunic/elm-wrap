@@ -208,53 +208,6 @@ static int pg_elm_v2_provider_get_versions(
     return written;
 }
 
-bool pg_elm_v2_parse_constraint(
-    const char *constraint,
-    PgVersionRange *out_range
-) {
-    if (!constraint || !out_range) {
-        return false;
-    }
-    
-    /* Elm's package constraints look like: "1.0.0 <= v < 2.0.0" */
-    int a1, a2, a3;
-    int b1, b2, b3;
-    
-    int matched = sscanf(
-        constraint,
-        " %d.%d.%d <= v < %d.%d.%d",
-        &a1, &a2, &a3,
-        &b1, &b2, &b3
-    );
-    
-    if (matched != 6) {
-        return false;
-    }
-    
-    PgVersion lower_v;
-    lower_v.major = a1;
-    lower_v.minor = a2;
-    lower_v.patch = a3;
-    
-    PgVersion upper_v;
-    upper_v.major = b1;
-    upper_v.minor = b2;
-    upper_v.patch = b3;
-    
-    PgVersionRange r;
-    r.lower.v = lower_v;
-    r.lower.inclusive = true;
-    r.lower.unbounded = false;
-    
-    r.upper.v = upper_v;
-    r.upper.inclusive = false;
-    r.upper.unbounded = false;
-    
-    r.is_empty = false;
-    *out_range = r;
-    return true;
-}
-
 bool pg_elm_v2_add_root_dependency(
     PgElmV2Context *ctx,
     PgPackageId pkg,
@@ -343,7 +296,7 @@ static int pg_elm_v2_provider_get_dependencies(
         
         /* Parse constraint */
         PgVersionRange range;
-        if (!pg_elm_v2_parse_constraint(dep->constraint, &range)) {
+        if (!version_parse_constraint(dep->constraint, &range)) {
             arena_free(dep_author);
             continue;
         }

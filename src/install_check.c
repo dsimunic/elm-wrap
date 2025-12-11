@@ -6,6 +6,7 @@
 #include "exit_codes.h"
 #include "terminal_colors.h"
 #include "log.h"
+#include "commands/package/package_common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,27 +23,6 @@ typedef struct {
     bool has_major_upgrade;
     bool is_test_dependency;
 } PackageUpgrade;
-
-/* Parse a package constraint string like "1.0.0 <= v < 2.0.0"
- * to extract upper bound major version.
- * Returns -1 if parsing fails.
- */
-static int parse_constraint_upper_major(const char *constraint) {
-    if (!constraint) return -1;
-    
-    /* Look for "< X.Y.Z" pattern */
-    const char *lt = strstr(constraint, "< ");
-    if (!lt) return -1;
-    
-    lt += 2; /* Skip "< " */
-    
-    int major = 0;
-    if (sscanf(lt, "%d", &major) == 1) {
-        return major;
-    }
-    
-    return -1;
-}
 
 /* Check for duplicate exposed modules in a package elm.json file.
  * Returns the number of duplicates found (0 if none).
@@ -168,56 +148,32 @@ static int check_duplicate_exposed_modules(const char *elm_json_path) {
     return duplicates;
 }
 
-/* Parse semantic version into major, minor, patch components */
-static bool parse_version(const char *version, int *major, int *minor, int *patch) {
-    if (!version) return false;
-    
-    *major = *minor = *patch = 0;
-    
-    if (sscanf(version, "%d.%d.%d", major, minor, patch) == 3) {
-        return true;
-    }
-    
-    return false;
-}
-
 /* Compare two semantic versions
  * Returns: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
  */
-static int compare_versions(const char *v1, const char *v2) {
-    int v1_major, v1_minor, v1_patch;
-    int v2_major, v2_minor, v2_patch;
-    
-    if (!parse_version(v1, &v1_major, &v1_minor, &v1_patch)) return -1;
-    if (!parse_version(v2, &v2_major, &v2_minor, &v2_patch)) return -1;
-    
-    if (v1_major != v2_major) return v1_major < v2_major ? -1 : 1;
-    if (v1_minor != v2_minor) return v1_minor < v2_minor ? -1 : 1;
-    if (v1_patch != v2_patch) return v1_patch < v2_patch ? -1 : 1;
-    
-    return 0;
+static int compare_versions(const char *v1_str, const char *v2_str) {
+    Version v1, v2;
+    if (!version_parse_safe(v1_str, &v1)) return -1;
+    if (!version_parse_safe(v2_str, &v2)) return -1;
+    return version_compare(&v1, &v2);
 }
 
 /* Check if a version is a minor upgrade (same major version, higher minor/patch) */
 static bool is_minor_upgrade(const char *current, const char *candidate) {
-    int curr_major, curr_minor, curr_patch;
-    int cand_major, cand_minor, cand_patch;
-    
-    if (!parse_version(current, &curr_major, &curr_minor, &curr_patch)) return false;
-    if (!parse_version(candidate, &cand_major, &cand_minor, &cand_patch)) return false;
-    
-    return (cand_major == curr_major) && (compare_versions(candidate, current) > 0);
+    Version curr, cand;
+    if (!version_parse_safe(current, &curr)) return false;
+    if (!version_parse_safe(candidate, &cand)) return false;
+
+    return (cand.major == curr.major) && (version_compare(&cand, &curr) > 0);
 }
 
 /* Check if a version is a major upgrade (higher major version) */
 static bool is_major_upgrade(const char *current, const char *candidate) {
-    int curr_major, curr_minor, curr_patch;
-    int cand_major, cand_minor, cand_patch;
-    
-    if (!parse_version(current, &curr_major, &curr_minor, &curr_patch)) return false;
-    if (!parse_version(candidate, &cand_major, &cand_minor, &cand_patch)) return false;
-    
-    return cand_major > curr_major;
+    Version curr, cand;
+    if (!version_parse_safe(current, &curr)) return false;
+    if (!version_parse_safe(candidate, &cand)) return false;
+
+    return cand.major > curr.major;
 }
 
 /* Find latest versions for a package in registry */
@@ -263,8 +219,8 @@ static void find_versions_beyond_constraint(Registry *registry, const char *auth
                                             const char *constraint, char **latest_beyond) {
     *latest_beyond = NULL;
 
-    int upper_major = parse_constraint_upper_major(constraint);
-    if (upper_major < 0) {
+    VersionRange range;
+    if (!version_parse_constraint(constraint, &range)) {
         return; /* Could not parse constraint */
     }
 
@@ -274,21 +230,18 @@ static void find_versions_beyond_constraint(Registry *registry, const char *auth
     }
 
     for (size_t i = 0; i < entry->version_count; i++) {
-        char *ver_str = version_to_string(&entry->versions[i]);
-        if (!ver_str) continue;
+        /* Check if version is at or beyond the upper bound */
+        if (version_compare(&entry->versions[i], &range.upper.v) >= 0) {
+            char *ver_str = version_to_string(&entry->versions[i]);
+            if (!ver_str) continue;
 
-        int ver_major, ver_minor, ver_patch;
-        if (parse_version(ver_str, &ver_major, &ver_minor, &ver_patch)) {
-            /* Check if version is at or beyond the upper bound */
-            if (ver_major >= upper_major) {
-                if (!*latest_beyond || compare_versions(ver_str, *latest_beyond) > 0) {
-                    arena_free(*latest_beyond);
-                    *latest_beyond = arena_strdup(ver_str);
-                }
+            if (!*latest_beyond || compare_versions(ver_str, *latest_beyond) > 0) {
+                arena_free(*latest_beyond);
+                *latest_beyond = arena_strdup(ver_str);
             }
-        }
 
-        arena_free(ver_str);
+            arena_free(ver_str);
+        }
     }
 }
 
@@ -521,8 +474,8 @@ static void find_latest_versions_v2(V2Registry *registry, const char *author, co
         }
         
         /* Format version string */
-        char ver_str[MAX_VERSION_STRING_LENGTH];
-        snprintf(ver_str, sizeof(ver_str), "%u.%u.%u", v->major, v->minor, v->patch);
+        char *ver_str = version_format(v->major, v->minor, v->patch);
+        if (!ver_str) continue;
 
         /* Check for minor upgrade */
         if (is_minor_upgrade(current_version, ver_str)) {
@@ -539,6 +492,8 @@ static void find_latest_versions_v2(V2Registry *registry, const char *author, co
                 *latest_major = arena_strdup(ver_str);
             }
         }
+
+        arena_free(ver_str);
     }
 }
 
@@ -582,8 +537,8 @@ static void find_versions_beyond_constraint_v2(V2Registry *registry, const char 
                                                const char *constraint, char **latest_beyond) {
     *latest_beyond = NULL;
 
-    int upper_major = parse_constraint_upper_major(constraint);
-    if (upper_major < 0) {
+    VersionRange range;
+    if (!version_parse_constraint(constraint, &range)) {
         return; /* Could not parse constraint */
     }
 
@@ -601,13 +556,15 @@ static void find_versions_beyond_constraint_v2(V2Registry *registry, const char 
         }
 
         /* Check if version is at or beyond the upper bound */
-        if ((int)v->major >= upper_major) {
-            char ver_str[MAX_VERSION_STRING_LENGTH];
-            snprintf(ver_str, sizeof(ver_str), "%u.%u.%u", v->major, v->minor, v->patch);
-            
-            if (!*latest_beyond || compare_versions(ver_str, *latest_beyond) > 0) {
-                arena_free(*latest_beyond);
-                *latest_beyond = arena_strdup(ver_str);
+        Version v_struct = {(uint16_t)v->major, (uint16_t)v->minor, (uint16_t)v->patch};
+        if (version_compare(&v_struct, &range.upper.v) >= 0) {
+            char *ver_str = version_format(v->major, v->minor, v->patch);
+            if (ver_str) {
+                if (!*latest_beyond || compare_versions(ver_str, *latest_beyond) > 0) {
+                    arena_free(*latest_beyond);
+                    *latest_beyond = arena_strdup(ver_str);
+                }
+                arena_free(ver_str);
             }
         }
     }

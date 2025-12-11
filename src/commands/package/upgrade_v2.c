@@ -23,25 +23,14 @@
 #include <string.h>
 #include <stdbool.h>
 
-static void parse_version(const char *version, int *major, int *minor, int *patch) {
-    *major = 0;
-    *minor = 0;
-    *patch = 0;
-
-    if (version) {
-        sscanf(version, "%d.%d.%d", major, minor, patch);
-    }
-}
+/* Removed local parse_version - now using version_parse_safe from package_common.h */
 
 /**
  * Format a V2 version to a string.
  * Returns arena-allocated string that caller must free.
  */
 static char *v2_version_to_string(V2PackageVersion *v) {
-    char *version_str = arena_malloc(MAX_VERSION_STRING_LENGTH);
-    if (!version_str) return NULL;
-    snprintf(version_str, MAX_VERSION_STRING_LENGTH, "%d.%d.%d", v->major, v->minor, v->patch);
-    return version_str;
+    return version_format(v->major, v->minor, v->patch);
 }
 
 int upgrade_single_package_v2(const char *package, ElmJson *elm_json, InstallEnv *env,
@@ -86,13 +75,18 @@ int upgrade_single_package_v2(const char *package, ElmJson *elm_json, InstallEnv
             }
         }
     } else {
-        int current_major, current_minor, current_patch;
-        parse_version(existing_pkg->version, &current_major, &current_minor, &current_patch);
+        Version current_version;
+        if (!version_parse_safe(existing_pkg->version, &current_version)) {
+            fprintf(stderr, "Error: Invalid version format: %s\n", existing_pkg->version);
+            arena_free(author);
+            arena_free(name);
+            return 1;
+        }
 
         /* Find first valid version with same major */
         for (size_t i = 0; i < entry->version_count; i++) {
             V2PackageVersion *v = &entry->versions[i];
-            if (v->status == V2_STATUS_VALID && v->major == current_major) {
+            if (v->status == V2_STATUS_VALID && v->major == current_version.major) {
                 latest_version = v2_version_to_string(v);
                 break;
             }
@@ -117,12 +111,26 @@ int upgrade_single_package_v2(const char *package, ElmJson *elm_json, InstallEnv
     }
 
     if (major_upgrade) {
-        int current_major, current_minor, current_patch;
-        int new_major, new_minor, new_patch;
-        parse_version(existing_pkg->version, &current_major, &current_minor, &current_patch);
-        parse_version(latest_version, &new_major, &new_minor, &new_patch);
+        Version current_version, new_version;
+        if (!version_parse_safe(existing_pkg->version, &current_version)) {
+            fprintf(stderr, "Error: Invalid version format: %s\n", existing_pkg->version);
+            arena_free(latest_version);
+            arena_free(author);
+            arena_free(name);
+            return 1;
+        }
+        if (!version_parse_safe(latest_version, &new_version)) {
+            fprintf(stderr, "Error: Invalid version format: %s\n", latest_version);
+            arena_free(latest_version);
+            arena_free(author);
+            arena_free(name);
+            return 1;
+        }
 
-        if (new_major != current_major) {
+        int current_major = current_version.major;
+        int new_major = new_version.major;
+
+        if (new_version.major != current_version.major) {
             PackageMap *all_deps = package_map_create();
 
             if (elm_json->dependencies_direct) {

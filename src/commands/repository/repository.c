@@ -714,8 +714,8 @@ static int list_local_dev_tracking(void) {
             /* Iterate over all versions */
             for (size_t j = 0; j < entry->version_count; j++) {
                 V2PackageVersion *ver = &entry->versions[j];
-                char version_str[MAX_VERSION_STRING_LENGTH];
-                snprintf(version_str, sizeof(version_str), "%u.%u.%u", ver->major, ver->minor, ver->patch);
+                char *version_str = version_format(ver->major, ver->minor, ver->patch);
+                if (!version_str) continue;
 
                 printf("  %s/%s %s\n", entry->author, entry->name, version_str);
 
@@ -726,6 +726,7 @@ static int list_local_dev_tracking(void) {
                                               &connection_tracking_enabled);
                 }
                 printf("\n");
+                arena_free(version_str);
             }
         }
 
@@ -791,12 +792,12 @@ static int list_local_dev_tracking(void) {
                                                                               name_entry->d_name);
                                 if (reg_entry) {
                                     /* Parse version string */
-                                    unsigned major = 0, minor = 0, patch = 0;
-                                    if (sscanf(version_entry->d_name, "%u.%u.%u", &major, &minor, &patch) == 3) {
+                                    Version parsed_v;
+                                    if (version_parse_safe(version_entry->d_name, &parsed_v)) {
                                         for (size_t v = 0; v < reg_entry->version_count; v++) {
-                                            if (reg_entry->versions[v].major == major &&
-                                                reg_entry->versions[v].minor == minor &&
-                                                reg_entry->versions[v].patch == patch) {
+                                            if (reg_entry->versions[v].major == parsed_v.major &&
+                                                reg_entry->versions[v].minor == parsed_v.minor &&
+                                                reg_entry->versions[v].patch == parsed_v.patch) {
                                                 already_shown = true;
                                                 break;
                                             }

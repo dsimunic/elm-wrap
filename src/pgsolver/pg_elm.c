@@ -176,11 +176,8 @@ static int pg_elm_provider_get_versions(
     /* Copy versions to output buffer (registry stores newest-first, which is what we want) */
     int written = 0;
     for (size_t i = 0; i < entry->version_count && written < (int)out_capacity; i++) {
-        PgVersion v;
-        v.major = entry->versions[i].major;
-        v.minor = entry->versions[i].minor;
-        v.patch = entry->versions[i].patch;
-        log_debug("  Version %zu: %d.%d.%d", i, v.major, v.minor, v.patch);
+        PgVersion v = entry->versions[i];  /* PgVersion is now typedef to Version - direct assignment */
+        log_debug("  Version %zu: %u.%u.%u", i, v.major, v.minor, v.patch);
         out_versions[written] = v;
         written++;
     }
@@ -197,14 +194,8 @@ bool pg_elm_parse_constraint(
         return false;
     }
 
-    /* Use unified version_parse_constraint and convert to PgVersionRange */
-    VersionRange vr;
-    if (!version_parse_constraint(constraint, &vr)) {
-        return false;
-    }
-
-    *out_range = pg_range_from_version_range(vr);
-    return true;
+    /* PgVersionRange is a typedef to VersionRange, so we can use it directly */
+    return version_parse_constraint(constraint, out_range);
 }
 
 bool pg_elm_add_root_dependency(
@@ -273,7 +264,7 @@ static int pg_elm_provider_get_dependencies(
     snprintf(
         version_str,
         sizeof(version_str),
-        "%d.%d.%d",
+        "%u.%u.%u",
         version.major,
         version.minor,
         version.patch

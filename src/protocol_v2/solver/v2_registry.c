@@ -153,14 +153,14 @@ static bool parse_version_line(const char *line, uint16_t *major, uint16_t *mino
     }
     
     line += 9;
-    int maj, min, pat;
-    if (sscanf(line, "%d.%d.%d", &maj, &min, &pat) != 3) {
+    Version parsed_v;
+    if (!version_parse_safe(line, &parsed_v)) {
         return false;
     }
-    
-    *major = (uint16_t)maj;
-    *minor = (uint16_t)min;
-    *patch = (uint16_t)pat;
+
+    *major = parsed_v.major;
+    *minor = parsed_v.minor;
+    *patch = parsed_v.patch;
     return true;
 }
 
