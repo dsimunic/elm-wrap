@@ -62,7 +62,7 @@ LocalDevPackage *local_dev_get_tracked_packages(const char *elm_json_path, int *
         return NULL;
     }
 
-    /* Scan tracking directory structure: tracking_dir/author/name/version/<hash> */
+    /* Scan tracking directory structure: tracking_dir/author/name/version/hash */
     DIR *author_dir = opendir(tracking_dir);
     if (!author_dir) {
         arena_free(tracking_dir);

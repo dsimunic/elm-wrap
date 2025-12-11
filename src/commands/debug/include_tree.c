@@ -38,13 +38,13 @@ static char *read_file_content(const char *filepath);
 #define TREE_SPACE  "    "
 
 static void print_include_tree_usage(void) {
-    printf("Usage: %s debug include-tree <file-path>|<directory-path>\n", global_context_program_name());
+    printf("Usage: %s debug include-tree PATH\n", global_context_program_name());
     printf("\n");
-    printf("Show import dependency tree for an Elm file or package.\n");
+    printf("Show import dependency tree for an Elm file or package at PATH.\n");
     printf("\n");
     printf("Arguments:\n");
-    printf("  <file-path>       Path to an Elm file (.elm)\n");
-    printf("  <directory-path>  Path to a package directory (must contain elm.json)\n");
+    printf("  PATH       Path to an Elm file (.elm)\n");
+    printf("             or a path to a package directory with elm.json\n");
     printf("\n");
     printf("For packages:\n");
     printf("  - Shows import tree for each exposed module\n");

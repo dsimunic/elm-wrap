@@ -53,7 +53,7 @@ void print_usage(const char *prog) {
     switch (compiler_type) {
         case COMPILER_WRAPC:
             /* wrapc only supports make */
-            printf("  make <ELM_FILE>    Compile Elm code to JavaScript or HTML\n");
+            printf("  make ELM_FILE        Compile Elm code to JavaScript or HTML\n");
             break;
 
         case COMPILER_LAMDERA:

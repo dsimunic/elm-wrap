@@ -95,7 +95,7 @@ static char *get_project_dir(const char *elm_json_path) {
 static void print_info_usage(const char *invocation) {
     const char *command_label = invocation ? invocation : "package info";
 
-    printf("Usage: %s %s [PATH | <author/package> [VERSION]]\n", global_context_program_name(), command_label);
+    printf("Usage: %s %s [PATH | PACKAGE [VERSION]]\n", global_context_program_name(), command_label);
     printf("\n");
     printf("Display package management information.\n");
     printf("\n");

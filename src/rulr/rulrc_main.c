@@ -5,10 +5,10 @@
  * and guaranteed error-free runtime execution.
  *
  * Usage:
- *   rulrc compile <file.dl>           Compile a .dl file to .dlc
- *   rulrc compile --output <out.dlc>  Compile from stdin to output file
- *   rulrc view <file.dlc>             Pretty-print a compiled file
- *   rulrc <path> [path ...]           Compile .dl files (legacy mode)
+ *   rulrc compile SOURCE_FILE         Compile a .dl file to .dlc
+ *   rulrc compile --output PATH       Compile from stdin to output file
+ *   rulrc view PATH                   Pretty-print a compiled file
+ *   rulrc PATH [PATH ...]             Compile .dl files (legacy mode)
  *   rulrc --help                      Show help
  *
  * If a path is a directory, all .dl files in that directory are compiled.

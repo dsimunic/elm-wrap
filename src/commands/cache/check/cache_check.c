@@ -358,7 +358,7 @@ int cmd_cache_check(int argc, char *argv[]) {
 
     if (!package_arg) {
         fprintf(stderr, "Error: Package name is required\n");
-        fprintf(stderr, "Usage: %s package cache check <PACKAGE>\n", global_context_program_name());
+        fprintf(stderr, "Usage: %s package cache check PACKAGE\n", global_context_program_name());
         return 1;
     }
 

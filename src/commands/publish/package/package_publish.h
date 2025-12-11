@@ -11,7 +11,7 @@
 /**
  * Run the package publish command.
  * 
- * Usage: wrap package publish <source-path>
+ * Usage: wrap package publish PATH
  * 
  * This command uses the core_package_files.dl and publish_files.dl rules
  * to determine which files should be published, then prints a report.

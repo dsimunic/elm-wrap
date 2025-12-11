@@ -59,20 +59,20 @@ static char *find_elm_json(void) {
 }
 
 static void print_install_plan_usage(void) {
-    printf("Usage: %s debug install-plan <package> [<package>...] [OPTIONS]\n", global_context_program_name());
+    printf("Usage: %s debug install-plan PACKAGE [PACKAGE ...] [OPTIONS]\n", global_context_program_name());
     printf("\n");
     printf("Show what packages would be installed for one or more packages (dry-run).\n");
     printf("This exercises the dependency solver without actually installing anything.\n");
     printf("\n");
     printf("Arguments:\n");
-    printf("  <package>          Package name in author/name format (e.g., elm/html)\n");
+    printf("  PACKAGE           Package name in author/name format (e.g., elm/html)\n");
     printf("                     Multiple packages can be specified.\n");
     printf("\n");
     printf("Options:\n");
     printf("  --test             Show plan for test dependencies\n");
     printf("  --major            Allow major version upgrades (single package only)\n");
     printf("  --local-dev        Debug local development package installation\n");
-    printf("  --from-path <path> Path to local package (requires --local-dev)\n");
+    printf("  --from-path PATH   Path to local package (requires --local-dev)\n");
     printf("  -v, --verbose      Show detailed logging output (default)\n");
     printf("  -vv                Show extra verbose (trace) logging output\n");
     printf("  -q, --quiet        Suppress statistics output\n");

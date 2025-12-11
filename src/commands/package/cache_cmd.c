@@ -150,25 +150,25 @@ static void print_cache_usage(void) {
     printf("Cache management commands.\n");
     printf("\n");
     printf("Subcommands:\n");
-    printf("  <PACKAGE> [VERSION]                Download package to cache\n");
-    printf("  check <PACKAGE>                    Check cache status for a package\n");
+    printf("  PACKAGE [VERSION]                Download package to cache\n");
+    printf("  check PACKAGE                    Check cache status for a package\n");
     printf("  full-scan                          Scan entire cache and verify all packages\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s package cache elm/html                  # Download latest elm/html\n", global_context_program_name());
-    printf("  %s package cache elm/html 1.0.0            # Download specific version\n", global_context_program_name());
-    printf("  %s package cache check elm/html            # Check cache status for elm/html\n", global_context_program_name());
+    printf("  %s package cache elm/html                    # Download latest elm/html\n", global_context_program_name());
+    printf("  %s package cache elm/html 1.0.0              # Download specific version\n", global_context_program_name());
+    printf("  %s package cache check elm/html              # Check cache status for elm/html\n", global_context_program_name());
     printf("  %s package cache check elm/html --fix-broken # Re-download broken versions\n", global_context_program_name());
-    printf("  %s package cache full-scan                 # Scan all packages in cache\n", global_context_program_name());
-    printf("  %s package cache --from-url <url> elm/html # Download from URL to cache\n", global_context_program_name());
-    printf("  %s package cache --from-file ./pkg elm/html # Download from local file to cache\n", global_context_program_name());
-    printf("  %s package cache --major elm/html         # Download next major version\n", global_context_program_name());
+    printf("  %s package cache full-scan                   # Scan all packages in cache\n", global_context_program_name());
+    printf("  %s package cache --from-url URL elm/html     # Download from URL to cache\n", global_context_program_name());
+    printf("  %s package cache --from-file ./pkg elm/html  # Download from local file to cache\n", global_context_program_name());
+    printf("  %s package cache --major elm/html            # Download next major version\n", global_context_program_name());
     printf("\n");
     printf("Download Options:\n");
-    printf("  <PACKAGE> <VERSION>             # Download specific version (e.g., 1.0.0)\n");
-    printf("  --from-file <path> <package>    # Download from local file/directory to cache\n");
-    printf("  --from-url <url> <package>      # Download from URL to cache\n");
-    printf("  --major <package>               # Download next major version to cache\n");
+    printf("  PACKAGE VERSION                 # Download specific version (e.g., 1.0.0)\n");
+    printf("  --from-file PATH PACKAGE        # Download from local file/directory to cache\n");
+    printf("  --from-url URL PACKAGE          # Download from URL to cache\n");
+    printf("  --major PACKAGE                 # Download highest major version to cache\n");
     printf("  --ignore-hash                   # Skip SHA-1 hash verification\n");
     printf("  -v, --verbose                   # Show progress reports\n");
     printf("  -q, --quiet                     # Suppress progress reports\n");
@@ -218,7 +218,7 @@ int cmd_cache(int argc, char *argv[]) {
                 i++;
                 package_arg = argv[i];
             } else {
-                fprintf(stderr, "Error: --from-file requires <path> and <package> arguments\n");
+                fprintf(stderr, "Error: --from-file requires PATH and PACKAGE arguments\n");
                 return 1;
             }
         } else if (strcmp(argv[i], "--from-url") == 0) {
@@ -228,7 +228,7 @@ int cmd_cache(int argc, char *argv[]) {
                 i++;
                 package_arg = argv[i];
             } else {
-                fprintf(stderr, "Error: --from-url requires <url> and <package> arguments\n");
+                fprintf(stderr, "Error: --from-url requires URL and PACKAGE arguments\n");
                 return 1;
             }
         } else if (strcmp(argv[i], "--major") == 0) {
@@ -274,7 +274,7 @@ int cmd_cache(int argc, char *argv[]) {
 
     if (!package_arg) {
         fprintf(stderr, "Error: Package name is required\n");
-        fprintf(stderr, "Usage: %s package cache <PACKAGE>\n", global_context_program_name());
+        fprintf(stderr, "Usage: %s package cache PACKAGE\n", global_context_program_name());
         return 1;
     }
 

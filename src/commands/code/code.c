@@ -10,7 +10,7 @@ static void print_code_usage(void) {
     printf("Code analysis and transformation commands.\n");
     printf("\n");
     printf("Subcommands:\n");
-    printf("  format <FILE>      Parse and canonicalize Elm source, output AST\n");
+    printf("  format FILE        Parse and canonicalize Elm source, output AST\n");
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help         Show this help message\n");

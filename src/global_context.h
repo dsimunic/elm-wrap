@@ -49,7 +49,7 @@ typedef struct {
  * 1. Get repository root path (WRAP_REPOSITORY_LOCAL_PATH or default)
  * 2. Determine compiler name (from WRAP_ELM_COMPILER_PATH basename, or "elm")
  * 3. Determine compiler version (by running compiler --version)
- * 4. Check if <root>/<compiler>/<version>/ exists as a directory
+ * 4. Check if root/compiler/version/ exists as a directory
  *    - If yes: V2 mode (repository created via `repository new`)
  *    - If no: V1 mode (use traditional Elm package management)
  *

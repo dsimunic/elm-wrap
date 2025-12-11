@@ -5,8 +5,8 @@
  * Repository command group - manage local package repositories
  * 
  * Commands:
- *   repository new [<root_path>] [--compiler <name>] [--version <version>]
- *   repository list [<root_path>]
+ *   repository new PATH [--compiler COMPILER [--version VERSION]]
+ *   repository list [PATH]
  *   repository local-dev [clear ...]
  */
 

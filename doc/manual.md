@@ -18,8 +18,8 @@ and they don't bleong to any group:
     repl               Open an interactive Elm REPL
     init               Initialize a new Elm project
     reactor            Start the Elm Reactor development server
-    make <ELM_FILE>    Compile Elm code to JavaScript or HTML
-    install <PACKAGE>  Install packages for your Elm project
+    make ELM_FILE      Compile Elm code to JavaScript or HTML
+    install PACKAGE    Install packages for your Elm project
     bump               Bump version based on API changes
     diff [VERSION]     Show API differences between versions
 
@@ -86,7 +86,7 @@ Synopsis:
 
 This is the most useful command in this group, and the one you'll likely use most often when developing Elm applications. 
 
-`wrap install <author/package>` does exactly what you'd expect and what you're used to from using the `elm` binary directly:
+`wrap install PACKAGE` does exactly what you'd expect and what you're used to from using the `elm` binary directly:
 installs dependencies for your Elm application or a package.
 
 There are a few flags that let you beyond the usual `install` command that might be helpful in certain scenarios:
@@ -98,14 +98,14 @@ There are a few flags that let you beyond the usual `install` command that might
     proposes upgrades to the latest minor version of your dependencies. Use this flag to check what packages have major version 
     updates and install. As usual, it will present you with the plan before implementing any changes.
 
-- `--from-file <FILE_PATH>`: Install a package from a local ZIP file rather than the registry. Useful for testing unpublished packages
+- `--from-file PATH`: Install a package from a local ZIP file rather than the registry. Useful for testing unpublished packages
   during development or working with private packages without using a local repository:
   
       wrap install --from-file ./my-package.zip author/package
 
-  If the `FILE_PATH` is a directory, it will pick up the files in that directory, as long as they follow the package layout structure.
+  If the `PATH` is a directory, it will pick up the files in that directory, as long as they follow the package layout structure.
 
-- `--from-url <URL>`: Install a package from a remote URL pointing to a ZIP file. Handy for installing packages hosted outside 
+- `--from-url URL`: Install a package from a remote URL pointing to a ZIP file. Handy for installing packages hosted outside 
     the official registry, such as private packages or pre-release versions. 
     
     It's essential for situations where the author a package your application depends on modified a tag, rewrote the repo history 
@@ -135,7 +135,7 @@ The `--major-ignore-test` flag allows major upgrades while ignoring conflicts fr
 test dependencies haven't caught up with a major release yet.
 
 
-#### **`remove <PACKAGE>`**     
+#### **`remove PACKAGE`**     
 
 Remove a package from your Elm project. This also cleans up any indirect dependencies that are no longer needed by other
 packages in your project.
@@ -161,7 +161,7 @@ This is super-useful for a quick check of all your projects' dependencies and av
     find /path/to/projects -name elm.json -print -exec wrap package info {} \;
 
   
-#### **`publish <PATH>`**       
+#### **`publish PATH`**       
 
 Determine which files should be published from a package. This doesn't actually publish anything--it just shows you what
 _would_ be included if you published.
@@ -170,7 +170,7 @@ The command uses Datalog rules (`core_package_files`, `publish_files`) to determ
 used by the actual publishing process, so you can verify your package contents before committing to a release.
 
 
-#### **`docs <PATH>`**          
+#### **`docs PATH`**          
 
 Generate documentation JSON for an Elm package. This produces the same `docs.json` format that the official package site
 uses, which you can use for local documentation tooling or preview purposes.
@@ -181,7 +181,7 @@ Point it at a directory containing `elm.json` and `src/`:
 
 Use `--verbose` to see which modules were skipped (e.g., internal modules not exposed in `elm.json`).
 
-#### **`cache [<PACKAGE>]`**    
+#### **`cache [PACKAGE]`**    
 
 Download packages to cache without prompting. Useful for pre-populating your cache before going offline, or for CI environments
 where you want to ensure all dependencies are available before running builds.
@@ -192,12 +192,12 @@ where you want to ensure all dependencies are available before running builds.
 Commands for managing local package repositories. This is relevant if you're running in V2 mode and hosting your own packages
 or mirroring packages from the official registry.
 
-#### **`new [<root_path>]`**
+#### **`new [PATH]`**
 
 Create a new repository directory structure at the specified path. If no path is given, uses the current directory. This sets up
 the folder layout that `wrap` expects for a local repository.
 
-#### **`list [<root_path>]`**
+#### **`list [PATH]`**
 
 List all repositories found at the given path. Helpful for discovering what's available in a shared repository location.
 
@@ -206,7 +206,7 @@ List all repositories found at the given path. Helpful for discovering what's av
 
 Commands for code analysis and transformation.
 
-#### **`format <FILE>`**
+#### **`format FILE`**
 
 Parse and canonicalize an Elm source file, outputting its AST (Abstract Syntax Tree). This is primarily useful for debugging
 or for building tooling that needs to understand Elm source structure.
@@ -216,7 +216,7 @@ or for building tooling that needs to understand Elm source structure.
 
 Commands for viewing and managing rulr policy rules. Rulr is `wrap`'s built-in linting and validation system.
 
-#### **`view <RULE>`**
+#### **`view RULE`**
 
 Print the source of a specific rule to stdout. Use this to inspect what a rule does before applying it, or as a starting point
 for writing your own rules.
@@ -231,11 +231,11 @@ dependencies, redundant files, and missing type exposures.
 
 Commands for running rulr rules against your Elm code. Think of this as `wrap`'s linting system.
 
-#### **`file <FILE>`**
+#### **`file FILE`**
 
 Analyze a single Elm source file with rulr rules. Outputs any violations found.
 
-#### **`package <PATH>`**
+#### **`package PATH`**
 
 Analyze an entire Elm package directory with rulr rules. This runs all applicable rules against every Elm file in the package
 and reports violations. Useful for CI pipelines or pre-publish checks.
@@ -248,7 +248,7 @@ everything passes. Handy for scripting.
 
 Diagnostic tools for development and troubleshooting.
 
-#### **`include-tree <path>`**
+#### **`include-tree PATH`**
 
 Show the import dependency tree for a file or package. Displays which modules import which other modules, helping you understand
 your project's dependency structure and identify potential circular dependencies or overly complex import chains.

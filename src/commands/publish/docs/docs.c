@@ -396,7 +396,7 @@ int cmd_publish_docs(int argc, char *argv[]) {
     }
 
     if (package_path == NULL) {
-        fprintf(stderr, "Error: Missing required argument <PATH>\n\n");
+        fprintf(stderr, "Error: Missing required argument PATH\n\n");
         print_docs_usage();
         return 1;
     }

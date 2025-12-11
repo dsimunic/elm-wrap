@@ -72,7 +72,7 @@ as well as developing a new version of an already published package.
 
 Differences between fresh and existing package scenarios are:
 
-- Fresh package requires running `wrap package init <author/package-name>`, so you are exercising this feature as well.
+- Fresh package requires running `wrap package init PACKAGE`, so you are exercising this feature as well.
 - Existing package requires removing any local source directories from `elm.json` of consuming applications.
 - The interaction with the package cache is different: the registry index is aware of published package's versions, so installing an existing package will pick up the latest 
 published version as the base for local development. Hence you must ensure that the local package's version is higher than the latest published version to avoid confusion.
@@ -85,7 +85,7 @@ Make sure your `elm.json` is valid and tracked in version control so you can res
 In the folder where the package source will reside, run:
 
 ```bash
-wrap package init <author/package-name>
+wrap package init PACKAGE
 ```
 
 As expected, this will create an `elm.json` file and an empty `src` folder. `elm.json`
@@ -99,7 +99,7 @@ Install the package in an application as any other published package:
 
 ```bash
 cd ../example-app
-wrap package install <author/package-name>
+wrap package install PACKAGE
 ```
 
 This will install the local package into the application, adding it to `elm.json` dependencies as usual.
@@ -108,7 +108,7 @@ This works because `wrap` starts tracking the local package path on `package ini
 index as normal. This makes the `package install` command work as expected without any special flags. It also appeases
 the stock compiler binary that expects to find the package in the registry at build time.
 
-At this point, `elm install <author/package-name>` also works as usual.
+At this point, `elm install PACKAGE` also works as usual.
 
 #### Existing package
 
@@ -118,10 +118,10 @@ to point to the local source.
 Remove the local source directory from `elm.json` and run the following command in the application folder:
 
 ```bash
-wrap package install --local-dev --from-path ../path-to-local-package  <author/package-name>
+wrap package install --local-dev --from-path ../path-to-local-package  PACKAGE
 ```
 
-`<author/package-name>` must match the name in the package's `elm.json`.
+`PACKAGE` must match the name in the package's `elm.json`.
 
 This will install the local package into the application, adding it to `elm.json` dependencies as usual. Additionally, it
 will set up dependency synchronization.
@@ -134,7 +134,7 @@ It is not necessary to pass `--local-dev` or `--from-path` again, as the local p
 
 ### Info
 
-Running `wrap package info <author/package-name>` for the  local package will show the paths to all applications that will be notified 
+Running `wrap package info PACKAGE` for the  local package will show the paths to all applications that will be notified 
 about the dependency changes.
 
 The same applies to `wrap package application info` command: the report shows the section "Tracking local dev packages:" if it is receiving
@@ -170,11 +170,11 @@ Now that you added the dependency to the package, installing it in another appli
 You can verify this by running:
 
 ```bash
-wrap package install <author/package-name>
+wrap package install PACKAGE
 
 or 
 
-elm install <author/package-name>
+elm install PACKAGE
 ```
 in another application. The new dependency will show up in the install plan. (Just say `n` to skip installing the local package--this was just to convince yourself it works).
 
@@ -193,7 +193,7 @@ To stop tracking a package for local development, uninstall it from all applicat
 Alternatively, you can run this command to stop tracking a specific package for local development:
 
 ```bash
-wrap registry local-dev remove <author/package-name> VERSION
+wrap registry local-dev remove PACKAGE VERSION
 ```
 
 You may also remove the package tracking for an app only, by also adding a path to the application folder
@@ -203,7 +203,7 @@ as reported by `wrap repository local-dev` command.
 wrap repository local-dev
 -- that gives a list of tracked packages and applications
 -- then run:
-wrap registry local-dev remove <author/package-name> VERSION /path/to/application
+wrap registry local-dev remove PACKAGE VERSION /path/to/application
 ```
 You may also clear all local-dev tracking by running:
 
@@ -234,7 +234,7 @@ Similar for other types. The default is `application` template, so `wrap applica
 A new package project can be created from a template as well:
 
 ```bash
-wrap package init <author/package-name>
+wrap package init PACKAGE
 ```
 
 This correctly generates a package project and inserts the author/package-name into the `elm.json` file.

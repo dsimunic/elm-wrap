@@ -17,7 +17,7 @@
 #include <stdbool.h>
 
 static void print_remove_usage(void) {
-    printf("Usage: %s package remove <PACKAGE> [PACKAGE...]\n", global_context_program_name());
+    printf("Usage: %s package remove PACKAGE [PACKAGE...]\n", global_context_program_name());
     printf("\n");
     printf("Remove packages from your Elm project.\n");
     printf("\n");
