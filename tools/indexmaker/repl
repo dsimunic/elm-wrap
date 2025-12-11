@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+#
+# REPL environment for testing wrap commands
+# Creates a temporary ELM_HOME with a custom registry.dat and opens a shell
+#
+# Usage:
+#   tools/indexmaker/repl packages.txt
+#
+# Where packages.txt contains one package per line in format:
+#   author/package@version
+#
+
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Show usage
+show_usage() {
+    echo "Usage: $(basename "$0") PACKAGES_FILE"
+    echo
+    echo "Creates a temporary Elm environment and opens a shell for testing."
+    echo
+    echo "Arguments:"
+    echo "  PACKAGES_FILE  File containing package specifications (author/package@version)"
+    echo
+    echo "Example:"
+    echo "  echo 'elm/core@1.0.5' > /tmp/packages.txt"
+    echo "  $(basename "$0") /tmp/packages.txt"
+    echo
+    echo "The shell will have ELM_HOME set to the temporary directory."
+    echo "Type 'exit' to leave the REPL environment."
+    exit 1
+}
+
+# Check arguments
+if [ $# -ne 1 ]; then
+    show_usage
+fi
+
+PACKAGES_FILE="$1"
+
+# Validate packages file
+if [ ! -f "$PACKAGES_FILE" ]; then
+    echo -e "${RED}✗ Error: Packages file not found: $PACKAGES_FILE${NC}"
+    exit 1
+fi
+
+# Check if wrap is available
+if ! command -v wrap &> /dev/null; then
+    echo -e "${RED}✗ Error: 'wrap' not found in PATH${NC}"
+    echo "  Please ensure wrap is installed or in your PATH"
+    exit 1
+fi
+
+# Check if indexmaker exists
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INDEXMAKER="$SCRIPT_DIR/../../bin/indexmaker"
+if [ ! -x "$INDEXMAKER" ]; then
+    echo -e "${RED}✗ Error: indexmaker not found at $INDEXMAKER${NC}"
+    echo "  Run 'make indexmaker' to build it"
+    exit 1
+fi
+
+# Create temporary directory
+TEMP_DIR=$(mktemp -d)
+REPL_HOME="$TEMP_DIR/elm_home/0.19.1/packages"
+mkdir -p "$REPL_HOME"
+
+# Cleanup on exit
+cleanup() {
+    echo
+    echo -e "${YELLOW}Cleaning up temporary environment...${NC}"
+    rm -rf "$TEMP_DIR"
+    echo -e "${GREEN}✓ Done${NC}"
+}
+trap cleanup EXIT
+
+# Generate registry.dat
+echo -e "${CYAN}Setting up REPL environment...${NC}"
+echo -e "  Packages file: ${YELLOW}$PACKAGES_FILE${NC}"
+echo -e "  Temp ELM_HOME: ${YELLOW}$TEMP_DIR/elm_home${NC}"
+echo
+
+if ! "$INDEXMAKER" "$PACKAGES_FILE" "$REPL_HOME/registry.dat" 2>&1; then
+    echo -e "${RED}✗ Error: Failed to generate registry.dat${NC}"
+    exit 1
+fi
+
+# Verify registry was created
+PACKAGE_COUNT=$(env ELM_HOME="$TEMP_DIR/elm_home" wrap debug registry_v1 list 2>/dev/null | grep "Total packages:" | awk '{print $3}' || echo "0")
+VERSION_COUNT=$(env ELM_HOME="$TEMP_DIR/elm_home" wrap debug registry_v1 list 2>/dev/null | grep "Total versions:" | awk '{print $3}' || echo "0")
+
+echo -e "${GREEN}✓ Registry created successfully${NC}"
+echo -e "  Packages: ${YELLOW}$PACKAGE_COUNT${NC}"
+echo -e "  Versions: ${YELLOW}$VERSION_COUNT${NC}"
+echo
+
+# Print helpful information
+echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}  REPL Environment Ready${NC}"
+echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
+echo
+echo -e "ELM_HOME is set to: ${YELLOW}$TEMP_DIR/elm_home${NC}"
+echo
+echo -e "You can now run wrap commands, for example:"
+echo -e "  ${YELLOW}wrap debug registry_v1 list${NC}"
+echo -e "  ${YELLOW}wrap install elm/html@1.0.0${NC}"
+echo
+echo -e "Type ${YELLOW}exit${NC} to leave the REPL environment."
+echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
+echo
+
+# Export ELM_HOME and start a new shell with custom prompt
+export ELM_HOME="$TEMP_DIR/elm_home"
+export PS1='$ '
+
+# Start the shell based on the current shell
+if [ -n "$BASH_VERSION" ]; then
+    # We're in bash
+    exec bash --norc --noprofile
+elif [ -n "$ZSH_VERSION" ]; then
+    # We're in zsh
+    exec zsh -f
+elif command -v fish &> /dev/null; then
+    # Use fish if available
+    exec fish
+else
+    # Fallback to sh
+    exec sh
+fi

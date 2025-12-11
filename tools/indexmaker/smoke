@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+#
+# Smoke test for indexmaker tool
+# Verifies that indexmaker can create valid registry.dat files
+#
+
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo "🧪 Running indexmaker smoke tests..."
+echo
+
+# Check if wrap is available
+if ! command -v wrap &> /dev/null; then
+    echo -e "${RED}✗ Error: 'wrap' not found in PATH${NC}"
+    echo "  Please ensure wrap is installed or in your PATH"
+    exit 1
+fi
+echo -e "${GREEN}✓${NC} wrap found: $(command -v wrap)"
+
+# Check if indexmaker exists
+if [ ! -x "$(dirname "$0")/../../bin/indexmaker" ]; then
+    echo -e "${RED}✗ Error: indexmaker not found at bin/indexmaker${NC}"
+    echo "  Run 'make indexmaker' to build it"
+    exit 1
+fi
+INDEXMAKER="$(dirname "$0")/../../bin/indexmaker"
+echo -e "${GREEN}✓${NC} indexmaker found: $INDEXMAKER"
+echo
+
+# Create temporary test directory
+TEST_DIR=$(mktemp -d)
+trap "rm -rf $TEST_DIR" EXIT
+
+echo "📁 Test directory: $TEST_DIR"
+echo
+
+# Test 1: Basic functionality - single package
+echo "Test 1: Single package from stdin"
+mkdir -p "$TEST_DIR/test1/0.19.1/packages"
+printf "elm/core@1.0.5\n" | "$INDEXMAKER" - "$TEST_DIR/test1/0.19.1/packages/registry.dat" > /dev/null 2>&1
+RESULT=$(env ELM_HOME="$TEST_DIR/test1" wrap debug registry_v1 list 2>/dev/null | grep -c "elm/core" || true)
+if [ "$RESULT" -eq 1 ]; then
+    echo -e "${GREEN}✓${NC} Single package test passed"
+else
+    echo -e "${RED}✗${NC} Single package test failed"
+    exit 1
+fi
+
+# Test 2: Multiple versions of same package
+echo "Test 2: Multiple versions of same package"
+mkdir -p "$TEST_DIR/test2/0.19.1/packages"
+printf "elm/core@1.0.0\nelm/core@1.0.1\nelm/core@1.0.5\n" | "$INDEXMAKER" - "$TEST_DIR/test2/0.19.1/packages/registry.dat" > /dev/null 2>&1
+VERSION_COUNT=$(env ELM_HOME="$TEST_DIR/test2" wrap debug registry_v1 list 2>/dev/null | grep -c "1.0." || true)
+if [ "$VERSION_COUNT" -eq 3 ]; then
+    echo -e "${GREEN}✓${NC} Multiple versions test passed"
+else
+    echo -e "${RED}✗${NC} Multiple versions test failed (found $VERSION_COUNT versions, expected 3)"
+    exit 1
+fi
+
+# Test 3: Multiple packages with comments and empty lines
+echo "Test 3: Multiple packages with comments and empty lines"
+mkdir -p "$TEST_DIR/test3/0.19.1/packages"
+cat > "$TEST_DIR/test3/input.txt" << 'EOF'
+# Core packages
+elm/core@1.0.5
+
+# HTML
+elm/html@1.0.0
+elm/html@1.0.1
+
+# JSON
+elm/json@1.1.3
+EOF
+"$INDEXMAKER" "$TEST_DIR/test3/input.txt" "$TEST_DIR/test3/0.19.1/packages/registry.dat" > /dev/null 2>&1
+PACKAGE_COUNT=$(env ELM_HOME="$TEST_DIR/test3" wrap debug registry_v1 list 2>/dev/null | grep -E "^elm/" | wc -l)
+if [ "$PACKAGE_COUNT" -ge 3 ]; then
+    echo -e "${GREEN}✓${NC} Comments and empty lines test passed"
+else
+    echo -e "${RED}✗${NC} Comments and empty lines test failed"
+    exit 1
+fi
+
+# Test 4: Alphabetical sorting
+echo "Test 4: Package sorting"
+mkdir -p "$TEST_DIR/test4/0.19.1/packages"
+printf "elm/json@1.0.0\nelm/core@1.0.0\nelm/html@1.0.0\n" | "$INDEXMAKER" - "$TEST_DIR/test4/0.19.1/packages/registry.dat" > /dev/null 2>&1
+FIRST_PACKAGE=$(env ELM_HOME="$TEST_DIR/test4" wrap debug registry_v1 list 2>/dev/null | grep -E "^elm/" | head -1 | tr -d '[:space:]')
+if [ "$FIRST_PACKAGE" = "elm/core" ]; then
+    echo -e "${GREEN}✓${NC} Package sorting test passed"
+else
+    echo -e "${RED}✗${NC} Package sorting test failed (first package: $FIRST_PACKAGE)"
+    exit 1
+fi
+
+# Test 5: File input
+echo "Test 5: File input"
+mkdir -p "$TEST_DIR/test5/0.19.1/packages"
+printf "elm/core@1.0.5\nelm/browser@1.0.2\n" > "$TEST_DIR/test5/packages.txt"
+"$INDEXMAKER" "$TEST_DIR/test5/packages.txt" "$TEST_DIR/test5/0.19.1/packages/registry.dat" > /dev/null 2>&1
+BROWSER_EXISTS=$(env ELM_HOME="$TEST_DIR/test5" wrap debug registry_v1 list 2>/dev/null | grep -c "elm/browser" || true)
+if [ "$BROWSER_EXISTS" -eq 1 ]; then
+    echo -e "${GREEN}✓${NC} File input test passed"
+else
+    echo -e "${RED}✗${NC} File input test failed"
+    exit 1
+fi
+
+# Test 6: Registry metadata
+echo "Test 6: Registry metadata verification"
+mkdir -p "$TEST_DIR/test6/0.19.1/packages"
+printf "elm/core@1.0.0\nelm/core@1.0.5\nelm/html@1.0.0\n" | "$INDEXMAKER" - "$TEST_DIR/test6/0.19.1/packages/registry.dat" > /dev/null 2>&1
+OUTPUT=$(env ELM_HOME="$TEST_DIR/test6" wrap debug registry_v1 list 2>/dev/null)
+TOTAL_PACKAGES=$(echo "$OUTPUT" | grep "Total packages:" | awk '{print $3}')
+TOTAL_VERSIONS=$(echo "$OUTPUT" | grep "Total versions:" | awk '{print $3}')
+if [ "$TOTAL_PACKAGES" -eq 2 ] && [ "$TOTAL_VERSIONS" -eq 3 ]; then
+    echo -e "${GREEN}✓${NC} Registry metadata test passed"
+else
+    echo -e "${RED}✗${NC} Registry metadata test failed (packages: $TOTAL_PACKAGES, versions: $TOTAL_VERSIONS)"
+    exit 1
+fi
+
+echo
+echo -e "${GREEN}═══════════════════════════════════════${NC}"
+echo -e "${GREEN}✓ All tests passed!${NC}"
+echo -e "${GREEN}═══════════════════════════════════════${NC}"
+echo
+echo "Indexmaker is working correctly and generates valid registry.dat files."

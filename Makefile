@@ -274,6 +274,7 @@ OBJECTS = $(BUILDDIR)/main.o \
 TARGET = $(BINDIR)/$(TARGET_FILE)
 PG_CORE_TEST = $(BINDIR)/pg_core_test
 PG_FILE_TEST = $(BINDIR)/pg_file_test
+INDEXMAKER = $(BINDIR)/indexmaker
 VERSION_FILE = VERSION
 ENV_DEFAULTS_FILE = ENV_DEFAULTS
 
@@ -309,7 +310,7 @@ BINDIR_INSTALL = $(PREFIX)/bin
 USER_PREFIX = $(HOME)/.local
 USER_BINDIR = $(USER_PREFIX)/bin
 
-.PHONY: all clean pg_core_test pg_file_test test check dist distcheck install install-user uninstall uninstall-user rulrc compile-builtin-rules
+.PHONY: all clean pg_core_test pg_file_test indexmaker test check dist distcheck install install-user uninstall uninstall-user rulrc compile-builtin-rules
 
 .DEFAULT_GOAL := all
 
@@ -640,6 +641,10 @@ $(BUILDDIR)/pg_core_test.o: test/src/pg_core_test.c $(SRCDIR)/pgsolver/pg_core.h
 $(BUILDDIR)/pg_file_test.o: test/src/pg_file_test.c $(SRCDIR)/pgsolver/pg_core.h test/src/vendor/jsmn/jsmn.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Build indexmaker object
+$(BUILDDIR)/indexmaker.o: tools/indexmaker/indexmaker.c $(SRCDIR)/registry.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/log.h $(SRCDIR)/commands/package/package_common.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # Build cJSON object
 $(BUILDDIR)/cJSON.o: $(SRCDIR)/vendor/cJSON.c $(SRCDIR)/vendor/cJSON.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -767,6 +772,11 @@ $(PG_CORE_TEST): $(BUILDDIR)/pg_core_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/el
 pg_file_test: $(PG_FILE_TEST)
 
 $(PG_FILE_TEST): $(BUILDDIR)/pg_file_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o | $(BINDIR)
+	$(CC) $(CFLAGS) $^ -o $@
+
+indexmaker: $(INDEXMAKER)
+
+$(INDEXMAKER): $(BUILDDIR)/indexmaker.o $(BUILDDIR)/registry.o $(BUILDDIR)/package_common.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/cJSON.o | $(BINDIR)
 	$(CC) $(CFLAGS) $^ -o $@
 
 test: pg_core_test pg_file_test
