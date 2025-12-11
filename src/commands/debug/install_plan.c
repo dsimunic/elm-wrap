@@ -379,7 +379,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
                     printf("    Status: Available in registry\n");
                     
                     // Try to resolve this dependency
-                    SolverState *solver = solver_init(install_env, true);
+                    SolverState *solver = solver_init(install_env, install_env_solver_online(install_env));
                     if (solver) {
                         InstallPlan *dep_plan = NULL;
                         SolverResult result = solver_add_package(solver, app_json, dep->author, dep->name,
@@ -485,7 +485,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
     }
 
     // Initialize solver
-    SolverState *solver = solver_init(install_env, true); // online=true
+    SolverState *solver = solver_init(install_env, install_env_solver_online(install_env));
     if (!solver) {
         fprintf(stderr, "Error: Failed to initialize solver\n");
         install_env_free(install_env);

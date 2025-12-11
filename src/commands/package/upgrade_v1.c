@@ -336,7 +336,7 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
 
     log_debug("Resolving dependencies for %s/%s upgrade to %s", author, name, latest_version);
 
-    SolverState *solver = solver_init(env, true);
+    SolverState *solver = solver_init(env, install_env_solver_online(env));
     if (!solver) {
         log_error("Failed to initialize solver");
         arena_free((char*)latest_version);
@@ -362,7 +362,7 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
                 log_error("No compatible version found for %s/%s", author, name);
                 break;
             case SOLVER_NO_OFFLINE_SOLUTION:
-                log_error("Cannot solve offline (no cached registry)");
+                log_offline_cache_error(env);
                 break;
             case SOLVER_NETWORK_ERROR:
                 log_error("Network error while downloading packages");
@@ -562,7 +562,7 @@ int upgrade_all_packages_v1(ElmJson *elm_json, InstallEnv *env,
 
     log_debug("Upgrading all packages%s (V1)", major_upgrade ? " (major allowed)" : "");
 
-    SolverState *solver = solver_init(env, true);
+    SolverState *solver = solver_init(env, install_env_solver_online(env));
     if (!solver) {
         log_error("Failed to initialize solver");
         return 1;
@@ -581,7 +581,7 @@ int upgrade_all_packages_v1(ElmJson *elm_json, InstallEnv *env,
                 log_error("No solution found for upgrades");
                 break;
             case SOLVER_NO_OFFLINE_SOLUTION:
-                log_error("Cannot solve offline (no cached registry)");
+                log_offline_cache_error(env);
                 break;
             case SOLVER_NETWORK_ERROR:
                 log_error("Network error while downloading packages");

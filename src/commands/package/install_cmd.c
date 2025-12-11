@@ -384,7 +384,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
         return 1;
     }
 
-    SolverState *solver = solver_init(env, true);
+    SolverState *solver = solver_init(env, install_env_solver_online(env));
     if (!solver) {
         log_error("Failed to initialize solver");
         return 1;
@@ -421,7 +421,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
                 }
                 break;
             case SOLVER_NO_OFFLINE_SOLUTION:
-                log_error("Cannot solve offline (no cached registry)");
+                log_offline_cache_error(env);
                 break;
             case SOLVER_NETWORK_ERROR:
                 log_error("Network error while downloading packages");
@@ -756,7 +756,7 @@ static int install_multiple_packages(
     MultiPackageValidation *validation = NULL;
 
     if (to_solve_count > 0) {
-        SolverState *solver = solver_init(env, true);
+        SolverState *solver = solver_init(env, install_env_solver_online(env));
         if (!solver) {
             log_error("Failed to initialize solver");
             arena_free(promotions);
@@ -805,7 +805,7 @@ static int install_multiple_packages(
                     }
                     break;
                 case SOLVER_NO_OFFLINE_SOLUTION:
-                    log_error("Cannot solve offline (no cached registry)");
+                    log_offline_cache_error(env);
                     break;
                 case SOLVER_NETWORK_ERROR:
                     log_error("Network error while downloading packages");

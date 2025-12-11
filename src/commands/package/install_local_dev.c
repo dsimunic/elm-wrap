@@ -594,7 +594,7 @@ static bool refresh_app_indirect_deps(const char *app_elm_json_path, InstallEnv 
             }
 
             /* Use solver to resolve this dependency */
-            SolverState *solver = solver_init(env, true);
+            SolverState *solver = solver_init(env, install_env_solver_online(env));
             if (!solver) {
                 log_error("Failed to initialize solver for %s/%s", dep->author, dep->name);
                 resolution_failed = true;
@@ -1113,7 +1113,7 @@ int install_local_dev(const char *source_path, const char *package_name,
             }
             
             /* Use solver to resolve this dependency */
-            SolverState *solver = solver_init(env, true);
+            SolverState *solver = solver_init(env, install_env_solver_online(env));
             if (!solver) {
                 log_error("Failed to initialize solver for %s/%s", dep->author, dep->name);
                 resolution_failed = true;

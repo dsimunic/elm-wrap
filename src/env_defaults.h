@@ -1,6 +1,8 @@
 #ifndef ENV_DEFAULTS_H
 #define ENV_DEFAULTS_H
 
+#include <stdbool.h>
+
 /**
  * Environment variable lookup with compiled-in defaults.
  * 
@@ -21,5 +23,8 @@ char *env_get_repository_local_path(void);
 
 /* Get WRAP_ELM_COMPILER_PATH (no compiled default, returns NULL if not set) */
 char *env_get_elm_compiler_path(void);
+
+/* Check if offline mode is forced via WRAP_OFFLINE_MODE=1 */
+bool env_get_offline_mode(void);
 
 #endif /* ENV_DEFAULTS_H */

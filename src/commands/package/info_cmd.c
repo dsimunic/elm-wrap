@@ -780,7 +780,11 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
 
         printf("\nRegistry URL: %s\n", env->registry_url);
         if (env->offline) {
-            printf("  Status: Offline (using cached data)\n");
+            if (env->offline_forced) {
+                printf("  Status: Offline (forced via WRAP_OFFLINE_MODE=1)\n");
+            } else {
+                printf("  Status: Offline (using cached data)\n");
+            }
         } else {
             printf("  Status: Connected\n");
         }

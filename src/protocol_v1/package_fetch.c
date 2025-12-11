@@ -101,6 +101,17 @@ static void report_progress(const char *author, const char *name, const char *ve
     }
 }
 
+static void log_offline_download_error(const InstallEnv *env, const char *action) {
+    if (!action) {
+        return;
+    }
+    if (env && env->offline_forced) {
+        log_error("Cannot %s while WRAP_OFFLINE_MODE=1 is set", action);
+    } else {
+        log_error("Cannot %s in offline mode", action);
+    }
+}
+
 /* ========================================================================
  * Internal Helper Functions
  * ======================================================================== */
@@ -332,7 +343,7 @@ bool fetch_package_metadata(InstallEnv *env, const char *author,
     if (!env || !author || !name || !version) return false;
 
     if (env->offline) {
-        log_error("Cannot download metadata in offline mode");
+        log_offline_download_error(env, "download package metadata");
         return false;
     }
 
@@ -436,7 +447,7 @@ char* fetch_package_archive(InstallEnv *env, const char *author,
     if (!env || !author || !name || !version || !endpoint) return NULL;
 
     if (env->offline) {
-        log_error("Cannot download package archive in offline mode");
+        log_offline_download_error(env, "download package archives");
         return NULL;
     }
 

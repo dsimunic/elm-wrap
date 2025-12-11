@@ -239,6 +239,11 @@ to go into "offline mode" as it cannot connect to the said address. The only rea
 is to contact the package registry that is hard-coded to `package.elm-lang.org`. Obviously not very useful if our goal is to 
 use our own package registry.
 
+**`WRAP_OFFLINE_MODE`** forces **elm-wrap** itself to run without touching the network. Set it to `1` to skip registry connectivity
+checks and registry updates entirely. Commands then rely solely on any cached `registry.dat`/`index.dat` that already exists in
+`ELM_HOME`. If no cache is present, commands will fail immediately with a hint to unset the variable or run online once to
+populate the cache.
+
 
 ## Status
 

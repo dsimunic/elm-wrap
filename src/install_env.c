@@ -1,5 +1,6 @@
 #include "install_env.h"
 #include "alloc.h"
+#include "env_defaults.h"
 #include "vendor/cJSON.h"
 #include "vendor/sha1.h"
 #include "log.h"
@@ -132,6 +133,12 @@ InstallEnv* install_env_create(void) {
 bool install_env_init(InstallEnv *env) {
     if (!env) return false;
 
+    bool forced_offline = env_get_offline_mode();
+    env->offline_forced = forced_offline;
+    if (forced_offline) {
+        log_progress("WRAP_OFFLINE_MODE=1: Network operations disabled");
+    }
+
     /* Initialize cache configuration (shared by both protocols) */
     env->cache = cache_config_init();
     if (!env->cache) {
@@ -260,15 +267,28 @@ bool install_env_init(InstallEnv *env) {
         char health_check_url[URL_MAX];
         snprintf(health_check_url, sizeof(health_check_url), "%s/all-packages", env->registry_url);
 
-        log_progress("Testing connectivity to %s...", env->registry_url);
-        env->offline = !curl_session_can_connect(env->curl_session, health_check_url);
+        if (env->offline_forced) {
+            log_progress("Offline mode forced via WRAP_OFFLINE_MODE=1");
+            env->offline = true;
+        } else {
+            log_progress("Testing connectivity to %s...", env->registry_url);
+            env->offline = !curl_session_can_connect(env->curl_session, health_check_url);
+        }
 
         if (env->offline) {
-            log_progress("Warning: Cannot connect to package registry (offline mode)");
+            if (env->offline_forced) {
+                log_progress("Using cached registry (offline mode forced)");
+            } else {
+                log_progress("Warning: Cannot connect to package registry (offline mode)");
+            }
 
             if (env->known_version_count == 0) {
-                fprintf(stderr, "Error: No cached registry and cannot connect to network\n");
-                fprintf(stderr, "Please run again when online to download package registry\n");
+                fprintf(stderr, "Error: No cached registry and offline mode is active\n");
+                if (env->offline_forced) {
+                    fprintf(stderr, "Hint: Unset WRAP_OFFLINE_MODE or run online first to cache registry data\n");
+                } else {
+                    fprintf(stderr, "Please run again when online to download package registry\n");
+                }
                 return false;
             }
 
@@ -454,7 +474,11 @@ bool install_env_download_package(InstallEnv *env, const char *author, const cha
     }
 
     if (env->offline) {
-        fprintf(stderr, "Error: Cannot download package in offline mode\n");
+        if (env->offline_forced) {
+            fprintf(stderr, "Error: Cannot download package while WRAP_OFFLINE_MODE=1 is set\n");
+        } else {
+            fprintf(stderr, "Error: Cannot download package in offline mode\n");
+        }
         return false;
     }
 
@@ -503,6 +527,11 @@ bool install_env_download_package(InstallEnv *env, const char *author, const cha
     log_progress("  Successfully installed %s/%s %s", author, name, version);
 
     return true;
+}
+
+bool install_env_solver_online(const InstallEnv *env) {
+    if (!env) return true;  /* Default to online if no env */
+    return !env->offline;
 }
 
 void install_env_free(InstallEnv *env) {

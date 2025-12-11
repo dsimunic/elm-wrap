@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 /* Expand ~ to the user's home directory in a path */
 static char *expand_tilde(const char *path) {
@@ -92,4 +93,12 @@ char *env_get_elm_compiler_path(void) {
         return expand_tilde(env_val);
     }
     return NULL;
+}
+
+bool env_get_offline_mode(void) {
+    const char *env_val = getenv("WRAP_OFFLINE_MODE");
+    if (env_val && env_val[0] == '1' && env_val[1] == '\0') {
+        return true;
+    }
+    return false;
 }

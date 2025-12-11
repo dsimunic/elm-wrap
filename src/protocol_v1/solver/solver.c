@@ -660,7 +660,11 @@ SolverResult solver_upgrade_all_v1(
 
     /* Check if package needs to be downloaded from registry */
     if (!state->online && !cache_registry_exists(state->cache)) {
-        log_error("Offline mode but no cached registry");
+        if (state->install_env && state->install_env->offline_forced) {
+            log_error("WRAP_OFFLINE_MODE=1 prevents downloading the registry (no cached data available)");
+        } else {
+            log_error("Offline mode but no cached registry");
+        }
         package_map_free(current_packages);
         return SOLVER_NO_OFFLINE_SOLUTION;
     }

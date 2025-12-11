@@ -27,6 +27,7 @@ typedef struct InstallEnv {
 
     /* Shared state */
     bool offline;
+    bool offline_forced;
     bool ignore_hash;  /* Skip SHA-1 verification of downloaded archives */
     ProtocolMode protocol_mode;
 } InstallEnv;
@@ -35,6 +36,9 @@ typedef struct InstallEnv {
 InstallEnv* install_env_create(void);
 bool install_env_init(InstallEnv *env);
 void install_env_free(InstallEnv *env);
+
+/* Solver parameter helper - returns true if network operations are allowed */
+bool install_env_solver_online(const InstallEnv *env);
 
 /* Registry operations */
 bool install_env_fetch_registry(InstallEnv *env);

@@ -4,6 +4,7 @@
 #include "global_context.h"
 #include "alloc.h"
 #include "log.h"
+#include "env_defaults.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,6 +59,11 @@ int cmd_config(int argc, char *argv[]) {
         printf("Repository path: %s\n", ctx->repository_path);
     }
     printf("ELM_HOME: %s\n", cache->elm_home);
+    if (env_get_offline_mode()) {
+        printf("Offline mode: forced (WRAP_OFFLINE_MODE=1)\n");
+    } else {
+        printf("Offline mode: auto-detect\n");
+    }
     if (compiler_version) {
         printf("Elm compiler version: %s\n", compiler_version);
     } else {

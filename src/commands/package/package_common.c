@@ -23,6 +23,14 @@
 #define PATH_MAX 4096
 #endif
 
+void log_offline_cache_error(InstallEnv *env) {
+    if (env && env->offline_forced) {
+        log_error("Cannot solve dependencies while WRAP_OFFLINE_MODE=1 is set and the registry cache is empty");
+    } else {
+        log_error("Cannot solve offline (no cached registry)");
+    }
+}
+
 /* ========================================================================
  * Version Parsing and Formatting
  * ======================================================================== */

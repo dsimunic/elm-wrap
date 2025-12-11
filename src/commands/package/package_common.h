@@ -196,6 +196,9 @@ char* find_package_elm_json(const char *pkg_path);
 bool install_from_file(const char *source_path, struct InstallEnv *env, const char *author, const char *name, const char *version);
 int compare_package_changes(const void *a, const void *b);
 
+/* Offline mode messaging */
+void log_offline_cache_error(struct InstallEnv *env);
+
 /**
  * Check if a package exists in the registry and count valid versions.
  * Works with both V1 and V2 protocols.
