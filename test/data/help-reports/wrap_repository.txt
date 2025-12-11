@@ -1,0 +1,11 @@
+Usage: wrap repository SUBCOMMAND [OPTIONS]
+
+Manage local package repositories.
+
+Subcommands:
+  init [ROOT_PATH]      Create a new repository directory
+  list [ROOT_PATH]      List repositories at path
+  local-dev             Manage local development tracking
+
+Options:
+  -h, --help            Show this help message

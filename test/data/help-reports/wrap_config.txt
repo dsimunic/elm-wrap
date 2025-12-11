@@ -1,0 +1,9 @@
+Usage: wrap config
+
+Display current configuration.
+
+Shows:
+  - Protocol mode (V1 or V2)
+  - ELM_HOME directory
+  - Elm compiler version
+  - Elm compiler binary path

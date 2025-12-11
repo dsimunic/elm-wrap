@@ -1,0 +1,19 @@
+Usage: wrap package upgrade [PACKAGE|all]
+
+Upgrade packages to their latest available versions.
+
+Examples:
+  wrap package upgrade                        # Upgrade all packages to latest minor versions
+  wrap package upgrade all                    # Same as above
+  wrap package upgrade elm/html               # Upgrade elm/html to latest minor version
+  wrap package upgrade --major elm/html       # Upgrade elm/html to latest major version
+  wrap package upgrade --major all            # Upgrade all packages to latest major versions
+  wrap package upgrade --major-ignore-test elm/html # Major upgrade, ignore test deps
+
+Options:
+  --major                              # Allow major version upgrades
+  --major-ignore-test                  # Allow major upgrades, ignore test dependency conflicts
+  -y, --yes                            # Automatically confirm changes
+  -v, --verbose                        # Show progress reports (registry, connectivity)
+  -q, --quiet                          # Suppress progress reports
+  --help                               # Show this help

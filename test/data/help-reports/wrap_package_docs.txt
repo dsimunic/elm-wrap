@@ -1,0 +1,10 @@
+Usage: wrap package docs PATH
+
+Generate json documentation for an Elm package.
+
+Arguments:
+  PATH               Path to package directory containing elm.json and src/
+
+Options:
+  -h, --help         Show this help message
+  -v, --verbose      Show verbose output including skipped modules

@@ -1,0 +1,8 @@
+Usage: wrap package init [OPTIONS] PACKAGE
+
+Initialize a new Elm package from embedded templates.
+
+Options:
+  --no-local-dev  Skip registering the package in the local-dev registry
+  -y, --yes       Skip confirmation prompt
+  -h, --help      Show this help message

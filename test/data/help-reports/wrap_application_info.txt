@@ -1,0 +1,17 @@
+Usage: wrap application info [PATH]
+
+Display application information.
+
+Shows:
+  - Current ELM_HOME directory
+  - Registry cache statistics
+  - Package registry connectivity
+  - Installed packages
+  - Available updates
+
+Examples:
+  wrap application info              # Show info for current directory
+  wrap application info ./path/to    # Show info for elm.json at path
+
+Options:
+  -h, --help   Show this help message

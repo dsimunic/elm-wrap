@@ -1,0 +1,23 @@
+Usage: wrap COMMAND [OPTIONS]
+
+Commands:
+  repl               Open an interactive Elm REPL
+  init               Initialize a new Elm project
+  reactor            Start the Elm Reactor development server
+  make ELM_FILE      Compile Elm code to JavaScript or HTML
+  install PACKAGE    Install packages for your Elm project
+
+  config                    Display current configuration
+  info [PATH | PACKAGE [VERSION]]  Display package or application info
+  application SUBCOMMAND    Application management commands
+  package SUBCOMMAND        Package management commands
+  repository SUBCOMMAND     Repository management commands
+  debug SUBCOMMAND          Diagnostic tools for development
+
+Options:
+  -v, --verbose      Show detailed logging output
+  -vv                Show extra verbose (trace) logging output
+  -V                 Show version number
+  --version          Show detailed version information
+  --sbom, --spdx     Show Software Bill of Materials (SBOM)
+  -h, --help         Show this help message

@@ -51,10 +51,12 @@ endif
 SRCDIR = src
 BUILDDIR = build
 BINDIR = bin
+LIBDIR = lib
+TOOLSDIR = $(BINDIR)/tools
 
 # Rulr (Mini Datalog) library
 RULR_SRCDIR = $(SRCDIR)/rulr
-RULR_LIB = $(BINDIR)/librulr.a
+RULR_LIB = $(LIBDIR)/librulr.a
 RULR_SOURCES = $(RULR_SRCDIR)/rulr.c \
                $(RULR_SRCDIR)/rulr_dl.c \
                $(RULR_SRCDIR)/builtin_rules.c \
@@ -79,7 +81,7 @@ EMBEDDED_ARCHIVE_DIR = $(BUILDDIR)/embedded_archive
 TEMPLATES_DIR = templates
 
 # Rulr compiler (rulrc)
-RULRC = $(BINDIR)/rulrc
+RULRC = $(TOOLSDIR)/rulrc
 RULRC_SRC = $(RULR_SRCDIR)/rulrc_main.c
 RULRC_OBJ = $(BUILDDIR)/rulr/rulrc_main.o
 
@@ -272,10 +274,11 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/miniz.o \
           $(BUILDDIR)/buildinfo.o
 TARGET = $(BINDIR)/$(TARGET_FILE)
-PG_CORE_TEST = $(BINDIR)/pg_core_test
-PG_FILE_TEST = $(BINDIR)/pg_file_test
-INDEXMAKER = $(BINDIR)/indexmaker
-MKPKG = $(BINDIR)/mkpkg
+PG_CORE_TEST = $(TOOLSDIR)/pg_core_test
+PG_FILE_TEST = $(TOOLSDIR)/pg_file_test
+INDEXMAKER = $(TOOLSDIR)/indexmaker
+MKPKG = $(TOOLSDIR)/mkpkg
+HELP_REPORT_HTML_GEN = $(TOOLSDIR)/help-report-html-gen
 VERSION_FILE = VERSION
 ENV_DEFAULTS_FILE = ENV_DEFAULTS
 
@@ -740,7 +743,7 @@ $(BUILDDIR)/rulr/%.o: $(SRCDIR)/rulr/%.c | $(BUILDDIR)
 	$(CC) $(RULR_CFLAGS) -c $< -o $@
 
 # Build librulr archive
-$(RULR_LIB): $(RULR_OBJECTS) | $(BINDIR)
+$(RULR_LIB): $(RULR_OBJECTS) | $(LIBDIR)
 	$(AR) rcs $@ $(RULR_OBJECTS)
 
 # Build rulr demo driver (optional helper for development)
@@ -752,7 +755,7 @@ $(RULRC_OBJ): $(RULRC_SRC) | $(BUILDDIR)
 	@mkdir -p $(dir $@)
 	$(CC) $(RULR_CFLAGS) -c $< -o $@
 
-$(RULRC): $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o | $(BINDIR)
+$(RULRC): $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o | $(TOOLSDIR)
 	$(CC) $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o -o $@
 
 # Link final binary
@@ -766,28 +769,39 @@ $(BUILDDIR):
 $(BINDIR):
 	mkdir -p $(BINDIR)
 
+$(LIBDIR):
+	mkdir -p $(LIBDIR)
+
+$(TOOLSDIR):
+	mkdir -p $(TOOLSDIR)
+
 clean:
-	rm -rf $(BUILDDIR) $(BINDIR)
+	rm -rf $(BUILDDIR) $(BINDIR) $(LIBDIR)
 
 pg_core_test: $(PG_CORE_TEST)
 
-$(PG_CORE_TEST): $(BUILDDIR)/pg_core_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o | $(BINDIR)
+$(PG_CORE_TEST): $(BUILDDIR)/pg_core_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o | $(TOOLSDIR)
 	$(CC) $(CFLAGS) $^ -o $@
 
 pg_file_test: $(PG_FILE_TEST)
 
-$(PG_FILE_TEST): $(BUILDDIR)/pg_file_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o | $(BINDIR)
+$(PG_FILE_TEST): $(BUILDDIR)/pg_file_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o | $(TOOLSDIR)
 	$(CC) $(CFLAGS) $^ -o $@
 
 indexmaker: $(INDEXMAKER)
 
-$(INDEXMAKER): $(BUILDDIR)/indexmaker.o $(BUILDDIR)/registry.o $(BUILDDIR)/package_common.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/cJSON.o | $(BINDIR)
+$(INDEXMAKER): $(BUILDDIR)/indexmaker.o $(BUILDDIR)/registry.o $(BUILDDIR)/package_common.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/cJSON.o | $(TOOLSDIR)
 	$(CC) $(CFLAGS) $^ -o $@
 
 mkpkg: $(MKPKG)
 
-$(MKPKG): $(BUILDDIR)/mkpkg.o $(BUILDDIR)/v2_registry.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/cache.o $(BUILDDIR)/elm_compiler.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/cJSON.o $(BUILDDIR)/miniz.o | $(BINDIR)
+$(MKPKG): $(BUILDDIR)/mkpkg.o $(BUILDDIR)/v2_registry.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/cache.o $(BUILDDIR)/elm_compiler.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/cJSON.o $(BUILDDIR)/miniz.o | $(TOOLSDIR)
 	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
+
+help-report-html-gen: $(HELP_REPORT_HTML_GEN)
+
+$(HELP_REPORT_HTML_GEN): tools/help-report-html-gen.c | $(TOOLSDIR)
+	$(CC) $(CFLAGS) -Isrc -DCJSON_DISABLE_ARENA $< -o $@
 
 test: pg_core_test pg_file_test
 	@echo "Running pg_core_test..."

@@ -59,7 +59,7 @@ fi
 
 # Check if indexmaker exists
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INDEXMAKER="$SCRIPT_DIR/../../bin/indexmaker"
+INDEXMAKER="$SCRIPT_DIR/../../bin/tools/indexmaker"
 if [ ! -x "$INDEXMAKER" ]; then
     echo -e "${RED}✗ Error: indexmaker not found at $INDEXMAKER${NC}"
     echo "  Run 'make indexmaker' to build it"

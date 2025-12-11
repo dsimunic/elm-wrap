@@ -24,12 +24,12 @@ fi
 echo -e "${GREEN}✓${NC} wrap found: $(command -v wrap)"
 
 # Check if indexmaker exists
-if [ ! -x "$(dirname "$0")/../../bin/indexmaker" ]; then
-    echo -e "${RED}✗ Error: indexmaker not found at bin/indexmaker${NC}"
+if [ ! -x "$(dirname "$0")/../../bin/tools/indexmaker" ]; then
+    echo -e "${RED}✗ Error: indexmaker not found at bin/tools/indexmaker${NC}"
     echo "  Run 'make indexmaker' to build it"
     exit 1
 fi
-INDEXMAKER="$(dirname "$0")/../../bin/indexmaker"
+INDEXMAKER="$(dirname "$0")/../../bin/tools/indexmaker"
 echo -e "${GREEN}✓${NC} indexmaker found: $INDEXMAKER"
 echo
 

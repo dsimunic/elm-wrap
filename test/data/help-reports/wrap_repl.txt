@@ -1,0 +1,8 @@
+Usage: wrap repl
+
+Start an interactive Elm REPL (Read-Eval-Print Loop).
+
+This command ensures all package dependencies are downloaded and cached
+before calling 'elm repl'.
+
+All options are passed through to 'elm repl'.

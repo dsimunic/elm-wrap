@@ -1,0 +1,27 @@
+Usage: wrap info [PATH | PACKAGE [VERSION]]
+
+Display package management information.
+
+Shows:
+  - Current ELM_HOME directory
+  - Registry cache statistics
+  - Package registry connectivity
+  - Installed packages (if run in a project directory)
+  - Available updates (if run in a project directory)
+
+Version resolution (for package lookup):
+  - If package is in elm.json: uses that version
+  - If not in elm.json and no VERSION specified: uses latest from registry
+  - If VERSION specified: uses that specific version
+
+Examples:
+  wrap info                  # Show general package info
+  wrap info ./path/to/dir    # Show info for elm.json at path
+  wrap info elm/core         # Show info for elm/core package
+  wrap info elm/http 2.0.0   # Show info for elm/http 2.0.0
+
+Note: Package name format (author/package) takes priority over paths.
+      Use './package/author' to treat as a path instead.
+
+Options:
+  --help                             # Show this help

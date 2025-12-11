@@ -1,0 +1,9 @@
+Usage: wrap repository list [ROOT_PATH]
+
+List all repositories at the given path.
+
+Arguments:
+  ROOT_PATH             Root path for repositories (default: WRAP_REPOSITORY_LOCAL_PATH)
+
+Options:
+  -h, --help            Show this help message

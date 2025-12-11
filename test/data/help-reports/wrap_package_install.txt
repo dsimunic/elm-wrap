@@ -1,0 +1,28 @@
+Usage: wrap install PACKAGE[@VERSION] [PACKAGE[@VERSION]...]
+
+Install packages for your Elm project.
+
+Examples:
+  wrap install elm/html                     # Add elm/html to your project
+  wrap install elm/html@1.0.0               # Add elm/html at specific version
+  wrap install elm/html 1.0.0               # Same (single package only)
+  wrap install elm/html elm/json elm/url    # Add multiple packages at once
+  wrap install elm/html@1.0.0 elm/json      # Mix versioned and latest
+  wrap install --test elm/json              # Add elm/json as a test dependency
+  wrap install --major elm/html             # Upgrade elm/html to next major version
+  wrap install --from-file ./pkg.zip elm/html  # Install from local file
+  wrap install --from-url URL elm/html         # Install from URL
+
+Options:
+  --test                             # Install as test dependency
+  --upgrade-all                      # Allow upgrading production deps (with --test)
+  --major PACKAGE                    # Allow major version upgrade for package (single package only)
+  --from-file PATH PACKAGE           # Install from local file/directory (single package only)
+  --from-url URL PACKAGE             # Install from URL (single package only)
+  --local-dev [--from-path PATH] [PACKAGE]
+                                     # Install package for local development
+  --remove-local-dev                 # Remove package from local-dev tracking
+  -v, --verbose                      # Show progress reports (registry, connectivity)
+  -q, --quiet                        # Suppress progress reports
+  -y, --yes                          # Automatically confirm changes
+  --help                             # Show this help

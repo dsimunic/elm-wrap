@@ -1,0 +1,14 @@
+Usage: wrap repository init [ROOT_PATH] [OPTIONS]
+
+Create a new repository directory for the current (or specified) compiler.
+
+Arguments:
+  ROOT_PATH             Root path for repositories (default: WRAP_REPOSITORY_LOCAL_PATH)
+
+Options:
+  --compiler NAME       Compiler name (elm, lamdera, wrapc, etc.)
+  --version VERSION     Compiler version (e.g., 0.19.1)
+  -h, --help            Show this help message
+
+The repository path is: ROOT_PATH/NAME/VERSION
+For example: ~/.elm-wrap/repository/elm/0.19.1/

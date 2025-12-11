@@ -1,0 +1,8 @@
+Usage: wrap reactor [OPTIONS]
+
+Start the Elm Reactor development server.
+
+This command ensures all package dependencies are downloaded and cached
+before calling 'elm reactor'.
+
+All options are passed through to 'elm reactor'.

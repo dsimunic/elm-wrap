@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+#
+# test-help-reports - Test script for help report generation and validation
+#
+# This script recursively discovers all wrap commands by parsing help output
+# and captures their help text to expect files. It also generates a static
+# HTML viewer showing all reports with diffs highlighted.
+#
+# Directory structure:
+#   test/data/help-reports/
+#     ├── wrap.txt                 - wrap --help output
+#     ├── wrap_install.txt         - wrap install --help output
+#     ├── wrap_package_init.txt    - wrap package init --help output
+#     ├── ...
+#     └── www/
+#         └── index.html           - Static HTML viewer
+#
+# Usage:
+#   ./test-help-reports                    # Run tests and compare against expected outputs
+#   ./test-help-reports --update-expected  # Update the expected outputs and regenerate HTML
+#   ./test-help-reports --clean            # Clean up test data directory
+#
+
+set -euo pipefail
+
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+WRAP_BIN="$PROJECT_ROOT/bin/wrap"
+DATA_DIR="$PROJECT_ROOT/test/data/help-reports"
+WWW_DIR="$DATA_DIR/www"
+HTML_GEN="$PROJECT_ROOT/bin/tools/help-report-html-gen"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Logging functions
+log() {
+    echo -e "${CYAN}[INFO]${NC} $*"
+}
+
+log_success() {
+    echo -e "${GREEN}[PASS]${NC} $*"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARN]${NC} $*"
+}
+
+log_error() {
+    echo -e "${RED}[FAIL]${NC} $*"
+}
+
+# Check if wrap binary exists
+check_wrap_binary() {
+    if [ ! -x "$WRAP_BIN" ]; then
+        log_error "wrap binary not found at $WRAP_BIN"
+        log_error "Please run 'make' to build the project first"
+        exit 1
+    fi
+}
+
+# Check if HTML generator tool exists
+check_html_gen() {
+    if [ ! -x "$HTML_GEN" ]; then
+        log_error "HTML generator tool not found at $HTML_GEN"
+        log_error "Please run 'make help-report-html-gen' first"
+        exit 1
+    fi
+}
+
+# Extract command names from help output
+# Looks for lines like "  command    Description text" in the Commands: section
+# Returns a list of commands, one per line
+# Includes commands with SUBCOMMAND but excludes commands with specific args like "ELM_FILE"
+extract_commands() {
+    local help_text="$1"
+    local in_commands_section=false
+    local commands=""
+    
+    while IFS= read -r line; do
+        # Detect Commands: or Subcommands: section start
+        if [[ "$line" =~ ^(Commands:|Subcommands:) ]]; then
+            in_commands_section=true
+            continue
+        fi
+        
+        # Stop at Options: or another major section (but not on blank lines)
+        if [[ "$line" =~ ^(Options:|Examples:|Usage:) ]]; then
+            in_commands_section=false
+        fi
+        
+        # Extract command names only from Commands: section
+        if [ "$in_commands_section" = true ]; then
+            # Match lines like "  command  " or "  command ARGS" or "  command SUBCOMMAND"
+            # Also handle lines with "remove | uninstall"
+            if [[ "$line" =~ ^[[:space:]]{2}([a-z][a-z-]+)([[:space:]|]|$) ]]; then
+                local cmd="${BASH_REMATCH[1]}"
+                # Skip if it's an option flag
+                if [[ ! "$cmd" =~ ^- ]]; then
+                    commands="$commands$cmd"$'\n'
+                fi
+            fi
+        fi
+    done <<< "$help_text"
+    
+    echo "$commands"
+}
+
+# Generate a safe filename from a command path
+# "wrap install" -> "wrap_install.txt"
+# "wrap package init" -> "wrap_package_init.txt"
+command_to_filename() {
+    local cmd="$1"
+    # Remove path prefix and keep only command names
+    cmd=$(echo "$cmd" | sed "s|$PROJECT_ROOT/bin/||g")
+    echo "$cmd" | tr ' ' '_' | sed 's/$/.txt/'
+}
+
+# Recursively discover and capture help for a command
+# Args: command_path (e.g., "wrap" or "wrap package")
+capture_help_recursive() {
+    local cmd_path="$1"
+    local filename
+    filename=$(command_to_filename "$cmd_path")
+    local filepath="$DATA_DIR/$filename"
+    
+    log "Capturing help for: $cmd_path"
+    
+    # Run the command with --help
+    local help_output
+    if ! help_output=$($cmd_path --help 2>&1); then
+        log_warning "Failed to get help for: $cmd_path"
+        return
+    fi
+    
+    # Save to file
+    echo "$help_output" > "$filepath"
+    
+    # Extract subcommands from the help output
+    local subcommands
+    subcommands=$(extract_commands "$help_output")
+    
+    # Recursively capture help for each subcommand
+    if [ -n "$subcommands" ]; then
+        while IFS= read -r subcmd; do
+            if [ -n "$subcmd" ]; then
+                capture_help_recursive "$cmd_path $subcmd"
+            fi
+        done <<< "$subcommands"
+    fi
+}
+
+# Capture all help reports
+capture_all_help() {
+    log "Discovering and capturing all help reports..."
+    
+    # Start with the root command
+    capture_help_recursive "$WRAP_BIN"
+    
+    log_success "All help reports captured"
+}
+
+# Generate static HTML viewer using C tool
+generate_html() {
+    log "Generating HTML viewer..."
+    
+    mkdir -p "$WWW_DIR"
+    
+    if ! "$HTML_GEN" "$DATA_DIR" "$WRAP_BIN" "$WWW_DIR"; then
+        log_error "Failed to generate HTML"
+        return 1
+    fi
+    
+    # Get the version to display the correct path
+    local version
+    version=$("$WRAP_BIN" -V 2>&1)
+    
+    log_success "HTML viewer generated at: $WWW_DIR/$version/index.html"
+    return 0
+}
+
+# Create backup of current files before updating
+backup_current_files() {
+    log "Creating backup of current help reports..."
+    
+    find "$DATA_DIR" -maxdepth 1 -name "*.txt" -type f 2>/dev/null | while IFS= read -r filepath; do
+        cp "$filepath" "${filepath}.backup"
+    done
+}
+
+# Clean up backup files
+cleanup_backups() {
+    find "$DATA_DIR" -maxdepth 1 -name "*.txt.backup" -type f -delete 2>/dev/null || true
+}
+
+# Clean up all generated files
+cleanup_all() {
+    log "Cleaning up test data..."
+    
+    if [ -d "$DATA_DIR" ]; then
+        rm -f "$DATA_DIR"/*.txt
+        rm -f "$DATA_DIR"/*.txt.backup
+        rm -rf "$WWW_DIR"
+        log_success "Cleanup complete"
+    else
+        log_warning "Nothing to clean"
+    fi
+}
+
+# Count changed files
+count_changed_files() {
+    local changed=0
+    
+    find "$DATA_DIR" -maxdepth 1 -name "*.txt" -type f 2>/dev/null | while IFS= read -r filepath; do
+        local backup="${filepath}.backup"
+        if [ -f "$backup" ]; then
+            if ! diff -q "$filepath" "$backup" > /dev/null 2>&1; then
+                changed=$((changed + 1))
+                echo "$changed" > /tmp/help-reports-changed-count
+            fi
+        fi
+    done
+    
+    if [ -f /tmp/help-reports-changed-count ]; then
+        cat /tmp/help-reports-changed-count
+        rm -f /tmp/help-reports-changed-count
+    else
+        echo "0"
+    fi
+}
+
+# Main execution
+main() {
+    local update_expected=false
+    local clean=false
+    
+    # Parse arguments
+    for arg in "$@"; do
+        case "$arg" in
+            --update-expected)
+                update_expected=true
+                ;;
+            --clean)
+                clean=true
+                ;;
+            *)
+                log_error "Unknown argument: $arg"
+                echo "Usage: $0 [--update-expected] [--clean]"
+                exit 1
+                ;;
+        esac
+    done
+    
+    if [ "$clean" = true ]; then
+        cleanup_all
+        exit 0
+    fi
+    
+    check_wrap_binary
+    check_html_gen
+    
+    # Create data directory if it doesn't exist
+    mkdir -p "$DATA_DIR"
+    
+    if [ "$update_expected" = true ]; then
+        log "Updating expected help reports..."
+        backup_current_files
+        capture_all_help
+        generate_html
+        cleanup_backups
+        log_success "Expected help reports updated!"
+    else
+        log "Running help report tests..."
+        backup_current_files
+        capture_all_help
+        generate_html
+        
+        # Count changed files
+        local changed_count
+        changed_count=$(count_changed_files)
+        
+        if [ "$changed_count" -eq 0 ]; then
+            log_success "All help reports match expected!"
+            cleanup_backups
+        else
+            log_warning "$changed_count help report(s) changed from expected"
+            local version
+            version=$("$WRAP_BIN" -V 2>&1)
+            log_warning "View differences at: $WWW_DIR/$version/index.html"
+            log_warning "Run with --update-expected to update expected outputs"
+        fi
+    fi
+    
+    local version
+    version=$("$WRAP_BIN" -V 2>&1)
+    log_success "Complete! Open $WWW_DIR/$version/index.html in a browser to view reports"
+}
+
+main "$@"

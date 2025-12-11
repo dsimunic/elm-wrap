@@ -1,0 +1,19 @@
+Usage: wrap application init [OPTIONS] [TEMPLATE]
+
+Initialize a new Elm application project from an embedded template.
+
+Templates:
+  application        Full Browser.application with URL handling (default)
+  document           Browser.document with title and body
+  element            Browser.element for embedding in HTML
+  sandbox            Browser.sandbox for simple programs
+
+Options:
+  -y, --yes          Skip confirmation prompt
+  -q, --no-report    Skip printing application info after initialization
+  -h, --help         Show this help message
+
+Examples:
+  wrap application init             # Create application template
+  wrap application init sandbox     # Create sandbox template
+  wrap application init -y element  # Create element template, no prompt

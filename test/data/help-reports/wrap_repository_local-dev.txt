@@ -1,0 +1,14 @@
+Usage: wrap repository local-dev [COMMAND]
+
+Manage local development package tracking.
+
+Commands:
+  (no command)          List all tracked local-dev packages and their dependents
+  clear --all           Clear all dependency tracking
+  clear PACKAGE VERSION
+                        Clear tracking for a specific package version
+  clear PACKAGE VERSION PATH
+                        Clear tracking for a specific path only
+
+Options:
+  -h, --help            Show this help message
