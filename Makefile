@@ -831,11 +831,16 @@ dist:
 	DIST_DIR=/tmp/wrap-dist-$$$$/$$DIST_NAME; \
 	rm -rf /tmp/wrap-dist-$$$$; \
 	mkdir -p $$DIST_DIR; \
-	cp -r $(SRCDIR) $(VERSION_FILE) Makefile buildinfo.mk elm.json README.md $$DIST_DIR/; \
+	cp -r $(SRCDIR) $(VERSION_FILE) Makefile buildinfo.mk README.md $$DIST_DIR/; \
 	if [ -d test ]; then cp -r test $$DIST_DIR/; fi; \
 	if [ -d doc ]; then cp -r doc $$DIST_DIR/; fi; \
 	if [ -d examples ]; then cp -r examples $$DIST_DIR/; fi; \
+	if [ -d tools ]; then cp -r tools $$DIST_DIR/; fi; \
+	if [ -d rulr ]; then cp -r rulr $$DIST_DIR/; fi; \
+	if [ -d templates ]; then cp -r templates $$DIST_DIR/; fi; \
 	if [ -f AGENTS.md ]; then cp AGENTS.md $$DIST_DIR/; fi; \
+	if [ -f LICENSE ]; then cp LICENSE $$DIST_DIR/; fi; \
+	if [ -f ENV_DEFAULTS ]; then cp ENV_DEFAULTS $$DIST_DIR/; fi; \
 	tar czf $$DIST_NAME.tar.gz -C /tmp/wrap-dist-$$$$ $$DIST_NAME; \
 	rm -rf /tmp/wrap-dist-$$$$; \
 	echo "Created $$DIST_NAME.tar.gz"
