@@ -1,0 +1,4747 @@
+format 2
+elm 0.19.1
+
+package: elm/core
+    version: 1.0.5
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+
+package: elm/json
+    version: 1.1.4
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+
+package: elm/http
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/bytes  1.0.0 <= v < 2.0.0
+        elm/core  1.0.1 <= v < 2.0.0
+        elm/file  1.0.0 <= v < 2.0.0
+        elm/json  1.1.0 <= v < 2.0.0
+
+package: elm/url
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+
+package: elm/time
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+
+package: elm/browser
+    version: 1.0.2
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/html  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.2 <= v < 2.0.0
+
+package: elm/svg
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/html  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: elm/virtual-dom
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: quirky-quark/tiny-spin
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        nosy-narwhal/sonar-snooper  2.0.0 <= v < 3.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  2.0.0 <= v < 3.0.0
+
+package: marmalade/citrus-cache
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        tiny-telescope/lens-flare  3.0.0 <= v < 4.0.0
+
+package: tiny-telescope/focus-ring
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: nosy-narwhal/fluke-finder
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  2.0.0 <= v < 3.0.0
+
+package: luna-crumb/nightcap
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/picnic-helper
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        neon-squid/ink-logger  4.0.0 <= v < 5.0.0
+
+package: mama-mustard/picnic-helper
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/picnic-helper
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/picnic-helper
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  3.0.0 <= v < 4.0.0
+
+package: quirky-quark/oddity
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+
+package: quirky-quark/oddity
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: quirky-quark/oddity
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: quirky-quark/oddity
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: nosy-narwhal/beakless
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+
+package: nosy-narwhal/beakless
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  2.0.0 <= v < 3.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+
+package: nosy-narwhal/beakless
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  5.0.0 <= v < 6.0.0
+
+package: beepboop/relay-dance
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: beepboop/relay-dance
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  1.0.0 <= v < 2.0.0
+
+package: beepboop/relay-dance
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  2.0.0 <= v < 3.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  5.0.0 <= v < 6.0.0
+
+package: beepboop/relay-dance
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/debug-hug
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/debug-hug
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  2.0.0 <= v < 3.0.0
+
+package: codey-mcbug/debug-hug
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/debug-hug
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  2.0.0 <= v < 3.0.0
+
+package: noodle-legend/noodle-scheme
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        marmalade/citrus-cache  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  3.0.0 <= v < 4.0.0
+
+package: noodle-legend/noodle-scheme
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  3.0.0 <= v < 4.0.0
+        beepboop/beep-o-matic  1.0.0 <= v < 2.0.0
+
+package: noodle-legend/noodle-scheme
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  1.0.0 <= v < 2.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+
+package: noodle-legend/noodle-scheme
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  3.0.0 <= v < 4.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+        noodle-legend/ramenify  3.0.0 <= v < 4.0.0
+
+package: marmalade/jammer
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  2.0.0 <= v < 3.0.0
+
+package: marmalade/jammer
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  3.0.0 <= v < 4.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+        pixelpanda/panda-guard  3.0.0 <= v < 4.0.0
+
+package: marmalade/jammer
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: marmalade/jammer
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  2.0.0 <= v < 3.0.0
+
+package: stargazer/constellation-map
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: stargazer/constellation-map
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+
+package: stargazer/constellation-map
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: stargazer/constellation-map
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/crumb-tracker
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        urban-gnome/alley-map  4.0.0 <= v < 5.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/crumb-tracker
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  2.0.0 <= v < 3.0.0
+        urban-gnome/street-light  4.0.0 <= v < 5.0.0
+        dr-sprocket/cog-keeper  4.0.0 <= v < 5.0.0
+
+package: luna-crumb/crumb-tracker
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        stargazer/wish-handler  2.0.0 <= v < 3.0.0
+        fuzzy-socks/warm-steps  3.0.0 <= v < 4.0.0
+        captain-kernel/helm  4.0.0 <= v < 5.0.0
+
+package: luna-crumb/crumb-tracker
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  1.0.0 <= v < 2.0.0
+        tiny-telescope/zoomy  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  2.0.0 <= v < 3.0.0
+
+package: platypus-prince/web-crawl
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+
+package: platypus-prince/web-crawl
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+
+package: platypus-prince/web-crawl
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: platypus-prince/billfold
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: platypus-prince/billfold
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+
+package: platypus-prince/billfold
+    version: 1.2.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: platypus-prince/billfold
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: platypus-prince/billfold
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: platypus-prince/billfold
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: nosy-narwhal/sonar-snooper
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        codey-mcbug/patchwork  2.0.0 <= v < 3.0.0
+        quirky-quark/quark-fling  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  1.0.0 <= v < 2.0.0
+
+package: nosy-narwhal/sonar-snooper
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        horatiolamouche/moon-toast  4.0.0 <= v < 5.0.0
+        stargazer/comet-chaser  4.0.0 <= v < 5.0.0
+
+package: nosy-narwhal/sonar-snooper
+    version: 1.2.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  3.0.0 <= v < 4.0.0
+        platypus-prince/billfold  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: nosy-narwhal/sonar-snooper
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  1.0.0 <= v < 2.0.0
+        pixelpanda/sprite-roller  4.0.0 <= v < 5.0.0
+        fuzzy-socks/sock-sort  2.0.0 <= v < 3.0.0
+
+package: nosy-narwhal/sonar-snooper
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        urban-gnome/alley-map  4.0.0 <= v < 5.0.0
+        codey-mcbug/null-safety  1.0.0 <= v < 2.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+
+package: nosy-narwhal/sonar-snooper
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        urban-gnome/alley-map  3.0.0 <= v < 4.0.0
+        marmalade/toastmate  3.0.0 <= v < 4.0.0
+        horatiolamouche/tea-timer  2.0.0 <= v < 3.0.0
+        beepboop/synth-honk  1.0.0 <= v < 2.0.0
+
+package: quirky-quark/quark-fling
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        horatiolamouche/moon-toast  3.0.0 <= v < 4.0.0
+        luna-crumb/cookie-run  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  4.0.0 <= v < 5.0.0
+
+package: quirky-quark/quark-fling
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  2.0.0 <= v < 3.0.0
+
+package: quirky-quark/quark-fling
+    version: 1.2.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  2.0.0 <= v < 3.0.0
+        horatiolamouche/tea-timer  5.0.0 <= v < 6.0.0
+        tiny-telescope/lens-flare  1.0.0 <= v < 2.0.0
+
+package: quirky-quark/quark-fling
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        marmalade/citrus-cache  1.0.0 <= v < 2.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+
+package: quirky-quark/quark-fling
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        urban-gnome/street-light  4.0.0 <= v < 5.0.0
+        fuzzy-socks/sock-sort  2.0.0 <= v < 3.0.0
+        glitter-biscuit/sparkle-box  2.0.0 <= v < 3.0.0
+
+package: quirky-quark/quark-fling
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/kernel-patch
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  3.0.0 <= v < 4.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/kernel-patch
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/kernel-patch
+    version: 1.2.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/kernel-patch
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/kernel-patch
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  2.0.0 <= v < 3.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/kernel-patch
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/buzzer
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  2.0.0 <= v < 3.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/buzzer
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/buzzer
+    version: 1.2.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/buzzer
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  2.0.0 <= v < 3.0.0
+
+package: horatiolamouche/buzzer
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/buzzer
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  3.0.0 <= v < 4.0.0
+
+package: dr-sprocket/sprocketize
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: dr-sprocket/sprocketize
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: dr-sprocket/sprocketize
+    version: 1.2.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  4.0.0 <= v < 5.0.0
+        marmalade/toastmate  3.0.0 <= v < 4.0.0
+        captain-kernel/helm  4.0.0 <= v < 5.0.0
+        fuzzy-socks/warm-steps  3.0.0 <= v < 4.0.0
+
+package: dr-sprocket/sprocketize
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  5.0.0 <= v < 6.0.0
+
+package: dr-sprocket/sprocketize
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  2.0.0 <= v < 3.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: dr-sprocket/sprocketize
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+
+package: tiny-telescope/zoomy
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        quirky-quark/quark-fling  2.0.0 <= v < 3.0.0
+        urban-gnome/street-light  1.0.0 <= v < 2.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  2.0.0 <= v < 3.0.0
+
+package: tiny-telescope/zoomy
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+
+package: tiny-telescope/zoomy
+    version: 1.2.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        tiny-telescope/lens-flare  2.0.0 <= v < 3.0.0
+        margarita-fiz/fizzler  2.0.0 <= v < 3.0.0
+        platypus-prince/billfold  2.0.0 <= v < 3.0.0
+
+package: tiny-telescope/zoomy
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        luna-crumb/nightcap  1.0.0 <= v < 2.0.0
+        quirky-quark/quark-fling  2.0.0 <= v < 3.0.0
+
+package: tiny-telescope/zoomy
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  5.0.0 <= v < 6.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+        beepboop/synth-honk  2.0.0 <= v < 3.0.0
+
+package: tiny-telescope/zoomy
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        urban-gnome/street-light  4.0.0 <= v < 5.0.0
+        neon-squid/ink-logger  3.0.0 <= v < 4.0.0
+        glitter-biscuit/biscuitify  2.0.0 <= v < 3.0.0
+        noodle-legend/ramenify  3.0.0 <= v < 4.0.0
+
+package: fuzzy-socks/sock-sort
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/sock-sort
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  5.0.0 <= v < 6.0.0
+
+package: fuzzy-socks/sock-sort
+    version: 1.2.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/sock-sort
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  4.0.0 <= v < 5.0.0
+
+package: fuzzy-socks/sock-sort
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+        captain-kernel/helm  5.0.0 <= v < 6.0.0
+
+package: fuzzy-socks/sock-sort
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/sparkle-box
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/sparkle-box
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/sparkle-box
+    version: 1.2.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  2.0.0 <= v < 3.0.0
+
+package: glitter-biscuit/sparkle-box
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  4.0.0 <= v < 5.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/sparkle-box
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  4.0.0 <= v < 5.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+        captain-kernel/helm  4.0.0 <= v < 5.0.0
+
+package: glitter-biscuit/sparkle-box
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  2.0.0 <= v < 3.0.0
+
+package: neon-squid/glow-payload
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  3.0.0 <= v < 4.0.0
+
+package: neon-squid/glow-payload
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  3.0.0 <= v < 4.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+
+package: neon-squid/glow-payload
+    version: 1.2.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+
+package: neon-squid/glow-payload
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+
+package: neon-squid/glow-payload
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  2.0.0 <= v < 3.0.0
+        glitter-biscuit/sparkle-box  2.0.0 <= v < 3.0.0
+        stargazer/wish-handler  4.0.0 <= v < 5.0.0
+        mama-mustard/tangy  3.0.0 <= v < 4.0.0
+
+package: neon-squid/glow-payload
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        neon-squid/ink-logger  4.0.0 <= v < 5.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+
+package: noodle-legend/ramenify
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  2.0.0 <= v < 3.0.0
+
+package: noodle-legend/ramenify
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  4.0.0 <= v < 5.0.0
+
+package: noodle-legend/ramenify
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  4.0.0 <= v < 5.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: noodle-legend/ramenify
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  4.0.0 <= v < 5.0.0
+
+package: noodle-legend/ramenify
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  2.0.0 <= v < 3.0.0
+
+package: noodle-legend/ramenify
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: noodle-legend/ramenify
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: noodle-legend/ramenify
+    version: 2.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: noodle-legend/ramenify
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+
+package: noodle-legend/ramenify
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: noodle-legend/ramenify
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: noodle-legend/ramenify
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  4.0.0 <= v < 5.0.0
+        beepboop/synth-honk  2.0.0 <= v < 3.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: beepboop/beep-o-matic
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: beepboop/beep-o-matic
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: beepboop/beep-o-matic
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: beepboop/beep-o-matic
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: beepboop/beep-o-matic
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: beepboop/beep-o-matic
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: beepboop/beep-o-matic
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+
+package: beepboop/beep-o-matic
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: beepboop/beep-o-matic
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+
+package: beepboop/beep-o-matic
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+
+package: tiny-telescope/lens-flare
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        marmalade/jammer  1.0.0 <= v < 2.0.0
+        neon-squid/ink-logger  2.0.0 <= v < 3.0.0
+        horatiolamouche/buzzer  1.0.0 <= v < 2.0.0
+
+package: tiny-telescope/lens-flare
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  4.0.0 <= v < 5.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+        stargazer/wish-handler  3.0.0 <= v < 4.0.0
+
+package: tiny-telescope/lens-flare
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+
+package: tiny-telescope/lens-flare
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        neon-squid/ink-logger  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  3.0.0 <= v < 4.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+
+package: tiny-telescope/lens-flare
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        neon-squid/ink-logger  4.0.0 <= v < 5.0.0
+        mama-mustard/tangy  1.0.0 <= v < 2.0.0
+
+package: tiny-telescope/lens-flare
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  2.0.0 <= v < 3.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+
+package: tiny-telescope/lens-flare
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        neon-squid/ink-logger  3.0.0 <= v < 4.0.0
+
+package: tiny-telescope/lens-flare
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  2.0.0 <= v < 3.0.0
+
+package: tiny-telescope/lens-flare
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  2.0.0 <= v < 3.0.0
+        luna-crumb/nightcap  1.0.0 <= v < 2.0.0
+
+package: marmalade/toastmate
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        noodle-legend/ramenify  2.0.0 <= v < 3.0.0
+
+package: marmalade/toastmate
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  3.0.0 <= v < 4.0.0
+
+package: marmalade/toastmate
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  4.0.0 <= v < 5.0.0
+        noodle-legend/ramenify  2.0.0 <= v < 3.0.0
+
+package: marmalade/toastmate
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  2.0.0 <= v < 3.0.0
+        mama-mustard/tangy  2.0.0 <= v < 3.0.0
+
+package: marmalade/toastmate
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+
+package: marmalade/toastmate
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  5.0.0 <= v < 6.0.0
+
+package: marmalade/toastmate
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  3.0.0 <= v < 4.0.0
+
+package: marmalade/toastmate
+    version: 2.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  3.0.0 <= v < 4.0.0
+
+package: marmalade/toastmate
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  5.0.0 <= v < 6.0.0
+
+package: marmalade/toastmate
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  3.0.0 <= v < 4.0.0
+
+package: marmalade/toastmate
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: marmalade/toastmate
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  3.0.0 <= v < 4.0.0
+
+package: marmalade/toastmate
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: marmalade/toastmate
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  1.0.0 <= v < 2.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+
+package: marmalade/toastmate
+    version: 4.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  1.0.0 <= v < 2.0.0
+
+package: marmalade/toastmate
+    version: 5.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        stargazer/wish-handler  4.0.0 <= v < 5.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+        pixelpanda/sprite-roller  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  3.0.0 <= v < 4.0.0
+
+package: marmalade/toastmate
+    version: 5.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  2.0.0 <= v < 3.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: marmalade/toastmate
+    version: 5.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  1.0.0 <= v < 2.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  1.0.0 <= v < 2.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  3.0.0 <= v < 4.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  1.0.0 <= v < 2.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  2.0.0 <= v < 3.0.0
+        neon-squid/glow-payload  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  2.0.0 <= v < 3.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  4.0.0 <= v < 5.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 2.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  4.0.0 <= v < 5.0.0
+        luna-crumb/cookie-run  1.0.0 <= v < 2.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  5.0.0 <= v < 6.0.0
+        captain-kernel/helm  2.0.0 <= v < 3.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  3.0.0 <= v < 4.0.0
+
+package: dr-sprocket/cog-keeper
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/alley-map
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        pixelpanda/pixel-porridge  2.0.0 <= v < 3.0.0
+
+package: urban-gnome/alley-map
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/alley-map
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  2.0.0 <= v < 3.0.0
+        glitter-biscuit/biscuitify  4.0.0 <= v < 5.0.0
+        tiny-telescope/zoomy  1.0.0 <= v < 2.0.0
+        pixelpanda/sprite-roller  2.0.0 <= v < 3.0.0
+
+package: urban-gnome/alley-map
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/alley-map
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        noodle-legend/ramenify  3.0.0 <= v < 4.0.0
+
+package: urban-gnome/alley-map
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/alley-map
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        tiny-telescope/lens-flare  2.0.0 <= v < 3.0.0
+        noodle-legend/ramenify  2.0.0 <= v < 3.0.0
+        pixelpanda/pixel-porridge  2.0.0 <= v < 3.0.0
+
+package: urban-gnome/alley-map
+    version: 2.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        stargazer/wish-handler  4.0.0 <= v < 5.0.0
+        quirky-quark/quark-fling  1.0.0 <= v < 2.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/alley-map
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  2.0.0 <= v < 3.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  2.0.0 <= v < 3.0.0
+
+package: urban-gnome/alley-map
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  4.0.0 <= v < 5.0.0
+        tiny-telescope/lens-flare  2.0.0 <= v < 3.0.0
+        quirky-quark/quark-fling  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/alley-map
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/alley-map
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  2.0.0 <= v < 3.0.0
+
+package: urban-gnome/alley-map
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+        stargazer/comet-chaser  4.0.0 <= v < 5.0.0
+        marmalade/toastmate  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/alley-map
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        quirky-quark/quark-fling  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  1.0.0 <= v < 2.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/fizzler
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        codey-mcbug/null-safety  3.0.0 <= v < 4.0.0
+        marmalade/toastmate  3.0.0 <= v < 4.0.0
+
+package: margarita-fiz/fizzler
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+        luna-crumb/nightcap  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  3.0.0 <= v < 4.0.0
+        marmalade/jammer  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/fizzler
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        noodle-legend/noodle-scheme  1.0.0 <= v < 2.0.0
+        codey-mcbug/null-safety  2.0.0 <= v < 3.0.0
+        captain-kernel/helm  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/fizzler
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  5.0.0 <= v < 6.0.0
+        marmalade/citrus-cache  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  2.0.0 <= v < 3.0.0
+
+package: margarita-fiz/fizzler
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+        noodle-legend/ramenify  3.0.0 <= v < 4.0.0
+        codey-mcbug/null-safety  2.0.0 <= v < 3.0.0
+
+package: margarita-fiz/fizzler
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+        pixelpanda/sprite-roller  5.0.0 <= v < 6.0.0
+        luna-crumb/nightcap  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  2.0.0 <= v < 3.0.0
+
+package: margarita-fiz/fizzler
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+        tiny-telescope/lens-flare  2.0.0 <= v < 3.0.0
+        mama-mustard/tangy  2.0.0 <= v < 3.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/fizzler
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/fizzler
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  3.0.0 <= v < 4.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+        noodle-legend/noodle-scheme  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/fizzler
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        pixelpanda/sprite-roller  5.0.0 <= v < 6.0.0
+
+package: margarita-fiz/fizzler
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  4.0.0 <= v < 5.0.0
+        glitter-biscuit/biscuitify  2.0.0 <= v < 3.0.0
+        captain-kernel/kernel-patch  2.0.0 <= v < 3.0.0
+        pixelpanda/sprite-roller  3.0.0 <= v < 4.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+
+package: margarita-fiz/fizzler
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  1.0.0 <= v < 2.0.0
+        urban-gnome/alley-map  3.0.0 <= v < 4.0.0
+        dr-sprocket/cog-keeper  2.0.0 <= v < 3.0.0
+
+package: margarita-fiz/fizzler
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  2.0.0 <= v < 3.0.0
+        noodle-legend/ramenify  3.0.0 <= v < 4.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+        neon-squid/ink-logger  3.0.0 <= v < 4.0.0
+
+package: margarita-fiz/fizzler
+    version: 4.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  1.0.0 <= v < 2.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  3.0.0 <= v < 4.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 2.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  4.0.0 <= v < 5.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 4.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  3.0.0 <= v < 4.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 5.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 5.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: fuzzy-socks/warm-steps
+    version: 5.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+
+package: mama-mustard/tangy
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  2.0.0 <= v < 3.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  2.0.0 <= v < 3.0.0
+
+package: mama-mustard/tangy
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 2.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: mama-mustard/tangy
+    version: 4.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  2.0.0 <= v < 3.0.0
+
+package: stargazer/wish-handler
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        margarita-fiz/lime-clock  3.0.0 <= v < 4.0.0
+        glitter-biscuit/sparkle-box  2.0.0 <= v < 3.0.0
+        beepboop/beep-o-matic  3.0.0 <= v < 4.0.0
+
+package: stargazer/wish-handler
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        margarita-fiz/lime-clock  3.0.0 <= v < 4.0.0
+        mama-mustard/tangy  1.0.0 <= v < 2.0.0
+
+package: stargazer/wish-handler
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  5.0.0 <= v < 6.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: stargazer/wish-handler
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  4.0.0 <= v < 5.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: stargazer/wish-handler
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+
+package: stargazer/wish-handler
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: stargazer/wish-handler
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+
+package: stargazer/wish-handler
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  1.0.0 <= v < 2.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+
+package: stargazer/wish-handler
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        neon-squid/ink-logger  4.0.0 <= v < 5.0.0
+
+package: stargazer/wish-handler
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  1.0.0 <= v < 2.0.0
+
+package: stargazer/wish-handler
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  1.0.0 <= v < 2.0.0
+        luna-crumb/nightcap  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: stargazer/wish-handler
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  1.0.0 <= v < 2.0.0
+        neon-squid/ink-logger  5.0.0 <= v < 6.0.0
+
+package: stargazer/wish-handler
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+
+package: stargazer/wish-handler
+    version: 4.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  2.0.0 <= v < 3.0.0
+        neon-squid/glow-payload  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  2.0.0 <= v < 3.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  2.0.0 <= v < 3.0.0
+        mama-mustard/tangy  2.0.0 <= v < 3.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 2.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  3.0.0 <= v < 4.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 5.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 5.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  1.0.0 <= v < 2.0.0
+
+package: glitter-biscuit/biscuitify
+    version: 5.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/street-light
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        stargazer/comet-chaser  5.0.0 <= v < 6.0.0
+        tiny-telescope/lens-flare  1.0.0 <= v < 2.0.0
+        marmalade/jammer  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/street-light
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        noodle-legend/ramenify  3.0.0 <= v < 4.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  3.0.0 <= v < 4.0.0
+
+package: urban-gnome/street-light
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        pixelpanda/sprite-roller  4.0.0 <= v < 5.0.0
+        neon-squid/ink-logger  4.0.0 <= v < 5.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+        noodle-legend/ramenify  3.0.0 <= v < 4.0.0
+
+package: urban-gnome/street-light
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        tiny-telescope/lens-flare  3.0.0 <= v < 4.0.0
+        pixelpanda/sprite-roller  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/street-light
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/street-light
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        stargazer/wish-handler  2.0.0 <= v < 3.0.0
+
+package: urban-gnome/street-light
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+        neon-squid/ink-logger  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/street-light
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  2.0.0 <= v < 3.0.0
+        stargazer/comet-chaser  4.0.0 <= v < 5.0.0
+
+package: urban-gnome/street-light
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/street-light
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        margarita-fiz/lime-clock  3.0.0 <= v < 4.0.0
+        luna-crumb/cookie-run  4.0.0 <= v < 5.0.0
+
+package: urban-gnome/street-light
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        margarita-fiz/fizzler  3.0.0 <= v < 4.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/street-light
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  2.0.0 <= v < 3.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+
+package: urban-gnome/street-light
+    version: 4.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  1.0.0 <= v < 2.0.0
+        codey-mcbug/null-safety  3.0.0 <= v < 4.0.0
+        captain-kernel/helm  4.0.0 <= v < 5.0.0
+
+package: urban-gnome/street-light
+    version: 5.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+        marmalade/toastmate  3.0.0 <= v < 4.0.0
+
+package: urban-gnome/street-light
+    version: 5.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  5.0.0 <= v < 6.0.0
+
+package: urban-gnome/street-light
+    version: 5.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  3.0.0 <= v < 4.0.0
+        margarita-fiz/lime-clock  2.0.0 <= v < 3.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+
+package: urban-gnome/street-light
+    version: 5.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        horatiolamouche/moon-toast  2.0.0 <= v < 3.0.0
+        mama-mustard/tangy  4.0.0 <= v < 5.0.0
+
+package: horatiolamouche/moon-toast
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        margarita-fiz/fizzler  2.0.0 <= v < 3.0.0
+
+package: horatiolamouche/moon-toast
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+
+package: horatiolamouche/moon-toast
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  4.0.0 <= v < 5.0.0
+
+package: horatiolamouche/moon-toast
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+        noodle-legend/ramenify  2.0.0 <= v < 3.0.0
+
+package: horatiolamouche/moon-toast
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+        margarita-fiz/lime-clock  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/moon-toast
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        urban-gnome/street-light  4.0.0 <= v < 5.0.0
+        platypus-prince/billfold  2.0.0 <= v < 3.0.0
+        dr-sprocket/sprocketize  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/moon-toast
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  3.0.0 <= v < 4.0.0
+        dr-sprocket/cog-keeper  1.0.0 <= v < 2.0.0
+        codey-mcbug/null-safety  2.0.0 <= v < 3.0.0
+        marmalade/toastmate  2.0.0 <= v < 3.0.0
+
+package: horatiolamouche/moon-toast
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+        codey-mcbug/null-safety  1.0.0 <= v < 2.0.0
+        tiny-telescope/lens-flare  2.0.0 <= v < 3.0.0
+
+package: horatiolamouche/moon-toast
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  3.0.0 <= v < 4.0.0
+        beepboop/beep-o-matic  1.0.0 <= v < 2.0.0
+        stargazer/wish-handler  2.0.0 <= v < 3.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/moon-toast
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        pixelpanda/sprite-roller  3.0.0 <= v < 4.0.0
+        stargazer/comet-chaser  4.0.0 <= v < 5.0.0
+        noodle-legend/ramenify  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/moon-toast
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/moon-toast
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  1.0.0 <= v < 2.0.0
+        noodle-legend/ramenify  2.0.0 <= v < 3.0.0
+        dr-sprocket/cog-keeper  1.0.0 <= v < 2.0.0
+        stargazer/comet-chaser  4.0.0 <= v < 5.0.0
+
+package: horatiolamouche/moon-toast
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  2.0.0 <= v < 3.0.0
+
+package: horatiolamouche/moon-toast
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  3.0.0 <= v < 4.0.0
+        urban-gnome/alley-map  4.0.0 <= v < 5.0.0
+
+package: horatiolamouche/moon-toast
+    version: 4.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        luna-crumb/nightcap  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/moon-toast
+    version: 5.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        noodle-legend/noodle-scheme  1.0.0 <= v < 2.0.0
+        pixelpanda/pixel-porridge  3.0.0 <= v < 4.0.0
+
+package: horatiolamouche/moon-toast
+    version: 5.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        tiny-telescope/lens-flare  2.0.0 <= v < 3.0.0
+        dr-sprocket/cog-keeper  2.0.0 <= v < 3.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/moon-toast
+    version: 5.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        pixelpanda/pixel-porridge  2.0.0 <= v < 3.0.0
+        luna-crumb/cookie-run  4.0.0 <= v < 5.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  2.0.0 <= v < 3.0.0
+        beepboop/synth-honk  2.0.0 <= v < 3.0.0
+
+package: horatiolamouche/moon-toast
+    version: 5.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        urban-gnome/street-light  2.0.0 <= v < 3.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        stargazer/wish-handler  3.0.0 <= v < 4.0.0
+
+package: beepboop/synth-honk
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  5.0.0 <= v < 6.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: beepboop/synth-honk
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: beepboop/synth-honk
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: beepboop/synth-honk
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  4.0.0 <= v < 5.0.0
+
+package: beepboop/synth-honk
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: beepboop/synth-honk
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: beepboop/synth-honk
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: beepboop/synth-honk
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+
+package: beepboop/synth-honk
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+
+package: beepboop/synth-honk
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  2.0.0 <= v < 3.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: beepboop/synth-honk
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: beepboop/synth-honk
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  2.0.0 <= v < 3.0.0
+        captain-kernel/helm  2.0.0 <= v < 3.0.0
+
+package: beepboop/synth-honk
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/lime-clock
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  3.0.0 <= v < 4.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/lime-clock
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/lime-clock
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  4.0.0 <= v < 5.0.0
+        beepboop/beep-o-matic  2.0.0 <= v < 3.0.0
+
+package: margarita-fiz/lime-clock
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        noodle-legend/ramenify  3.0.0 <= v < 4.0.0
+        fuzzy-socks/warm-steps  3.0.0 <= v < 4.0.0
+
+package: margarita-fiz/lime-clock
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+        horatiolamouche/tea-timer  5.0.0 <= v < 6.0.0
+
+package: margarita-fiz/lime-clock
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/lime-clock
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/lime-clock
+    version: 2.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  4.0.0 <= v < 5.0.0
+
+package: margarita-fiz/lime-clock
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/lime-clock
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: margarita-fiz/lime-clock
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  2.0.0 <= v < 3.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  3.0.0 <= v < 4.0.0
+        fuzzy-socks/warm-steps  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 2.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  2.0.0 <= v < 3.0.0
+        glitter-biscuit/sparkle-box  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 4.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 5.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 5.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 5.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  2.0.0 <= v < 3.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: luna-crumb/cookie-run
+    version: 5.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 4.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 5.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 5.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 5.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+
+package: captain-kernel/helm
+    version: 5.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/sprite-roller
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        noodle-legend/noodle-scheme  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/sprite-roller
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        tiny-telescope/lens-flare  1.0.0 <= v < 2.0.0
+        marmalade/jammer  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/sprite-roller
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        margarita-fiz/lime-clock  3.0.0 <= v < 4.0.0
+        platypus-prince/billfold  2.0.0 <= v < 3.0.0
+
+package: pixelpanda/sprite-roller
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/sprite-roller
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        stargazer/wish-handler  3.0.0 <= v < 4.0.0
+        marmalade/citrus-cache  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  2.0.0 <= v < 3.0.0
+
+package: pixelpanda/sprite-roller
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        marmalade/jammer  1.0.0 <= v < 2.0.0
+        marmalade/citrus-cache  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  4.0.0 <= v < 5.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/sprite-roller
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  2.0.0 <= v < 3.0.0
+        stargazer/wish-handler  3.0.0 <= v < 4.0.0
+
+package: pixelpanda/sprite-roller
+    version: 2.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/sprite-roller
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  2.0.0 <= v < 3.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/sprite-roller
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  1.0.0 <= v < 2.0.0
+        marmalade/citrus-cache  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/sprite-roller
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        marmalade/jammer  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/sprite-roller
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  2.0.0 <= v < 3.0.0
+        luna-crumb/nightcap  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/sprite-roller
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  3.0.0 <= v < 4.0.0
+
+package: pixelpanda/sprite-roller
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  3.0.0 <= v < 4.0.0
+
+package: pixelpanda/sprite-roller
+    version: 5.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/sprite-roller
+    version: 5.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        margarita-fiz/lime-clock  3.0.0 <= v < 4.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  4.0.0 <= v < 5.0.0
+
+package: pixelpanda/sprite-roller
+    version: 5.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  2.0.0 <= v < 3.0.0
+
+package: pixelpanda/panda-guard
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/panda-guard
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        luna-crumb/nightcap  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/panda-guard
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  2.0.0 <= v < 3.0.0
+        horatiolamouche/tea-timer  4.0.0 <= v < 5.0.0
+        beepboop/beep-o-matic  2.0.0 <= v < 3.0.0
+
+package: pixelpanda/panda-guard
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/panda-guard
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  2.0.0 <= v < 3.0.0
+
+package: pixelpanda/panda-guard
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/panda-guard
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  1.0.0 <= v < 2.0.0
+        margarita-fiz/lime-clock  2.0.0 <= v < 3.0.0
+
+package: pixelpanda/panda-guard
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/panda-guard
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+        noodle-legend/ramenify  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/panda-guard
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  4.0.0 <= v < 5.0.0
+
+package: pixelpanda/panda-guard
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  3.0.0 <= v < 4.0.0
+
+package: pixelpanda/panda-guard
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        noodle-legend/ramenify  3.0.0 <= v < 4.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/panda-guard
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  2.0.0 <= v < 3.0.0
+        marmalade/toastmate  3.0.0 <= v < 4.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+
+package: stargazer/comet-chaser
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        pixelpanda/sprite-roller  5.0.0 <= v < 6.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        mama-mustard/picnic-helper  1.0.0 <= v < 2.0.0
+
+package: stargazer/comet-chaser
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  2.0.0 <= v < 3.0.0
+        stargazer/wish-handler  2.0.0 <= v < 3.0.0
+        pixelpanda/panda-guard  4.0.0 <= v < 5.0.0
+
+package: stargazer/comet-chaser
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  1.0.0 <= v < 2.0.0
+
+package: stargazer/comet-chaser
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+
+package: stargazer/comet-chaser
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  3.0.0 <= v < 4.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  1.0.0 <= v < 2.0.0
+
+package: stargazer/comet-chaser
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+
+package: stargazer/comet-chaser
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        margarita-fiz/lime-clock  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  2.0.0 <= v < 3.0.0
+
+package: stargazer/comet-chaser
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: stargazer/comet-chaser
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  2.0.0 <= v < 3.0.0
+        captain-kernel/helm  1.0.0 <= v < 2.0.0
+
+package: stargazer/comet-chaser
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        noodle-legend/ramenify  2.0.0 <= v < 3.0.0
+
+package: stargazer/comet-chaser
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  2.0.0 <= v < 3.0.0
+        marmalade/citrus-cache  1.0.0 <= v < 2.0.0
+
+package: stargazer/comet-chaser
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+
+package: stargazer/comet-chaser
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  4.0.0 <= v < 5.0.0
+        beepboop/beep-o-matic  1.0.0 <= v < 2.0.0
+
+package: stargazer/comet-chaser
+    version: 4.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        noodle-legend/ramenify  1.0.0 <= v < 2.0.0
+
+package: stargazer/comet-chaser
+    version: 5.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  1.0.0 <= v < 2.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  3.0.0 <= v < 4.0.0
+
+package: stargazer/comet-chaser
+    version: 5.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  3.0.0 <= v < 4.0.0
+        marmalade/citrus-cache  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  2.0.0 <= v < 3.0.0
+
+package: stargazer/comet-chaser
+    version: 5.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  3.0.0 <= v < 4.0.0
+        fuzzy-socks/sock-sort  1.0.0 <= v < 2.0.0
+        noodle-legend/noodle-scheme  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/patchwork
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        luna-crumb/crumb-tracker  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/patchwork
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  3.0.0 <= v < 4.0.0
+        fuzzy-socks/warm-steps  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/patchwork
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/patchwork
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        luna-crumb/crumb-tracker  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  3.0.0 <= v < 4.0.0
+
+package: codey-mcbug/patchwork
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  3.0.0 <= v < 4.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        urban-gnome/alley-map  3.0.0 <= v < 4.0.0
+        luna-crumb/nightcap  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/patchwork
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/patchwork
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        marmalade/citrus-cache  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  3.0.0 <= v < 4.0.0
+        margarita-fiz/fizzler  4.0.0 <= v < 5.0.0
+
+package: codey-mcbug/patchwork
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        codey-mcbug/null-safety  1.0.0 <= v < 2.0.0
+        urban-gnome/street-light  3.0.0 <= v < 4.0.0
+
+package: codey-mcbug/patchwork
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        urban-gnome/alley-map  3.0.0 <= v < 4.0.0
+        pixelpanda/sprite-roller  2.0.0 <= v < 3.0.0
+        fuzzy-socks/sock-sort  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  3.0.0 <= v < 4.0.0
+
+package: codey-mcbug/patchwork
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  2.0.0 <= v < 3.0.0
+        neon-squid/ink-logger  3.0.0 <= v < 4.0.0
+
+package: codey-mcbug/patchwork
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        pixelpanda/pixel-porridge  2.0.0 <= v < 3.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+        beepboop/beep-o-matic  2.0.0 <= v < 3.0.0
+
+package: codey-mcbug/patchwork
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        urban-gnome/alley-map  1.0.0 <= v < 2.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  2.0.0 <= v < 3.0.0
+
+package: codey-mcbug/patchwork
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  1.0.0 <= v < 2.0.0
+        horatiolamouche/buzzer  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/patchwork
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/patchwork
+    version: 4.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        tiny-telescope/zoomy  2.0.0 <= v < 3.0.0
+        luna-crumb/cookie-run  1.0.0 <= v < 2.0.0
+        marmalade/jammer  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/null-safety
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        urban-gnome/street-light  2.0.0 <= v < 3.0.0
+        neon-squid/ink-logger  4.0.0 <= v < 5.0.0
+
+package: codey-mcbug/null-safety
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        tiny-telescope/lens-flare  2.0.0 <= v < 3.0.0
+
+package: codey-mcbug/null-safety
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+        stargazer/wish-handler  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  5.0.0 <= v < 6.0.0
+
+package: codey-mcbug/null-safety
+    version: 1.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  2.0.0 <= v < 3.0.0
+
+package: codey-mcbug/null-safety
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        neon-squid/glow-payload  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/null-safety
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  5.0.0 <= v < 6.0.0
+
+package: codey-mcbug/null-safety
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  2.0.0 <= v < 3.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+        fuzzy-socks/sock-sort  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/null-safety
+    version: 2.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  5.0.0 <= v < 6.0.0
+        marmalade/citrus-cache  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/null-safety
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  5.0.0 <= v < 6.0.0
+        stargazer/wish-handler  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/null-safety
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+        stargazer/comet-chaser  4.0.0 <= v < 5.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+
+package: codey-mcbug/null-safety
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+        stargazer/comet-chaser  4.0.0 <= v < 5.0.0
+
+package: codey-mcbug/null-safety
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        margarita-fiz/lime-clock  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  4.0.0 <= v < 5.0.0
+        stargazer/comet-chaser  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  4.0.0 <= v < 5.0.0
+
+package: horatiolamouche/tea-timer
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  1.0.0 <= v < 2.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 2.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        quirky-quark/oddity  1.0.0 <= v < 2.0.0
+        beepboop/beep-o-matic  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 3.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  5.0.0 <= v < 6.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  4.0.0 <= v < 5.0.0
+
+package: horatiolamouche/tea-timer
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  1.0.0 <= v < 2.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 5.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        noodle-legend/ramenify  1.0.0 <= v < 2.0.0
+        platypus-prince/billfold  2.0.0 <= v < 3.0.0
+
+package: horatiolamouche/tea-timer
+    version: 5.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  1.0.0 <= v < 2.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+
+package: horatiolamouche/tea-timer
+    version: 5.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  2.0.0 <= v < 3.0.0
+
+package: horatiolamouche/tea-timer
+    version: 5.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  4.0.0 <= v < 5.0.0
+
+package: pixelpanda/pixel-porridge
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        tiny-telescope/zoomy  2.0.0 <= v < 3.0.0
+        fuzzy-socks/sock-sort  2.0.0 <= v < 3.0.0
+        luna-crumb/cookie-run  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/pixel-porridge
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  1.0.0 <= v < 2.0.0
+        codey-mcbug/null-safety  2.0.0 <= v < 3.0.0
+
+package: pixelpanda/pixel-porridge
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        dr-sprocket/cog-keeper  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/pixel-porridge
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+        marmalade/toastmate  5.0.0 <= v < 6.0.0
+
+package: pixelpanda/pixel-porridge
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  4.0.0 <= v < 5.0.0
+        horatiolamouche/tea-timer  5.0.0 <= v < 6.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/pixel-porridge
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        horatiolamouche/moon-toast  1.0.0 <= v < 2.0.0
+        marmalade/jammer  1.0.0 <= v < 2.0.0
+        codey-mcbug/null-safety  3.0.0 <= v < 4.0.0
+        beepboop/relay-dance  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/pixel-porridge
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        beepboop/synth-honk  4.0.0 <= v < 5.0.0
+        stargazer/comet-chaser  3.0.0 <= v < 4.0.0
+        neon-squid/ink-logger  3.0.0 <= v < 4.0.0
+        platypus-prince/billfold  2.0.0 <= v < 3.0.0
+        quirky-quark/quark-fling  1.0.0 <= v < 2.0.0
+
+package: pixelpanda/pixel-porridge
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  5.0.0 <= v < 6.0.0
+        horatiolamouche/buzzer  2.0.0 <= v < 3.0.0
+
+package: pixelpanda/pixel-porridge
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+        luna-crumb/crumb-tracker  1.0.0 <= v < 2.0.0
+        margarita-fiz/lime-clock  3.0.0 <= v < 4.0.0
+        codey-mcbug/patchwork  2.0.0 <= v < 3.0.0
+
+package: neon-squid/ink-logger
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/browser  1.0.0 <= v < 2.0.0
+        stargazer/wish-handler  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  5.0.0 <= v < 6.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+
+package: neon-squid/ink-logger
+    version: 1.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  1.0.0 <= v < 2.0.0
+        stargazer/wish-handler  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+
+package: neon-squid/ink-logger
+    version: 1.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        stargazer/constellation-map  1.0.0 <= v < 2.0.0
+
+package: neon-squid/ink-logger
+    version: 2.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+
+package: neon-squid/ink-logger
+    version: 2.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  2.0.0 <= v < 3.0.0
+        glitter-biscuit/biscuitify  5.0.0 <= v < 6.0.0
+
+package: neon-squid/ink-logger
+    version: 2.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+
+package: neon-squid/ink-logger
+    version: 3.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  1.0.0 <= v < 2.0.0
+        glitter-biscuit/biscuitify  3.0.0 <= v < 4.0.0
+        nosy-narwhal/fluke-finder  1.0.0 <= v < 2.0.0
+
+package: neon-squid/ink-logger
+    version: 3.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/time  1.0.0 <= v < 2.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+        luna-crumb/cookie-run  5.0.0 <= v < 6.0.0
+        captain-kernel/helm  2.0.0 <= v < 3.0.0
+
+package: neon-squid/ink-logger
+    version: 3.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        horatiolamouche/tea-timer  4.0.0 <= v < 5.0.0
+        fuzzy-socks/warm-steps  1.0.0 <= v < 2.0.0
+
+package: neon-squid/ink-logger
+    version: 4.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/url  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+
+package: neon-squid/ink-logger
+    version: 4.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        codey-mcbug/debug-hug  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+        beepboop/synth-honk  4.0.0 <= v < 5.0.0
+
+package: neon-squid/ink-logger
+    version: 4.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        dr-sprocket/sprocketize  1.0.0 <= v < 2.0.0
+        mama-mustard/tangy  4.0.0 <= v < 5.0.0
+        platypus-prince/web-crawl  1.0.0 <= v < 2.0.0
+
+package: neon-squid/ink-logger
+    version: 4.1.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/http  1.0.0 <= v < 2.0.0
+        elm/svg  1.0.0 <= v < 2.0.0
+        glitter-biscuit/sparkle-box  1.0.0 <= v < 2.0.0
+
+package: neon-squid/ink-logger
+    version: 5.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/virtual-dom  1.0.0 <= v < 2.0.0
+        captain-kernel/helm  3.0.0 <= v < 4.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+
+package: neon-squid/ink-logger
+    version: 5.0.1
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        elm/json  1.0.0 <= v < 2.0.0
+        pixelpanda/panda-guard  4.0.0 <= v < 5.0.0
+        dr-sprocket/sprocketize  2.0.0 <= v < 3.0.0
+        nosy-narwhal/beakless  1.0.0 <= v < 2.0.0
+
+package: neon-squid/ink-logger
+    version: 5.1.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        fuzzy-socks/warm-steps  2.0.0 <= v < 3.0.0
+        marmalade/toastmate  3.0.0 <= v < 4.0.0
+        tiny-telescope/focus-ring  1.0.0 <= v < 2.0.0
+        captain-kernel/kernel-patch  1.0.0 <= v < 2.0.0
+
