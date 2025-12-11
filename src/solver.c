@@ -18,6 +18,7 @@ static SolverResult run_with_strategy(
     const ElmJson *elm_json,
     const char *author,
     const char *name,
+    const Version *target_version,
     bool is_test_dependency,
     bool upgrade_all,
     SolverStrategy strategy,
@@ -27,11 +28,11 @@ static SolverResult run_with_strategy(
     /* Dispatch to protocol-specific implementation */
     bool is_v2 = (state->install_env && state->install_env->protocol_mode == PROTOCOL_V2);
     if (is_v2) {
-        return run_with_strategy_v2(state, elm_json, author, name, is_test_dependency,
-                                     upgrade_all, strategy, current_packages, out_plan);
+        return run_with_strategy_v2(state, elm_json, author, name, target_version,
+                                     is_test_dependency, upgrade_all, strategy, current_packages, out_plan);
     } else {
-        return run_with_strategy_v1(state, elm_json, author, name, is_test_dependency,
-                                     upgrade_all, strategy, current_packages, out_plan);
+        return run_with_strategy_v1(state, elm_json, author, name, target_version,
+                                     is_test_dependency, upgrade_all, strategy, current_packages, out_plan);
     }
 }
 
@@ -41,6 +42,7 @@ SolverResult solver_add_package(
     const ElmJson *elm_json,
     const char *author,
     const char *name,
+    const Version *target_version,
     bool is_test_dependency,
     bool major_upgrade,
     bool upgrade_all,
@@ -52,9 +54,16 @@ SolverResult solver_add_package(
 
     *out_plan = NULL;
 
-    log_debug("Adding package: %s/%s%s%s",
-            author, name, is_test_dependency ? " (test dependency)" : "",
-            major_upgrade ? " (major upgrade allowed)" : "");
+    if (target_version) {
+        log_debug("Adding package: %s/%s@%u.%u.%u%s%s",
+                author, name, target_version->major, target_version->minor, target_version->patch,
+                is_test_dependency ? " (test dependency)" : "",
+                major_upgrade ? " (major upgrade allowed)" : "");
+    } else {
+        log_debug("Adding package: %s/%s%s%s",
+                author, name, is_test_dependency ? " (test dependency)" : "",
+                major_upgrade ? " (major upgrade allowed)" : "");
+    }
 
     /* Collect current packages */
     PackageMap *current_packages = collect_current_packages(elm_json);
@@ -76,11 +85,20 @@ SolverResult solver_add_package(
         return SOLVER_NETWORK_ERROR;
     }
 
-    /* Strategy ladder: choose strategies based on major_upgrade flag */
+    /* Strategy ladder: choose strategies based on target version / flags */
     SolverStrategy strategies[4];
     int num_strategies;
 
-    if (major_upgrade) {
+    if (target_version) {
+        /*
+         * For explicitly requested versions, keep indirect deps flexible first
+         * and fall back to exact resolution if that fails.
+         */
+        strategies[0] = STRATEGY_UPGRADABLE_WITHIN_MAJOR;
+        strategies[1] = STRATEGY_EXACT_DIRECT_UPGRADABLE_INDIRECT;
+        strategies[2] = STRATEGY_EXACT_ALL;
+        num_strategies = 3;
+    } else if (major_upgrade) {
         /* For major upgrades, only try cross-major strategy */
         strategies[0] = STRATEGY_CROSS_MAJOR_FOR_TARGET;
         num_strategies = 1;
@@ -99,6 +117,7 @@ SolverResult solver_add_package(
             elm_json,
             author,
             name,
+            target_version,
             is_test_dependency,
             upgrade_all,
             strategies[i],
@@ -213,7 +232,7 @@ void install_plan_merge(InstallPlan *dest, const InstallPlan *source) {
 SolverResult solver_add_packages(
     SolverState *state,
     const ElmJson *elm_json,
-    const char **packages,
+    const PackageVersionSpec *packages,
     int count,
     bool is_test,
     bool upgrade_all,
@@ -242,26 +261,14 @@ SolverResult solver_add_packages(
 
     for (int i = 0; i < count; i++) {
         PackageValidationResult *r = &validation->results[i];
-        char *author = NULL;
-        char *name = NULL;
 
-        /* Parse and validate name format */
-        if (!parse_package_name(packages[i], &author, &name)) {
-            r->author = arena_strdup(packages[i]);
-            r->name = NULL;
-            r->valid_name = false;
-            r->exists = false;
-            r->error_msg = "Invalid format (expected author/package)";
-            validation->invalid_count++;
-            continue;
-        }
-
-        r->author = author;
-        r->name = name;
+        /* Already parsed - just copy */
+        r->author = packages[i].author;
+        r->name = packages[i].name;
         r->valid_name = true;
 
         /* Check registry */
-        if (!package_exists_in_registry_internal(state, author, name)) {
+        if (!package_exists_in_registry_internal(state, packages[i].author, packages[i].name)) {
             r->exists = false;
             r->error_msg = "Package not found in registry";
             validation->invalid_count++;
@@ -295,12 +302,13 @@ SolverResult solver_add_packages(
     }
 
     for (int i = 0; i < count; i++) {
-        PackageValidationResult *r = &validation->results[i];
+        const PackageVersionSpec *spec = &packages[i];
         InstallPlan *single_plan = NULL;
 
         SolverResult result = solver_add_package(
             state, elm_json,
-            r->author, r->name,
+            spec->author, spec->name,
+            spec->version,  /* Pass target version from spec */
             is_test,
             false,  /* major_upgrade - not supported for multi */
             upgrade_all,

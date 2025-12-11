@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "elm_json.h"
 #include "cache.h"
+#include "commands/package/package_common.h"
 
 struct InstallEnv;
 
@@ -77,6 +78,7 @@ SolverResult solver_add_package(
     const ElmJson *elm_json,
     const char *author,
     const char *name,
+    const Version *target_version,  /* NULL for latest, or pointer to Version */
     bool is_test_dependency,
     bool major_upgrade,
     bool upgrade_all,
@@ -97,6 +99,17 @@ SolverResult solver_upgrade_all(
     bool major_upgrade,
     InstallPlan **out_plan
 );
+
+/*
+ * Multi-package version specification
+ */
+
+/* Package version specification for multi-package installs */
+typedef struct {
+    const char *author;
+    const char *name;
+    const Version *version;  /* NULL for latest, or pointer to Version */
+} PackageVersionSpec;
 
 /*
  * Multi-package validation structures
@@ -129,12 +142,12 @@ void multi_package_validation_free(MultiPackageValidation *validation);
  * 1. Validates ALL package names upfront (format check)
  * 2. Checks ALL packages exist in registry before solving
  * 3. Reports all errors at once (not fail-fast)
- * 4. If all valid, calls solver_add_package() for each
+ * 4. If all valid, calls solver_add_package() for each with target versions
  * 5. Combines results into single InstallPlan
  *
  * @param state        Initialized solver state
  * @param elm_json     Current project elm.json
- * @param packages     Array of "author/name" strings
+ * @param packages     Array of PackageVersionSpec (author, name, optional version)
  * @param count        Number of packages
  * @param is_test      Install as test dependencies
  * @param upgrade_all  Allow upgrading existing deps
@@ -145,7 +158,7 @@ void multi_package_validation_free(MultiPackageValidation *validation);
 SolverResult solver_add_packages(
     SolverState *state,
     const ElmJson *elm_json,
-    const char **packages,
+    const PackageVersionSpec *packages,
     int count,
     bool is_test,
     bool upgrade_all,

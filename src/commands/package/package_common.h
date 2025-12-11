@@ -97,16 +97,19 @@ char *version_range_to_string(const VersionRange *range);
  * Package specification parsing
  */
 
+/* Package install specification with optional version */
+typedef struct {
+    char *author;           /* Parsed author (arena-allocated) */
+    char *name;             /* Parsed name (arena-allocated) */
+    Version version;        /* Parsed version (only valid if has_version) */
+    bool has_version;       /* true if user specified a version */
+} PackageInstallSpec;
+
 /* Parse "author/name@version" into components.
  * Returns true on success.
  * out_author, out_name: arena-allocated strings (caller frees)
  * out_version: Version struct */
 bool parse_package_with_version(const char *spec, char **out_author, char **out_name, Version *out_version);
-
-/* Parse "author/name@X.Y.Z" keeping version as string.
- * Returns true on success.
- * out_author, out_name, out_version: arena-allocated strings (caller frees) */
-bool parse_package_spec(const char *spec, char **out_author, char **out_name, char **out_version);
 
 /*
  * Constraint utilities

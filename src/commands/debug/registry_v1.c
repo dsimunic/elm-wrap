@@ -102,44 +102,12 @@ static int cmd_registry_v1_add(const char *package_spec) {
     }
 
     /* Parse package specification: author/name@version */
-    char *spec_copy = arena_strdup(package_spec);
-    if (!spec_copy) {
-        log_error("Out of memory");
-        return 1;
-    }
-
-    /* Find @ separator */
-    char *at_pos = strchr(spec_copy, '@');
-    if (!at_pos) {
-        fprintf(stderr, "Error: Invalid package specification '%s'\n", package_spec);
-        fprintf(stderr, "Expected format: AUTHOR/NAME@VERSION\n");
-        arena_free(spec_copy);
-        return 1;
-    }
-
-    *at_pos = '\0';
-    const char *package_name = spec_copy;
-    const char *version_str = at_pos + 1;
-
-    /* Parse author/name */
     char *author = NULL;
     char *name = NULL;
-    if (!parse_package_name(package_name, &author, &name)) {
-        fprintf(stderr, "Error: Invalid package name '%s'\n", package_name);
-        fprintf(stderr, "Expected format: AUTHOR/NAME\n");
-        arena_free(spec_copy);
-        return 1;
-    }
-
-    /* Parse version */
-    Version version = version_parse(version_str);
-    if (version.major == 0 && version.minor == 0 && version.patch == 0 &&
-        strcmp(version_str, "0.0.0") != 0) {
-        fprintf(stderr, "Error: Invalid version string '%s'\n", version_str);
-        fprintf(stderr, "Expected format: MAJOR.MINOR.PATCH\n");
-        arena_free(author);
-        arena_free(name);
-        arena_free(spec_copy);
+    Version version;
+    if (!parse_package_with_version(package_spec, &author, &name, &version)) {
+        fprintf(stderr, "Error: Invalid package specification '%s'\n", package_spec);
+        fprintf(stderr, "Expected format: AUTHOR/NAME@VERSION\n");
         return 1;
     }
 
@@ -149,7 +117,6 @@ static int cmd_registry_v1_add(const char *package_spec) {
         log_error("Failed to initialize cache configuration");
         arena_free(author);
         arena_free(name);
-        arena_free(spec_copy);
         return 1;
     }
 
@@ -165,7 +132,6 @@ static int cmd_registry_v1_add(const char *package_spec) {
             cache_config_free(cache);
             arena_free(author);
             arena_free(name);
-            arena_free(spec_copy);
             return 1;
         }
     } else {
@@ -175,7 +141,6 @@ static int cmd_registry_v1_add(const char *package_spec) {
             cache_config_free(cache);
             arena_free(author);
             arena_free(name);
-            arena_free(spec_copy);
             return 1;
         }
     }
@@ -185,12 +150,13 @@ static int cmd_registry_v1_add(const char *package_spec) {
     if (entry) {
         for (size_t i = 0; i < entry->version_count; i++) {
             if (registry_version_compare(&entry->versions[i], &version) == 0) {
-                printf("Package %s/%s@%s already exists in registry\n", author, name, version_str);
+                char *ver_str = version_to_string(&version);
+                printf("Package %s/%s@%s already exists in registry\n", author, name, ver_str ? ver_str : "(unknown)");
+                if (ver_str) arena_free(ver_str);
                 registry_free(registry);
                 cache_config_free(cache);
                 arena_free(author);
                 arena_free(name);
-                arena_free(spec_copy);
                 return 0;
             }
         }
@@ -198,12 +164,13 @@ static int cmd_registry_v1_add(const char *package_spec) {
 
     /* Add version (registry_add_version handles insertion in correct order) */
     if (!registry_add_version(registry, author, name, version)) {
-        log_error("Failed to add %s/%s@%s to registry", author, name, version_str);
+        char *ver_str = version_to_string(&version);
+        log_error("Failed to add %s/%s@%s to registry", author, name, ver_str ? ver_str : "(unknown)");
+        if (ver_str) arena_free(ver_str);
         registry_free(registry);
         cache_config_free(cache);
         arena_free(author);
         arena_free(name);
-        arena_free(spec_copy);
         return 1;
     }
 
@@ -215,17 +182,17 @@ static int cmd_registry_v1_add(const char *package_spec) {
         cache_config_free(cache);
         arena_free(author);
         arena_free(name);
-        arena_free(spec_copy);
         return 1;
     }
 
-    printf("Added %s/%s@%s to registry\n", author, name, version_str);
+    char *ver_str = version_to_string(&version);
+    printf("Added %s/%s@%s to registry\n", author, name, ver_str ? ver_str : "(unknown)");
+    if (ver_str) arena_free(ver_str);
 
     registry_free(registry);
     cache_config_free(cache);
     arena_free(author);
     arena_free(name);
-    arena_free(spec_copy);
     return 0;
 }
 
@@ -240,44 +207,12 @@ static int cmd_registry_v1_remove(const char *package_spec) {
     }
 
     /* Parse package specification: author/name@version */
-    char *spec_copy = arena_strdup(package_spec);
-    if (!spec_copy) {
-        log_error("Out of memory");
-        return 1;
-    }
-
-    /* Find @ separator */
-    char *at_pos = strchr(spec_copy, '@');
-    if (!at_pos) {
-        fprintf(stderr, "Error: Invalid package specification '%s'\n", package_spec);
-        fprintf(stderr, "Expected format: AUTHOR/NAME@VERSION\n");
-        arena_free(spec_copy);
-        return 1;
-    }
-
-    *at_pos = '\0';
-    const char *package_name = spec_copy;
-    const char *version_str = at_pos + 1;
-
-    /* Parse author/name */
     char *author = NULL;
     char *name = NULL;
-    if (!parse_package_name(package_name, &author, &name)) {
-        fprintf(stderr, "Error: Invalid package name '%s'\n", package_name);
-        fprintf(stderr, "Expected format: AUTHOR/NAME\n");
-        arena_free(spec_copy);
-        return 1;
-    }
-
-    /* Parse version */
-    Version version = version_parse(version_str);
-    if (version.major == 0 && version.minor == 0 && version.patch == 0 &&
-        strcmp(version_str, "0.0.0") != 0) {
-        fprintf(stderr, "Error: Invalid version string '%s'\n", version_str);
-        fprintf(stderr, "Expected format: MAJOR.MINOR.PATCH\n");
-        arena_free(author);
-        arena_free(name);
-        arena_free(spec_copy);
+    Version version;
+    if (!parse_package_with_version(package_spec, &author, &name, &version)) {
+        fprintf(stderr, "Error: Invalid package specification '%s'\n", package_spec);
+        fprintf(stderr, "Expected format: AUTHOR/NAME@VERSION\n");
         return 1;
     }
 
@@ -287,7 +222,6 @@ static int cmd_registry_v1_remove(const char *package_spec) {
         log_error("Failed to initialize cache configuration");
         arena_free(author);
         arena_free(name);
-        arena_free(spec_copy);
         return 1;
     }
 
@@ -300,7 +234,6 @@ static int cmd_registry_v1_remove(const char *package_spec) {
         cache_config_free(cache);
         arena_free(author);
         arena_free(name);
-        arena_free(spec_copy);
         return 1;
     }
 
@@ -310,7 +243,6 @@ static int cmd_registry_v1_remove(const char *package_spec) {
         cache_config_free(cache);
         arena_free(author);
         arena_free(name);
-        arena_free(spec_copy);
         return 1;
     }
 
@@ -322,7 +254,6 @@ static int cmd_registry_v1_remove(const char *package_spec) {
         cache_config_free(cache);
         arena_free(author);
         arena_free(name);
-        arena_free(spec_copy);
         return 1;
     }
 
@@ -336,13 +267,14 @@ static int cmd_registry_v1_remove(const char *package_spec) {
     }
 
     if (version_index == (size_t)-1) {
+        char *ver_str = version_to_string(&version);
         fprintf(stderr, "Error: Version %s not found for package %s/%s\n",
-                version_str, author, name);
+                ver_str ? ver_str : "(unknown)", author, name);
+        if (ver_str) arena_free(ver_str);
         registry_free(registry);
         cache_config_free(cache);
         arena_free(author);
         arena_free(name);
-        arena_free(spec_copy);
         return 1;
     }
 
@@ -386,17 +318,17 @@ static int cmd_registry_v1_remove(const char *package_spec) {
         cache_config_free(cache);
         arena_free(author);
         arena_free(name);
-        arena_free(spec_copy);
         return 1;
     }
 
-    printf("Removed %s/%s@%s from registry\n", author, name, version_str);
+    char *ver_str = version_to_string(&version);
+    printf("Removed %s/%s@%s from registry\n", author, name, ver_str ? ver_str : "(unknown)");
+    if (ver_str) arena_free(ver_str);
 
     registry_free(registry);
     cache_config_free(cache);
     arena_free(author);
     arena_free(name);
-    arena_free(spec_copy);
     return 0;
 }
 

@@ -13,6 +13,7 @@ SolverResult run_with_strategy_v2(
     const ElmJson *elm_json,
     const char *author,
     const char *name,
+    const Version *target_version,
     bool is_test_dependency,
     bool upgrade_all,
     SolverStrategy strategy,

@@ -107,33 +107,17 @@ static bool parse_since_response(const char *json_str, Registry *registry) {
 
         const char *entry_str = item->valuestring;
 
-        const char *at = strchr(entry_str, '@');
-        if (!at) continue;
-
-        size_t package_name_len = at - entry_str;
-        char *package_name = arena_malloc(package_name_len + 1);
-        if (!package_name) {
-            cJSON_Delete(json);
-            return false;
-        }
-
-        strncpy(package_name, entry_str, package_name_len);
-        package_name[package_name_len] = '\0';
-
         char *author = NULL;
         char *name = NULL;
-        if (!parse_package_name(package_name, &author, &name)) {
-            arena_free(package_name);
+        Version version;
+        if (!parse_package_with_version(entry_str, &author, &name, &version)) {
             continue;
         }
-
-        const char *version_str = at + 1;
-        Version version = version_parse(version_str);
 
         registry_add_version(registry, author, name, version);
 
         arena_free(author);
-        arena_free(package_name);
+        arena_free(name);
     }
 
     cJSON_Delete(json);

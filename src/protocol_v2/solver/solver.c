@@ -389,6 +389,7 @@ SolverResult run_with_strategy_v2(
     const ElmJson *elm_json,
     const char *author,
     const char *name,
+    const Version *target_version,
     bool is_test_dependency,
     bool upgrade_all,
     SolverStrategy strategy,
@@ -514,7 +515,22 @@ SolverResult run_with_strategy_v2(
             return SOLVER_INVALID_PACKAGE;
         }
 
-        PgVersionRange new_pkg_range = pg_range_any();
+        PgVersionRange new_pkg_range;
+        if (target_version) {
+            /* User requested specific version - use exact constraint */
+            PgVersion v = {
+                .major = target_version->major,
+                .minor = target_version->minor,
+                .patch = target_version->patch
+            };
+            new_pkg_range = pg_range_exact(v);
+            log_debug("Using exact version constraint (V2): %u.%u.%u",
+                      v.major, v.minor, v.patch);
+        } else {
+            /* No specific version - allow any version */
+            new_pkg_range = pg_range_any();
+        }
+
         if (!pg_elm_v2_add_root_dependency(pg_ctx, new_pkg_id, new_pkg_range)) {
             log_error("Conflicting constraints for requested package %s/%s (V2)", author, name);
             pg_solver_free(pg_solver);

@@ -18,7 +18,7 @@ and they don't bleong to any group:
     repl               Open an interactive Elm REPL
     init               Initialize a new Elm project
     reactor            Start the Elm Reactor development server
-    make ELM_FILE      Compile Elm code to JavaScript or HTML
+    make FILE          Compile Elm code to JavaScript or HTML
     install PACKAGE    Install packages for your Elm project
     bump               Bump version based on API changes
     diff [VERSION]     Show API differences between versions
@@ -66,7 +66,8 @@ Synopsis:
     Usage: wrap package SUBCOMMAND [OPTIONS]
 
     Subcommands:
-    install [PACKAGE]              Add a dependency to current elm.json
+    install PACKAGE[@VERSION] [PACKAGE[@VERSION]...]
+                                  Add a dependency to current elm.json
     upgrade [PACKAGE]              Upgrade packages to latest versions
     remove   PACKAGE               Remove a package from elm.json
     info    [ PATH                 Display package information and upgrades
@@ -74,7 +75,8 @@ Synopsis:
             ]
     publish PATH                   Show files that would be published from a package
     docs    PATH                   Generate documentation JSON for a package
-    cache   [PACKAGE]              Download package to ELM_HOME without adding it to elm.json
+    cache   PACKAGE[@VERSION] [PACKAGE[@VERSION]...]
+                                  Download packages to ELM_HOME without adding them to elm.json
 
     Options:
     -y, --yes            Automatically confirm changes
@@ -87,7 +89,19 @@ Synopsis:
 This is the most useful command in this group, and the one you'll likely use most often when developing Elm applications. 
 
 `wrap install PACKAGE` does exactly what you'd expect and what you're used to from using the `elm` binary directly:
-installs dependencies for your Elm application or a package.
+installs dependencies for your Elm application or a package. When you need a specific
+release, append `@VERSION` to the package name. Multiple packages can be specified in
+a single command and you can mix versioned and unversioned requests:
+
+```
+wrap install elm/html@1.0.0                 # Pin to an exact version
+wrap install elm/html@1.0.0 elm/json        # Mix explicit + latest
+wrap install elm/html elm/json@1.1.3        # Reverse order works too
+wrap install elm/html 1.0.0                 # Positional version (single package)
+```
+
+The positional version form (`wrap install package 1.0.0`) remains for backwards
+compatibility, but only when dealing with a single package at a time.
 
 There are a few flags that let you beyond the usual `install` command that might be helpful in certain scenarios:
 
@@ -181,10 +195,20 @@ Point it at a directory containing `elm.json` and `src/`:
 
 Use `--verbose` to see which modules were skipped (e.g., internal modules not exposed in `elm.json`).
 
-#### **`cache [PACKAGE]`**    
+#### **`cache PACKAGE[@VERSION] [PACKAGE[@VERSION]...]`**    
 
 Download packages to cache without prompting. Useful for pre-populating your cache before going offline, or for CI environments
-where you want to ensure all dependencies are available before running builds.
+where you want to ensure all dependencies are available before running builds. This command supports the same
+`PACKAGE@VERSION` syntax as `wrap install`, so you can download exact releases or a mix of latest and pinned packages:
+
+```
+wrap package cache elm/html@1.0.0              # Cache a specific version
+wrap package cache elm/html elm/json@1.1.3     # Mix pinned + latest
+wrap package cache elm/html 1.0.0              # Positional version (single package)
+wrap package cache elm/html elm/json elm/url   # Cache several latest versions
+```
+
+If you only provide package names, **elm-wrap** grabs the latest compatible versions, mirroring what `wrap install` would resolve.
 
 
 ### `repository` Group

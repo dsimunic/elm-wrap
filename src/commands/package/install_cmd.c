@@ -25,6 +25,148 @@
 #define ANSI_DULL_CYAN "\033[36m"
 #define ANSI_DULL_YELLOW "\033[33m"
 #define ANSI_RESET "\033[0m"
+#define AVAILABLE_VERSION_DISPLAY_LIMIT 10
+
+static bool version_exists_in_registry_env(InstallEnv *env, const char *author, const char *name, const Version *target) {
+    if (!env || !author || !name || !target) {
+        return false;
+    }
+
+    if (env->protocol_mode == PROTOCOL_V2) {
+        if (!env->v2_registry) {
+            return false;
+        }
+        V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
+        if (!entry) {
+            return false;
+        }
+        for (size_t i = 0; i < entry->version_count; i++) {
+            V2PackageVersion *ver = &entry->versions[i];
+            if (ver->status != V2_STATUS_VALID) {
+                continue;
+            }
+            if (ver->major == target->major &&
+                ver->minor == target->minor &&
+                ver->patch == target->patch) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if (!env->registry) {
+        return false;
+    }
+
+    RegistryEntry *entry = registry_find(env->registry, author, name);
+    if (!entry) {
+        return false;
+    }
+
+    for (size_t i = 0; i < entry->version_count; i++) {
+        if (version_compare(&entry->versions[i], target) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void print_available_versions_for_package(InstallEnv *env, const char *author, const char *name, size_t limit) {
+    fprintf(stderr, "Available versions:\n");
+    if (!env) {
+        fprintf(stderr, "  (registry unavailable)\n");
+        return;
+    }
+
+    size_t printed = 0;
+    size_t total = 0;
+
+    if (env->protocol_mode == PROTOCOL_V2) {
+        if (!env->v2_registry) {
+            fprintf(stderr, "  (registry data unavailable)\n");
+            return;
+        }
+
+        V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
+        if (!entry) {
+            fprintf(stderr, "  (package not found in registry)\n");
+            return;
+        }
+
+        for (size_t i = 0; i < entry->version_count; i++) {
+            V2PackageVersion *ver = &entry->versions[i];
+            if (ver->status != V2_STATUS_VALID) {
+                continue;
+            }
+            total++;
+            if (printed < limit) {
+                char *ver_str = version_format(ver->major, ver->minor, ver->patch);
+                fprintf(stderr, "  %s\n", ver_str ? ver_str : "(invalid)");
+                if (ver_str) {
+                    arena_free(ver_str);
+                }
+                printed++;
+            }
+        }
+
+        if (total == 0) {
+            fprintf(stderr, "  (no published versions)\n");
+            return;
+        }
+
+        if (total > printed) {
+            fprintf(stderr, "  ... and %zu more\n", total - printed);
+        }
+        return;
+    }
+
+    if (!env->registry) {
+        fprintf(stderr, "  (registry data unavailable)\n");
+        return;
+    }
+
+    RegistryEntry *entry = registry_find(env->registry, author, name);
+    if (!entry || entry->version_count == 0) {
+        fprintf(stderr, "  (no published versions)\n");
+        return;
+    }
+
+    size_t show_count = entry->version_count < limit ? entry->version_count : limit;
+    for (size_t i = 0; i < show_count; i++) {
+        char *ver_str = version_to_string(&entry->versions[i]);
+        fprintf(stderr, "  %s\n", ver_str ? ver_str : "(invalid)");
+        if (ver_str) {
+            arena_free(ver_str);
+        }
+    }
+
+    if (entry->version_count > limit) {
+        fprintf(stderr, "  ... and %zu more\n", entry->version_count - limit);
+    }
+}
+
+static void print_target_version_conflict(const char *author, const char *name, const Version *version, bool include_guidance) {
+    if (!author || !name || !version) {
+        return;
+    }
+
+    char *ver_str = version_to_string(version);
+    log_error("Cannot install %s/%s at version %s",
+              author,
+              name,
+              ver_str ? ver_str : "(invalid)");
+    if (ver_str) {
+        arena_free(ver_str);
+    }
+    if (include_guidance) {
+        fprintf(stderr, "\nThe requested version has dependencies that conflict with your\n");
+        fprintf(stderr, "current elm.json. You may need to:\n\n");
+        fprintf(stderr, "  1. Try a different version\n");
+        fprintf(stderr, "  2. Upgrade conflicting packages first\n");
+        fprintf(stderr, "  3. Use --major to allow major version upgrades of dependencies\n");
+    }
+}
 
 /* Note: Helper functions find_package_map() and remove_from_all_app_maps() 
  * are now in package_common.c/h */
@@ -50,13 +192,16 @@ static void print_install_what(const char *elm_home) {
 }
 
 static void print_install_usage(void) {
-    printf("Usage: %s install PACKAGE [PACKAGE...]\n", global_context_program_name());
+    printf("Usage: %s install PACKAGE[@VERSION] [PACKAGE[@VERSION]...]\n", global_context_program_name());
     printf("\n");
     printf("Install packages for your Elm project.\n");
     printf("\n");
     printf("Examples:\n");
     printf("  %s install elm/html                     # Add elm/html to your project\n", global_context_program_name());
+    printf("  %s install elm/html@1.0.0               # Add elm/html at specific version\n", global_context_program_name());
+    printf("  %s install elm/html 1.0.0               # Same (single package only)\n", global_context_program_name());
     printf("  %s install elm/html elm/json elm/url    # Add multiple packages at once\n", global_context_program_name());
+    printf("  %s install elm/html@1.0.0 elm/json      # Mix versioned and latest\n", global_context_program_name());
     printf("  %s install --test elm/json              # Add elm/json as a test dependency\n", global_context_program_name());
     printf("  %s install --major elm/html             # Upgrade elm/html to next major version\n", global_context_program_name());
     printf("  %s install --from-file ./pkg.zip elm/html  # Install from local file\n", global_context_program_name());
@@ -99,13 +244,10 @@ static bool create_pin_file(const char *pkg_path, const char *version) {
     return true;
 }
 
-static int install_package(const char *package, bool is_test, bool major_upgrade, bool upgrade_all, bool auto_yes, ElmJson *elm_json, InstallEnv *env) {
-    char *author = NULL;
-    char *name = NULL;
-
-    if (!parse_package_name(package, &author, &name)) {
-        return 1;
-    }
+static int install_package(const PackageInstallSpec *spec, bool is_test, bool major_upgrade, bool upgrade_all, bool auto_yes, ElmJson *elm_json, InstallEnv *env) {
+    const char *author = spec->author;
+    const char *name = spec->name;
+    const Version *target_version = spec->has_version ? &spec->version : NULL;
 
     log_debug("Installing %s/%s%s%s", author, name,
               is_test ? " (test dependency)" : "",
@@ -114,103 +256,108 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
     Package *existing_pkg = find_existing_package(elm_json, author, name);
     PromotionType promotion = elm_json_find_package(elm_json, author, name);
 
-    if (existing_pkg && !major_upgrade) {
-        log_debug("Package %s/%s is already in your dependencies", author, name);
-        if (existing_pkg->version &&
-            cache_package_exists(env->cache, author, name, existing_pkg->version)) {
-            log_debug("Package already downloaded");
-        } else {
-            log_debug("Package not downloaded yet");
-        }
+    if (existing_pkg) {
+        if (target_version) {
+            Version existing_ver = {0};
+            bool parsed_existing = false;
+            if (existing_pkg->version) {
+                parsed_existing = version_parse_safe(existing_pkg->version, &existing_ver);
+            }
 
-        /*
-         * Handle --test flag specially: when the user explicitly asks for a test
-         * dependency, we need to ensure the package ends up in test-dependencies,
-         * not just get promoted within production dependencies.
-         */
-        if (is_test && elm_json->type == ELM_PROJECT_APPLICATION) {
-            /* Check if already in test-dependencies/direct */
-            if (package_map_find(elm_json->dependencies_test_direct, author, name)) {
-                printf("It is already a direct test dependency!\n");
-                arena_free(author);
-                arena_free(name);
+            if (parsed_existing && version_equals(&existing_ver, target_version)) {
+                printf("%s/%s is already installed at version %s\n",
+                       author, name, existing_pkg->version);
                 return 0;
             }
-            
-            /* Check if in test-dependencies/indirect - promote within test deps */
-            Package *test_indirect = package_map_find(elm_json->dependencies_test_indirect, author, name);
-            if (test_indirect) {
-                package_map_add(elm_json->dependencies_test_direct, author, name, test_indirect->version);
-                package_map_remove(elm_json->dependencies_test_indirect, author, name);
-                printf("Promoted %s/%s from test-indirect to test-direct dependencies.\n", author, name);
+
+            char *ver_str = version_to_string(target_version);
+            log_debug("Changing %s/%s from %s to %s",
+                      author,
+                      name,
+                      existing_pkg->version ? existing_pkg->version : "(unknown)",
+                      ver_str ? ver_str : "(unknown)");
+            if (ver_str) {
+                arena_free(ver_str);
+            }
+            /* Continue to solver to perform the requested version change */
+        } else if (!major_upgrade) {
+            log_debug("Package %s/%s is already in your dependencies", author, name);
+            if (existing_pkg->version &&
+                cache_package_exists(env->cache, author, name, existing_pkg->version)) {
+                log_debug("Package already downloaded");
+            } else {
+                log_debug("Package not downloaded yet");
+            }
+
+            /*
+             * Handle --test flag specially: when the user explicitly asks for a test
+             * dependency, we need to ensure the package ends up in test-dependencies,
+             * not just get promoted within production dependencies.
+             */
+            if (is_test && elm_json->type == ELM_PROJECT_APPLICATION) {
+                /* Check if already in test-dependencies/direct */
+                if (package_map_find(elm_json->dependencies_test_direct, author, name)) {
+                    printf("It is already a direct test dependency!\n");
+                    return 0;
+                }
+                
+                /* Check if in test-dependencies/indirect - promote within test deps */
+                Package *test_indirect = package_map_find(elm_json->dependencies_test_indirect, author, name);
+                if (test_indirect) {
+                    package_map_add(elm_json->dependencies_test_direct, author, name, test_indirect->version);
+                    package_map_remove(elm_json->dependencies_test_indirect, author, name);
+                    printf("Promoted %s/%s from test-indirect to test-direct dependencies.\n", author, name);
+                    if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+                        log_error("Failed to write elm.json");
+                        return 1;
+                    }
+                    return 0;
+                }
+                
+                /* Package is in production deps (direct or indirect) - add to test-direct */
+                package_map_add(elm_json->dependencies_test_direct, author, name, existing_pkg->version);
+                printf("Added %s/%s to test-direct dependencies (already available as production dependency).\n", author, name);
                 if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
                     log_error("Failed to write elm.json");
-                    arena_free(author);
-                    arena_free(name);
                     return 1;
                 }
-                arena_free(author);
-                arena_free(name);
                 return 0;
-            }
-            
-            /* Package is in production deps (direct or indirect) - add to test-direct */
-            package_map_add(elm_json->dependencies_test_direct, author, name, existing_pkg->version);
-            printf("Added %s/%s to test-direct dependencies (already available as production dependency).\n", author, name);
-            if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
-                log_error("Failed to write elm.json");
-                arena_free(author);
-                arena_free(name);
-                return 1;
-            }
-            arena_free(author);
-            arena_free(name);
-            return 0;
-        } else if (is_test && elm_json->type == ELM_PROJECT_PACKAGE) {
-            /* For packages: check if already in test-dependencies */
-            if (package_map_find(elm_json->package_test_dependencies, author, name)) {
-                printf("It is already a test dependency!\n");
-                arena_free(author);
-                arena_free(name);
-                return 0;
-            }
-            
-            /* Package is in main deps - add to test deps */
-            package_map_add(elm_json->package_test_dependencies, author, name, existing_pkg->version);
-            printf("Added %s/%s to test-dependencies (already available as main dependency).\n", author, name);
-            if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
-                log_error("Failed to write elm.json");
-                arena_free(author);
-                arena_free(name);
-                return 1;
-            }
-            arena_free(author);
-            arena_free(name);
-            return 0;
-        }
-
-        /* Standard promotion (not --test) */
-        if (promotion != PROMOTION_NONE) {
-            if (elm_json_promote_package(elm_json, author, name)) {
-                log_debug("Saving updated elm.json");
+            } else if (is_test && elm_json->type == ELM_PROJECT_PACKAGE) {
+                /* For packages: check if already in test-dependencies */
+                if (package_map_find(elm_json->package_test_dependencies, author, name)) {
+                    printf("It is already a test dependency!\n");
+                    return 0;
+                }
+                
+                /* Package is in main deps - add to test deps */
+                package_map_add(elm_json->package_test_dependencies, author, name, existing_pkg->version);
+                printf("Added %s/%s to test-dependencies (already available as main dependency).\n", author, name);
                 if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
                     log_error("Failed to write elm.json");
-                    arena_free(author);
-                    arena_free(name);
                     return 1;
                 }
-                log_debug("Done");
+                return 0;
             }
-        } else {
-            printf("It is already installed!\n");
-        }
 
-        arena_free(author);
-        arena_free(name);
-        return 0;
-    } else if (existing_pkg && major_upgrade) {
-        log_debug("Package %s/%s exists at %s, checking for major upgrade", 
-                  author, name, existing_pkg->version);
+            /* Standard promotion (not --test) */
+            if (promotion != PROMOTION_NONE) {
+                if (elm_json_promote_package(elm_json, author, name)) {
+                    log_debug("Saving updated elm.json");
+                    if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+                        log_error("Failed to write elm.json");
+                        return 1;
+                    }
+                    log_debug("Done");
+                }
+            } else {
+                printf("It is already installed!\n");
+            }
+
+            return 0;
+        } else if (major_upgrade) {
+            log_debug("Package %s/%s exists at %s, checking for major upgrade", 
+                      author, name, existing_pkg->version);
+        }
     }
 
     size_t available_versions = 0;
@@ -218,23 +365,33 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
     if (!package_exists_in_registry(env, author, name, &available_versions)) {
         log_error("I cannot find package '%s/%s'", author, name);
         log_error("Make sure the package name is correct");
-        arena_free(author);
-        arena_free(name);
         return 1;
     }
 
     log_debug("Found package in registry with %zu version(s)", available_versions);
 
+    if (target_version &&
+        !version_exists_in_registry_env(env, author, name, target_version)) {
+        char *ver_str = version_to_string(target_version);
+        fprintf(stderr, "Error: Version %s not found for package %s/%s\n\n",
+                ver_str ? ver_str : "(invalid)",
+                author,
+                name);
+        if (ver_str) {
+            arena_free(ver_str);
+        }
+        print_available_versions_for_package(env, author, name, AVAILABLE_VERSION_DISPLAY_LIMIT);
+        return 1;
+    }
+
     SolverState *solver = solver_init(env, true);
     if (!solver) {
         log_error("Failed to initialize solver");
-        arena_free(author);
-        arena_free(name);
         return 1;
     }
 
     InstallPlan *out_plan = NULL;
-    SolverResult result = solver_add_package(solver, elm_json, author, name, is_test, major_upgrade, upgrade_all, &out_plan);
+    SolverResult result = solver_add_package(solver, elm_json, author, name, target_version, is_test, major_upgrade, upgrade_all, &out_plan);
 
     solver_free(solver);
 
@@ -243,7 +400,11 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
 
         switch (result) {
             case SOLVER_NO_SOLUTION:
-                log_error("No compatible version found for %s/%s", author, name);
+                if (target_version) {
+                    print_target_version_conflict(author, name, target_version, true);
+                } else {
+                    log_error("No compatible version found for %s/%s", author, name);
+                }
                 if (is_test && !upgrade_all) {
                     fprintf(stderr, "\n");
                     fprintf(stderr, "When installing a test dependency, production dependencies are pinned\n");
@@ -272,8 +433,6 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
                 break;
         }
 
-        arena_free(author);
-        arena_free(name);
         return 1;
     }
 
@@ -391,16 +550,12 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
         if (!fgets(response, sizeof(response), stdin)) {
             fprintf(stderr, "Error reading input\n");
             install_plan_free(out_plan);
-            arena_free(author);
-            arena_free(name);
             return 1;
         }
         
         if (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n') {
             printf("Aborted.\n");
             install_plan_free(out_plan);
-            arena_free(author);
-            arena_free(name);
             return 0;
         }
     }
@@ -454,8 +609,6 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
                       change->name,
                       change->new_version ? change->new_version : "(null)");
             install_plan_free(out_plan);
-            arena_free(author);
-            arena_free(name);
             return 1;
         }
     }
@@ -464,8 +617,6 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
     if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
         fprintf(stderr, "Error: Failed to write elm.json\n");
         install_plan_free(out_plan);
-        arena_free(author);
-        arena_free(name);
         return 1;
     }
 
@@ -483,8 +634,6 @@ static int install_package(const char *package, bool is_test, bool major_upgrade
     printf("Successfully installed %s/%s!\n", author, name);
 
     install_plan_free(out_plan);
-    arena_free(author);
-    arena_free(name);
     return 0;
 }
 
@@ -529,15 +678,35 @@ typedef struct {
 } PromotionInfo;
 
 static int install_multiple_packages(
-    const char **packages,
-    int package_count,
+    const PackageInstallSpec *specs,
+    int specs_count,
     bool is_test,
     bool upgrade_all,
     bool auto_yes,
     ElmJson *elm_json,
     InstallEnv *env
 ) {
-    log_debug("Installing %d packages%s", package_count, is_test ? " (test dependencies)" : "");
+    for (int i = 0; i < specs_count; i++) {
+        const PackageInstallSpec *spec = &specs[i];
+        if (spec->has_version &&
+            !version_exists_in_registry_env(env, spec->author, spec->name, &spec->version)) {
+            char *ver_str = version_to_string(&spec->version);
+            fprintf(stderr, "Error: Version %s not found for package %s/%s\n\n",
+                    ver_str ? ver_str : "(invalid)",
+                    spec->author,
+                    spec->name);
+            if (ver_str) {
+                arena_free(ver_str);
+            }
+            print_available_versions_for_package(env,
+                                                 spec->author,
+                                                 spec->name,
+                                                 AVAILABLE_VERSION_DISPLAY_LIMIT);
+            return 1;
+        }
+    }
+
+    log_debug("Installing %d packages%s", specs_count, is_test ? " (test dependencies)" : "");
 
     /*
      * First pass: identify packages that are already installed as indirect
@@ -551,39 +720,35 @@ static int install_multiple_packages(
     /* Track which packages need solving (not already in direct) */
     int to_solve_capacity = INITIAL_SMALL_CAPACITY;
     int to_solve_count = 0;
-    const char **to_solve = arena_malloc(to_solve_capacity * sizeof(const char *));
+    PackageVersionSpec *to_solve = arena_malloc(to_solve_capacity * sizeof(PackageVersionSpec));
 
-    for (int i = 0; i < package_count; i++) {
-        char *author = NULL;
-        char *name = NULL;
-        if (!parse_package_name(packages[i], &author, &name)) {
-            arena_free(promotions);
-            arena_free(to_solve);
-            log_error("Invalid package name format: %s", packages[i]);
-            return 1;
-        }
+    for (int i = 0; i < specs_count; i++) {
+        const char *author = specs[i].author;
+        const char *name = specs[i].name;
 
         PromotionType promo = elm_json_find_package(elm_json, author, name);
 
         if (promo == PROMOTION_INDIRECT_TO_DIRECT) {
             /* Package is in indirect dependencies - need to promote */
             Package *existing = find_existing_package(elm_json, author, name);
-            DYNARRAY_PUSH(promotions, promotions_count, promotions_capacity, 
-                ((PromotionInfo){ .author = arena_strdup(author), 
+            DYNARRAY_PUSH(promotions, promotions_count, promotions_capacity,
+                ((PromotionInfo){ .author = arena_strdup(author),
                                   .name = arena_strdup(name),
                                   .version = existing ? arena_strdup(existing->version) : NULL }),
                 PromotionInfo);
             log_debug("Package %s/%s will be promoted from indirect to direct", author, name);
         } else if (promo == PROMOTION_NONE) {
             /* Package not installed at all - needs solving */
-            DYNARRAY_PUSH(to_solve, to_solve_count, to_solve_capacity, packages[i], const char *);
+            /* Pass version spec to solver */
+            PackageVersionSpec spec;
+            spec.author = author;
+            spec.name = name;
+            spec.version = specs[i].has_version ? &specs[i].version : NULL;
+            DYNARRAY_PUSH(to_solve, to_solve_count, to_solve_capacity, spec, PackageVersionSpec);
         } else {
             /* Already a direct dependency - skip */
             log_debug("Package %s/%s is already a direct dependency", author, name);
         }
-
-        arena_free(author);
-        arena_free(name);
     }
 
     /* If all packages are either already direct or just need promotion, skip solver */
@@ -619,6 +784,19 @@ static int install_multiple_packages(
             switch (result) {
                 case SOLVER_NO_SOLUTION:
                     log_error("No compatible solution found for the requested packages");
+                    {
+                        bool printed_guidance = false;
+                        for (int i = 0; i < specs_count; i++) {
+                            if (!specs[i].has_version) {
+                                continue;
+                            }
+                            print_target_version_conflict(specs[i].author,
+                                                          specs[i].name,
+                                                          &specs[i].version,
+                                                          !printed_guidance);
+                            printed_guidance = true;
+                        }
+                    }
                     if (is_test && !upgrade_all) {
                         fprintf(stderr, "\n");
                         fprintf(stderr, "When installing test dependencies, production dependencies are pinned\n");
@@ -669,17 +847,12 @@ static int install_multiple_packages(
             /* For packages, only count the requested packages */
             if (is_package) {
                 bool is_requested = false;
-                for (int j = 0; j < package_count; j++) {
-                    char *author = NULL;
-                    char *name = NULL;
-                    if (parse_package_name(packages[j], &author, &name)) {
-                        if (strcmp(change->author, author) == 0 && strcmp(change->name, name) == 0) {
-                            is_requested = true;
-                        }
-                        arena_free(author);
-                        arena_free(name);
+                for (int j = 0; j < specs_count; j++) {
+                    if (strcmp(change->author, specs[j].author) == 0 &&
+                        strcmp(change->name, specs[j].name) == 0) {
+                        is_requested = true;
+                        break;
                     }
-                    if (is_requested) break;
                 }
                 if (!is_requested) continue;
                 if (find_package_map(elm_json, change->author, change->name)) continue;
@@ -707,17 +880,12 @@ static int install_multiple_packages(
 
             if (is_package) {
                 bool is_requested = false;
-                for (int j = 0; j < package_count; j++) {
-                    char *author = NULL;
-                    char *name = NULL;
-                    if (parse_package_name(packages[j], &author, &name)) {
-                        if (strcmp(change->author, author) == 0 && strcmp(change->name, name) == 0) {
-                            is_requested = true;
-                        }
-                        arena_free(author);
-                        arena_free(name);
+                for (int j = 0; j < specs_count; j++) {
+                    if (strcmp(change->author, specs[j].author) == 0 &&
+                        strcmp(change->name, specs[j].name) == 0) {
+                        is_requested = true;
+                        break;
                     }
-                    if (is_requested) break;
                 }
                 if (!is_requested) continue;
                 if (find_package_map(elm_json, change->author, change->name)) continue;
@@ -831,17 +999,12 @@ static int install_multiple_packages(
 
             /* Check if this is one of the requested packages */
             bool is_requested_package = false;
-            for (int j = 0; j < package_count; j++) {
-                char *author = NULL;
-                char *name = NULL;
-                if (parse_package_name(packages[j], &author, &name)) {
-                    if (strcmp(change->author, author) == 0 && strcmp(change->name, name) == 0) {
-                        is_requested_package = true;
-                    }
-                    arena_free(author);
-                    arena_free(name);
+            for (int j = 0; j < specs_count; j++) {
+                if (strcmp(change->author, specs[j].author) == 0 &&
+                    strcmp(change->name, specs[j].name) == 0) {
+                    is_requested_package = true;
+                    break;
                 }
-                if (is_requested_package) break;
             }
 
             if (elm_json->type == ELM_PROJECT_PACKAGE) {
@@ -893,16 +1056,10 @@ static int install_multiple_packages(
     }
 
     /* Print success message */
-    if (package_count == 1) {
-        char *author = NULL;
-        char *name = NULL;
-        if (parse_package_name(packages[0], &author, &name)) {
-            printf("Successfully installed %s/%s!\n", author, name);
-            arena_free(author);
-            arena_free(name);
-        }
+    if (specs_count == 1) {
+        printf("Successfully installed %s/%s!\n", specs[0].author, specs[0].name);
     } else {
-        printf("Successfully installed %d packages!\n", package_count);
+        printf("Successfully installed %d packages!\n", specs_count);
     }
 
     if (out_plan) install_plan_free(out_plan);
@@ -925,10 +1082,10 @@ int cmd_install(int argc, char *argv[]) {
     const char *from_url = NULL;
     const char *from_path = NULL;
 
-    /* Multi-package support: collect package names into a dynamic array */
-    const char **package_names = NULL;
-    int package_count = 0;
-    int package_capacity = 0;
+    /* Multi-package support: collect package specs into a dynamic array */
+    PackageInstallSpec *specs = NULL;
+    int specs_count = 0;
+    int specs_capacity = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -951,7 +1108,35 @@ int cmd_install(int argc, char *argv[]) {
                 i++;
                 from_file_path = argv[i];
                 i++;
-                DYNARRAY_PUSH(package_names, package_count, package_capacity, argv[i], const char*);
+                /* Parse package spec (may include @version) */
+                char *author = NULL;
+                char *name = NULL;
+                Version version = {0};
+                bool has_version = false;
+
+                if (strchr(argv[i], '@')) {
+                    if (!parse_package_with_version(argv[i], &author, &name, &version)) {
+                        fprintf(stderr, "Error: Invalid package specification '%s'\n", argv[i]);
+                        print_install_usage();
+                        return 1;
+                    }
+                    has_version = true;
+                } else {
+                    if (!parse_package_name(argv[i], &author, &name)) {
+                        fprintf(stderr, "Error: Invalid package name '%s'\n", argv[i]);
+                        print_install_usage();
+                        return 1;
+                    }
+                }
+
+                DYNARRAY_PUSH(specs, specs_count, specs_capacity,
+                    ((PackageInstallSpec){
+                        .author = author,
+                        .name = name,
+                        .version = version,
+                        .has_version = has_version
+                    }),
+                    PackageInstallSpec);
             } else {
                 fprintf(stderr, "Error: --from-file requires PATH and PACKAGE arguments\n");
                 print_install_usage();
@@ -962,7 +1147,35 @@ int cmd_install(int argc, char *argv[]) {
                 i++;
                 from_url = argv[i];
                 i++;
-                DYNARRAY_PUSH(package_names, package_count, package_capacity, argv[i], const char*);
+                /* Parse package spec (may include @version) */
+                char *author = NULL;
+                char *name = NULL;
+                Version version = {0};
+                bool has_version = false;
+
+                if (strchr(argv[i], '@')) {
+                    if (!parse_package_with_version(argv[i], &author, &name, &version)) {
+                        fprintf(stderr, "Error: Invalid package specification '%s'\n", argv[i]);
+                        print_install_usage();
+                        return 1;
+                    }
+                    has_version = true;
+                } else {
+                    if (!parse_package_name(argv[i], &author, &name)) {
+                        fprintf(stderr, "Error: Invalid package name '%s'\n", argv[i]);
+                        print_install_usage();
+                        return 1;
+                    }
+                }
+
+                DYNARRAY_PUSH(specs, specs_count, specs_capacity,
+                    ((PackageInstallSpec){
+                        .author = author,
+                        .name = name,
+                        .version = version,
+                        .has_version = has_version
+                    }),
+                    PackageInstallSpec);
             } else {
                 fprintf(stderr, "Error: --from-url requires URL and PACKAGE arguments\n");
                 print_install_usage();
@@ -992,8 +1205,51 @@ int cmd_install(int argc, char *argv[]) {
                 return 1;
             }
         } else if (argv[i][0] != '-') {
-            /* Collect package names into array */
-            DYNARRAY_PUSH(package_names, package_count, package_capacity, argv[i], const char*);
+            /* Parse positional argument as package spec or version */
+            Version v;
+            /* Check if this is a version string for the previous package (backwards compat) */
+            if (specs_count > 0 &&
+                !specs[specs_count - 1].has_version &&
+                version_parse_safe(argv[i], &v)) {
+                /* Previous spec has no version, this looks like a version */
+                specs[specs_count - 1].version = v;
+                specs[specs_count - 1].has_version = true;
+            } else if (strchr(argv[i], '@')) {
+                /* Package with embedded version: use parse_package_with_version */
+                char *author = NULL;
+                char *name = NULL;
+                Version ver;
+                if (!parse_package_with_version(argv[i], &author, &name, &ver)) {
+                    fprintf(stderr, "Error: Invalid package specification '%s'\n", argv[i]);
+                    print_install_usage();
+                    return 1;
+                }
+                DYNARRAY_PUSH(specs, specs_count, specs_capacity,
+                    ((PackageInstallSpec){
+                        .author = author,
+                        .name = name,
+                        .version = ver,
+                        .has_version = true
+                    }),
+                    PackageInstallSpec);
+            } else {
+                /* Package without version (will use latest) */
+                char *author = NULL;
+                char *name = NULL;
+                if (!parse_package_name(argv[i], &author, &name)) {
+                    fprintf(stderr, "Error: Invalid package name '%s'\n", argv[i]);
+                    print_install_usage();
+                    return 1;
+                }
+                DYNARRAY_PUSH(specs, specs_count, specs_capacity,
+                    ((PackageInstallSpec){
+                        .author = author,
+                        .name = name,
+                        .version = {0},
+                        .has_version = false
+                    }),
+                    PackageInstallSpec);
+            }
         } else {
             fprintf(stderr, "Error: Unknown option: %s\n", argv[i]);
             print_install_usage();
@@ -1008,16 +1264,48 @@ int cmd_install(int argc, char *argv[]) {
             print_install_usage();
             return 1;
         }
-        if (package_count > 0) {
+        if (specs_count > 0) {
             fprintf(stderr, "Error: --major can only be used with a single package\n");
             return 1;
         }
-        DYNARRAY_PUSH(package_names, package_count, package_capacity, major_package_name, const char*);
+        /* Parse major package spec */
+        char *author = NULL;
+        char *name = NULL;
+        Version ver = {0};
+        bool has_version = false;
+
+        if (strchr(major_package_name, '@')) {
+            if (!parse_package_with_version(major_package_name, &author, &name, &ver)) {
+                fprintf(stderr, "Error: Invalid package specification '%s'\n", major_package_name);
+                print_install_usage();
+                return 1;
+            }
+            has_version = true;
+            /* Warn when both --major and explicit version are specified */
+            fprintf(stderr, "Warning: --major flag is ignored when an explicit version is specified\n");
+            fprintf(stderr, "         Installing %s/%s at version %u.%u.%u\n",
+                    author, name, ver.major, ver.minor, ver.patch);
+        } else {
+            if (!parse_package_name(major_package_name, &author, &name)) {
+                fprintf(stderr, "Error: Invalid package name '%s'\n", major_package_name);
+                print_install_usage();
+                return 1;
+            }
+        }
+
+        DYNARRAY_PUSH(specs, specs_count, specs_capacity,
+            ((PackageInstallSpec){
+                .author = author,
+                .name = name,
+                .version = ver,
+                .has_version = has_version
+            }),
+            PackageInstallSpec);
     }
 
     /* Validate flag combinations for single-package-only options */
     if (from_file_path || from_url) {
-        if (package_count > 1) {
+        if (specs_count > 1) {
             fprintf(stderr, "Error: %s can only install one package at a time\n",
                     from_file_path ? "--from-file" : "--from-url");
             return 1;
@@ -1096,7 +1384,14 @@ int cmd_install(int argc, char *argv[]) {
     if (local_dev) {
         /* Handle --local-dev installation */
         const char *source_path = from_path ? from_path : ".";
-        const char *package_name = (package_count > 0) ? package_names[0] : NULL;
+        /* Reconstruct package name for local-dev (doesn't support versioned specs) */
+        const char *package_name = NULL;
+        char package_name_buf[MAX_PACKAGE_NAME_LENGTH];
+        if (specs_count > 0) {
+            snprintf(package_name_buf, sizeof(package_name_buf), "%s/%s",
+                     specs[0].author, specs[0].name);
+            package_name = package_name_buf;
+        }
         
         /*
          * Check if we're running from within a package directory itself.
@@ -1123,8 +1418,7 @@ int cmd_install(int argc, char *argv[]) {
         log_set_level(original_level);
         return result;
     } else if (from_file_path || from_url) {
-        const char *package_name = (package_count > 0) ? package_names[0] : NULL;
-        if (!package_name) {
+        if (specs_count == 0) {
             fprintf(stderr, "Error: Package name required for --from-file or --from-url\n");
             elm_json_free(elm_json);
             install_env_free(env);
@@ -1132,21 +1426,14 @@ int cmd_install(int argc, char *argv[]) {
             return 1;
         }
 
-        char *author = NULL;
-        char *name = NULL;
+        char *author = specs[0].author;
+        char *name = specs[0].name;
         char *version = NULL;
         char *actual_author = NULL;
         char *actual_name = NULL;
         char *actual_version = NULL;
         char temp_dir_buf[1024];
         temp_dir_buf[0] = '\0';
-
-        if (!parse_package_name(package_name, &author, &name)) {
-            elm_json_free(elm_json);
-            install_env_free(env);
-            log_set_level(original_level);
-            return 1;
-        }
 
         if (from_url) {
             snprintf(temp_dir_buf, sizeof(temp_dir_buf), "/tmp/wrap_temp_%s_%s", author, name);
@@ -1286,8 +1573,6 @@ int cmd_install(int argc, char *argv[]) {
                 (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n')) {
                 printf("Aborted.\n");
                 if (version) arena_free(version);
-                arena_free(author);
-                arena_free(name);
                 elm_json_free(elm_json);
                 install_env_free(env);
                 log_set_level(original_level);
@@ -1298,8 +1583,6 @@ int cmd_install(int argc, char *argv[]) {
         if (!install_from_file(from_file_path, env, author, name, version)) {
             fprintf(stderr, "Error: Failed to install package from file\n");
             if (version) arena_free(version);
-            arena_free(author);
-            arena_free(name);
             elm_json_free(elm_json);
             install_env_free(env);
             log_set_level(original_level);
@@ -1316,28 +1599,27 @@ int cmd_install(int argc, char *argv[]) {
             }
         }
 
-        if (is_update) {
-            arena_free(existing_pkg->version);
-            existing_pkg->version = arena_strdup(version);
-        } else {
-            PackageMap *target_map = NULL;
-            if (elm_json->type == ELM_PROJECT_APPLICATION) {
-                target_map = is_test ? elm_json->dependencies_test_direct : elm_json->dependencies_direct;
-            } else {
-                target_map = is_test ? elm_json->package_test_dependencies : elm_json->package_dependencies;
-            }
-
-            if (target_map) {
-                package_map_add(target_map, author, name, version);
-            }
+        if (!add_or_update_package_in_elm_json(
+                elm_json,
+                author,
+                name,
+                version,
+                is_test,
+                true,   /* always treat as direct dependency */
+                true))  /* remove from other maps before adding */
+        {
+            fprintf(stderr, "Error: Failed to record %s/%s %s in elm.json\n", author, name, version);
+            if (version) arena_free(version);
+            elm_json_free(elm_json);
+            install_env_free(env);
+            log_set_level(original_level);
+            return 1;
         }
 
         printf("Saving elm.json...\n");
         if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
             fprintf(stderr, "Error: Failed to write elm.json\n");
             if (version) arena_free(version);
-            arena_free(author);
-            arena_free(name);
             elm_json_free(elm_json);
             install_env_free(env);
             log_set_level(original_level);
@@ -1347,20 +1629,18 @@ int cmd_install(int argc, char *argv[]) {
         printf("Successfully installed %s/%s %s!\n", author, name, version);
 
         if (version) arena_free(version);
-        arena_free(author);
-        arena_free(name);
         result = 0;
-    } else if (package_count > 0) {
+    } else if (specs_count > 0) {
         /* Install one or more packages */
-        if (package_count == 1 && major_upgrade) {
+        if (specs_count == 1 && major_upgrade) {
             /* Single package with --major flag: use existing install_package */
-            result = install_package(package_names[0], is_test, major_upgrade, upgrade_all, auto_yes, elm_json, env);
-        } else if (package_count == 1) {
+            result = install_package(&specs[0], is_test, major_upgrade, upgrade_all, auto_yes, elm_json, env);
+        } else if (specs_count == 1) {
             /* Single package without special flags: use existing install_package */
-            result = install_package(package_names[0], is_test, false, upgrade_all, auto_yes, elm_json, env);
+            result = install_package(&specs[0], is_test, false, upgrade_all, auto_yes, elm_json, env);
         } else {
             /* Multiple packages: use new multi-package install */
-            result = install_multiple_packages(package_names, package_count, is_test, upgrade_all, auto_yes, elm_json, env);
+            result = install_multiple_packages(specs, specs_count, is_test, upgrade_all, auto_yes, elm_json, env);
         }
         
         /* If we're in a package directory that's being tracked for local-dev,

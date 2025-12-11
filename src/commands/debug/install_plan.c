@@ -382,8 +382,8 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
                     SolverState *solver = solver_init(install_env, true);
                     if (solver) {
                         InstallPlan *dep_plan = NULL;
-                        SolverResult result = solver_add_package(solver, app_json, dep->author, dep->name, 
-                                                                  is_test, false, false, &dep_plan);
+                        SolverResult result = solver_add_package(solver, app_json, dep->author, dep->name,
+                                                                  NULL, is_test, false, false, &dep_plan);
                         
                         if (result == SOLVER_OK) {
                             printf("    Resolution: OK\n");
@@ -510,7 +510,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
             return 1;
         }
 
-        result = solver_add_package(solver, elm_json, author, name, is_test, major_upgrade, false, &plan);
+        result = solver_add_package(solver, elm_json, author, name, NULL, is_test, major_upgrade, false, &plan);
 
         if (result != SOLVER_OK) {
             /* If V2, try to spell out obvious pinned-version conflicts for the target package */
@@ -564,9 +564,26 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
             }
         }
     } else {
-        // Multi-package mode
+        // Multi-package mode - convert package names to PackageVersionSpec
+        PackageVersionSpec *specs = arena_malloc(package_count * sizeof(PackageVersionSpec));
+        for (int i = 0; i < package_count; i++) {
+            char *pkg_author = NULL;
+            char *pkg_name = NULL;
+            if (!parse_package_name(packages[i], &pkg_author, &pkg_name)) {
+                fprintf(stderr, "Error: Invalid package name '%s'\n", packages[i]);
+                solver_free(solver);
+                install_env_free(install_env);
+                elm_json_free(elm_json);
+                arena_free(elm_json_path);
+                return 1;
+            }
+            specs[i].author = pkg_author;
+            specs[i].name = pkg_name;
+            specs[i].version = NULL;  // No version targeting in debug command
+        }
+
         MultiPackageValidation *validation = NULL;
-        result = solver_add_packages(solver, elm_json, packages, package_count, is_test, false, &plan, &validation);
+        result = solver_add_packages(solver, elm_json, specs, package_count, is_test, false, &plan, &validation);
 
         // Print validation errors if any
         if (validation && validation->invalid_count > 0) {

@@ -343,44 +343,6 @@ bool parse_package_with_version(const char *spec, char **out_author, char **out_
     return true;
 }
 
-bool parse_package_spec(const char *spec, char **out_author, char **out_name, char **out_version) {
-    if (!spec || !out_author || !out_name || !out_version) {
-        return false;
-    }
-
-    const char *at_pos = strchr(spec, '@');
-    if (!at_pos) {
-        return false;
-    }
-
-    size_t pkg_len = (size_t)(at_pos - spec);
-    char *pkg_part = arena_malloc(pkg_len + 1);
-    if (!pkg_part) {
-        return false;
-    }
-
-    strncpy(pkg_part, spec, pkg_len);
-    pkg_part[pkg_len] = '\0';
-
-    if (!parse_package_name(pkg_part, out_author, out_name)) {
-        arena_free(pkg_part);
-        return false;
-    }
-
-    arena_free(pkg_part);
-
-    *out_version = arena_strdup(at_pos + 1);
-    if (!*out_version) {
-        arena_free(*out_author);
-        arena_free(*out_name);
-        *out_author = NULL;
-        *out_name = NULL;
-        return false;
-    }
-
-    return true;
-}
-
 /* ========================================================================
  * Constraint utilities
  * ======================================================================== */

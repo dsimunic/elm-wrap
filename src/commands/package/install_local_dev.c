@@ -602,7 +602,7 @@ static bool refresh_app_indirect_deps(const char *app_elm_json_path, InstallEnv 
             }
 
             InstallPlan *dep_plan = NULL;
-            SolverResult result = solver_add_package(solver, app_json, dep->author, dep->name, false, false, false, &dep_plan);
+            SolverResult result = solver_add_package(solver, app_json, dep->author, dep->name, NULL, false, false, false, &dep_plan);
             solver_free(solver);
 
             if (result != SOLVER_OK) {
@@ -1121,7 +1121,7 @@ int install_local_dev(const char *source_path, const char *package_name,
             }
             
             InstallPlan *dep_plan = NULL;
-            SolverResult result = solver_add_package(solver, app_json, dep->author, dep->name, is_test, false, false, &dep_plan);
+            SolverResult result = solver_add_package(solver, app_json, dep->author, dep->name, NULL, is_test, false, false, &dep_plan);
             solver_free(solver);
             
             if (result != SOLVER_OK) {
