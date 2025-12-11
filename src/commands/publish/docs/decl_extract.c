@@ -35,37 +35,64 @@ char *extract_type_expression(TSNode type_node, const char *source_code, const c
     return result;
 }
 
+/* Helper to find type_annotation for a function by name, recursively searching the tree.
+ * This handles cases where parser errors cause type_annotations to be nested inside
+ * ERROR nodes or other constructs. */
+static TSNode find_type_annotation_by_name_recursive(TSNode node, const char *func_name, const char *source_code, int depth) {
+    /* Limit recursion depth to avoid infinite loops */
+    if (depth > 10) {
+        TSNode null_node = {0};
+        return null_node;
+    }
+
+    uint32_t child_count = ts_node_child_count(node);
+    for (uint32_t i = 0; i < child_count; i++) {
+        TSNode child = ts_node_child(node, i);
+        const char *child_type = ts_node_type(child);
+
+        if (strcmp(child_type, "type_annotation") == 0) {
+            /* Check if this type annotation is for our function */
+            uint32_t ann_child_count = ts_node_child_count(child);
+            for (uint32_t j = 0; j < ann_child_count; j++) {
+                TSNode ann_child = ts_node_child(child, j);
+                if (strcmp(ts_node_type(ann_child), "lower_case_identifier") == 0) {
+                    char *ann_name = get_node_text(ann_child, source_code);
+                    bool match = (strcmp(ann_name, func_name) == 0);
+                    arena_free(ann_name);
+                    if (match) {
+                        return child;
+                    }
+                    break;
+                }
+            }
+            /* Also search inside this type_annotation in case it contains nested ones */
+            TSNode nested = find_type_annotation_by_name_recursive(child, func_name, source_code, depth + 1);
+            if (!ts_node_is_null(nested)) {
+                return nested;
+            }
+        } else if (ts_node_is_named(child)) {
+            /* Recursively search in other named nodes (including ERROR nodes) */
+            TSNode found = find_type_annotation_by_name_recursive(child, func_name, source_code, depth + 1);
+            if (!ts_node_is_null(found)) {
+                return found;
+            }
+        }
+    }
+    /* Return a null node if not found */
+    TSNode null_node = {0};
+    return null_node;
+}
+
+static TSNode find_type_annotation_by_name(TSNode root, const char *func_name, const char *source_code) {
+    return find_type_annotation_by_name_recursive(root, func_name, source_code, 0);
+}
+
 /* Extract value declaration (function/constant) */
 bool extract_value_decl(TSNode node, const char *source_code, ElmValue *value, const char *module_name,
                         ImportMap *import_map, ModuleAliasMap *alias_map, DirectModuleImports *direct_imports,
                         char **local_types, int local_types_count, TypeAliasMap *type_alias_map,
                         DependencyCache *dep_cache) {
-    /* Find type_annotation sibling, skipping over comment nodes */
-    TSNode type_annotation = ts_node_prev_named_sibling(node);
-
-    /* Skip over any comment nodes to find the type_annotation */
-    while (!ts_node_is_null(type_annotation)) {
-        const char *sibling_type = ts_node_type(type_annotation);
-        if (strcmp(sibling_type, "type_annotation") == 0) {
-            /* Found it! */
-            break;
-        } else if (strcmp(sibling_type, "line_comment") == 0 ||
-                   strcmp(sibling_type, "block_comment") == 0) {
-            /* Skip comment and continue looking */
-            type_annotation = ts_node_prev_named_sibling(type_annotation);
-        } else {
-            /* Hit a non-comment, non-type-annotation node - no type annotation found */
-            break;
-        }
-    }
-
-    if (ts_node_is_null(type_annotation) ||
-        strcmp(ts_node_type(type_annotation), "type_annotation") != 0) {
-        /* No type annotation found - skip this value */
-        return false;
-    }
-
-    /* Extract function name from value_declaration */
+    /* First, extract function name from value_declaration */
     char *func_name = NULL;
     uint32_t child_count = ts_node_child_count(node);
     for (uint32_t i = 0; i < child_count; i++) {
@@ -87,6 +114,17 @@ bool extract_value_decl(TSNode node, const char *source_code, ElmValue *value, c
     }
 
     if (!func_name) {
+        return false;
+    }
+
+    /* Find type_annotation by name - search from root node.
+     * This is more robust than sibling traversal when tree-sitter has parse errors. */
+    TSNode root = ts_node_parent(node);
+    TSNode type_annotation = find_type_annotation_by_name(root, func_name, source_code);
+
+    if (ts_node_is_null(type_annotation)) {
+        /* No type annotation found - skip this value */
+        arena_free(func_name);
         return false;
     }
 
