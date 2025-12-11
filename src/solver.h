@@ -99,4 +99,68 @@ SolverResult solver_upgrade_all(
     InstallPlan **out_plan
 );
 
+/*
+ * Multi-package validation structures
+ */
+
+/* Result of validating a single package */
+typedef struct {
+    const char *author;
+    const char *name;
+    bool exists;           /* Package found in registry */
+    bool valid_name;       /* Name format is valid (author/name) */
+    const char *error_msg; /* Human-readable error if failed */
+} PackageValidationResult;
+
+/* Collection of validation results for multiple packages */
+typedef struct {
+    PackageValidationResult *results;
+    int count;
+    int valid_count;       /* Number of packages that passed validation */
+    int invalid_count;     /* Number of packages that failed */
+} MultiPackageValidation;
+
+/* Free multi-package validation results */
+void multi_package_validation_free(MultiPackageValidation *validation);
+
+/**
+ * Add multiple packages to the project.
+ *
+ * This function:
+ * 1. Validates ALL package names upfront (format check)
+ * 2. Checks ALL packages exist in registry before solving
+ * 3. Reports all errors at once (not fail-fast)
+ * 4. If all valid, calls solver_add_package() for each
+ * 5. Combines results into single InstallPlan
+ *
+ * @param state        Initialized solver state
+ * @param elm_json     Current project elm.json
+ * @param packages     Array of "author/name" strings
+ * @param count        Number of packages
+ * @param is_test      Install as test dependencies
+ * @param upgrade_all  Allow upgrading existing deps
+ * @param out_plan     Combined install plan (caller must free)
+ * @param out_validation Validation results (caller must free, may be NULL)
+ * @return SOLVER_OK if all packages resolved, error code otherwise
+ */
+SolverResult solver_add_packages(
+    SolverState *state,
+    const ElmJson *elm_json,
+    const char **packages,
+    int count,
+    bool is_test,
+    bool upgrade_all,
+    InstallPlan **out_plan,
+    MultiPackageValidation **out_validation
+);
+
+/**
+ * Merge source install plan into destination, deduplicating changes.
+ * If the same package appears in both plans, keeps the one from dest.
+ *
+ * @param dest   Destination plan to merge into
+ * @param source Source plan to merge from
+ */
+void install_plan_merge(InstallPlan *dest, const InstallPlan *source);
+
 #endif /* SOLVER_H */

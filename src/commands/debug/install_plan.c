@@ -1,11 +1,14 @@
 #include "debug.h"
 #include "../../alloc.h"
+#include "../../constants.h"
+#include "../../dyn_array.h"
 #include "../../log.h"
 #include "../../solver.h"
 #include "../../install_env.h"
 #include "../../elm_json.h"
 #include "../../fileutil.h"
 #include "../../global_context.h"
+#include "../../terminal_colors.h"
 #include "../../protocol_v2/solver/v2_registry.h"
 #include "../../protocol_v2/solver/pg_elm_v2.h"
 #include "../../pgsolver/pg_core.h"
@@ -55,17 +58,18 @@ static char *find_elm_json(void) {
 }
 
 static void print_install_plan_usage(void) {
-    printf("Usage: %s debug install-plan <package> [OPTIONS]\n", global_context_program_name());
+    printf("Usage: %s debug install-plan <package> [<package>...] [OPTIONS]\n", global_context_program_name());
     printf("\n");
-    printf("Show what packages would be installed for a package (dry-run).\n");
+    printf("Show what packages would be installed for one or more packages (dry-run).\n");
     printf("This exercises the dependency solver without actually installing anything.\n");
     printf("\n");
     printf("Arguments:\n");
     printf("  <package>          Package name in author/name format (e.g., elm/html)\n");
+    printf("                     Multiple packages can be specified.\n");
     printf("\n");
     printf("Options:\n");
-    printf("  --test             Show plan for test dependency\n");
-    printf("  --major            Allow major version upgrades\n");
+    printf("  --test             Show plan for test dependencies\n");
+    printf("  --major            Allow major version upgrades (single package only)\n");
     printf("  --local-dev        Debug local development package installation\n");
     printf("  --from-path <path> Path to local package (requires --local-dev)\n");
     printf("  -v, --verbose      Show detailed logging output (default)\n");
@@ -163,7 +167,10 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         return 1;
     }
 
-    const char *package = NULL;
+    /* Multi-package support: collect package names into a dynamic array */
+    const char **packages = NULL;
+    int package_count = 0;
+    int package_capacity = 0;
 
     if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
         print_install_plan_usage();
@@ -203,12 +210,8 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-q") == 0 || strcmp(argv[i], "--quiet") == 0) {
             quiet_mode = true;
         } else if (argv[i][0] != '-') {
-            if (!package) {
-                package = argv[i];
-            } else {
-                fprintf(stderr, "Error: Multiple package names specified\n");
-                return 1;
-            }
+            /* Collect package names into array */
+            DYNARRAY_PUSH(packages, package_count, package_capacity, argv[i], const char*);
         } else {
             fprintf(stderr, "Error: Unknown option '%s'\n", argv[i]);
             print_install_plan_usage();
@@ -220,6 +223,12 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
     if (from_path && !local_dev) {
         fprintf(stderr, "Error: --from-path requires --local-dev flag\n");
         print_install_plan_usage();
+        return 1;
+    }
+
+    /* --major only works with single package */
+    if (major_upgrade && package_count > 1) {
+        fprintf(stderr, "Error: --major can only be used with a single package\n");
         return 1;
     }
 
@@ -281,12 +290,12 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         author[author_len] = '\0';
         
         // Verify package name matches if specified
-        if (package) {
-            char full_name[256];
+        if (package_count > 0) {
+            char full_name[MAX_PACKAGE_NAME_LENGTH];
             snprintf(full_name, sizeof(full_name), "%s/%s", author, name);
-            if (strcmp(package, full_name) != 0) {
+            if (strcmp(packages[0], full_name) != 0) {
                 fprintf(stderr, "Error: Package name mismatch: specified %s but elm.json has %s\n", 
-                        package, full_name);
+                        packages[0], full_name);
                 elm_json_free(pkg_json);
                 return 1;
             }
@@ -453,29 +462,12 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         arena_free(elm_json_path);
         return issues > 0 ? 1 : 0;
     } else {
-        // Regular mode - require package name
-        if (!package) {
-            fprintf(stderr, "Error: Package name required\n");
+        // Regular mode - require at least one package name
+        if (package_count == 0) {
+            fprintf(stderr, "Error: At least one package name required\n");
             print_install_plan_usage();
             return 1;
         }
-        
-        // Parse package name
-        const char *slash = strchr(package, '/');
-        if (!slash) {
-            fprintf(stderr, "Error: Package name must be in author/name format (e.g., elm/html)\n");
-            return 1;
-        }
-
-        size_t author_len = slash - package;
-        author = arena_malloc(author_len + 1);
-        name = arena_strdup(slash + 1);
-        if (!author || !name) {
-            fprintf(stderr, "Error: Out of memory\n");
-            return 1;
-        }
-        memcpy(author, package, author_len);
-        author[author_len] = '\0';
     }
 
     // Find elm.json
@@ -522,57 +514,156 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
 
     // Run solver to get install plan
     InstallPlan *plan = NULL;
-    SolverResult result = solver_add_package(solver, elm_json, author, name, is_test, major_upgrade, false, &plan);
+    SolverResult result;
 
-    if (result != SOLVER_OK) {
-        /* If V2, try to spell out obvious pinned-version conflicts for the target package */
-        report_conflicts_v2(install_env, elm_json, author, name);
-
-        printf("\n");
-        printf("Failed to create install plan for package %s/%s%s%s\n", author, name,
-               is_test ? " (test dependency)" : "",
-               major_upgrade ? " (major upgrades allowed)" : "");
-        printf("\n");
-        printf("Reason: ");
-        switch (result) {
-            case SOLVER_NO_SOLUTION:
-                printf("No solution found - the package has conflicts with current dependencies\n");
-                break;
-            case SOLVER_NO_OFFLINE_SOLUTION:
-                printf("No offline solution found - network connection may be required\n");
-                break;
-            case SOLVER_NETWORK_ERROR:
-                printf("Network error occurred\n");
-                break;
-            case SOLVER_INVALID_PACKAGE:
-                printf("Invalid package name or package does not exist\n");
-                break;
-            default:
-                printf("Unknown error\n");
-                break;
+    if (package_count == 1) {
+        // Single package mode - use original logic for better error messages
+        const char *package = packages[0];
+        const char *slash = strchr(package, '/');
+        if (!slash) {
+            fprintf(stderr, "Error: Package name must be in author/name format (e.g., elm/html)\n");
+            solver_free(solver);
+            install_env_free(install_env);
+            elm_json_free(elm_json);
+            arena_free(elm_json_path);
+            return 1;
         }
-        printf("\n");
-        printf("See error messages above for details about conflicts.\n");
-    } else {
-        printf("Install plan for package %s/%s%s%s:\n", author, name,
-               is_test ? " (test dependency)" : "",
-               major_upgrade ? " (major upgrades allowed)" : "");
-        printf("\n");
 
-        if (!plan || plan->count == 0) {
-            printf("No packages need to be installed\n");
+        size_t author_len = slash - package;
+        author = arena_malloc(author_len + 1);
+        name = arena_strdup(slash + 1);
+        if (!author || !name) {
+            fprintf(stderr, "Error: Out of memory\n");
+            solver_free(solver);
+            install_env_free(install_env);
+            elm_json_free(elm_json);
+            arena_free(elm_json_path);
+            return 1;
+        }
+        memcpy(author, package, author_len);
+        author[author_len] = '\0';
+
+        result = solver_add_package(solver, elm_json, author, name, is_test, major_upgrade, false, &plan);
+
+        if (result != SOLVER_OK) {
+            /* If V2, try to spell out obvious pinned-version conflicts for the target package */
+            report_conflicts_v2(install_env, elm_json, author, name);
+
+            printf("\n");
+            printf("Failed to create install plan for package %s/%s%s%s\n", author, name,
+                   is_test ? " (test dependency)" : "",
+                   major_upgrade ? " (major upgrades allowed)" : "");
+            printf("\n");
+            printf("Reason: ");
+            switch (result) {
+                case SOLVER_NO_SOLUTION:
+                    printf("No solution found - the package has conflicts with current dependencies\n");
+                    break;
+                case SOLVER_NO_OFFLINE_SOLUTION:
+                    printf("No offline solution found - network connection may be required\n");
+                    break;
+                case SOLVER_NETWORK_ERROR:
+                    printf("Network error occurred\n");
+                    break;
+                case SOLVER_INVALID_PACKAGE:
+                    printf("Invalid package name or package does not exist\n");
+                    break;
+                default:
+                    printf("Unknown error\n");
+                    break;
+            }
+            printf("\n");
+            printf("See error messages above for details about conflicts.\n");
         } else {
-            printf("Packages to be installed:\n");
-            for (int i = 0; i < plan->count; i++) {
-                PackageChange *change = &plan->changes[i];
-                if (change->old_version) {
-                    printf("  %s/%s: %s -> %s\n", change->author, change->name,
-                           change->old_version, change->new_version);
-                } else {
-                    printf("  %s/%s: %s (new)\n", change->author, change->name,
-                           change->new_version);
+            printf("Install plan for package %s/%s%s%s:\n", author, name,
+                   is_test ? " (test dependency)" : "",
+                   major_upgrade ? " (major upgrades allowed)" : "");
+            printf("\n");
+
+            if (!plan || plan->count == 0) {
+                printf("No packages need to be installed\n");
+            } else {
+                printf("Packages to be installed:\n");
+                for (int i = 0; i < plan->count; i++) {
+                    PackageChange *change = &plan->changes[i];
+                    if (change->old_version) {
+                        printf("  %s/%s: %s -> %s\n", change->author, change->name,
+                               change->old_version, change->new_version);
+                    } else {
+                        printf("  %s/%s: %s (new)\n", change->author, change->name,
+                               change->new_version);
+                    }
                 }
             }
+        }
+    } else {
+        // Multi-package mode
+        MultiPackageValidation *validation = NULL;
+        result = solver_add_packages(solver, elm_json, packages, package_count, is_test, false, &plan, &validation);
+
+        // Print validation errors if any
+        if (validation && validation->invalid_count > 0) {
+            printf("\n");
+            printf("Package validation errors:\n");
+            for (int i = 0; i < validation->count; i++) {
+                PackageValidationResult *r = &validation->results[i];
+                if (!r->valid_name || !r->exists) {
+                    printf("  %s✗%s %s/%s: %s\n", ANSI_RED, ANSI_RESET,
+                           r->author ? r->author : "?",
+                           r->name ? r->name : "?",
+                           r->error_msg ? r->error_msg : "Unknown error");
+                }
+            }
+            printf("\n");
+        }
+
+        if (result != SOLVER_OK) {
+            printf("Failed to create install plan for packages%s\n",
+                   is_test ? " (test dependencies)" : "");
+            printf("\n");
+            printf("Reason: ");
+            switch (result) {
+                case SOLVER_NO_SOLUTION:
+                    printf("No solution found - the packages have conflicts with current dependencies\n");
+                    break;
+                case SOLVER_NO_OFFLINE_SOLUTION:
+                    printf("No offline solution found - network connection may be required\n");
+                    break;
+                case SOLVER_NETWORK_ERROR:
+                    printf("Network error occurred\n");
+                    break;
+                case SOLVER_INVALID_PACKAGE:
+                    printf("One or more packages are invalid or do not exist\n");
+                    break;
+                default:
+                    printf("Unknown error\n");
+                    break;
+            }
+            printf("\n");
+        } else {
+            printf("Install plan for %d packages%s:\n", package_count,
+                   is_test ? " (test dependencies)" : "");
+            printf("\n");
+
+            if (!plan || plan->count == 0) {
+                printf("No packages need to be installed\n");
+            } else {
+                printf("Packages to be installed:\n");
+                for (int i = 0; i < plan->count; i++) {
+                    PackageChange *change = &plan->changes[i];
+                    if (change->old_version) {
+                        printf("  %s/%s: %s -> %s\n", change->author, change->name,
+                               change->old_version, change->new_version);
+                    } else {
+                        printf("  %s/%s: %s (new)\n", change->author, change->name,
+                               change->new_version);
+                    }
+                }
+            }
+        }
+
+        if (validation) {
+            multi_package_validation_free(validation);
         }
     }
 

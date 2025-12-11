@@ -3,8 +3,11 @@
 #include "pgsolver/solver_common.h"
 #include "protocol_v1/solver/solver.h"
 #include "protocol_v2/solver/solver.h"
+#include "protocol_v2/solver/v2_registry.h"
+#include "registry.h"
 #include "cache.h"
 #include "log.h"
+#include "alloc.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -142,4 +145,213 @@ SolverResult solver_upgrade_all(
     } else {
         return solver_upgrade_all_v1(state, elm_json, major_upgrade, out_plan);
     }
+}
+
+/* Free multi-package validation results */
+void multi_package_validation_free(MultiPackageValidation *validation) {
+    if (!validation) return;
+    if (validation->results) {
+        arena_free(validation->results);
+    }
+    arena_free(validation);
+}
+
+/* Helper to parse package name (duplicated here to avoid header dependency) */
+static bool parse_package_name_internal(const char *package, char **author, char **name) {
+    if (!package) return false;
+
+    const char *slash = strchr(package, '/');
+    if (!slash) {
+        return false;
+    }
+
+    size_t author_len = slash - package;
+    *author = arena_malloc(author_len + 1);
+    if (!*author) return false;
+    strncpy(*author, package, author_len);
+    (*author)[author_len] = '\0';
+
+    *name = arena_strdup(slash + 1);
+    if (!*name) {
+        arena_free(*author);
+        return false;
+    }
+
+    return true;
+}
+
+/* Check if package exists in registry (for V1 and V2 protocols) */
+static bool package_exists_in_registry_internal(
+    SolverState *state,
+    const char *author,
+    const char *name
+) {
+    if (!state->install_env) return false;
+
+    if (state->install_env->protocol_mode == PROTOCOL_V2) {
+        if (!state->install_env->v2_registry) return false;
+        V2PackageEntry *entry = v2_registry_find(state->install_env->v2_registry, author, name);
+        if (!entry) return false;
+        /* Check for at least one valid version */
+        for (size_t i = 0; i < entry->version_count; i++) {
+            if (entry->versions[i].status == V2_STATUS_VALID) {
+                return true;
+            }
+        }
+        return false;
+    } else {
+        if (!state->install_env->registry) return false;
+        RegistryEntry *entry = registry_find(state->install_env->registry, author, name);
+        return (entry != NULL);
+    }
+}
+
+/* Merge source install plan into destination */
+void install_plan_merge(InstallPlan *dest, const InstallPlan *source) {
+    if (!dest || !source) return;
+
+    for (int i = 0; i < source->count; i++) {
+        PackageChange *src_change = &source->changes[i];
+
+        /* Check if this package is already in dest */
+        bool found = false;
+        for (int j = 0; j < dest->count; j++) {
+            if (strcmp(dest->changes[j].author, src_change->author) == 0 &&
+                strcmp(dest->changes[j].name, src_change->name) == 0) {
+                found = true;
+                break;
+            }
+        }
+
+        /* Only add if not already present */
+        if (!found) {
+            install_plan_add_change(dest, src_change->author, src_change->name,
+                                    src_change->old_version, src_change->new_version);
+        }
+    }
+}
+
+/* Add multiple packages to the project */
+SolverResult solver_add_packages(
+    SolverState *state,
+    const ElmJson *elm_json,
+    const char **packages,
+    int count,
+    bool is_test,
+    bool upgrade_all,
+    InstallPlan **out_plan,
+    MultiPackageValidation **out_validation
+) {
+    if (!state || !elm_json || !packages || count <= 0 || !out_plan) {
+        return SOLVER_INVALID_PACKAGE;
+    }
+
+    *out_plan = NULL;
+
+    /* Phase 1: Validate all package names and check registry */
+    MultiPackageValidation *validation = arena_malloc(sizeof(MultiPackageValidation));
+    if (!validation) {
+        return SOLVER_INVALID_PACKAGE;
+    }
+    validation->results = arena_calloc(count, sizeof(PackageValidationResult));
+    if (!validation->results) {
+        arena_free(validation);
+        return SOLVER_INVALID_PACKAGE;
+    }
+    validation->count = count;
+    validation->valid_count = 0;
+    validation->invalid_count = 0;
+
+    for (int i = 0; i < count; i++) {
+        PackageValidationResult *r = &validation->results[i];
+        char *author = NULL;
+        char *name = NULL;
+
+        /* Parse and validate name format */
+        if (!parse_package_name_internal(packages[i], &author, &name)) {
+            r->author = arena_strdup(packages[i]);
+            r->name = NULL;
+            r->valid_name = false;
+            r->exists = false;
+            r->error_msg = "Invalid format (expected author/package)";
+            validation->invalid_count++;
+            continue;
+        }
+
+        r->author = author;
+        r->name = name;
+        r->valid_name = true;
+
+        /* Check registry */
+        if (!package_exists_in_registry_internal(state, author, name)) {
+            r->exists = false;
+            r->error_msg = "Package not found in registry";
+            validation->invalid_count++;
+        } else {
+            r->exists = true;
+            r->error_msg = NULL;
+            validation->valid_count++;
+        }
+    }
+
+    /* Return validation results if requested */
+    if (out_validation) {
+        *out_validation = validation;
+    }
+
+    /* Phase 2: Fail if any packages are invalid */
+    if (validation->invalid_count > 0) {
+        if (!out_validation) {
+            multi_package_validation_free(validation);
+        }
+        return SOLVER_INVALID_PACKAGE;
+    }
+
+    /* Phase 3: Solve each package, accumulating into combined plan */
+    InstallPlan *combined_plan = install_plan_create();
+    if (!combined_plan) {
+        if (!out_validation) {
+            multi_package_validation_free(validation);
+        }
+        return SOLVER_INVALID_PACKAGE;
+    }
+
+    for (int i = 0; i < count; i++) {
+        PackageValidationResult *r = &validation->results[i];
+        InstallPlan *single_plan = NULL;
+
+        SolverResult result = solver_add_package(
+            state, elm_json,
+            r->author, r->name,
+            is_test,
+            false,  /* major_upgrade - not supported for multi */
+            upgrade_all,
+            &single_plan
+        );
+
+        if (result != SOLVER_OK) {
+            /* Store which package caused the conflict */
+            install_plan_free(combined_plan);
+            if (single_plan) install_plan_free(single_plan);
+            if (!out_validation) {
+                multi_package_validation_free(validation);
+            }
+            return result;
+        }
+
+        /* Merge single_plan into combined_plan (deduplicating) */
+        if (single_plan) {
+            install_plan_merge(combined_plan, single_plan);
+            install_plan_free(single_plan);
+        }
+    }
+
+    *out_plan = combined_plan;
+
+    /* Free validation if caller doesn't want it */
+    if (!out_validation) {
+        multi_package_validation_free(validation);
+    }
+
+    return SOLVER_OK;
 }
