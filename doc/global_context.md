@@ -178,6 +178,7 @@ The compiler is detected from the `WRAP_ELM_COMPILER_PATH` environment variable 
 |----------|---------|
 | `WRAP_REPOSITORY_LOCAL_PATH` | Root path for V2 repositories |
 | `WRAP_ELM_COMPILER_PATH` | Path to Elm compiler (affects compiler name detection) |
+| `WRAP_OFFLINE_MODE` | Force offline mode (set to `1` to enable) |
 
 ## Related Files
 
