@@ -2373,12 +2373,16 @@ static void pg_explain_external_inline(
     }
 
     if (inc->reason == PG_REASON_NO_VERSIONS && inc->term_count > 0) {
-        char term_str[MAX_TERM_STRING_LENGTH];
         PgTerm term = inc->terms[0];
         if (!term.positive) {
             term.positive = true;
         }
-        pg_format_term(&term, name_resolver, name_ctx, term_str, sizeof(term_str));
+
+        /* Get just the package name (without range) for the error message */
+        const char *pkg_name = name_resolver ? name_resolver(name_ctx, term.pkg) : NULL;
+        if (!pkg_name) {
+            pkg_name = "<unknown>";
+        }
 
         /* Try to show the required range and current pinned version (if available) */
         char range_str[MAX_RANGE_STRING_LENGTH];
@@ -2386,13 +2390,12 @@ static void pg_explain_external_inline(
         pg_format_version_range(term.range, range_str, sizeof(range_str), &is_any);
 
         const char *current_version = NULL;
-        const char *pkg_name = name_resolver ? name_resolver(name_ctx, term.pkg) : NULL;
         if (name_ctx && pkg_name) {
             PgExplainContext *ctx = (PgExplainContext *)name_ctx;
             if (ctx->current_packages) {
                 char *author = NULL;
                 char *name = NULL;
-                if (parse_package_name(pkg_name, &author, &name)) {
+                if (parse_package_name_silent(pkg_name, &author, &name)) {
                     Package *pkg = package_map_find(ctx->current_packages, author, name);
                     if (pkg) {
                         current_version = pkg->version;
@@ -2404,11 +2407,11 @@ static void pg_explain_external_inline(
         if (current_version) {
             pg_error_writer_appendf(writer,
                 "no versions of %s satisfy the constraints (%s) while your project pins %s",
-                term_str, is_any ? "any version" : range_str, current_version);
+                pkg_name, is_any ? "any version" : range_str, current_version);
         } else {
             pg_error_writer_appendf(writer,
                 "no versions of %s satisfy the constraints%s%s",
-                term_str,
+                pkg_name,
                 is_any ? "" : " ",
                 is_any ? "" : range_str);
         }
