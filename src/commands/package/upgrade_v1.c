@@ -359,7 +359,8 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
 
         switch (result) {
             case SOLVER_NO_SOLUTION:
-                log_error("No compatible version found for %s/%s", author, name);
+                log_error("No solution found - the upgrade conflicts with current dependencies");
+                report_missing_registry_versions_for_elm_json(env, elm_json);
                 break;
             case SOLVER_NO_OFFLINE_SOLUTION:
                 log_offline_cache_error(env);

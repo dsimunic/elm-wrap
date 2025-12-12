@@ -477,6 +477,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         if (result != SOLVER_OK) {
             /* If V2, try to spell out obvious pinned-version conflicts for the target package */
             report_conflicts_v2(install_env, elm_json, author, name);
+            report_missing_registry_versions_for_elm_json(install_env, elm_json);
 
             printf("\n");
             printf("Failed to create install plan for package %s/%s%s%s\n", author, name,

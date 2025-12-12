@@ -234,4 +234,22 @@ bool find_orphaned_packages(
     PackageMap **out_orphaned
 );
 
+/**
+ * Check if an exact version exists in the currently loaded registry.
+ * Works for both V1 and V2 protocols.
+ */
+bool version_exists_in_registry(struct InstallEnv *env,
+                                const char *author,
+                                const char *name,
+                                const Version *target);
+
+/**
+ * Report (to stderr) any exact dependency versions in the current project's elm.json
+ * that are missing from the cached registry, which can make solving impossible in
+ * offline mode or with incomplete registry data.
+ *
+ * @return The number of missing versions reported.
+ */
+size_t report_missing_registry_versions_for_elm_json(struct InstallEnv *env, const ElmJson *elm_json);
+
 #endif /* PACKAGE_COMMON_H */

@@ -28,51 +28,6 @@
 #define ANSI_RESET "\033[0m"
 #define AVAILABLE_VERSION_DISPLAY_LIMIT 10
 
-static bool version_exists_in_registry_env(InstallEnv *env, const char *author, const char *name, const Version *target) {
-    if (!env || !author || !name || !target) {
-        return false;
-    }
-
-    if (env->protocol_mode == PROTOCOL_V2) {
-        if (!env->v2_registry) {
-            return false;
-        }
-        V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
-        if (!entry) {
-            return false;
-        }
-        for (size_t i = 0; i < entry->version_count; i++) {
-            V2PackageVersion *ver = &entry->versions[i];
-            if (ver->status != V2_STATUS_VALID) {
-                continue;
-            }
-            if (ver->major == target->major &&
-                ver->minor == target->minor &&
-                ver->patch == target->patch) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    if (!env->registry) {
-        return false;
-    }
-
-    RegistryEntry *entry = registry_find(env->registry, author, name);
-    if (!entry) {
-        return false;
-    }
-
-    for (size_t i = 0; i < entry->version_count; i++) {
-        if (version_compare(&entry->versions[i], target) == 0) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 static void print_available_versions_for_package(InstallEnv *env, const char *author, const char *name, size_t limit) {
     fprintf(stderr, "Available versions:\n");
     if (!env) {
@@ -397,7 +352,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
     log_debug("Found package in registry with %zu version(s)", available_versions);
 
     if (target_version &&
-        !version_exists_in_registry_env(env, author, name, target_version)) {
+        !version_exists_in_registry(env, author, name, target_version)) {
         char *ver_str = version_to_string(target_version);
         fprintf(stderr, "Error: Version %s not found for package %s/%s\n\n",
                 ver_str ? ver_str : "(invalid)",
@@ -429,7 +384,8 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
                 if (target_version) {
                     print_target_version_conflict(author, name, target_version, true);
                 } else {
-                    log_error("No compatible version found for %s/%s", author, name);
+                    log_error("No solution found - the package conflicts with current dependencies");
+                    report_missing_registry_versions_for_elm_json(env, elm_json);
                 }
                 if (is_test && !upgrade_all) {
                     fprintf(stderr, "\n");
@@ -716,7 +672,7 @@ static int install_multiple_packages(
     for (int i = 0; i < specs_count; i++) {
         const PackageInstallSpec *spec = &specs[i];
         if (spec->has_version &&
-            !version_exists_in_registry_env(env, spec->author, spec->name, &spec->version)) {
+            !version_exists_in_registry(env, spec->author, spec->name, &spec->version)) {
             char *ver_str = version_to_string(&spec->version);
             fprintf(stderr, "Error: Version %s not found for package %s/%s\n\n",
                     ver_str ? ver_str : "(invalid)",
@@ -811,6 +767,7 @@ static int install_multiple_packages(
             switch (result) {
                 case SOLVER_NO_SOLUTION:
                     log_error("No compatible solution found for the requested packages");
+                    report_missing_registry_versions_for_elm_json(env, elm_json);
                     {
                         bool printed_guidance = false;
                         for (int i = 0; i < specs_count; i++) {

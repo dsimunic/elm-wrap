@@ -12,6 +12,7 @@
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"
 #include "../../rulr/runtime/runtime.h"
+#include "../../dyn_array.h"
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -29,6 +30,51 @@ void log_offline_cache_error(InstallEnv *env) {
     } else {
         log_error("Cannot solve offline (no cached registry)");
     }
+}
+
+bool version_exists_in_registry(InstallEnv *env, const char *author, const char *name, const Version *target) {
+    if (!env || !author || !name || !target) {
+        return false;
+    }
+
+    if (env->protocol_mode == PROTOCOL_V2) {
+        if (!env->v2_registry) {
+            return false;
+        }
+        V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
+        if (!entry) {
+            return false;
+        }
+        for (size_t i = 0; i < entry->version_count; i++) {
+            V2PackageVersion *ver = &entry->versions[i];
+            if (ver->status != V2_STATUS_VALID) {
+                continue;
+            }
+            if (ver->major == target->major &&
+                ver->minor == target->minor &&
+                ver->patch == target->patch) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if (!env->registry) {
+        return false;
+    }
+
+    RegistryEntry *entry = registry_find(env->registry, author, name);
+    if (!entry) {
+        return false;
+    }
+
+    for (size_t i = 0; i < entry->version_count; i++) {
+        if (version_compare(&entry->versions[i], target) == 0) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /* ========================================================================
@@ -140,6 +186,197 @@ bool version_is_constraint(const char *version_str) {
     }
 
     return strstr(version_str, "<=") != NULL || strstr(version_str, "<") != NULL;
+}
+
+typedef struct {
+    const char *author;
+    const char *name;
+    Version required;
+    bool has_latest;
+    Version latest;
+} MissingRegistryVersion;
+
+static bool get_latest_registry_version(InstallEnv *env, const char *author, const char *name, Version *out_latest) {
+    if (!env || !author || !name || !out_latest) {
+        return false;
+    }
+
+    if (env->protocol_mode == PROTOCOL_V2) {
+        if (!env->v2_registry) {
+            return false;
+        }
+        V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
+        if (!entry) {
+            return false;
+        }
+        bool found_any = false;
+        Version best = {0, 0, 0};
+        for (size_t i = 0; i < entry->version_count; i++) {
+            V2PackageVersion *ver = &entry->versions[i];
+            if (ver->status != V2_STATUS_VALID) {
+                continue;
+            }
+            Version candidate = {ver->major, ver->minor, ver->patch};
+            if (!found_any || version_compare(&candidate, &best) > 0) {
+                best = candidate;
+                found_any = true;
+            }
+        }
+        if (!found_any) {
+            return false;
+        }
+        *out_latest = best;
+        return true;
+    }
+
+    if (!env->registry) {
+        return false;
+    }
+
+    RegistryEntry *entry = registry_find(env->registry, author, name);
+    if (!entry || entry->version_count == 0) {
+        return false;
+    }
+
+    Version best = entry->versions[0];
+    for (size_t i = 1; i < entry->version_count; i++) {
+        if (version_compare(&entry->versions[i], &best) > 0) {
+            best = entry->versions[i];
+        }
+    }
+
+    *out_latest = best;
+    return true;
+}
+
+static bool missing_list_contains(MissingRegistryVersion *missing,
+                                  int missing_count,
+                                  const char *author,
+                                  const char *name,
+                                  const Version *required) {
+    for (int i = 0; i < missing_count; i++) {
+        if (strcmp(missing[i].author, author) == 0 &&
+            strcmp(missing[i].name, name) == 0 &&
+            version_equals(&missing[i].required, required)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void collect_missing_from_map(InstallEnv *env,
+                                     const PackageMap *map,
+                                     MissingRegistryVersion **missing,
+                                     int *missing_count,
+                                     int *missing_capacity) {
+    if (!env || !map || !missing || !missing_count || !missing_capacity) {
+        return;
+    }
+
+    for (int i = 0; i < map->count; i++) {
+        const Package *pkg = &map->packages[i];
+        if (!pkg || !pkg->author || !pkg->name || !pkg->version) {
+            continue;
+        }
+
+        if (version_is_constraint(pkg->version)) {
+            continue;
+        }
+
+        Version required;
+        if (!version_parse_safe(pkg->version, &required)) {
+            continue;
+        }
+
+        if (version_exists_in_registry(env, pkg->author, pkg->name, &required)) {
+            continue;
+        }
+
+        if (missing_list_contains(*missing, *missing_count, pkg->author, pkg->name, &required)) {
+            continue;
+        }
+
+        MissingRegistryVersion entry = {
+            .author = pkg->author,
+            .name = pkg->name,
+            .required = required,
+            .has_latest = false,
+            .latest = (Version){0, 0, 0}
+        };
+
+        Version latest;
+        if (get_latest_registry_version(env, pkg->author, pkg->name, &latest)) {
+            entry.has_latest = true;
+            entry.latest = latest;
+        }
+
+        DYNARRAY_PUSH(*missing, *missing_count, *missing_capacity, entry, MissingRegistryVersion);
+    }
+}
+
+size_t report_missing_registry_versions_for_elm_json(InstallEnv *env, const ElmJson *elm_json) {
+    if (!env || !elm_json) {
+        return 0;
+    }
+
+    int missing_capacity = INITIAL_SMALL_CAPACITY;
+    int missing_count = 0;
+    MissingRegistryVersion *missing = arena_malloc((size_t)missing_capacity * sizeof(MissingRegistryVersion));
+    if (!missing) {
+        return 0;
+    }
+
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        collect_missing_from_map(env, elm_json->dependencies_direct, &missing, &missing_count, &missing_capacity);
+        collect_missing_from_map(env, elm_json->dependencies_indirect, &missing, &missing_count, &missing_capacity);
+        collect_missing_from_map(env, elm_json->dependencies_test_direct, &missing, &missing_count, &missing_capacity);
+        collect_missing_from_map(env, elm_json->dependencies_test_indirect, &missing, &missing_count, &missing_capacity);
+    } else {
+        collect_missing_from_map(env, elm_json->package_dependencies, &missing, &missing_count, &missing_capacity);
+        collect_missing_from_map(env, elm_json->package_test_dependencies, &missing, &missing_count, &missing_capacity);
+    }
+
+    if (missing_count == 0) {
+        arena_free(missing);
+        return 0;
+    }
+
+    log_error("Your cached registry is missing versions required by your current elm.json:");
+    for (int i = 0; i < missing_count; i++) {
+        char *required_str = version_to_string(&missing[i].required);
+        char *latest_str = missing[i].has_latest ? version_to_string(&missing[i].latest) : NULL;
+
+        if (missing[i].has_latest && latest_str) {
+            fprintf(stderr, "  - %s/%s %s (latest known: %s)\n",
+                    missing[i].author,
+                    missing[i].name,
+                    required_str ? required_str : "(invalid)",
+                    latest_str);
+        } else {
+            fprintf(stderr, "  - %s/%s %s (package missing from registry)\n",
+                    missing[i].author,
+                    missing[i].name,
+                    required_str ? required_str : "(invalid)");
+        }
+
+        if (required_str) {
+            arena_free(required_str);
+        }
+        if (latest_str) {
+            arena_free(latest_str);
+        }
+    }
+
+    fprintf(stderr, "\n");
+    if (env->offline_forced) {
+        fprintf(stderr, "Offline mode is enabled (WRAP_OFFLINE_MODE=1).\n");
+        fprintf(stderr, "Unset it and rerun so %s can refresh the registry cache.\n", global_context_program_name());
+    } else {
+        fprintf(stderr, "Try rerunning so %s can refresh the registry cache.\n", global_context_program_name());
+    }
+
+    arena_free(missing);
+    return (size_t)missing_count;
 }
 
 bool version_parse_constraint(const char *constraint, VersionRange *out) {
