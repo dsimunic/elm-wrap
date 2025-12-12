@@ -30,6 +30,14 @@ indexmaker - <output-file>           # Read from stdin
 
 #### Input Format
 
+`indexmaker` auto-detects the input format by reading the first line:
+- **V2 registry text format**: first line is `format 2`
+- **V1 package list**: otherwise, first line must be `author/package@version`
+
+For V1 package lists, comments/empty lines are supported after the first line.
+
+##### V1 Package List
+
 One package per line in the format `author/package@version`:
 
 ```
@@ -39,15 +47,14 @@ elm/json@1.1.3
 ```
 
 **Features:**
-- Comments: Lines starting with `#` are ignored
-- Empty lines are ignored
+- Comments: Lines starting with `#` are ignored (after the first line)
+- Empty lines are ignored (after the first line)
 - Multiple versions of the same package are supported
 - Packages are automatically sorted alphabetically in the output
 
 #### Example Input File
 
 ```
-# Core Elm packages
 elm/core@1.0.0
 elm/core@1.0.5
 
@@ -59,6 +66,10 @@ elm/html@1.0.1
 elm/json@1.0.0
 elm/json@1.1.3
 ```
+
+##### V2 Registry Text Format
+
+Provide a V2 registry text file starting with `format 2` (for example `test/data/imaginary-package-registry.txt`).
 
 ### Examples
 

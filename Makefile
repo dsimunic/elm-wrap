@@ -656,7 +656,7 @@ $(BUILDDIR)/package_suggestions_test.o: test/src/package_suggestions_test.c $(SR
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build indexmaker object
-$(BUILDDIR)/indexmaker.o: tools/indexmaker/indexmaker.c $(SRCDIR)/registry.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/log.h $(SRCDIR)/commands/package/package_common.h | $(BUILDDIR)
+$(BUILDDIR)/indexmaker.o: tools/indexmaker/indexmaker.c $(SRCDIR)/registry.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/log.h $(SRCDIR)/commands/package/package_common.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build mkpkg object
@@ -805,7 +805,7 @@ $(PACKAGE_SUGGESTIONS_TEST): $(BUILDDIR)/package_suggestions_test.o $(BUILDDIR)/
 
 indexmaker: $(INDEXMAKER)
 
-$(INDEXMAKER): $(BUILDDIR)/indexmaker.o $(BUILDDIR)/registry.o $(BUILDDIR)/package_common.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/cJSON.o | $(TOOLSDIR)
+$(INDEXMAKER): $(BUILDDIR)/indexmaker.o $(BUILDDIR)/registry.o $(BUILDDIR)/v2_registry.o $(BUILDDIR)/package_common.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/cJSON.o $(BUILDDIR)/miniz.o | $(TOOLSDIR)
 	$(CC) $(CFLAGS) $^ -o $@
 
 mkpkg: $(MKPKG)
