@@ -121,7 +121,121 @@ static void print_info_usage(const char *invocation) {
     printf("      Use './package/author' to treat as a path instead.\n");
     printf("\n");
     printf("Options:\n");
+    printf("  -d, --deps-only                   # Only print dependencies\n");
     printf("  --help                             # Show this help\n");
+}
+
+static void update_max_name_len_from_package_map(const PackageMap *map, size_t *max_name_len) {
+    if (!map || !max_name_len) {
+        return;
+    }
+
+    for (int i = 0; i < map->count; i++) {
+        Package *pkg = &map->packages[i];
+        if (!pkg || !pkg->author || !pkg->name) {
+            continue;
+        }
+        size_t len = strlen(pkg->author) + 1 + strlen(pkg->name);
+        if (len > *max_name_len) {
+            *max_name_len = len;
+        }
+    }
+}
+
+static size_t get_max_dependency_name_len(const ElmJson *elm_json) {
+    size_t max_name_len = 0;
+    if (!elm_json) {
+        return 0;
+    }
+
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        update_max_name_len_from_package_map(elm_json->dependencies_direct, &max_name_len);
+        update_max_name_len_from_package_map(elm_json->dependencies_indirect, &max_name_len);
+        update_max_name_len_from_package_map(elm_json->dependencies_test_direct, &max_name_len);
+        update_max_name_len_from_package_map(elm_json->dependencies_test_indirect, &max_name_len);
+    } else {
+        update_max_name_len_from_package_map(elm_json->package_dependencies, &max_name_len);
+        update_max_name_len_from_package_map(elm_json->package_test_dependencies, &max_name_len);
+    }
+
+    return max_name_len;
+}
+
+static int get_total_dependency_count(const ElmJson *elm_json) {
+    if (!elm_json) {
+        return 0;
+    }
+
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        int direct = elm_json->dependencies_direct ? elm_json->dependencies_direct->count : 0;
+        int indirect = elm_json->dependencies_indirect ? elm_json->dependencies_indirect->count : 0;
+        int test_direct = elm_json->dependencies_test_direct ? elm_json->dependencies_test_direct->count : 0;
+        int test_indirect = elm_json->dependencies_test_indirect ? elm_json->dependencies_test_indirect->count : 0;
+        return direct + indirect + test_direct + test_indirect;
+    }
+
+    int deps = elm_json->package_dependencies ? elm_json->package_dependencies->count : 0;
+    int test_deps = elm_json->package_test_dependencies ? elm_json->package_test_dependencies->count : 0;
+    return deps + test_deps;
+}
+
+static void print_dependency_entries(const PackageMap *map, size_t max_name_len, const char *annotation) {
+    if (!map) {
+        return;
+    }
+
+    for (int i = 0; i < map->count; i++) {
+        Package *pkg = &map->packages[i];
+        char full_name[MAX_PACKAGE_NAME_LENGTH];
+        snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
+        printf("  %-*s  %s%s\n", (int)max_name_len, full_name, pkg->version, annotation ? annotation : "");
+    }
+}
+
+static void print_dependencies_section(const ElmJson *elm_json, size_t max_name_len) {
+    int total_packages = get_total_dependency_count(elm_json);
+
+    printf("\nDependencies:\n\n");
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        print_dependency_entries(elm_json->dependencies_direct, max_name_len, NULL);
+
+        if (elm_json->dependencies_direct && elm_json->dependencies_indirect &&
+            elm_json->dependencies_direct->count > 0 && elm_json->dependencies_indirect->count > 0) {
+            printf("\n");
+        }
+
+        print_dependency_entries(elm_json->dependencies_indirect, max_name_len, " (indirect)");
+
+        bool any_prod = (elm_json->dependencies_direct && elm_json->dependencies_direct->count > 0) ||
+                        (elm_json->dependencies_indirect && elm_json->dependencies_indirect->count > 0);
+        bool any_test = (elm_json->dependencies_test_direct && elm_json->dependencies_test_direct->count > 0) ||
+                        (elm_json->dependencies_test_indirect && elm_json->dependencies_test_indirect->count > 0);
+        if (any_prod && any_test) {
+            printf("\n");
+        }
+
+        print_dependency_entries(elm_json->dependencies_test_direct, max_name_len, " (test)");
+
+        if (elm_json->dependencies_test_direct && elm_json->dependencies_test_indirect &&
+            elm_json->dependencies_test_direct->count > 0 && elm_json->dependencies_test_indirect->count > 0) {
+            printf("\n");
+        }
+
+        print_dependency_entries(elm_json->dependencies_test_indirect, max_name_len, " (test, indirect)");
+    } else {
+        print_dependency_entries(elm_json->package_dependencies, max_name_len, NULL);
+
+        if (elm_json->package_dependencies && elm_json->package_test_dependencies &&
+            elm_json->package_dependencies->count > 0 && elm_json->package_test_dependencies->count > 0) {
+            printf("\n");
+        }
+
+        print_dependency_entries(elm_json->package_test_dependencies, max_name_len, " (test)");
+    }
+
+    /* Print total dependencies aligned with version column */
+    printf("\n%-*s  %d\n", (int)(max_name_len + 2), "  Total:", total_packages);
+    printf("\n");
 }
 
 static bool is_package_name_format(const char *str) {
@@ -447,11 +561,14 @@ static int show_package_info_from_registry(const char *package_name, const char 
 int cmd_info(int argc, char *argv[], const char *invocation) {
     const char *arg = NULL;
     const char *version_arg = NULL;
+    bool deps_only = false;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_info_usage(invocation);
             return 0;
+        } else if (strcmp(argv[i], "--deps-only") == 0 || strcmp(argv[i], "-d") == 0) {
+            deps_only = true;
         } else if (argv[i][0] == '-') {
             fprintf(stderr, "Error: Unknown option: %s\n", argv[i]);
             print_info_usage(invocation);
@@ -505,6 +622,10 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
     }
 
     if (is_package_lookup) {
+        if (deps_only) {
+            fprintf(stderr, "Error: --deps-only is only supported with PATH (not PACKAGE [VERSION])\n");
+            return 1;
+        }
         InstallEnv *env = install_env_create();
         if (!env) {
             log_error("Failed to create install environment");
@@ -520,6 +641,19 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
         int result = show_package_info_from_registry(arg, version_arg, env);
         install_env_free(env);
         return result;
+    }
+
+    if (deps_only) {
+        ElmJson *elm_json = elm_json_read(elm_json_path);
+        if (!elm_json) {
+            fprintf(stderr, "Error: Failed to read elm.json at: %s\n", elm_json_path);
+            return 1;
+        }
+
+        size_t max_name_len = get_max_dependency_name_len(elm_json);
+        print_dependencies_section(elm_json, max_name_len);
+        elm_json_free(elm_json);
+        return 0;
     }
 
     V2Registry *v2_registry = NULL;
@@ -563,17 +697,10 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
         printf("-------------------\n");
         printf("\n");
 
-        int total_packages = 0;
         if (elm_json->type == ELM_PROJECT_APPLICATION) {
-            total_packages = elm_json->dependencies_direct->count +
-                           elm_json->dependencies_indirect->count +
-                           elm_json->dependencies_test_direct->count +
-                           elm_json->dependencies_test_indirect->count;
             printf("Type: Application\n");
             printf("Path: %s\n", project_dir);
         } else {
-            total_packages = elm_json->package_dependencies->count +
-                           elm_json->package_test_dependencies->count;
             printf("Type: Package\n");
             printf("Path: %s\n", project_dir);
 
@@ -608,117 +735,12 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
             max_name_len = get_max_upgrade_name_len(elm_json_path, env->registry);
         }
 
-        if (elm_json->type == ELM_PROJECT_APPLICATION) {
-            for (int i = 0; i < elm_json->dependencies_direct->count; i++) {
-                Package *pkg = &elm_json->dependencies_direct->packages[i];
-                char full_name[256];
-                snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-                size_t len = strlen(full_name);
-                if (len > max_name_len) max_name_len = len;
-            }
-            for (int i = 0; i < elm_json->dependencies_indirect->count; i++) {
-                Package *pkg = &elm_json->dependencies_indirect->packages[i];
-                char full_name[256];
-                snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-                size_t len = strlen(full_name);
-                if (len > max_name_len) max_name_len = len;
-            }
-            for (int i = 0; i < elm_json->dependencies_test_direct->count; i++) {
-                Package *pkg = &elm_json->dependencies_test_direct->packages[i];
-                char full_name[256];
-                snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-                size_t len = strlen(full_name);
-                if (len > max_name_len) max_name_len = len;
-            }
-            for (int i = 0; i < elm_json->dependencies_test_indirect->count; i++) {
-                Package *pkg = &elm_json->dependencies_test_indirect->packages[i];
-                char full_name[256];
-                snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-                size_t len = strlen(full_name);
-                if (len > max_name_len) max_name_len = len;
-            }
-        } else {
-            for (int i = 0; i < elm_json->package_dependencies->count; i++) {
-                Package *pkg = &elm_json->package_dependencies->packages[i];
-                char full_name[256];
-                snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-                size_t len = strlen(full_name);
-                if (len > max_name_len) max_name_len = len;
-            }
-            for (int i = 0; i < elm_json->package_test_dependencies->count; i++) {
-                Package *pkg = &elm_json->package_test_dependencies->packages[i];
-                char full_name[256];
-                snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-                size_t len = strlen(full_name);
-                if (len > max_name_len) max_name_len = len;
-            }
+        size_t dep_max_name_len = get_max_dependency_name_len(elm_json);
+        if (dep_max_name_len > max_name_len) {
+            max_name_len = dep_max_name_len;
         }
 
-        printf("\nDependencies:\n\n");
-        if (elm_json->type == ELM_PROJECT_APPLICATION) {
-            for (int i = 0; i < elm_json->dependencies_direct->count; i++) {
-                Package *pkg = &elm_json->dependencies_direct->packages[i];
-                char full_name[256];
-                snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-                printf("  %-*s  %s\n", (int)max_name_len, full_name, pkg->version);
-            }
-
-            if (elm_json->dependencies_direct->count > 0 && elm_json->dependencies_indirect->count > 0) {
-                printf("\n");
-            }
-
-            for (int i = 0; i < elm_json->dependencies_indirect->count; i++) {
-                Package *pkg = &elm_json->dependencies_indirect->packages[i];
-                char full_name[256];
-                snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-                printf("  %-*s  %s (indirect)\n", (int)max_name_len, full_name, pkg->version);
-            }
-
-            if ((elm_json->dependencies_direct->count > 0 || elm_json->dependencies_indirect->count > 0) &&
-                (elm_json->dependencies_test_direct->count > 0 || elm_json->dependencies_test_indirect->count > 0)) {
-                printf("\n");
-            }
-
-            for (int i = 0; i < elm_json->dependencies_test_direct->count; i++) {
-                Package *pkg = &elm_json->dependencies_test_direct->packages[i];
-                char full_name[256];
-                snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-                printf("  %-*s  %s (test)\n", (int)max_name_len, full_name, pkg->version);
-            }
-
-            if (elm_json->dependencies_test_direct->count > 0 && elm_json->dependencies_test_indirect->count > 0) {
-                printf("\n");
-            }
-
-            for (int i = 0; i < elm_json->dependencies_test_indirect->count; i++) {
-                Package *pkg = &elm_json->dependencies_test_indirect->packages[i];
-                char full_name[256];
-                snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-                printf("  %-*s  %s (test, indirect)\n", (int)max_name_len, full_name, pkg->version);
-            }
-        } else {
-            for (int i = 0; i < elm_json->package_dependencies->count; i++) {
-                Package *pkg = &elm_json->package_dependencies->packages[i];
-                char full_name[256];
-                snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-                printf("  %-*s  %s\n", (int)max_name_len, full_name, pkg->version);
-            }
-
-            if (elm_json->package_dependencies->count > 0 && elm_json->package_test_dependencies->count > 0) {
-                printf("\n");
-            }
-
-            for (int i = 0; i < elm_json->package_test_dependencies->count; i++) {
-                Package *pkg = &elm_json->package_test_dependencies->packages[i];
-                char full_name[256];
-                snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-                printf("  %-*s  %s (test)\n", (int)max_name_len, full_name, pkg->version);
-            }
-        }
-
-        /* Print total dependencies aligned with version column */
-        printf("\n%-*s  %d\n", (int)(max_name_len + 2), "  Total:", total_packages);
-        printf("\n");
+        print_dependencies_section(elm_json, max_name_len);
 
         if (global_context_is_v2() && v2_registry) {
             check_all_upgrades_v2(elm_json_path, v2_registry, max_name_len);
