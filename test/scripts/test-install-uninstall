@@ -1,0 +1,657 @@
+#!/usr/bin/env bash
+#
+# test-install-uninstall - Top-level driver for install/uninstall/upgrade test suite
+#
+# This script sets up an isolated test environment and runs all test subscripts
+# for the wrap install, uninstall, and upgrade commands.
+#
+# Environment setup:
+#   - Creates a temporary ELM_HOME with pre-populated package cache
+#   - Sets WRAP_OFFLINE_MODE=1 to prevent network access
+#   - Generates registry.dat from imaginary-package-registry.txt
+#   - Populates package cache using mkpkg
+#
+# Usage:
+#   ./test-install-uninstall                    # Run all tests
+#   ./test-install-uninstall --update-expected  # Update expected output files
+#   ./test-install-uninstall --instant-death    # Stop on first failure
+#   ./test-install-uninstall --clean            # Clean up test artifacts
+#   ./test-install-uninstall --list             # List available test suites
+#   ./test-install-uninstall SUITE...           # Run specific test suite(s)
+#
+# Test suites:
+#   install-happy      - Install command happy path tests
+#   install-unhappy    - Install command error cases
+#   uninstall-happy    - Uninstall command happy path tests
+#   uninstall-unhappy  - Uninstall command error cases
+#   upgrade-happy      - Upgrade command happy path tests
+#   upgrade-unhappy    - Upgrade command error cases
+#   local-dev          - Local development workflow tests
+#
+
+set -euo pipefail
+
+# =============================================================================
+# Configuration
+# =============================================================================
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+TEST_SCRIPTS_DIR="$SCRIPT_DIR/install-uninstall"
+
+# Binaries
+WRAP_BIN="$PROJECT_ROOT/bin/wrap"
+INDEXMAKER="$PROJECT_ROOT/bin/tools/indexmaker"
+MKPKG="$PROJECT_ROOT/bin/tools/mkpkg"
+
+# Test data
+REGISTRY_FILE="$PROJECT_ROOT/test/data/imaginary-package-registry.txt"
+EXPECTED_DIR="$TEST_SCRIPTS_DIR/expected"
+ACTUAL_DIR="$TEST_SCRIPTS_DIR/actual"
+
+# Test environment (created fresh each run)
+TEST_ROOT="${TEST_ROOT:-/tmp/elm-wrap-install-test-$$}"
+TEST_ELM_HOME="$TEST_ROOT/elm_home"
+TEST_WRAP_HOME="$TEST_ROOT/wrap_home"
+
+# Elm version for cache structure
+ELM_VERSION="0.19.1"
+
+# =============================================================================
+# Terminal Colors
+# =============================================================================
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# =============================================================================
+# Logging Functions
+# =============================================================================
+
+log() {
+    echo -e "${CYAN}[INFO]${NC} $*"
+}
+
+log_success() {
+    echo -e "${GREEN}[PASS]${NC} $*"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARN]${NC} $*"
+}
+
+log_error() {
+    echo -e "${RED}[FAIL]${NC} $*"
+}
+
+log_section() {
+    echo ""
+    echo -e "${BOLD}${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}${CYAN}  $*${NC}"
+    echo -e "${BOLD}${CYAN}════════════════════════════════════════════════════════════════${NC}"
+}
+
+log_subsection() {
+    echo ""
+    echo -e "${YELLOW}────────────────────────────────────────${NC}"
+    echo -e "${YELLOW}  $*${NC}"
+    echo -e "${YELLOW}────────────────────────────────────────${NC}"
+}
+
+# =============================================================================
+# Command Line Parsing
+# =============================================================================
+
+UPDATE_EXPECTED=false
+INSTANT_DEATH=false
+CLEAN_ONLY=false
+LIST_ONLY=false
+SELECTED_SUITES=()
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --update-expected)
+                UPDATE_EXPECTED=true
+                shift
+                ;;
+            --instant-death)
+                INSTANT_DEATH=true
+                shift
+                ;;
+            --clean)
+                CLEAN_ONLY=true
+                shift
+                ;;
+            --list)
+                LIST_ONLY=true
+                shift
+                ;;
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            -*)
+                log_error "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+            *)
+                SELECTED_SUITES+=("$1")
+                shift
+                ;;
+        esac
+    done
+}
+
+show_help() {
+    cat << 'EOF'
+Usage: test-install-uninstall [OPTIONS] [SUITE...]
+
+Run install/uninstall/upgrade test suite for wrap.
+
+Options:
+  --update-expected  Update expected output files with current results
+  --instant-death    Stop immediately on first test failure
+  --clean            Remove test artifacts and exit
+  --list             List available test suites
+  -h, --help         Show this help message
+
+Test Suites:
+  install-happy      Install command happy path tests
+  install-unhappy    Install command error cases
+  uninstall-happy    Uninstall command happy path tests
+  uninstall-unhappy  Uninstall command error cases
+  upgrade-happy      Upgrade command happy path tests
+  upgrade-unhappy    Upgrade command error cases
+  local-dev          Local development workflow tests
+
+Examples:
+  ./test-install-uninstall                      # Run all tests
+  ./test-install-uninstall install-happy        # Run only install happy path
+  ./test-install-uninstall --instant-death      # Stop on first failure
+  ./test-install-uninstall --update-expected    # Update expected outputs
+EOF
+}
+
+# =============================================================================
+# Available Test Suites
+# =============================================================================
+
+ALL_SUITES=(
+    "install-happy"
+    "install-unhappy"
+    "uninstall-happy"
+    "uninstall-unhappy"
+    "upgrade-happy"
+    "upgrade-unhappy"
+    "local-dev"
+)
+
+list_suites() {
+    echo "Available test suites:"
+    echo ""
+    for suite in "${ALL_SUITES[@]}"; do
+        local script="$TEST_SCRIPTS_DIR/test-$suite"
+        if [[ -x "$script" ]]; then
+            echo -e "  ${GREEN}●${NC} $suite"
+        else
+            echo -e "  ${YELLOW}○${NC} $suite (not implemented)"
+        fi
+    done
+    echo ""
+}
+
+# =============================================================================
+# Prerequisite Checks
+# =============================================================================
+
+check_prerequisites() {
+    log_section "Checking Prerequisites"
+    
+    local missing=false
+    
+    # Check wrap binary
+    if [[ -x "$WRAP_BIN" ]]; then
+        log_success "wrap binary: $WRAP_BIN"
+    else
+        log_error "wrap binary not found at $WRAP_BIN"
+        log_error "Run 'make' to build the project first"
+        missing=true
+    fi
+    
+    # Check indexmaker
+    if [[ -x "$INDEXMAKER" ]]; then
+        log_success "indexmaker: $INDEXMAKER"
+    else
+        log_error "indexmaker not found at $INDEXMAKER"
+        log_error "Run 'make indexmaker' to build it"
+        missing=true
+    fi
+    
+    # Check mkpkg
+    if [[ -x "$MKPKG" ]]; then
+        log_success "mkpkg: $MKPKG"
+    else
+        log_error "mkpkg not found at $MKPKG"
+        log_error "Run 'make mkpkg' to build it"
+        missing=true
+    fi
+    
+    # Check registry file
+    if [[ -f "$REGISTRY_FILE" ]]; then
+        log_success "Registry file: $REGISTRY_FILE"
+    else
+        log_error "Registry file not found at $REGISTRY_FILE"
+        missing=true
+    fi
+    
+    if [[ "$missing" == "true" ]]; then
+        exit 1
+    fi
+}
+
+# =============================================================================
+# Environment Setup
+# =============================================================================
+
+# List of all packages to pre-populate in the cache
+# Extracted from imaginary-package-registry.txt
+CACHE_PACKAGES=(
+    "elm/core"
+    "elm/bytes"
+    "elm/file"
+    "elm/html"
+    "elm/json"
+    "elm/http"
+    "elm/url"
+    "elm/time"
+    "elm/browser"
+    "elm/svg"
+    "elm/virtual-dom"
+    "wrap/package-single-no-deps"
+    "wrap/package-3v-no-deps"
+    "wrap/package-3m-no-deps"
+    "wrap/package-3v-changing-deps"
+    "wrap/dep-single-no-deps"
+    "wrap/depA-single-no-deps"
+    "wrap/depB-single-no-deps"
+    "wrap/depC-single-no-deps"
+    "wrap/package-single-1d"
+    "wrap/package-A-single-1d-shared"
+    "wrap/package-B-single-1d-shaerd"
+    "wrap/dep-shared-single-no-deps"
+    "wrap/testdep-req-newer-prod-single"
+)
+
+setup_test_environment() {
+    log_section "Setting Up Test Environment"
+    
+    log "Creating test directories..."
+    mkdir -p "$TEST_ROOT"
+    mkdir -p "$TEST_ELM_HOME/$ELM_VERSION/packages"
+    mkdir -p "$TEST_WRAP_HOME"
+    mkdir -p "$ACTUAL_DIR"
+    
+    log "Test root: $TEST_ROOT"
+    log "ELM_HOME: $TEST_ELM_HOME"
+    log "WRAP_HOME: $TEST_WRAP_HOME"
+    
+    # Generate registry.dat
+    log "Generating registry.dat from $REGISTRY_FILE..."
+    if ! "$INDEXMAKER" "$REGISTRY_FILE" "$TEST_ELM_HOME/$ELM_VERSION/packages/registry.dat" >/dev/null 2>&1; then
+        log_error "Failed to generate registry.dat"
+        exit 1
+    fi
+    log_success "registry.dat created"
+    
+    # Populate package cache
+    log "Populating package cache..."
+    local pkg_count=0
+    local pkg_errors=0
+    
+    for pkg in "${CACHE_PACKAGES[@]}"; do
+        if ELM_HOME="$TEST_ELM_HOME" "$MKPKG" "$REGISTRY_FILE" "$pkg" >/dev/null 2>&1; then
+            ((pkg_count++)) || true
+        else
+            log_warning "Failed to create package: $pkg"
+            ((pkg_errors++)) || true
+        fi
+    done
+    
+    log_success "Created $pkg_count packages in cache ($pkg_errors errors)"
+    
+    # Verify setup
+    log "Verifying environment..."
+    local verify_output
+    if verify_output=$(env ELM_HOME="$TEST_ELM_HOME" WRAP_OFFLINE_MODE=1 "$WRAP_BIN" debug registry_v1 list 2>&1); then
+        local pkg_in_registry
+        pkg_in_registry=$(echo "$verify_output" | grep -c "^[a-z]" || true)
+        log_success "Registry contains $pkg_in_registry package entries"
+    else
+        log_error "Failed to verify registry setup"
+        echo "$verify_output"
+        exit 1
+    fi
+}
+
+cleanup_test_environment() {
+    if [[ -d "$TEST_ROOT" ]]; then
+        log "Cleaning up test environment at $TEST_ROOT"
+        rm -rf "$TEST_ROOT"
+    fi
+}
+
+# =============================================================================
+# Helper Functions (exported to subscripts)
+# =============================================================================
+
+# Create an application project
+# Usage: create_app <directory> <name>
+create_app() {
+    local dir="$1"
+    local name="$2"
+    
+    mkdir -p "$dir"
+    cd "$dir"
+    
+    # Initialize with -y to skip prompts, -q to reduce output noise
+    "$WRAP_BIN" application init -y -q >/dev/null 2>&1
+    
+    echo "$dir"
+}
+
+# Create a package project
+# Usage: create_package <directory> <author/name>
+create_package() {
+    local dir="$1"
+    local name="$2"
+    
+    mkdir -p "$dir"
+    cd "$dir"
+    
+    # Initialize with -y to skip prompts, --no-local-dev to avoid tracking
+    "$WRAP_BIN" package init -y --no-local-dev "$name" >/dev/null 2>&1
+    
+    echo "$dir"
+}
+
+# Get dependencies as normalized output (filters variable content)
+# Usage: get_deps [path]
+get_deps() {
+    local path="${1:-.}"
+    cd "$path"
+    
+    # Get deps and filter out variable content like timestamps, paths
+    "$WRAP_BIN" info -d 2>&1 | normalize_output
+}
+
+# Normalize output by removing variable content
+# - Strips ANSI color codes
+# - Removes absolute paths (replaces with relative or placeholder)
+# - Removes timestamps
+# - Removes version-specific wrap build info
+normalize_output() {
+    sed -E \
+        -e 's/\x1b\[[0-9;]*m//g' \
+        -e "s|$TEST_ROOT|<TEST_ROOT>|g" \
+        -e "s|$TEST_ELM_HOME|<ELM_HOME>|g" \
+        -e "s|$TEST_WRAP_HOME|<WRAP_HOME>|g" \
+        -e "s|$PROJECT_ROOT|<PROJECT_ROOT>|g" \
+        -e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}:[0-9]{2}[^ ]*/\<TIMESTAMP\>/g' \
+        -e 's/wrap [0-9]+\.[0-9]+\.[0-9]+(-[^ ]+)?/wrap <VERSION>/g' \
+        -e 's/elm [0-9]+\.[0-9]+\.[0-9]+/elm <VERSION>/g'
+}
+
+# Run a wrap command and capture normalized output
+# Usage: run_wrap <args...>
+run_wrap() {
+    "$WRAP_BIN" "$@" 2>&1 | normalize_output
+}
+
+# Assert that a package is in direct dependencies
+# Usage: assert_direct_dep <package> <version> [path]
+assert_direct_dep() {
+    local pkg="$1"
+    local version="$2"
+    local path="${3:-.}"
+    
+    local deps
+    deps=$(get_deps "$path")
+    
+    if echo "$deps" | grep -q "direct.*$pkg.*$version"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Assert that a package is in indirect dependencies
+# Usage: assert_indirect_dep <package> <version> [path]
+assert_indirect_dep() {
+    local pkg="$1"
+    local version="$2"
+    local path="${3:-.}"
+    
+    local deps
+    deps=$(get_deps "$path")
+    
+    if echo "$deps" | grep -q "indirect.*$pkg.*$version"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Assert that a package is NOT in dependencies at all
+# Usage: assert_no_dep <package> [path]
+assert_no_dep() {
+    local pkg="$1"
+    local path="${2:-.}"
+    
+    local deps
+    deps=$(get_deps "$path")
+    
+    if echo "$deps" | grep -q "$pkg"; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+# Export functions and variables for subscripts
+export -f create_app create_package get_deps normalize_output run_wrap
+export -f assert_direct_dep assert_indirect_dep assert_no_dep
+export TEST_ROOT TEST_ELM_HOME TEST_WRAP_HOME ELM_VERSION
+export WRAP_BIN INDEXMAKER MKPKG REGISTRY_FILE
+export PROJECT_ROOT TEST_SCRIPTS_DIR EXPECTED_DIR ACTUAL_DIR
+export WRAP_OFFLINE_MODE=1
+export ELM_HOME="$TEST_ELM_HOME"
+export WRAP_HOME="$TEST_WRAP_HOME"
+
+# =============================================================================
+# Test Execution
+# =============================================================================
+
+# Counters for summary
+TESTS_PASSED=0
+TESTS_FAILED=0
+TESTS_SKIPPED=0
+FAILED_TESTS=()
+
+run_test_suite() {
+    local suite="$1"
+    local script="$TEST_SCRIPTS_DIR/test-$suite"
+    
+    log_subsection "Running: $suite"
+    
+    if [[ ! -x "$script" ]]; then
+        log_warning "Test script not found or not executable: $script"
+        ((TESTS_SKIPPED++))
+        return 0
+    fi
+    
+    local actual_file="$ACTUAL_DIR/$suite.actual"
+    local expected_file="$EXPECTED_DIR/$suite.expected"
+    
+    # Run the test script
+    local exit_code=0
+    if ! "$script" > "$actual_file" 2>&1; then
+        exit_code=$?
+    fi
+    
+    # Check for test script errors (not test failures)
+    if [[ $exit_code -ne 0 && $exit_code -ne 1 ]]; then
+        log_error "Test script crashed with exit code $exit_code"
+        cat "$actual_file"
+        FAILED_TESTS+=("$suite (script error)")
+        ((TESTS_FAILED++))
+        
+        if [[ "$INSTANT_DEATH" == "true" ]]; then
+            return 1
+        fi
+        return 0
+    fi
+    
+    # Update expected files if requested
+    if [[ "$UPDATE_EXPECTED" == "true" ]]; then
+        mkdir -p "$EXPECTED_DIR"
+        cp "$actual_file" "$expected_file"
+        log_success "Updated expected output: $expected_file"
+        ((TESTS_PASSED++))
+        return 0
+    fi
+    
+    # Compare with expected output
+    if [[ ! -f "$expected_file" ]]; then
+        log_warning "No expected output file: $expected_file"
+        log_warning "Run with --update-expected to create it"
+        ((TESTS_SKIPPED++))
+        return 0
+    fi
+    
+    if diff -q "$expected_file" "$actual_file" >/dev/null 2>&1; then
+        log_success "$suite"
+        ((TESTS_PASSED++))
+    else
+        log_error "$suite - output differs from expected"
+        echo ""
+        echo "Diff (expected vs actual):"
+        diff -u "$expected_file" "$actual_file" | head -50 || true
+        echo ""
+        
+        FAILED_TESTS+=("$suite")
+        ((TESTS_FAILED++))
+        
+        if [[ "$INSTANT_DEATH" == "true" ]]; then
+            return 1
+        fi
+    fi
+    
+    return 0
+}
+
+run_all_tests() {
+    log_section "Running Tests"
+    
+    local suites_to_run=()
+    
+    if [[ ${#SELECTED_SUITES[@]} -gt 0 ]]; then
+        suites_to_run=("${SELECTED_SUITES[@]}")
+    else
+        suites_to_run=("${ALL_SUITES[@]}")
+    fi
+    
+    for suite in "${suites_to_run[@]}"; do
+        if ! run_test_suite "$suite"; then
+            # Instant death triggered
+            break
+        fi
+    done
+}
+
+print_summary() {
+    log_section "Test Summary"
+    
+    local total=$((TESTS_PASSED + TESTS_FAILED + TESTS_SKIPPED))
+    
+    echo ""
+    echo -e "  ${GREEN}Passed:${NC}  $TESTS_PASSED"
+    echo -e "  ${RED}Failed:${NC}  $TESTS_FAILED"
+    echo -e "  ${YELLOW}Skipped:${NC} $TESTS_SKIPPED"
+    echo -e "  ${BOLD}Total:${NC}   $total"
+    echo ""
+    
+    if [[ ${#FAILED_TESTS[@]} -gt 0 ]]; then
+        echo -e "${RED}Failed tests:${NC}"
+        for test in "${FAILED_TESTS[@]}"; do
+            echo "  - $test"
+        done
+        echo ""
+    fi
+    
+    if [[ $TESTS_FAILED -eq 0 && $TESTS_SKIPPED -eq 0 ]]; then
+        echo -e "${GREEN}${BOLD}All tests passed!${NC}"
+    elif [[ $TESTS_FAILED -eq 0 ]]; then
+        echo -e "${YELLOW}${BOLD}All executed tests passed (some skipped)${NC}"
+    else
+        echo -e "${RED}${BOLD}Some tests failed${NC}"
+    fi
+    echo ""
+}
+
+# =============================================================================
+# Cleanup Handler
+# =============================================================================
+
+cleanup_on_exit() {
+    # Only cleanup if not in debug mode
+    if [[ "${DEBUG:-}" != "1" ]]; then
+        cleanup_test_environment
+    else
+        log "DEBUG mode: keeping test environment at $TEST_ROOT"
+    fi
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+    parse_args "$@"
+    
+    # Handle --clean
+    if [[ "$CLEAN_ONLY" == "true" ]]; then
+        log "Cleaning test artifacts..."
+        rm -rf "$ACTUAL_DIR"
+        log_success "Cleaned actual output directory"
+        exit 0
+    fi
+    
+    # Handle --list
+    if [[ "$LIST_ONLY" == "true" ]]; then
+        list_suites
+        exit 0
+    fi
+    
+    # Set up cleanup trap
+    trap cleanup_on_exit EXIT
+    
+    # Run the test suite
+    check_prerequisites
+    setup_test_environment
+    run_all_tests
+    print_summary
+    
+    # Exit with appropriate code
+    if [[ $TESTS_FAILED -gt 0 ]]; then
+        exit 1
+    fi
+    exit 0
+}
+
+main "$@"

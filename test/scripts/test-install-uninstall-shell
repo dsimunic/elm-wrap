@@ -1,0 +1,301 @@
+#!/usr/bin/env bash
+#
+# test-install-uninstall-shell - Open an interactive shell with test environment
+#
+# This script sets up the same isolated test environment as test-install-uninstall
+# but instead of running tests, it opens an interactive shell where you can
+# manually test wrap commands.
+#
+# The shell has:
+#   - WRAP_OFFLINE_MODE=1 (no network access)
+#   - Custom ELM_HOME with pre-populated package cache
+#   - Custom WRAP_HOME for local-dev tracking
+#   - A distinct prompt "$ " to indicate you're in the test environment
+#
+# Usage:
+#   ./test-install-uninstall-shell              # Open test shell
+#   ./test-install-uninstall-shell --keep       # Keep environment after exit
+#
+
+set -euo pipefail
+
+# =============================================================================
+# Configuration
+# =============================================================================
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Binaries
+WRAP_BIN="$PROJECT_ROOT/bin/wrap"
+INDEXMAKER="$PROJECT_ROOT/bin/tools/indexmaker"
+MKPKG="$PROJECT_ROOT/bin/tools/mkpkg"
+
+# Test data
+REGISTRY_FILE="$PROJECT_ROOT/test/data/imaginary-package-registry.txt"
+
+# Test environment
+TEST_ROOT="${TEST_ROOT:-/tmp/elm-wrap-test-shell-$$}"
+TEST_ELM_HOME="$TEST_ROOT/elm_home"
+TEST_WRAP_HOME="$TEST_ROOT/wrap_home"
+WORKSPACE="$TEST_ROOT/workspace"
+
+# Elm version for cache structure
+ELM_VERSION="0.19.1"
+
+# =============================================================================
+# Terminal Colors
+# =============================================================================
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# =============================================================================
+# Command Line Parsing
+# =============================================================================
+
+KEEP_ENV=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --keep)
+            KEEP_ENV=true
+            shift
+            ;;
+        --help|-h)
+            cat << 'EOF'
+Usage: test-install-uninstall-shell [OPTIONS]
+
+Open an interactive shell with an isolated test environment for wrap.
+
+Options:
+  --keep     Keep the test environment after exiting the shell
+  -h, --help Show this help message
+
+The shell will have:
+  - WRAP_OFFLINE_MODE=1 (no network access)
+  - Isolated ELM_HOME with pre-populated packages
+  - Isolated WRAP_HOME for local-dev tracking
+  - Working directory set to a clean workspace
+
+Available test packages from imaginary-package-registry.txt:
+  elm/core, elm/json, elm/http, elm/browser, elm/html, elm/svg, etc.
+  wrap/package-single-no-deps, wrap/package-3v-no-deps, wrap/package-3m-no-deps
+  wrap/package-single-1d, wrap/dep-single-no-deps, and more
+
+Examples inside the shell:
+  mkdir app1 && cd app1 && wrap application init -y
+  wrap install wrap/package-single-no-deps
+  wrap info -d
+EOF
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# =============================================================================
+# Prerequisite Checks
+# =============================================================================
+
+echo -e "${CYAN}Checking prerequisites...${NC}"
+
+missing=false
+
+if [[ ! -x "$WRAP_BIN" ]]; then
+    echo -e "${RED}✗${NC} wrap binary not found at $WRAP_BIN"
+    echo "  Run 'make' to build the project first"
+    missing=true
+else
+    echo -e "${GREEN}✓${NC} wrap binary found"
+fi
+
+if [[ ! -x "$INDEXMAKER" ]]; then
+    echo -e "${RED}✗${NC} indexmaker not found at $INDEXMAKER"
+    echo "  Run 'make indexmaker' to build it"
+    missing=true
+else
+    echo -e "${GREEN}✓${NC} indexmaker found"
+fi
+
+if [[ ! -x "$MKPKG" ]]; then
+    echo -e "${RED}✗${NC} mkpkg not found at $MKPKG"
+    echo "  Run 'make mkpkg' to build it"
+    missing=true
+else
+    echo -e "${GREEN}✓${NC} mkpkg found"
+fi
+
+if [[ ! -f "$REGISTRY_FILE" ]]; then
+    echo -e "${RED}✗${NC} Registry file not found at $REGISTRY_FILE"
+    missing=true
+else
+    echo -e "${GREEN}✓${NC} Registry file found"
+fi
+
+if [[ "$missing" == "true" ]]; then
+    exit 1
+fi
+
+# =============================================================================
+# Environment Setup
+# =============================================================================
+
+echo ""
+echo -e "${CYAN}Setting up test environment...${NC}"
+
+mkdir -p "$TEST_ROOT"
+mkdir -p "$TEST_ELM_HOME/$ELM_VERSION/packages"
+mkdir -p "$TEST_WRAP_HOME"
+mkdir -p "$WORKSPACE"
+
+echo -e "  Test root:  ${BOLD}$TEST_ROOT${NC}"
+echo -e "  ELM_HOME:   ${BOLD}$TEST_ELM_HOME${NC}"
+echo -e "  WRAP_HOME:  ${BOLD}$TEST_WRAP_HOME${NC}"
+echo -e "  Workspace:  ${BOLD}$WORKSPACE${NC}"
+
+# Generate registry.dat
+echo -e "${CYAN}Generating registry.dat...${NC}"
+if ! "$INDEXMAKER" "$REGISTRY_FILE" "$TEST_ELM_HOME/$ELM_VERSION/packages/registry.dat" >/dev/null 2>&1; then
+    echo -e "${RED}Failed to generate registry.dat${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓${NC} registry.dat created"
+
+# List of packages to pre-populate
+CACHE_PACKAGES=(
+    "elm/core"
+    "elm/bytes"
+    "elm/file"
+    "elm/html"
+    "elm/json"
+    "elm/http"
+    "elm/url"
+    "elm/time"
+    "elm/browser"
+    "elm/svg"
+    "elm/virtual-dom"
+    "wrap/package-single-no-deps"
+    "wrap/package-3v-no-deps"
+    "wrap/package-3m-no-deps"
+    "wrap/package-3v-changing-deps"
+    "wrap/dep-single-no-deps"
+    "wrap/depA-single-no-deps"
+    "wrap/depB-single-no-deps"
+    "wrap/depC-single-no-deps"
+    "wrap/package-single-1d"
+    "wrap/package-A-single-1d-shared"
+    "wrap/package-B-single-1d-shaerd"
+    "wrap/dep-shared-single-no-deps"
+    "wrap/testdep-req-newer-prod-single"
+)
+
+echo -e "${CYAN}Populating package cache...${NC}"
+pkg_count=0
+pkg_errors=0
+
+for pkg in "${CACHE_PACKAGES[@]}"; do
+    if ELM_HOME="$TEST_ELM_HOME" "$MKPKG" "$REGISTRY_FILE" "$pkg" >/dev/null 2>&1; then
+        ((pkg_count++)) || true
+    else
+        ((pkg_errors++)) || true
+    fi
+done
+
+echo -e "${GREEN}✓${NC} Created $pkg_count packages ($pkg_errors errors)"
+
+# =============================================================================
+# Shell Information
+# =============================================================================
+
+echo ""
+echo -e "${BOLD}${CYAN}════════════════════════════════════════════════════════════════${NC}"
+echo -e "${BOLD}${CYAN}  elm-wrap Test Shell${NC}"
+echo -e "${BOLD}${CYAN}════════════════════════════════════════════════════════════════${NC}"
+echo ""
+echo -e "${BOLD}Environment:${NC}"
+echo -e "  WRAP_OFFLINE_MODE=1  ${YELLOW}(network access disabled)${NC}"
+echo -e "  ELM_HOME=$TEST_ELM_HOME"
+echo -e "  WRAP_HOME=$TEST_WRAP_HOME"
+echo ""
+echo -e "${BOLD}Available test packages:${NC}"
+echo -e "  ${GREEN}elm/*${NC}  - core, json, http, browser, html, svg, url, time, virtual-dom"
+echo -e "  ${GREEN}wrap/*${NC} - package-single-no-deps, package-3v-no-deps, package-3m-no-deps"
+echo -e "           package-single-1d, dep-single-no-deps, package-3v-changing-deps"
+echo -e "           depA/B/C-single-no-deps, package-A/B-single-1d-shared"
+echo -e "           dep-shared-single-no-deps, testdep-req-newer-prod-single"
+echo ""
+echo -e "${BOLD}Quick reference:${NC}"
+echo -e "  ${CYAN}wrap application init -y${NC}      Initialize an application"
+echo -e "  ${CYAN}wrap package init -y NAME${NC}     Initialize a package"
+echo -e "  ${CYAN}wrap install PKG${NC}              Install a package"
+echo -e "  ${CYAN}wrap install PKG@VERSION${NC}      Install specific version"
+echo -e "  ${CYAN}wrap info -d${NC}                  Show dependencies"
+echo -e "  ${CYAN}wrap package remove PKG${NC}       Remove a package"
+echo -e "  ${CYAN}wrap package upgrade${NC}          Upgrade packages"
+echo ""
+echo -e "${BOLD}Version info:${NC}"
+echo -e "  wrap/package-3v-no-deps:     1.0.0, 2.0.0, 3.0.0"
+echo -e "  wrap/package-3m-no-deps:     1.0.0, 1.1.0, 1.2.0"
+echo -e "  wrap/package-3v-changing-deps:"
+echo -e "    1.0.0 → depA, 2.0.0 → depB, 3.0.0 → depC"
+echo ""
+echo -e "${YELLOW}Type 'exit' to leave the test shell${NC}"
+if [[ "$KEEP_ENV" == "true" ]]; then
+    echo -e "${YELLOW}Environment will be kept at: $TEST_ROOT${NC}"
+else
+    echo -e "${YELLOW}Environment will be cleaned up on exit${NC}"
+fi
+echo ""
+echo -e "${BOLD}${CYAN}════════════════════════════════════════════════════════════════${NC}"
+echo ""
+
+# =============================================================================
+# Launch Shell
+# =============================================================================
+
+# Create a temporary rc file for bash with our environment
+RC_FILE="$TEST_ROOT/.bashrc"
+cat > "$RC_FILE" << EOF
+# Test environment for elm-wrap
+export ELM_HOME="$TEST_ELM_HOME"
+export WRAP_HOME="$TEST_WRAP_HOME"
+export WRAP_OFFLINE_MODE=1
+export PATH="$PROJECT_ROOT/bin:\$PATH"
+
+# Custom prompt to indicate test environment
+export PS1='\[\033[1;33m\][elm-wrap-test]\[\033[0m\] \w \$ '
+
+# Convenience aliases
+alias deps='wrap info -d'
+alias init-app='wrap application init -y'
+init-pkg() { wrap package init -y --no-local-dev "\$1"; }
+
+cd "$WORKSPACE"
+EOF
+
+# Cleanup function
+cleanup() {
+    if [[ "$KEEP_ENV" != "true" ]]; then
+        echo ""
+        echo -e "${CYAN}Cleaning up test environment...${NC}"
+        rm -rf "$TEST_ROOT"
+        echo -e "${GREEN}Done${NC}"
+    else
+        echo ""
+        echo -e "${YELLOW}Test environment kept at: $TEST_ROOT${NC}"
+        echo "To clean up later: rm -rf $TEST_ROOT"
+    fi
+}
+
+trap cleanup EXIT
+
+# Start bash with our rc file
+exec bash --rcfile "$RC_FILE" -i
