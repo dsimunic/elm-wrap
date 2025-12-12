@@ -122,6 +122,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/review/review.c \
           $(SRCDIR)/commands/review/reporter.c \
           $(SRCDIR)/commands/package/package_common.c \
+          $(SRCDIR)/package_suggestions.c \
           $(SRCDIR)/commands/package/install_cmd.c \
           $(SRCDIR)/commands/package/install_local_dev.c \
           $(SRCDIR)/local_dev/local_dev_tracking.c \
@@ -215,6 +216,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/review.o \
           $(BUILDDIR)/reporter.o \
           $(BUILDDIR)/package_common.o \
+          $(BUILDDIR)/package_suggestions.o \
           $(BUILDDIR)/install_cmd.o \
           $(BUILDDIR)/install_local_dev.o \
           $(BUILDDIR)/local_dev_tracking.o \
@@ -276,6 +278,7 @@ OBJECTS = $(BUILDDIR)/main.o \
 TARGET = $(BINDIR)/$(TARGET_FILE)
 PG_CORE_TEST = $(TOOLSDIR)/pg_core_test
 PG_FILE_TEST = $(TOOLSDIR)/pg_file_test
+PACKAGE_SUGGESTIONS_TEST = $(TOOLSDIR)/package_suggestions_test
 INDEXMAKER = $(TOOLSDIR)/indexmaker
 MKPKG = $(TOOLSDIR)/mkpkg
 HELP_REPORT_HTML_GEN = $(TOOLSDIR)/help-report-html-gen
@@ -318,7 +321,7 @@ USER_BINDIR = $(USER_PREFIX)/bin
 
 .DEFAULT_GOAL := all
 
-all: $(TARGET) append-builtin-rules $(PG_CORE_TEST) $(PG_FILE_TEST) $(INDEXMAKER) $(MKPKG) $(HELP_REPORT_HTML_GEN)
+all: $(TARGET) append-builtin-rules $(PG_CORE_TEST) $(PG_FILE_TEST) $(PACKAGE_SUGGESTIONS_TEST) $(INDEXMAKER) $(MKPKG) $(HELP_REPORT_HTML_GEN)
 
 rulrc: $(RULRC)
 
@@ -556,6 +559,9 @@ $(BUILDDIR)/ts_elm_scanner.o: $(SRCDIR)/vendor/tree-sitter-elm/scanner.c | $(BUI
 $(BUILDDIR)/package_common.o: $(SRCDIR)/commands/package/package_common.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/alloc.h $(SRCDIR)/cache.h $(SRCDIR)/fileutil.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/log.h $(SRCDIR)/rulr/rulr.h $(SRCDIR)/rulr/rulr_dl.h $(SRCDIR)/rulr/host_helpers.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
 
+$(BUILDDIR)/package_suggestions.o: $(SRCDIR)/package_suggestions.c $(SRCDIR)/package_suggestions.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILDDIR)/install_cmd.o: $(SRCDIR)/commands/package/install_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/http_client.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -643,6 +649,10 @@ $(BUILDDIR)/pg_core_test.o: test/src/pg_core_test.c $(SRCDIR)/pgsolver/pg_core.h
 
 # Build pg_file test object
 $(BUILDDIR)/pg_file_test.o: test/src/pg_file_test.c $(SRCDIR)/pgsolver/pg_core.h test/src/vendor/jsmn/jsmn.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build package_suggestions test object
+$(BUILDDIR)/package_suggestions_test.o: test/src/package_suggestions_test.c $(SRCDIR)/package_suggestions.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build indexmaker object
@@ -788,6 +798,11 @@ pg_file_test: $(PG_FILE_TEST)
 $(PG_FILE_TEST): $(BUILDDIR)/pg_file_test.o $(BUILDDIR)/pg_core.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/package_common.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/cJSON.o | $(TOOLSDIR)
 	$(CC) $(CFLAGS) $^ -o $@
 
+package_suggestions_test: $(PACKAGE_SUGGESTIONS_TEST)
+
+$(PACKAGE_SUGGESTIONS_TEST): $(BUILDDIR)/package_suggestions_test.o $(BUILDDIR)/package_suggestions.o $(BUILDDIR)/alloc.o | $(TOOLSDIR)
+	$(CC) $(CFLAGS) $^ -o $@
+
 indexmaker: $(INDEXMAKER)
 
 $(INDEXMAKER): $(BUILDDIR)/indexmaker.o $(BUILDDIR)/registry.o $(BUILDDIR)/package_common.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/cJSON.o | $(TOOLSDIR)
@@ -803,12 +818,15 @@ help-report-html-gen: $(HELP_REPORT_HTML_GEN)
 $(HELP_REPORT_HTML_GEN): tools/help-report-html-gen.c | $(TOOLSDIR)
 	$(CC) $(CFLAGS) -Isrc -DCJSON_DISABLE_ARENA $< -o $@
 
-test: pg_core_test pg_file_test
+test: pg_core_test pg_file_test package_suggestions_test
 	@echo "Running pg_core_test..."
 	@$(PG_CORE_TEST)
 	@echo ""
 	@echo "Running pg_file_test..."
 	@$(PG_FILE_TEST) test/data
+	@echo ""
+	@echo "Running package_suggestions_test..."
+	@$(PACKAGE_SUGGESTIONS_TEST)
 
 # Print current version
 .PHONY: version

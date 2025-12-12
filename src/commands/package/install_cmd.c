@@ -1,5 +1,6 @@
 #include "package_common.h"
 #include "install_local_dev.h"
+#include "../../package_suggestions.h"
 #include "../../install.h"
 #include "../../global_context.h"
 #include "../../elm_json.h"
@@ -144,6 +145,23 @@ static void print_available_versions_for_package(InstallEnv *env, const char *au
     if (entry->version_count > limit) {
         fprintf(stderr, "  ... and %zu more\n", entry->version_count - limit);
     }
+}
+
+static void print_package_suggestions_block(const char *author, const char *name, const PackageSuggestion *suggestions, size_t count) {
+    if (!suggestions || count == 0) {
+        return;
+    }
+
+    fprintf(stderr, "\n%s-- UNKNOWN PACKAGE -------------------------------------------------------------%s\n\n",
+            ANSI_DULL_CYAN, ANSI_RESET);
+    fprintf(stderr, "I could not find '%s/%s' in the package registry, but I found\n", author, name);
+    fprintf(stderr, "these packages with similar names:\n\n");
+
+    for (size_t i = 0; i < count && i < MAX_PACKAGE_SUGGESTIONS; i++) {
+        fprintf(stderr, "    %s/%s\n", suggestions[i].author, suggestions[i].name);
+    }
+
+    fprintf(stderr, "\nMaybe you want one of these instead?\n\n");
 }
 
 static void print_target_version_conflict(const char *author, const char *name, const Version *version, bool include_guidance) {
@@ -363,8 +381,16 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
     size_t available_versions = 0;
 
     if (!package_exists_in_registry(env, author, name, &available_versions)) {
-        log_error("I cannot find package '%s/%s'", author, name);
-        log_error("Make sure the package name is correct");
+        PackageSuggestion suggestions[MAX_PACKAGE_SUGGESTIONS];
+        size_t suggestion_count = package_suggest_nearby_from_env(env, author, name, suggestions);
+
+        if (suggestion_count > 0) {
+            log_debug("Package '%s/%s' not found, showing suggestions", author, name);
+            print_package_suggestions_block(author, name, suggestions, suggestion_count);
+        } else {
+            log_error("I cannot find package '%s/%s'", author, name);
+            log_error("Make sure the package name is correct");
+        }
         return 1;
     }
 
