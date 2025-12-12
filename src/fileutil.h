@@ -48,6 +48,14 @@ bool copy_directory_selective(const char *src_path, const char *dest_path);
  */
 bool file_exists(const char *path);
 
+/* Find elm.json by walking up parent directories.
+ *
+ * If start_path is NULL, starts from the current working directory.
+ * If start_path is a file path, starts from its parent directory.
+ * Returns an arena-allocated path to the nearest elm.json, or NULL if not found.
+ */
+char *find_elm_json_upwards(const char *start_path);
+
 /* Read entire file contents into an arena-allocated buffer
  * Returns NULL on failure (file not found, read error, or allocation failure)
  * The returned string is null-terminated

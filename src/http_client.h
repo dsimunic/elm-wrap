@@ -37,6 +37,29 @@ HttpResult http_get_json(CurlSession *session, const char *url, MemoryBuffer *ou
 HttpResult http_download_file(CurlSession *session, const char *url, const char *dest_path);
 HttpResult http_head(CurlSession *session, const char *url);
 
+/* Conditional requests / ETag helpers
+ *
+ * If if_none_match is non-NULL, sends an If-None-Match header.
+ * If out_not_modified is non-NULL, it is set to true when HTTP 304 is received.
+ * If out_etag is non-NULL, it is set to the response ETag (arena-allocated) when provided.
+ */
+HttpResult http_get_json_etag(
+    CurlSession *session,
+    const char *url,
+    const char *if_none_match,
+    MemoryBuffer *out,
+    char **out_etag,
+    bool *out_not_modified
+);
+
+HttpResult http_head_etag(
+    CurlSession *session,
+    const char *url,
+    const char *if_none_match,
+    char **out_etag,
+    bool *out_not_modified
+);
+
 /* Memory buffer operations */
 MemoryBuffer* memory_buffer_create(void);
 void memory_buffer_free(MemoryBuffer *buf);

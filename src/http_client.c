@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #define DEFAULT_TIMEOUT_MS 10000
 #define CONNECT_TEST_TIMEOUT_MS 2000
@@ -15,7 +16,84 @@ struct CurlSession {
     long timeout_ms;
     struct curl_slist *headers;
     char error_buffer[CURL_ERROR_SIZE];
+    char *cainfo;
 };
+
+typedef struct {
+    char *etag;
+} HeaderCapture;
+
+static void curl_session_apply_defaults(CurlSession *session) {
+    if (!session || !session->handle) return;
+
+    session->error_buffer[0] = '\0';
+
+    curl_easy_setopt(session->handle, CURLOPT_USERAGENT, "Elm/0.19.1 (libcurl)");
+    curl_easy_setopt(session->handle, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(session->handle, CURLOPT_ACCEPT_ENCODING, "");
+    curl_easy_setopt(session->handle, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(session->handle, CURLOPT_TIMEOUT_MS, session->timeout_ms);
+    curl_easy_setopt(session->handle, CURLOPT_ERRORBUFFER, session->error_buffer);
+
+    /* TLS verification defaults */
+    curl_easy_setopt(session->handle, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(session->handle, CURLOPT_SSL_VERIFYHOST, 2L);
+
+    if (session->cainfo) {
+        curl_easy_setopt(session->handle, CURLOPT_CAINFO, session->cainfo);
+    }
+}
+
+static void curl_session_prepare_request(CurlSession *session) {
+    if (!session || !session->handle) return;
+    curl_easy_reset(session->handle);
+    curl_session_apply_defaults(session);
+}
+
+static size_t header_cb(char *buffer, size_t size, size_t nitems, void *userdata) {
+    size_t total = size * nitems;
+    HeaderCapture *cap = (HeaderCapture *)userdata;
+    if (!buffer || total == 0 || !cap) {
+        return total;
+    }
+
+    /* Match "ETag:" case-insensitively */
+    const char *prefix = "etag:";
+    if (total >= 5) {
+        char tmp[6];
+        size_t copy = (total < 5) ? total : 5;
+        for (size_t i = 0; i < copy; i++) {
+            tmp[i] = (char)tolower((unsigned char)buffer[i]);
+        }
+        tmp[copy] = '\0';
+
+        if (strcmp(tmp, prefix) == 0) {
+            char *start = buffer + 5;
+            char *end = buffer + (long)total;
+            while (start < end && (*start == ' ' || *start == '\t')) {
+                start++;
+            }
+            while (end > start && (end[-1] == '\r' || end[-1] == '\n' || end[-1] == ' ' || end[-1] == '\t')) {
+                end--;
+            }
+
+            size_t vlen = (size_t)(end - start);
+            if (vlen > 0) {
+                char *val = arena_malloc(vlen + 1);
+                if (val) {
+                    memcpy(val, start, vlen);
+                    val[vlen] = '\0';
+                    if (cap->etag) {
+                        arena_free(cap->etag);
+                    }
+                    cap->etag = val;
+                }
+            }
+        }
+    }
+
+    return total;
+}
 
 /* Write callback for libcurl */
 static size_t write_cb(void *contents, size_t size, size_t nmemb, void *userdata) {
@@ -62,27 +140,16 @@ CurlSession* curl_session_create(void) {
 
     session->timeout_ms = DEFAULT_TIMEOUT_MS;
     session->headers = NULL;
+    session->cainfo = NULL;
     session->error_buffer[0] = '\0';
 
-    /* Configure session defaults */
-    curl_easy_setopt(session->handle, CURLOPT_USERAGENT, "Elm/0.19.1 (libcurl)");
-    curl_easy_setopt(session->handle, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(session->handle, CURLOPT_ACCEPT_ENCODING, "");  /* Accept all supported encodings */
-    curl_easy_setopt(session->handle, CURLOPT_NOSIGNAL, 1L);  /* Thread-safe */
-    curl_easy_setopt(session->handle, CURLOPT_TIMEOUT_MS, session->timeout_ms);
-    curl_easy_setopt(session->handle, CURLOPT_ERRORBUFFER, session->error_buffer);
-
-    /* TLS verification defaults */
-    curl_easy_setopt(session->handle, CURLOPT_SSL_VERIFYPEER, 1L);
-    curl_easy_setopt(session->handle, CURLOPT_SSL_VERIFYHOST, 2L);
-
-    /* Respect environment variables for CA bundle */
+    /* Determine CA bundle path once so curl_easy_reset() doesn't lose it */
     const char *ca_bundle = getenv("CURL_CA_BUNDLE");
-    if (!ca_bundle) {
+    if (!ca_bundle || ca_bundle[0] == '\0') {
         ca_bundle = getenv("SSL_CERT_FILE");
     }
-    if (ca_bundle) {
-        curl_easy_setopt(session->handle, CURLOPT_CAINFO, ca_bundle);
+    if (ca_bundle && ca_bundle[0] != '\0') {
+        session->cainfo = arena_strdup(ca_bundle);
     } else {
         /* Try common CA bundle locations for portability across distros */
         const char *ca_paths[] = {
@@ -93,16 +160,18 @@ CurlSession* curl_session_create(void) {
             "/usr/local/share/certs/ca-root-nss.crt", /* FreeBSD */
             NULL
         };
-        
+
         for (int i = 0; ca_paths[i] != NULL; i++) {
             FILE *test = fopen(ca_paths[i], "r");
             if (test) {
                 fclose(test);
-                curl_easy_setopt(session->handle, CURLOPT_CAINFO, ca_paths[i]);
+                session->cainfo = arena_strdup(ca_paths[i]);
                 break;
             }
         }
     }
+
+    curl_session_apply_defaults(session);
 
     return session;
 }
@@ -118,6 +187,10 @@ void curl_session_free(CurlSession *session) {
         curl_easy_cleanup(session->handle);
     }
 
+    if (session->cainfo) {
+        arena_free(session->cainfo);
+    }
+
     arena_free(session);
 }
 
@@ -127,10 +200,8 @@ bool curl_session_can_connect(CurlSession *session, const char *test_url) {
 
     CURL *handle = session->handle;
 
-    /* Save current timeout */
-    long saved_timeout = session->timeout_ms;
+    curl_session_prepare_request(session);
 
-    /* Set short timeout for connectivity test */
     curl_easy_setopt(handle, CURLOPT_TIMEOUT_MS, CONNECT_TEST_TIMEOUT_MS);
     curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT_MS, CONNECT_TEST_TIMEOUT_MS);
     curl_easy_setopt(handle, CURLOPT_URL, test_url);
@@ -149,10 +220,6 @@ bool curl_session_can_connect(CurlSession *session, const char *test_url) {
         log_debug("Connection test failed: %s (code %d)", error_msg, res);
     }
 
-    /* Restore timeout */
-    curl_easy_setopt(handle, CURLOPT_TIMEOUT_MS, saved_timeout);
-    curl_easy_setopt(handle, CURLOPT_NOBODY, 0L);
-
     return (res == CURLE_OK);
 }
 
@@ -170,6 +237,8 @@ HttpResult http_download_file(CurlSession *session, const char *url, const char 
     if (!session || !url || !dest_path) return HTTP_ERROR_INIT;
 
     CURL *handle = session->handle;
+
+    curl_session_prepare_request(session);
 
     /* Open file for writing */
     FILE *file = fopen(dest_path, "wb");
@@ -223,15 +292,14 @@ HttpResult http_head(CurlSession *session, const char *url) {
 
     CURL *handle = session->handle;
 
+    curl_session_prepare_request(session);
+
     curl_easy_setopt(handle, CURLOPT_URL, url);
     curl_easy_setopt(handle, CURLOPT_NOBODY, 1L);
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, NULL);
     curl_easy_setopt(handle, CURLOPT_WRITEDATA, NULL);
 
     CURLcode res = curl_easy_perform(handle);
-
-    /* Reset to GET */
-    curl_easy_setopt(handle, CURLOPT_NOBODY, 0L);
 
     if (res != CURLE_OK) {
         if (res == CURLE_OPERATION_TIMEDOUT) {
@@ -254,11 +322,97 @@ HttpResult http_head(CurlSession *session, const char *url) {
     return HTTP_ERROR_NETWORK;
 }
 
+HttpResult http_head_etag(
+    CurlSession *session,
+    const char *url,
+    const char *if_none_match,
+    char **out_etag,
+    bool *out_not_modified
+) {
+    if (out_not_modified) {
+        *out_not_modified = false;
+    }
+    if (out_etag) {
+        *out_etag = NULL;
+    }
+
+    if (!session || !url) return HTTP_ERROR_INIT;
+
+    CURL *handle = session->handle;
+    curl_session_prepare_request(session);
+
+    HeaderCapture cap = {0};
+
+    struct curl_slist *hdrs = NULL;
+    char *header_line = NULL;
+    if (if_none_match && if_none_match[0] != '\0') {
+        size_t hlen = strlen("If-None-Match: ") + strlen(if_none_match) + 1;
+        header_line = arena_malloc(hlen);
+        if (!header_line) {
+            return HTTP_ERROR_MEMORY;
+        }
+        snprintf(header_line, hlen, "If-None-Match: %s", if_none_match);
+        hdrs = curl_slist_append(hdrs, header_line);
+        curl_easy_setopt(handle, CURLOPT_HTTPHEADER, hdrs);
+    }
+
+    curl_easy_setopt(handle, CURLOPT_URL, url);
+    curl_easy_setopt(handle, CURLOPT_NOBODY, 1L);
+    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, NULL);
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, NULL);
+    curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, header_cb);
+    curl_easy_setopt(handle, CURLOPT_HEADERDATA, &cap);
+
+    CURLcode res = curl_easy_perform(handle);
+
+    if (hdrs) {
+        curl_slist_free_all(hdrs);
+    }
+    if (header_line) {
+        arena_free(header_line);
+    }
+
+    if (res != CURLE_OK) {
+        if (res == CURLE_OPERATION_TIMEDOUT) {
+            return HTTP_ERROR_TIMEOUT;
+        }
+        return HTTP_ERROR_NETWORK;
+    }
+
+    long response_code;
+    curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &response_code);
+    if (response_code == 304) {
+        if (out_not_modified) {
+            *out_not_modified = true;
+        }
+        if (out_etag && cap.etag) {
+            *out_etag = cap.etag;
+        }
+        return HTTP_OK;
+    }
+
+    if (out_etag && cap.etag) {
+        *out_etag = cap.etag;
+    }
+
+    if (http_is_success(response_code)) {
+        return HTTP_OK;
+    } else if (http_is_client_error(response_code)) {
+        return HTTP_ERROR_4XX;
+    } else if (http_is_server_error(response_code)) {
+        return HTTP_ERROR_5XX;
+    }
+
+    return HTTP_ERROR_NETWORK;
+}
+
 /* HTTP GET with JSON response */
 HttpResult http_get_json(CurlSession *session, const char *url, MemoryBuffer *out) {
     if (!session || !url || !out) return HTTP_ERROR_INIT;
 
     CURL *handle = session->handle;
+
+    curl_session_prepare_request(session);
 
     /* Clear output buffer */
     memory_buffer_clear(out);
@@ -282,6 +436,92 @@ HttpResult http_get_json(CurlSession *session, const char *url, MemoryBuffer *ou
     /* Check HTTP response code */
     long response_code;
     curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &response_code);
+
+    if (http_is_success(response_code)) {
+        return HTTP_OK;
+    } else if (http_is_client_error(response_code)) {
+        return HTTP_ERROR_4XX;
+    } else if (http_is_server_error(response_code)) {
+        return HTTP_ERROR_5XX;
+    }
+
+    return HTTP_ERROR_NETWORK;
+}
+
+HttpResult http_get_json_etag(
+    CurlSession *session,
+    const char *url,
+    const char *if_none_match,
+    MemoryBuffer *out,
+    char **out_etag,
+    bool *out_not_modified
+) {
+    if (out_not_modified) {
+        *out_not_modified = false;
+    }
+    if (out_etag) {
+        *out_etag = NULL;
+    }
+
+    if (!session || !url || !out) return HTTP_ERROR_INIT;
+
+    CURL *handle = session->handle;
+    curl_session_prepare_request(session);
+
+    HeaderCapture cap = {0};
+
+    /* Clear output buffer */
+    memory_buffer_clear(out);
+
+    struct curl_slist *hdrs = NULL;
+    char *header_line = NULL;
+    if (if_none_match && if_none_match[0] != '\0') {
+        size_t hlen = strlen("If-None-Match: ") + strlen(if_none_match) + 1;
+        header_line = arena_malloc(hlen);
+        if (!header_line) {
+            return HTTP_ERROR_MEMORY;
+        }
+        snprintf(header_line, hlen, "If-None-Match: %s", if_none_match);
+        hdrs = curl_slist_append(hdrs, header_line);
+        curl_easy_setopt(handle, CURLOPT_HTTPHEADER, hdrs);
+    }
+
+    curl_easy_setopt(handle, CURLOPT_URL, url);
+    curl_easy_setopt(handle, CURLOPT_HTTPGET, 1L);
+    curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, write_cb);
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, out);
+    curl_easy_setopt(handle, CURLOPT_HEADERFUNCTION, header_cb);
+    curl_easy_setopt(handle, CURLOPT_HEADERDATA, &cap);
+
+    CURLcode res = curl_easy_perform(handle);
+
+    if (hdrs) {
+        curl_slist_free_all(hdrs);
+    }
+    if (header_line) {
+        arena_free(header_line);
+    }
+
+    if (res != CURLE_OK) {
+        if (res == CURLE_OPERATION_TIMEDOUT) {
+            return HTTP_ERROR_TIMEOUT;
+        }
+        return HTTP_ERROR_NETWORK;
+    }
+
+    long response_code;
+    curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &response_code);
+
+    if (out_etag && cap.etag) {
+        *out_etag = cap.etag;
+    }
+
+    if (response_code == 304) {
+        if (out_not_modified) {
+            *out_not_modified = true;
+        }
+        return HTTP_OK;
+    }
 
     if (http_is_success(response_code)) {
         return HTTP_OK;

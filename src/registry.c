@@ -168,6 +168,12 @@ Registry* registry_load_from_dat(const char *path, size_t *known_count) {
         return NULL;
     }
 
+    if (total_versions > (uint64_t)SIZE_MAX) {
+        log_error("Registry total_versions too large in %s", path);
+        registry_free(registry);
+        fclose(f);
+        return NULL;
+    }
     registry->total_versions = (size_t)total_versions;
     if (known_count) {
         *known_count = registry->total_versions;
@@ -182,9 +188,23 @@ Registry* registry_load_from_dat(const char *path, size_t *known_count) {
         return NULL;
     }
 
+    if (entry_count > (uint64_t)SIZE_MAX) {
+        log_error("Registry entry_count too large in %s", path);
+        registry_free(registry);
+        fclose(f);
+        return NULL;
+    }
+
+    if ((size_t)entry_count > (SIZE_MAX / sizeof(RegistryEntry))) {
+        log_error("Registry entry_count would overflow allocation in %s", path);
+        registry_free(registry);
+        fclose(f);
+        return NULL;
+    }
+
     /* Ensure capacity */
     if (entry_count > registry->capacity) {
-        registry->capacity = entry_count;
+        registry->capacity = (size_t)entry_count;
         RegistryEntry *new_entries = arena_realloc(registry->entries, sizeof(RegistryEntry) * registry->capacity);
         if (!new_entries) {
             registry_free(registry);
@@ -256,8 +276,24 @@ Registry* registry_load_from_dat(const char *path, size_t *known_count) {
             return NULL;
         }
 
-        /* Allocate versions array */
+        if (prev_count > (uint64_t)SIZE_MAX - 1) {
+            log_error("Registry prev_count too large for %s/%s", author, name);
+            arena_free(author);
+            arena_free(name);
+            registry_free(registry);
+            fclose(f);
+            return NULL;
+        }
+
         size_t total_version_count = 1 + (size_t)prev_count;
+        if (total_version_count > (SIZE_MAX / sizeof(Version))) {
+            log_error("Registry version_count would overflow allocation for %s/%s", author, name);
+            arena_free(author);
+            arena_free(name);
+            registry_free(registry);
+            fclose(f);
+            return NULL;
+        }
         Version *versions = arena_malloc(sizeof(Version) * total_version_count);
         if (!versions) {
             arena_free(author);

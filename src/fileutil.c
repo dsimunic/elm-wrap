@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <libgen.h>
 #include <limits.h>
+#include <ctype.h>
 
 #ifndef PATH_MAX
 #define PATH_MAX MAX_PATH_LENGTH
@@ -192,6 +193,96 @@ bool extract_zip_selective(const char *zip_path, const char *dest_dir) {
 
     mz_zip_reader_end(&zip);
     return success;
+}
+
+char *find_elm_json_upwards(const char *start_path) {
+    char cwd[MAX_PATH_LENGTH];
+    const char *initial = start_path;
+
+    if (!initial) {
+        if (!getcwd(cwd, sizeof(cwd))) {
+            return NULL;
+        }
+        initial = cwd;
+    }
+
+    char *path = arena_strdup(initial);
+    if (!path) {
+        return NULL;
+    }
+
+    /* If start_path is a file, start from its parent directory */
+    struct stat st;
+    if (stat(path, &st) == 0 && S_ISREG(st.st_mode)) {
+        char *slash = strrchr(path, '/');
+        if (slash) {
+            if (slash == path) {
+                /* File in root dir */
+                path[1] = '\0';
+            } else {
+                *slash = '\0';
+            }
+        } else {
+            /* Relative filename with no slash */
+            arena_free(path);
+            path = arena_strdup(".");
+            if (!path) {
+                return NULL;
+            }
+        }
+    }
+
+    char *stripped = strip_trailing_slash(path);
+    if (stripped) {
+        arena_free(path);
+        path = stripped;
+    }
+
+    while (true) {
+        const bool is_root = (strcmp(path, "/") == 0);
+        size_t buf_len = strlen(path) + (is_root ? sizeof("elm.json") : sizeof("/elm.json"));
+
+        char *candidate = arena_malloc(buf_len);
+        if (!candidate) {
+            arena_free(path);
+            return NULL;
+        }
+
+        if (is_root) {
+            snprintf(candidate, buf_len, "/elm.json");
+        } else {
+            snprintf(candidate, buf_len, "%s/elm.json", path);
+        }
+
+        if (file_exists(candidate)) {
+            arena_free(path);
+            return candidate;
+        }
+        arena_free(candidate);
+
+        /* Go up one directory */
+        char *slash = strrchr(path, '/');
+        if (!slash) {
+            break;
+        }
+        if (slash == path) {
+            /* Reached root */
+            break;
+        }
+        *slash = '\0';
+
+        /* Strip any trailing slashes introduced by truncation */
+        while (path[0] != '\0') {
+            size_t len = strlen(path);
+            if (len <= 1 || path[len - 1] != '/') {
+                break;
+            }
+            path[len - 1] = '\0';
+        }
+    }
+
+    arena_free(path);
+    return NULL;
 }
 
 char* find_first_subdirectory(const char *dir_path) {

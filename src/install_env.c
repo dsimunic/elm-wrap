@@ -1,5 +1,6 @@
 #include "install_env.h"
 #include "alloc.h"
+#include "constants.h"
 #include "env_defaults.h"
 #include "vendor/cJSON.h"
 #include "vendor/sha1.h"
@@ -17,6 +18,75 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <limits.h>
+#include <errno.h>
+
+static char *registry_etag_file_path(const char *registry_dat_path) {
+    if (!registry_dat_path) return NULL;
+
+    size_t len = strlen(registry_dat_path) + strlen(".etag") + 1;
+    char *path = arena_malloc(len);
+    if (!path) return NULL;
+    snprintf(path, len, "%s.etag", registry_dat_path);
+    return path;
+}
+
+static void trim_trailing_ws_in_place(char *s) {
+    if (!s) return;
+    size_t len = strlen(s);
+    while (len > 0) {
+        char c = s[len - 1];
+        if (c == '\n' || c == '\r' || c == ' ' || c == '\t') {
+            s[len - 1] = '\0';
+            len--;
+            continue;
+        }
+        break;
+    }
+}
+
+static char *registry_etag_read_from_disk(const char *etag_path) {
+    if (!etag_path) return NULL;
+    char *contents = file_read_contents(etag_path);
+    if (!contents) return NULL;
+    trim_trailing_ws_in_place(contents);
+    if (contents[0] == '\0') {
+        arena_free(contents);
+        return NULL;
+    }
+    return contents;
+}
+
+static bool registry_etag_write_to_disk(const char *etag_path, const char *etag) {
+    if (!etag_path || !etag || etag[0] == '\0') return false;
+
+    char tmp_path[MAX_TEMP_PATH_LENGTH];
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", etag_path);
+
+    FILE *f = fopen(tmp_path, "wb");
+    if (!f) {
+        log_debug("Failed to open %s for writing: %s", tmp_path, strerror(errno));
+        return false;
+    }
+
+    size_t len = strlen(etag);
+    if (fwrite(etag, 1, len, f) != len || fputc('\n', f) == EOF) {
+        fclose(f);
+        unlink(tmp_path);
+        return false;
+    }
+
+    fflush(f);
+    fsync(fileno(f));
+    fclose(f);
+
+    if (rename(tmp_path, etag_path) != 0) {
+        log_debug("Failed to rename %s to %s: %s", tmp_path, etag_path, strerror(errno));
+        unlink(tmp_path);
+        return false;
+    }
+
+    return true;
+}
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
@@ -231,6 +301,13 @@ bool install_env_init(InstallEnv *env) {
 
         env->registry = registry_load_from_dat(env->cache->registry_path, &env->known_version_count);
 
+        /* Load cached ETag (best-effort) */
+        char *etag_path = registry_etag_file_path(env->cache->registry_path);
+        if (etag_path) {
+            env->registry_etag = registry_etag_read_from_disk(etag_path);
+            arena_free(etag_path);
+        }
+
         if (env->registry) {
             log_progress("Loaded cached registry: %zu packages, %zu versions",
                    env->registry->entry_count, env->registry->total_versions);
@@ -329,7 +406,9 @@ bool install_env_fetch_registry(InstallEnv *env) {
         return false;
     }
 
-    HttpResult result = http_get_json(env->curl_session, url, buffer);
+    char *new_etag = NULL;
+    bool not_modified = false;
+    HttpResult result = http_get_json_etag(env->curl_session, url, env->registry_etag, buffer, &new_etag, &not_modified);
 
     if (result != HTTP_OK) {
         fprintf(stderr, "Error: Failed to fetch registry\n");
@@ -340,6 +419,22 @@ bool install_env_fetch_registry(InstallEnv *env) {
         memory_buffer_free(buffer);
         env->offline = true;
         return false;
+    }
+
+    if (not_modified) {
+        /* Should not generally happen on first fetch, but treat as success */
+        log_progress("Registry not modified (ETag match)");
+        memory_buffer_free(buffer);
+        if (new_etag) {
+            if (env->registry_etag) arena_free(env->registry_etag);
+            env->registry_etag = new_etag;
+            char *etag_path = registry_etag_file_path(env->cache->registry_path);
+            if (etag_path) {
+                registry_etag_write_to_disk(etag_path, env->registry_etag);
+                arena_free(etag_path);
+            }
+        }
+        return true;
     }
 
     printf("Downloaded %zu bytes\n", buffer->len);
@@ -363,11 +458,54 @@ bool install_env_fetch_registry(InstallEnv *env) {
         env->known_version_count = env->registry->total_versions;
     }
 
+    if (new_etag) {
+        if (env->registry_etag) {
+            arena_free(env->registry_etag);
+        }
+        env->registry_etag = new_etag;
+        char *etag_path = registry_etag_file_path(env->cache->registry_path);
+        if (etag_path) {
+            registry_etag_write_to_disk(etag_path, env->registry_etag);
+            arena_free(etag_path);
+        }
+    }
+
     return true;
 }
 
 bool install_env_update_registry(InstallEnv *env) {
     if (!env || !env->curl_session || !env->registry_url) return false;
+
+    /* If we have an ETag, do a quick HEAD check to avoid /since when unchanged */
+    if (env->registry_etag && env->registry_etag[0] != '\0') {
+        char all_url[URL_MAX];
+        snprintf(all_url, sizeof(all_url), "%s/all-packages", env->registry_url);
+        char *head_etag = NULL;
+        bool not_modified = false;
+        HttpResult head_res = http_head_etag(env->curl_session, all_url, env->registry_etag, &head_etag, &not_modified);
+        if (head_res == HTTP_OK && not_modified) {
+            log_progress("Registry is up to date (ETag match)");
+            if (head_etag) {
+                /* Some servers include ETag on 304; keep it */
+                arena_free(env->registry_etag);
+                env->registry_etag = head_etag;
+                char *etag_path = registry_etag_file_path(env->cache->registry_path);
+                if (etag_path) {
+                    registry_etag_write_to_disk(etag_path, env->registry_etag);
+                    arena_free(etag_path);
+                }
+            }
+            return true;
+        }
+
+        if (head_res == HTTP_OK && head_etag) {
+            /* Keep new ETag; will write after successful update */
+            if (env->registry_etag) {
+                arena_free(env->registry_etag);
+            }
+            env->registry_etag = head_etag;
+        }
+    }
 
     char url[URL_MAX];
     snprintf(url, sizeof(url), "%s/all-packages/since/%zu",
@@ -412,6 +550,15 @@ bool install_env_update_registry(InstallEnv *env) {
         }
     } else {
         log_progress("Registry is up to date");
+    }
+
+    /* Persist ETag from latest HEAD check (best-effort) */
+    if (env->registry_etag && env->registry_etag[0] != '\0') {
+        char *etag_path = registry_etag_file_path(env->cache->registry_path);
+        if (etag_path) {
+            registry_etag_write_to_disk(etag_path, env->registry_etag);
+            arena_free(etag_path);
+        }
     }
 
     return true;

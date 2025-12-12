@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <errno.h>
 
 /* Package operations */
 Package* package_create(const char *author, const char *name, const char *version) {
@@ -381,10 +382,8 @@ static void package_map_sort(PackageMap *map) {
  * - Proper array formatting with newlines
  * - Trailing newline
  */
-static bool write_elm_json_formatted(cJSON *json, const char *filepath) {
-    FILE *file = fopen(filepath, "w");
-    if (!file) {
-        log_error("Could not open %s for writing", filepath);
+static bool write_elm_json_formatted_to_file(cJSON *json, FILE *file) {
+    if (!json || !file) {
         return false;
     }
     
@@ -493,9 +492,50 @@ static bool write_elm_json_formatted(cJSON *json, const char *filepath) {
     }
     
     fputs("}\n", file);
-    fclose(file);
-    
+
     #undef INDENT
+    return true;
+}
+
+static bool write_elm_json_formatted_atomic(cJSON *json, const char *filepath) {
+    if (!json || !filepath) {
+        return false;
+    }
+
+    size_t tmp_len = strlen(filepath) + sizeof(".tmp");
+    char *tmp_path = arena_malloc(tmp_len);
+    if (!tmp_path) {
+        return false;
+    }
+    snprintf(tmp_path, tmp_len, "%s.tmp", filepath);
+
+    FILE *file = fopen(tmp_path, "w");
+    if (!file) {
+        log_error("Could not open %s for writing: %s", tmp_path, strerror(errno));
+        arena_free(tmp_path);
+        return false;
+    }
+
+    bool ok = write_elm_json_formatted_to_file(json, file);
+    if (!ok) {
+        fclose(file);
+        unlink(tmp_path);
+        arena_free(tmp_path);
+        return false;
+    }
+
+    fflush(file);
+    fsync(fileno(file));
+    fclose(file);
+
+    if (rename(tmp_path, filepath) != 0) {
+        log_error("Could not replace %s: %s", filepath, strerror(errno));
+        unlink(tmp_path);
+        arena_free(tmp_path);
+        return false;
+    }
+
+    arena_free(tmp_path);
     return true;
 }
 
@@ -640,8 +680,8 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
         }
     }
     
-    // Use custom formatter instead of cJSON_Print
-    bool result = write_elm_json_formatted(json, filepath);
+    /* Use custom formatter instead of cJSON_Print; write atomically */
+    bool result = write_elm_json_formatted_atomic(json, filepath);
     cJSON_Delete(json);
     
     return result;

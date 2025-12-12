@@ -244,7 +244,7 @@ static bool create_pin_file(const char *pkg_path, const char *version) {
     return true;
 }
 
-static int install_package(const PackageInstallSpec *spec, bool is_test, bool major_upgrade, bool upgrade_all, bool auto_yes, ElmJson *elm_json, InstallEnv *env) {
+static int install_package(const PackageInstallSpec *spec, bool is_test, bool major_upgrade, bool upgrade_all, bool auto_yes, ElmJson *elm_json, InstallEnv *env, const char *elm_json_path) {
     const char *author = spec->author;
     const char *name = spec->name;
     const Version *target_version = spec->has_version ? &spec->version : NULL;
@@ -307,7 +307,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
                     package_map_add(elm_json->dependencies_test_direct, author, name, test_indirect->version);
                     package_map_remove(elm_json->dependencies_test_indirect, author, name);
                     printf("Promoted %s/%s from test-indirect to test-direct dependencies.\n", author, name);
-                    if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+                    if (!elm_json_write(elm_json, elm_json_path)) {
                         log_error("Failed to write elm.json");
                         return 1;
                     }
@@ -317,7 +317,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
                 /* Package is in production deps (direct or indirect) - add to test-direct */
                 package_map_add(elm_json->dependencies_test_direct, author, name, existing_pkg->version);
                 printf("Added %s/%s to test-direct dependencies (already available as production dependency).\n", author, name);
-                if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+                if (!elm_json_write(elm_json, elm_json_path)) {
                     log_error("Failed to write elm.json");
                     return 1;
                 }
@@ -332,7 +332,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
                 /* Package is in main deps - add to test deps */
                 package_map_add(elm_json->package_test_dependencies, author, name, existing_pkg->version);
                 printf("Added %s/%s to test-dependencies (already available as main dependency).\n", author, name);
-                if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+                if (!elm_json_write(elm_json, elm_json_path)) {
                     log_error("Failed to write elm.json");
                     return 1;
                 }
@@ -343,7 +343,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
             if (promotion != PROMOTION_NONE) {
                 if (elm_json_promote_package(elm_json, author, name)) {
                     log_debug("Saving updated elm.json");
-                    if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+                    if (!elm_json_write(elm_json, elm_json_path)) {
                         log_error("Failed to write elm.json");
                         return 1;
                     }
@@ -614,7 +614,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
     }
 
     printf("Saving elm.json...\n");
-    if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+    if (!elm_json_write(elm_json, elm_json_path)) {
         fprintf(stderr, "Error: Failed to write elm.json\n");
         install_plan_free(out_plan);
         return 1;
@@ -626,7 +626,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
             PackageChange *change = &out_plan->changes[i];
             if (change->new_version) {
                 register_local_dev_tracking_if_needed(change->author, change->name,
-                                                      change->new_version, ELM_JSON_PATH);
+                                                      change->new_version, elm_json_path);
             }
         }
     }
@@ -684,7 +684,8 @@ static int install_multiple_packages(
     bool upgrade_all,
     bool auto_yes,
     ElmJson *elm_json,
-    InstallEnv *env
+    InstallEnv *env,
+    const char *elm_json_path
 ) {
     for (int i = 0; i < specs_count; i++) {
         const PackageInstallSpec *spec = &specs[i];
@@ -1037,7 +1038,7 @@ static int install_multiple_packages(
     }
 
     printf("Saving elm.json...\n");
-    if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+    if (!elm_json_write(elm_json, elm_json_path)) {
         fprintf(stderr, "Error: Failed to write elm.json\n");
         if (out_plan) install_plan_free(out_plan);
         arena_free(promotions);
@@ -1050,7 +1051,7 @@ static int install_multiple_packages(
             PackageChange *change = &out_plan->changes[i];
             if (change->new_version) {
                 register_local_dev_tracking_if_needed(change->author, change->name,
-                                                      change->new_version, ELM_JSON_PATH);
+                                                      change->new_version, elm_json_path);
             }
         }
     }
@@ -1361,11 +1362,21 @@ int cmd_install(int argc, char *argv[]) {
 
     log_debug("ELM_HOME: %s", env->cache->elm_home);
 
-    log_debug("Reading elm.json");
-    ElmJson *elm_json = elm_json_read(ELM_JSON_PATH);
+    char *project_elm_json_path = find_elm_json_upwards(NULL);
+    if (!project_elm_json_path) {
+        log_error("Could not find elm.json in current or parent directories");
+        log_error("Have you run 'elm init' or '%s init'?", global_context_program_name());
+        install_env_free(env);
+        log_set_level(original_level);
+        return 1;
+    }
+
+    log_debug("Reading elm.json (%s)", project_elm_json_path);
+    ElmJson *elm_json = elm_json_read(project_elm_json_path);
     if (!elm_json) {
         log_error("Could not read elm.json");
         log_error("Have you run 'elm init' or '%s init'?", global_context_program_name());
+        arena_free(project_elm_json_path);
         install_env_free(env);
         return 1;
     }
@@ -1376,6 +1387,7 @@ int cmd_install(int argc, char *argv[]) {
         /* Handle --remove-local-dev: unregister package from local-dev tracking */
         elm_json_free(elm_json);
         result = unregister_local_dev_package(env);
+        arena_free(project_elm_json_path);
         install_env_free(env);
         log_set_level(original_level);
         return result;
@@ -1406,14 +1418,16 @@ int cmd_install(int argc, char *argv[]) {
             /* Register-only mode: just put in cache and registry */
             result = register_local_dev_package(source_path, package_name, env, auto_yes, false);
             elm_json_free(elm_json);
+            arena_free(project_elm_json_path);
             install_env_free(env);
             log_set_level(original_level);
             return result;
         }
         
-        result = install_local_dev(source_path, package_name, ELM_JSON_PATH, env, is_test, auto_yes);
+        result = install_local_dev(source_path, package_name, project_elm_json_path, env, is_test, auto_yes);
         
         elm_json_free(elm_json);
+        arena_free(project_elm_json_path);
         install_env_free(env);
         log_set_level(original_level);
         return result;
@@ -1449,6 +1463,7 @@ int cmd_install(int argc, char *argv[]) {
                 arena_free(author);
                 arena_free(name);
                 elm_json_free(elm_json);
+                arena_free(project_elm_json_path);
                 install_env_free(env);
                 log_set_level(original_level);
                 return 1;
@@ -1459,6 +1474,7 @@ int cmd_install(int argc, char *argv[]) {
                 arena_free(author);
                 arena_free(name);
                 elm_json_free(elm_json);
+                arena_free(project_elm_json_path);
                 install_env_free(env);
                 log_set_level(original_level);
                 return 1;
@@ -1475,41 +1491,44 @@ int cmd_install(int argc, char *argv[]) {
             arena_free(author);
             arena_free(name);
             elm_json_free(elm_json);
+            arena_free(project_elm_json_path);
             install_env_free(env);
             log_set_level(original_level);
             return 1;
         }
 
-        char elm_json_path[2048];
+        char pkg_elm_json_path[2048];
         if (S_ISDIR(st.st_mode)) {
-            snprintf(elm_json_path, sizeof(elm_json_path), "%s/elm.json", from_file_path);
+            snprintf(pkg_elm_json_path, sizeof(pkg_elm_json_path), "%s/elm.json", from_file_path);
         } else {
             fprintf(stderr, "Error: --from-file requires a directory path\n");
             arena_free(author);
             arena_free(name);
             elm_json_free(elm_json);
+            arena_free(project_elm_json_path);
             install_env_free(env);
             log_set_level(original_level);
             return 1;
         }
 
-        if (stat(elm_json_path, &st) != 0) {
+        if (stat(pkg_elm_json_path, &st) != 0) {
             char *found_path = find_package_elm_json(from_file_path);
             if (found_path) {
-                snprintf(elm_json_path, sizeof(elm_json_path), "%s", found_path);
+                snprintf(pkg_elm_json_path, sizeof(pkg_elm_json_path), "%s", found_path);
                 arena_free(found_path);
             } else {
                 fprintf(stderr, "Error: Could not find elm.json in %s\n", from_file_path);
                 arena_free(author);
                 arena_free(name);
                 elm_json_free(elm_json);
+                arena_free(project_elm_json_path);
                 install_env_free(env);
                 log_set_level(original_level);
                 return 1;
             }
         }
 
-        if (read_package_info_from_elm_json(elm_json_path, &actual_author, &actual_name, &actual_version)) {
+        if (read_package_info_from_elm_json(pkg_elm_json_path, &actual_author, &actual_name, &actual_version)) {
             if (strcmp(author, actual_author) != 0 || strcmp(name, actual_name) != 0) {
                 printf("Warning: Package name in elm.json (%s/%s) differs from specified name (%s/%s)\n",
                        actual_author, actual_name, author, name);
@@ -1528,6 +1547,7 @@ int cmd_install(int argc, char *argv[]) {
                         arena_free(author);
                         arena_free(name);
                         elm_json_free(elm_json);
+                        arena_free(project_elm_json_path);
                         install_env_free(env);
                         log_set_level(original_level);
                         return 0;
@@ -1541,10 +1561,11 @@ int cmd_install(int argc, char *argv[]) {
             name = actual_name;
             version = actual_version;
         } else {
-            fprintf(stderr, "Error: Could not read package information from %s\n", elm_json_path);
+            fprintf(stderr, "Error: Could not read package information from %s\n", pkg_elm_json_path);
             arena_free(author);
             arena_free(name);
             elm_json_free(elm_json);
+            arena_free(project_elm_json_path);
             install_env_free(env);
             log_set_level(original_level);
             return 1;
@@ -1574,6 +1595,7 @@ int cmd_install(int argc, char *argv[]) {
                 printf("Aborted.\n");
                 if (version) arena_free(version);
                 elm_json_free(elm_json);
+                arena_free(project_elm_json_path);
                 install_env_free(env);
                 log_set_level(original_level);
                 return 0;
@@ -1584,6 +1606,7 @@ int cmd_install(int argc, char *argv[]) {
             fprintf(stderr, "Error: Failed to install package from file\n");
             if (version) arena_free(version);
             elm_json_free(elm_json);
+            arena_free(project_elm_json_path);
             install_env_free(env);
             log_set_level(original_level);
             return 1;
@@ -1611,16 +1634,18 @@ int cmd_install(int argc, char *argv[]) {
             fprintf(stderr, "Error: Failed to record %s/%s %s in elm.json\n", author, name, version);
             if (version) arena_free(version);
             elm_json_free(elm_json);
+            arena_free(project_elm_json_path);
             install_env_free(env);
             log_set_level(original_level);
             return 1;
         }
 
         printf("Saving elm.json...\n");
-        if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+        if (!elm_json_write(elm_json, project_elm_json_path)) {
             fprintf(stderr, "Error: Failed to write elm.json\n");
             if (version) arena_free(version);
             elm_json_free(elm_json);
+            arena_free(project_elm_json_path);
             install_env_free(env);
             log_set_level(original_level);
             return 1;
@@ -1634,13 +1659,13 @@ int cmd_install(int argc, char *argv[]) {
         /* Install one or more packages */
         if (specs_count == 1 && major_upgrade) {
             /* Single package with --major flag: use existing install_package */
-            result = install_package(&specs[0], is_test, major_upgrade, upgrade_all, auto_yes, elm_json, env);
+            result = install_package(&specs[0], is_test, major_upgrade, upgrade_all, auto_yes, elm_json, env, project_elm_json_path);
         } else if (specs_count == 1) {
             /* Single package without special flags: use existing install_package */
-            result = install_package(&specs[0], is_test, false, upgrade_all, auto_yes, elm_json, env);
+            result = install_package(&specs[0], is_test, false, upgrade_all, auto_yes, elm_json, env, project_elm_json_path);
         } else {
             /* Multiple packages: use new multi-package install */
-            result = install_multiple_packages(specs, specs_count, is_test, upgrade_all, auto_yes, elm_json, env);
+            result = install_multiple_packages(specs, specs_count, is_test, upgrade_all, auto_yes, elm_json, env, project_elm_json_path);
         }
         
         /* If we're in a package directory that's being tracked for local-dev,
@@ -1654,6 +1679,7 @@ int cmd_install(int argc, char *argv[]) {
     } else {
         char *elm_home = arena_strdup(env->cache->elm_home);
         elm_json_free(elm_json);
+        arena_free(project_elm_json_path);
         install_env_free(env);
         log_set_level(original_level);
 
@@ -1663,6 +1689,7 @@ int cmd_install(int argc, char *argv[]) {
     }
 
     elm_json_free(elm_json);
+    arena_free(project_elm_json_path);
     install_env_free(env);
 
     log_set_level(original_level);

@@ -20,44 +20,6 @@
 #include <stdbool.h>
 #include <unistd.h>
 
-static char *find_elm_json(void) {
-    char cwd[1024];
-    if (!getcwd(cwd, sizeof(cwd))) {
-        return NULL;
-    }
-
-    char *path = arena_strdup(cwd);
-    if (!path) {
-        return NULL;
-    }
-
-    while (true) {
-        size_t dir_len = strlen(path);
-        size_t buf_len = dir_len + sizeof("/elm.json");
-        char *candidate = arena_malloc(buf_len);
-        if (!candidate) {
-            arena_free(path);
-            return NULL;
-        }
-
-        snprintf(candidate, buf_len, "%s/elm.json", path);
-        if (file_exists(candidate)) {
-            arena_free(path);
-            return candidate;
-        }
-        arena_free(candidate);
-
-        char *slash = strrchr(path, '/');
-        if (!slash || slash == path) {
-            break;
-        }
-        *slash = '\0';
-    }
-
-    arena_free(path);
-    return NULL;
-}
-
 static void print_install_plan_usage(void) {
     printf("Usage: %s debug install-plan PACKAGE [PACKAGE ...] [OPTIONS]\n", global_context_program_name());
     printf("\n");
@@ -300,7 +262,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         printf("\n");
         
         // Find app's elm.json
-        char *elm_json_path = find_elm_json();
+        char *elm_json_path = find_elm_json_upwards(NULL);
         if (!elm_json_path) {
             fprintf(stderr, "Error: Could not find elm.json in current directory or parent directories\n");
             elm_json_free(pkg_json);
@@ -453,7 +415,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
     }
 
     // Find elm.json
-    char *elm_json_path = find_elm_json();
+    char *elm_json_path = find_elm_json_upwards(NULL);
     if (!elm_json_path) {
         fprintf(stderr, "Error: Could not find elm.json in current directory or parent directories\n");
         return 1;
