@@ -117,6 +117,7 @@ static void print_info_usage(const char *invocation) {
     printf("  %s %s                  # Show general package info\n", global_context_program_name(), command_label);
     printf("  %s %s ./path/to/dir    # Show info for elm.json at path\n", global_context_program_name(), command_label);
     printf("  %s %s elm/core         # Show info for elm/core package\n", global_context_program_name(), command_label);
+    printf("  %s %s elm/core@1.0.0   # Show info for elm/core 1.0.0\n", global_context_program_name(), command_label);
     printf("  %s %s elm/http 2.0.0   # Show info for elm/http 2.0.0\n", global_context_program_name(), command_label);
     printf("\n");
     printf("Note: Package name format (author/package) takes priority over paths.\n");
@@ -602,6 +603,8 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
     const char *arg = NULL;
     const char *version_arg = NULL;
     bool deps_only = false;
+    char package_name_buf[MAX_PACKAGE_NAME_LENGTH];
+    package_name_buf[0] = '\0';
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -632,6 +635,39 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
     if (arg) {
         if (is_package_name_format(arg)) {
             is_package_lookup = true;
+            const char *at_pos = strchr(arg, '@');
+            if (at_pos) {
+                if (version_arg) {
+                    fprintf(stderr, "Error: Version specified twice (use either PACKAGE@VERSION or PACKAGE VERSION)\n");
+                    print_info_usage(invocation);
+                    return 1;
+                }
+
+                size_t name_len = (size_t)(at_pos - arg);
+                if (name_len == 0 || name_len >= sizeof(package_name_buf)) {
+                    fprintf(stderr, "Error: Invalid package specification '%s'\n", arg);
+                    print_info_usage(invocation);
+                    return 1;
+                }
+
+                memcpy(package_name_buf, arg, name_len);
+                package_name_buf[name_len] = '\0';
+
+                Version parsed_version = (Version){0};
+                if (!version_parse_safe(at_pos + 1, &parsed_version)) {
+                    fprintf(stderr, "Error: Invalid version '%s' (expected X.Y.Z)\n", at_pos + 1);
+                    return 1;
+                }
+
+                arg = package_name_buf;
+                version_arg = at_pos + 1;
+            } else if (version_arg) {
+                Version parsed_version = (Version){0};
+                if (!version_parse_safe(version_arg, &parsed_version)) {
+                    fprintf(stderr, "Error: Invalid version '%s' (expected X.Y.Z)\n", version_arg);
+                    return 1;
+                }
+            }
         } else {
             if (version_arg) {
                 fprintf(stderr, "Error: Version argument is only valid with package name (author/package)\n");

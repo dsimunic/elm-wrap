@@ -13,6 +13,7 @@
 #include "../../rulr/host_helpers.h"
 #include "../../rulr/runtime/runtime.h"
 #include "../../dyn_array.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -741,8 +742,42 @@ VersionRange version_range_intersect(VersionRange a, VersionRange b) {
  * Existing functionality
  * ======================================================================== */
 
+static bool is_valid_package_segment(const char *segment, size_t len) {
+    if (!segment || len == 0) {
+        return false;
+    }
+
+    /* Prevent "." and ".." segments (path traversal / ambiguous names) */
+    if ((len == 1 && segment[0] == '.') ||
+        (len == 2 && segment[0] == '.' && segment[1] == '.')) {
+        return false;
+    }
+
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)segment[i];
+
+        if (c == '@' || c == '/' || c == '\\' || isspace(c)) {
+            return false;
+        }
+
+        if (!(isalnum(c) || c == '-' || c == '_' || c == '.')) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool parse_package_name(const char *package, char **author, char **name) {
-    if (!package) return false;
+    if (!package || !author || !name) {
+        return false;
+    }
+
+    size_t package_len = strlen(package);
+    if (package_len == 0 || package_len >= MAX_PACKAGE_NAME_LENGTH) {
+        fprintf(stderr, "Error: Invalid package name '%s' (too long)\n", package);
+        return false;
+    }
 
     const char *slash = strchr(package, '/');
     if (!slash) {
@@ -751,6 +786,19 @@ bool parse_package_name(const char *package, char **author, char **name) {
     }
 
     size_t author_len = slash - package;
+    size_t name_len = strlen(slash + 1);
+
+    if (author_len == 0 || name_len == 0 || strchr(slash + 1, '/')) {
+        fprintf(stderr, "Error: Package name must be in format 'author/package'\n");
+        return false;
+    }
+
+    if (!is_valid_package_segment(package, author_len) ||
+        !is_valid_package_segment(slash + 1, name_len)) {
+        fprintf(stderr, "Error: Invalid package name '%s' (expected author/name)\n", package);
+        return false;
+    }
+
     *author = arena_malloc(author_len + 1);
     if (!*author) return false;
     strncpy(*author, package, author_len);
@@ -766,7 +814,14 @@ bool parse_package_name(const char *package, char **author, char **name) {
 }
 
 bool parse_package_name_silent(const char *package, char **author, char **name) {
-    if (!package) return false;
+    if (!package || !author || !name) {
+        return false;
+    }
+
+    size_t package_len = strlen(package);
+    if (package_len == 0 || package_len >= MAX_PACKAGE_NAME_LENGTH) {
+        return false;
+    }
 
     const char *slash = strchr(package, '/');
     if (!slash) {
@@ -774,6 +829,17 @@ bool parse_package_name_silent(const char *package, char **author, char **name) 
     }
 
     size_t author_len = slash - package;
+    size_t name_len = strlen(slash + 1);
+
+    if (author_len == 0 || name_len == 0 || strchr(slash + 1, '/')) {
+        return false;
+    }
+
+    if (!is_valid_package_segment(package, author_len) ||
+        !is_valid_package_segment(slash + 1, name_len)) {
+        return false;
+    }
+
     *author = arena_malloc(author_len + 1);
     if (!*author) return false;
     strncpy(*author, package, author_len);

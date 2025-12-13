@@ -15,14 +15,12 @@
 #include <errno.h>
 #include <unistd.h>
 
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
-
 #define TEMPLATE_PREFIX "templates/package/init"
 
 static void print_package_init_usage(void) {
-    printf("Usage: %s package init [OPTIONS] PACKAGE\n", global_context_program_name());
+    printf("Usage:\n");
+    printf("  %s package init [OPTIONS] PACKAGE[@VERSION]\n", global_context_program_name());
+    printf("  %s package init [OPTIONS] PACKAGE VERSION\n", global_context_program_name());
     printf("\n");
     printf("Initialize a new Elm package from embedded templates.\n");
     printf("\nOptions:\n");
@@ -132,7 +130,13 @@ static bool write_file_contents(const char *path, const void *data, size_t size)
     return true;
 }
 
-static bool write_elm_json_with_name(const char *path, const char *package_name, void *data, size_t size) {
+static bool write_elm_json_with_name(
+    const char *path,
+    const char *package_name,
+    const char *package_version,
+    void *data,
+    size_t size
+) {
     char *json_text = arena_malloc(size + 1);
     if (!json_text) {
         fprintf(stderr, "Error: Out of memory while preparing elm.json\n");
@@ -161,6 +165,13 @@ static bool write_elm_json_with_name(const char *path, const char *package_name,
         cJSON_Delete(root);
         return false;
     }
+
+    cJSON *version_item = cJSON_GetObjectItemCaseSensitive(root, "version");
+    if (!version_item || !cJSON_IsString(version_item)) {
+        fprintf(stderr, "Error: Template elm.json is missing a valid \"version\" field\n");
+        cJSON_Delete(root);
+        return false;
+    }
     cJSON_Delete(root);
 
     /* Insert name field after "type": "package" line using string manipulation
@@ -180,7 +191,7 @@ static bool write_elm_json_with_name(const char *path, const char *package_name,
     insert_pos++; /* Move past the newline */
 
     /* Build the name line with proper indentation (4 spaces to match template) */
-    char name_line[256];
+    char name_line[MAX_TEMP_BUFFER_LENGTH];
     int name_line_len = snprintf(name_line, sizeof(name_line),
                                   "    \"name\": \"%s\",\n", package_name);
     if (name_line_len < 0 || name_line_len >= (int)sizeof(name_line)) {
@@ -205,6 +216,44 @@ static bool write_elm_json_with_name(const char *path, const char *package_name,
     memcpy(new_json + prefix_len + (size_t)name_line_len, insert_pos, suffix_len);
     new_json[new_size] = '\0';
 
+    char *final_json = new_json;
+    size_t final_size = new_size;
+    if (package_version) {
+        const char *version_prefix = "\"version\": \"";
+        char *version_pos = strstr(final_json, version_prefix);
+        if (!version_pos) {
+            fprintf(stderr, "Error: Could not find version field in expected format\n");
+            return false;
+        }
+
+        char *value_start = version_pos + strlen(version_prefix);
+        char *value_end = strchr(value_start, '"');
+        if (!value_end) {
+            fprintf(stderr, "Error: Malformed version field in template elm.json\n");
+            return false;
+        }
+
+        size_t prefix2_len = (size_t)(value_start - final_json);
+        size_t suffix2_len = final_size - (size_t)(value_end - final_json);
+        size_t version_len = strlen(package_version);
+        size_t new_size2 = prefix2_len + version_len + suffix2_len;
+
+        char *new_json2 = arena_malloc(new_size2 + 1);
+        if (!new_json2) {
+            fprintf(stderr, "Error: Out of memory while preparing elm.json\n");
+            return false;
+        }
+
+        memcpy(new_json2, final_json, prefix2_len);
+        memcpy(new_json2 + prefix2_len, package_version, version_len);
+        memcpy(new_json2 + prefix2_len + version_len, value_end, suffix2_len);
+        new_json2[new_size2] = '\0';
+
+        arena_free(final_json);
+        final_json = new_json2;
+        final_size = new_size2;
+    }
+
     if (!ensure_parent_directories(path)) {
         fprintf(stderr, "Error: Failed to create parent directories for %s\n", path);
         return false;
@@ -216,8 +265,8 @@ static bool write_elm_json_with_name(const char *path, const char *package_name,
         return false;
     }
 
-    size_t written = fwrite(new_json, 1, new_size, out);
-    if (written != new_size) {
+    size_t written = fwrite(final_json, 1, final_size, out);
+    if (written != final_size) {
         fprintf(stderr, "Error: Failed to write %s\n", path);
         fclose(out);
         return false;
@@ -227,7 +276,7 @@ static bool write_elm_json_with_name(const char *path, const char *package_name,
     return true;
 }
 
-static bool extract_templates(const char *package_name) {
+static bool extract_templates(const char *package_name, const char *package_version) {
     mz_uint count = embedded_archive_file_count();
     size_t prefix_len = strlen(TEMPLATE_PREFIX);
     bool found = false;
@@ -287,7 +336,7 @@ static bool extract_templates(const char *package_name) {
 
         bool ok;
         if (strcmp(target_path, "elm.json") == 0) {
-            ok = write_elm_json_with_name(target_path, package_name, data, size);
+            ok = write_elm_json_with_name(target_path, package_name, package_version, data, size);
         } else {
             ok = write_file_contents(target_path, data, size);
         }
@@ -309,11 +358,16 @@ static bool extract_templates(const char *package_name) {
 }
 
 static bool show_init_plan_and_confirm(const char *package_name, const char *resolved_source,
+                                       const char *package_version,
                                        bool will_register_local_dev, bool auto_yes) {
     printf("Here is my plan:\n");
     printf("  \n");
     printf("  Create new elm.json for the package:\n");
-    printf("    %s    (version from template)\n", package_name);
+    if (package_version) {
+        printf("    %s    %s\n", package_name, package_version);
+    } else {
+        printf("    %s    (version from template)\n", package_name);
+    }
     printf("  \n");
     printf("  Source: %s\n", resolved_source);
     printf("  \n");
@@ -332,7 +386,7 @@ static bool show_init_plan_and_confirm(const char *package_name, const char *res
         printf("\nWould you like me to proceed? [Y/n]: ");
         fflush(stdout);
 
-        char response[10];
+        char response[MAX_TEMP_BUFFER_LENGTH];
         if (!fgets(response, sizeof(response), stdin) ||
             (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n')) {
             printf("Aborted.\n");
@@ -346,7 +400,8 @@ static bool show_init_plan_and_confirm(const char *package_name, const char *res
 int cmd_package_init(int argc, char *argv[]) {
     bool no_local_dev = false;
     bool auto_yes = false;
-    const char *package_name = NULL;
+    const char *package_spec = NULL;
+    const char *package_version_arg = NULL;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -360,8 +415,10 @@ int cmd_package_init(int argc, char *argv[]) {
             fprintf(stderr, "Error: Unknown option %s\n", argv[i]);
             print_package_init_usage();
             return 1;
-        } else if (!package_name) {
-            package_name = argv[i];
+        } else if (!package_spec) {
+            package_spec = argv[i];
+        } else if (!package_version_arg) {
+            package_version_arg = argv[i];
         } else {
             fprintf(stderr, "Error: Unexpected argument %s\n", argv[i]);
             print_package_init_usage();
@@ -369,7 +426,7 @@ int cmd_package_init(int argc, char *argv[]) {
         }
     }
 
-    if (!package_name) {
+    if (!package_spec) {
         fprintf(stderr, "Error: Package name is required\n");
         print_package_init_usage();
         return 1;
@@ -377,22 +434,59 @@ int cmd_package_init(int argc, char *argv[]) {
 
     char *author = NULL;
     char *name = NULL;
-    if (!parse_package_name(package_name, &author, &name)) {
-        return 1;
+    Version requested_version = (Version){0};
+    bool has_version = false;
+
+    if (strchr(package_spec, '@')) {
+        if (package_version_arg) {
+            fprintf(stderr, "Error: Version specified twice (use either PACKAGE@VERSION or PACKAGE VERSION)\n");
+            print_package_init_usage();
+            return 1;
+        }
+        if (!parse_package_with_version(package_spec, &author, &name, &requested_version)) {
+            fprintf(stderr, "Error: Invalid package specification '%s'\n", package_spec);
+            print_package_init_usage();
+            return 1;
+        }
+        has_version = true;
+    } else {
+        if (!parse_package_name(package_spec, &author, &name)) {
+            fprintf(stderr, "Error: Invalid package name '%s'\n", package_spec);
+            print_package_init_usage();
+            return 1;
+        }
+        if (package_version_arg) {
+            if (!version_parse_safe(package_version_arg, &requested_version)) {
+                fprintf(stderr, "Error: Invalid version '%s' (expected X.Y.Z)\n", package_version_arg);
+                arena_free(author);
+                arena_free(name);
+                return 1;
+            }
+            has_version = true;
+        }
     }
 
-    if (author[0] == '\0' || name[0] == '\0') {
-        fprintf(stderr, "Error: Package name must be in the form author/name\n");
-        arena_free(author);
-        arena_free(name);
-        return 1;
-    }
-
+    char package_name_buf[MAX_PACKAGE_NAME_LENGTH];
+    int package_name_len = snprintf(package_name_buf, sizeof(package_name_buf), "%s/%s", author, name);
     arena_free(author);
     arena_free(name);
+    if (package_name_len < 0 || package_name_len >= (int)sizeof(package_name_buf)) {
+        fprintf(stderr, "Error: Package name too long\n");
+        return 1;
+    }
+
+    char *requested_version_str = NULL;
+    if (has_version) {
+        requested_version_str = version_to_string(&requested_version);
+        if (!requested_version_str) {
+            fprintf(stderr, "Error: Out of memory while preparing version\n");
+            return 1;
+        }
+    }
 
     if (file_exists("elm.json")) {
         fprintf(stderr, "This folder already contains an elm.json.\n");
+        if (requested_version_str) arena_free(requested_version_str);
         return 1;
     }
 
@@ -402,20 +496,24 @@ int cmd_package_init(int argc, char *argv[]) {
     }
 
     /* Get current directory for display */
-    char cwd[PATH_MAX];
+    char cwd[MAX_PATH_LENGTH];
     if (!getcwd(cwd, sizeof(cwd))) {
         fprintf(stderr, "Error: Failed to get current directory\n");
+        if (requested_version_str) arena_free(requested_version_str);
         return 1;
     }
 
     /* Show plan and get confirmation */
-    if (!show_init_plan_and_confirm(package_name, cwd, !no_local_dev, auto_yes)) {
+    if (!show_init_plan_and_confirm(package_name_buf, cwd, requested_version_str, !no_local_dev, auto_yes)) {
+        if (requested_version_str) arena_free(requested_version_str);
         return 0;
     }
 
-    if (!extract_templates(package_name)) {
+    if (!extract_templates(package_name_buf, requested_version_str)) {
+        if (requested_version_str) arena_free(requested_version_str);
         return 1;
     }
+    if (requested_version_str) arena_free(requested_version_str);
 
     /* Read actual version from the newly created elm.json */
     char *pkg_author = NULL;
@@ -427,7 +525,7 @@ int cmd_package_init(int argc, char *argv[]) {
     }
 
     if (no_local_dev) {
-        printf("Successfully created elm.json for %s %s!\n", package_name, pkg_version);
+        printf("Successfully created elm.json for %s %s!\n", package_name_buf, pkg_version);
         arena_free(pkg_author);
         arena_free(pkg_name);
         arena_free(pkg_version);
@@ -452,11 +550,11 @@ int cmd_package_init(int argc, char *argv[]) {
         return 1;
     }
 
-    int result = register_local_dev_package(".", package_name, env, true, true);
+    int result = register_local_dev_package(".", package_name_buf, env, true, true);
     install_env_free(env);
 
     if (result == 0) {
-        printf("Successfully created and registered %s %s (local)!\n", package_name, pkg_version);
+        printf("Successfully created and registered %s %s (local)!\n", package_name_buf, pkg_version);
     }
 
     arena_free(pkg_author);
