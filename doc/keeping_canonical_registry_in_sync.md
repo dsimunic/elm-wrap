@@ -55,7 +55,7 @@ Key behavior:
 
 Local-dev is implemented in:
 
-- `src/commands/package/install_cmd.c` (`--local-dev`, `--from-path`, `--remove-local-dev`)
+- `src/commands/package/install_cmd.c` (`--local-dev`, `--from-path`)
 - `src/commands/package/install_local_dev.c` (core local-dev mechanics)
 
 When `wrap install --local-dev ...` runs, it calls:
@@ -78,14 +78,14 @@ Commands that affect local-dev tracking today:
   - `wrap package install --local-dev ...` (same command group)
   - Includes “register-only mode” when run from a package directory without `--from-path`.
 - Removes local-dev tracking and also removes the local-only version from the V1 registry map:
-  - `wrap install --remove-local-dev`
+  - `wrap uninstall --local-dev` (or `wrap package uninstall --local-dev`)
     - Calls `unregister_local_dev_package()` which deletes tracking directories under `WRAP_HOME/<LOCAL_DEV_TRACKING_DIR>/packages/...`
     - Removes the corresponding version from `$ELM_HOME/.../packages/registry.dat` (without decrementing `since_count`)
   - `wrap repository local-dev clear ...`
     - Deletes tracking paths, or the whole tracking directory (`clear --all`)
     - Removes corresponding versions from `$ELM_HOME/.../packages/registry.dat` (without decrementing `since_count`)
 
-There is **no** `wrap uninstall --local-dev` flag. “Uninstall” in **elm-wrap** is `wrap package remove` / `wrap package uninstall`, which updates `elm.json` but does not revert the local-dev registry cache mutation.
+`wrap uninstall --local-dev` removes local-dev tracking and reverts the local-only V1 registry cache mutation. Regular “uninstall” (`wrap package remove` / `wrap package uninstall`) updates `elm.json` only.
 
 ### Other registry mutators
 

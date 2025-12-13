@@ -11,8 +11,17 @@ set -euo pipefail
 # Test Cases
 # =============================================================================
 
+get_v1_since_count() {
+    local out
+    out=$(run_wrap debug registry_v1 list | head -4)
+    echo "$out" | awk -F': ' '/^Since count: /{print $2; exit}'
+}
+
 # APP-01: single package install
 test_app_01_single_package_install() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-01: single package install ==="
     
     # Create app
@@ -26,11 +35,17 @@ test_app_01_single_package_install() {
     # Verify direct dependency
     assert_direct_dep "wrap/package-single-no-deps" "1.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-01 ==="
 }
 
 # APP-02: install multiple packages at once
 test_app_02_install_multiple_packages() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-02: install multiple packages at once ==="
     
     # Create app
@@ -45,11 +60,17 @@ test_app_02_install_multiple_packages() {
     assert_direct_dep "wrap/package-single-no-deps" "1.0.0" "$app_dir"
     assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-02 ==="
 }
 
 # APP-03: Install package with targeted version (PACKAGE@VERSION)
 test_app_03_install_targeted_version() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-03: Install package with targeted version ==="
     
     # Create app
@@ -63,11 +84,17 @@ test_app_03_install_targeted_version() {
     # Verify direct dependency with correct version
     assert_direct_dep "wrap/package-3v-no-deps" "2.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-03 ==="
 }
 
 # APP-04: Install package with dependencies
 test_app_04_install_with_dependencies() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-04: Install package with dependencies ==="
     
     # Create app
@@ -82,11 +109,17 @@ test_app_04_install_with_dependencies() {
     assert_direct_dep "wrap/package-single-1d" "1.0.0" "$app_dir"
     assert_indirect_dep "wrap/dep-single-no-deps" "1.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-04 ==="
 }
 
 # APP-05: Move package from indirect to direct
 test_app_05_move_indirect_to_direct() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-05: Move package from indirect to direct ==="
     
     # Create app
@@ -107,11 +140,17 @@ test_app_05_move_indirect_to_direct() {
     # Verify it's now direct (and still indirect from the other package)
     assert_direct_dep "wrap/dep-single-no-deps" "1.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-05 ==="
 }
 
 # APP-07: Install multiple packages with mixed version specifications
 test_app_07_mixed_version_specs() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-07: Install multiple packages with mixed version specifications ==="
     
     # Create app
@@ -128,11 +167,17 @@ test_app_07_mixed_version_specs() {
     assert_direct_dep "wrap/package-single-1d" "1.0.0" "$app_dir"
     assert_indirect_dep "wrap/dep-single-no-deps" "1.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-07 ==="
 }
 
 # APP-08: Re-install does not cross major without --major
 test_app_08_reinstall_no_cross_major() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-08: Re-install does not cross major without --major ==="
     
     # Create app
@@ -152,11 +197,17 @@ test_app_08_reinstall_no_cross_major() {
     # Verify still at 2.0.0 (no major version upgrade)
     assert_direct_dep "wrap/package-3v-no-deps" "2.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-08 ==="
 }
 
 # APP-09: Re-install crosses major with --major (single package)
 test_app_09_reinstall_cross_major() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-09: Re-install crosses major with --major ==="
     
     # Depends on APP-08
@@ -169,11 +220,17 @@ test_app_09_reinstall_cross_major() {
     # Verify upgraded to 3.0.0
     assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-09 ==="
 }
 
 # APP-10: Install as test dependency (--test)
 test_app_10_install_as_test_dep() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-10: Install as test dependency (--test) ==="
     
     # Create app
@@ -188,11 +245,17 @@ test_app_10_install_as_test_dep() {
     # Note: We can't easily check test vs prod deps with current helpers
     # This test mainly verifies the command doesn't fail
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-10 ==="
 }
 
 # APP-11: Install test dep requiring prod upgrade (requires --upgrade-all)
 test_app_11_test_dep_requires_prod_upgrade() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-11: Install test dep requiring prod upgrade ==="
     
     # Create app
@@ -221,11 +284,17 @@ test_app_11_test_dep_requires_prod_upgrade() {
     # Verify prod dep was upgraded
     assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-11 ==="
 }
 
 # PKG-01: Install single package to package type
 test_pkg_01_install_single_to_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN PKG-01: Install single package to package type ==="
     
     # Create package
@@ -239,11 +308,17 @@ test_pkg_01_install_single_to_package() {
     # Verify constraint was added (can't easily check elm.json with current helpers)
     # This test mainly verifies the command doesn't fail
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-01 ==="
 }
 
 # PKG-02: Install multiple packages to package type
 test_pkg_02_install_multiple_to_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN PKG-02: Install multiple packages to package type ==="
     
     # Create package
@@ -256,11 +331,17 @@ test_pkg_02_install_multiple_to_package() {
     
     # Verify constraints were added
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-02 ==="
 }
 
 # PKG-03: Install package with targeted version to package type
 test_pkg_03_install_targeted_version_to_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN PKG-03: Install package with targeted version to package type ==="
     
     # Create package
@@ -273,11 +354,17 @@ test_pkg_03_install_targeted_version_to_package() {
     
     # Verify constraint was added with correct lower bound
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-03 ==="
 }
 
 # PKG-04: Install package with dependencies to package type
 test_pkg_04_install_with_deps_to_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN PKG-04: Install package with dependencies to package type ==="
     
     # Create package
@@ -290,11 +377,17 @@ test_pkg_04_install_with_deps_to_package() {
     
     # Verify only the requested package constraint was added (not transitive deps)
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-04 ==="
 }
 
 # APP-12: Install from local file/directory (--from-file)
 test_app_12_install_from_file() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-12: Install from local file/directory (--from-file) ==="
     
     # Create app
@@ -311,6 +404,9 @@ test_app_12_install_from_file() {
     # Verify direct dependency
     assert_direct_dep "wrap/package-from-file-single-no-deps" "1.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-12 ==="
 }
 

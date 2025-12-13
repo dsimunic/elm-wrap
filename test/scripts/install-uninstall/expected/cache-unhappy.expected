@@ -1,19 +1,26 @@
 Running cache-unhappy tests...
 
+
 === BEGIN ERR-01: Cache non-existent package ===
 [ERROR] I cannot find package 'wrap/does-not-exist'
 [ERROR] Make sure the package name is correct
+[Registry since-count: 24 -> 24 (Δ0)]
 === END ERR-01 ===
+
 === BEGIN ERR-02: Cache package with non-existent version ===
 [ERROR] Version 9.9.9 not found for package wrap/package-3v-no-deps
 [ERROR] Available versions:
 [ERROR]   3.0.0
 [ERROR]   2.0.0
 [ERROR]   1.0.0
+[Registry since-count: 24 -> 24 (Δ0)]
 === END ERR-02 ===
+
 === BEGIN ERR-03: Cache from non-existent file path ===
 Error: Path does not exist: /does/not/exist
+[Registry since-count: 24 -> 24 (Δ0)]
 === END ERR-03 ===
+
 === BEGIN ERR-04: Cache with both --from-file and --from-url ===
 Error: Package name must be in format 'author/package'
 Error: Invalid package name '--from-url'
@@ -54,6 +61,10 @@ Check Options:
 Full-scan Options:
   -q, --quiet                               # Only show summary counts
   -v, --verbose                             # Show all issues including missing latest
+[Registry since-count: 24 -> 24 (Δ0)]
 === END ERR-04 ===
+
+[Registry since-count: 24 -> 24 (Δ0)]
+=== END ===
 
 All cache-unhappy tests completed successfully

@@ -506,10 +506,18 @@ snapshot_deps() {
     get_deps "$path"
 }
 
+# Get V1 registry since_count
+# Usage: count=$(get_v1_since_count)
+get_v1_since_count() {
+    local out
+    out=$("$WRAP_BIN" debug registry_v1 list 2>&1 | head -4)
+    echo "$out" | awk -F': ' '/^Since count: /{print $2; exit}'
+}
+
 # Export functions and variables for subscripts
 export -f create_app create_package get_deps normalize_output run_wrap
 export -f assert_direct_dep assert_indirect_dep assert_no_dep
-export -f assert_deps_unchanged snapshot_deps
+export -f assert_deps_unchanged snapshot_deps get_v1_since_count
 export TEST_ROOT TEST_ELM_HOME TEST_WRAP_HOME ELM_VERSION
 export WRAP_BIN INDEXMAKER MKPKG REGISTRY_FILE
 export PROJECT_ROOT TEST_SCRIPTS_DIR EXPECTED_DIR ACTUAL_DIR

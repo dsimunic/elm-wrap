@@ -19,6 +19,9 @@ get_v1_since_count() {
 
 # LOCAL-01: Initialize package with local-dev and install to app
 test_local_01_init_and_install() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN LOCAL-01: Initialize package with local-dev and install to app ==="
     
     # Create package
@@ -40,11 +43,17 @@ test_local_01_init_and_install() {
     # Verify local-dev dependency
     assert_direct_dep "testauthor/local-pkg1" "1.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END LOCAL-01 ==="
 }
 
 # LOCAL-02: Install package with --local-dev --from-path
 test_local_02_install_from_path() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN LOCAL-02: Install package with --local-dev --from-path ==="
     
     # Create package
@@ -62,11 +71,17 @@ test_local_02_install_from_path() {
     # Verify local-dev dependency
     assert_direct_dep "testauthor/local-src2" "1.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END LOCAL-02 ==="
 }
 
 # LOCAL-03: Dependency synchronization when local package changes
 test_local_03_dependency_sync() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN LOCAL-03: Dependency synchronization when local package changes ==="
     
     # Create package
@@ -96,11 +111,17 @@ test_local_03_dependency_sync() {
     
     # Verify dependency sync worked (would include new deps if elm.json changed)
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END LOCAL-03 ==="
 }
 
 # LOCAL-04: Multiple applications depending on same local package
 test_local_04_multiple_apps_same_local() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN LOCAL-04: Multiple applications depending on same local package ==="
     
     # Create package
@@ -138,12 +159,18 @@ test_local_04_multiple_apps_same_local() {
     assert_direct_dep "testauthor/local-pkg4" "1.0.0" "$app1_dir"
     assert_direct_dep "testauthor/local-pkg4" "1.0.0" "$app2_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END LOCAL-04 ==="
 }
 
-# LOCAL-05: Remove local-dev tracking with --remove-local-dev
+# LOCAL-05: Remove local-dev tracking with uninstall --local-dev
 test_local_05_remove_local_dev_tracking() {
-    echo "=== BEGIN LOCAL-05: Remove local-dev tracking with --remove-local-dev ==="
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
+    echo "=== BEGIN LOCAL-05: Remove local-dev tracking with uninstall --local-dev ==="
     
     # Create package
     local pkg_dir
@@ -154,7 +181,7 @@ test_local_05_remove_local_dev_tracking() {
     run_wrap install --local-dev
     
     # Remove local-dev tracking
-    run_wrap install --remove-local-dev
+    run_wrap uninstall --local-dev
 
     local registry_after
     registry_after=$(run_wrap debug registry_v1 list)
@@ -164,8 +191,11 @@ test_local_05_remove_local_dev_tracking() {
     fi
     
     # Try to remove again (should be idempotent)
-    run_wrap install --remove-local-dev
+    run_wrap uninstall --local-dev
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END LOCAL-05 ==="
 }
 
@@ -219,6 +249,9 @@ EOF
 
 # ERR-01: Install with --local-dev --from-path with non-existent path
 test_err_01_local_dev_nonexistent_path() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN ERR-01: Install with --local-dev --from-path with non-existent path ==="
     
     # Create app
@@ -235,11 +268,17 @@ test_err_01_local_dev_nonexistent_path() {
     # Verify dependencies unchanged
     assert_no_dep "testauthor/does-not-exist" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-01 ==="
 }
 
 # ERR-02: Install multiple packages with --local-dev (should fail)
 test_err_02_local_dev_multiple_packages() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN ERR-02: Install multiple packages with --local-dev (should fail) ==="
     
     # Create packages
@@ -262,11 +301,17 @@ test_err_02_local_dev_multiple_packages() {
     assert_no_dep "testauthor/err02-pkg1" "$app_dir"
     assert_no_dep "testauthor/err02-pkg2" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-02 ==="
 }
 
 # ERR-03: Use --from-path without --local-dev (should fail)
 test_err_03_from_path_without_local_dev() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN ERR-03: Use --from-path without --local-dev (should fail) ==="
     
     # Create app
@@ -283,6 +328,9 @@ test_err_03_from_path_without_local_dev() {
     # Verify dependencies unchanged
     assert_no_dep "testauthor/some-pkg" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-03 ==="
 }
 

@@ -1,5 +1,6 @@
 Running uninstall-unhappy tests...
 
+
 === BEGIN ERR-01: Uninstall non-existent package ===
 -- PACKAGE REMOVAL FAILED -----------------------------------------------------
 
@@ -10,7 +11,9 @@ I cannot remove these requested packages:
 Please fix the specification and try again.
 
 I didn't remove anything yet, as I can only remove all specified packages or none.
+[Registry since-count: 24 -> 24 (Δ0)]
 === END ERR-01 ===
+
 === BEGIN ERR-02: Uninstall package not in dependencies ===
 Here is my plan:
   
@@ -28,3 +31,8 @@ I cannot remove these requested packages:
 Please fix the specification and try again.
 
 I didn't remove anything yet, as I can only remove all specified packages or none.
+[Registry since-count: 24 -> 24 (Δ0)]
+=== END ERR-02 ===
+
+[Registry since-count: 24 -> 24 (Δ0)]
+=== END ===

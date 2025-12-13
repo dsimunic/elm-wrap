@@ -11,8 +11,17 @@ set -euo pipefail
 # Test Cases
 # =============================================================================
 
+get_v1_since_count() {
+    local out
+    out=$(run_wrap debug registry_v1 list | head -4)
+    echo "$out" | awk -F': ' '/^Since count: /{print $2; exit}'
+}
+
 # ERR-01: Upgrade non-existent package (should fail)
 test_err_01_upgrade_nonexistent_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN ERR-01: Upgrade non-existent package ==="
     
     # Create app
@@ -29,11 +38,17 @@ test_err_01_upgrade_nonexistent_package() {
     # Verify dependencies unchanged
     assert_no_dep "wrap/does-not-exist" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-01 ==="
 }
 
 # ERR-02: Upgrade package not in dependencies (should fail)
 test_err_02_upgrade_not_in_dependencies() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN ERR-02: Upgrade package not in dependencies ==="
     
     # Create app
@@ -53,6 +68,9 @@ test_err_02_upgrade_not_in_dependencies() {
     # Verify original dependency still there
     assert_direct_dep "wrap/package-single-no-deps" "1.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-02 ==="
 }
 

@@ -13,6 +13,9 @@ set -euo pipefail
 
 # ERR-01: Cache non-existent package (should fail)
 test_err_01_cache_nonexistent_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+    
     echo "=== BEGIN ERR-01: Cache non-existent package ==="
     
     local work_dir="$TEST_ROOT/cache_err01"
@@ -25,11 +28,17 @@ test_err_01_cache_nonexistent_package() {
         exit 1
     fi
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-01 ==="
 }
 
 # ERR-02: Cache package with non-existent version (should fail)
 test_err_02_cache_nonexistent_version() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+    
     echo "=== BEGIN ERR-02: Cache package with non-existent version ==="
     
     local work_dir="$TEST_ROOT/cache_err02"
@@ -42,11 +51,17 @@ test_err_02_cache_nonexistent_version() {
         exit 1
     fi
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-02 ==="
 }
 
 # ERR-03: Cache from non-existent file path (should fail)
 test_err_03_cache_from_nonexistent_path() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+    
     echo "=== BEGIN ERR-03: Cache from non-existent file path ==="
     
     local work_dir="$TEST_ROOT/cache_err03"
@@ -59,11 +74,17 @@ test_err_03_cache_from_nonexistent_path() {
         exit 1
     fi
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-03 ==="
 }
 
 # ERR-04: Cache with both --from-file and --from-url (should fail)
 test_err_04_cache_both_from_file_and_url() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+    
     echo "=== BEGIN ERR-04: Cache with both --from-file and --from-url ==="
     
     local work_dir="$TEST_ROOT/cache_err04"
@@ -78,6 +99,9 @@ test_err_04_cache_both_from_file_and_url() {
         exit 1
     fi
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-04 ==="
 }
 

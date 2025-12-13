@@ -1,21 +1,34 @@
 Running cache-happy tests...
 
+
 === BEGIN CACHE-01: Cache single package ===
 Package wrap/package-single-no-deps 1.0.0 and all dependencies already cached
+[Registry since-count: 24 -> 24 (Δ0)]
 === END CACHE-01 ===
+
 === BEGIN CACHE-02: Cache multiple packages at once ===
 Package wrap/package-single-no-deps 1.0.0 and all dependencies already cached
 Package wrap/package-3v-no-deps 3.0.0 and all dependencies already cached
+[Registry since-count: 24 -> 24 (Δ0)]
 === END CACHE-02 ===
+
 === BEGIN CACHE-03: Cache specific version ===
 Package wrap/package-3v-no-deps 2.0.0 and all dependencies already cached
+[Registry since-count: 24 -> 24 (Δ0)]
 === END CACHE-03 ===
+
 === BEGIN CACHE-04: Cache package that's already in cache ===
 Package wrap/package-single-no-deps 1.0.0 and all dependencies already cached
 Package wrap/package-single-no-deps 1.0.0 and all dependencies already cached
+[Registry since-count: 24 -> 24 (Δ0)]
 === END CACHE-04 ===
+
 === BEGIN CACHE-05: Cache from file/directory ===
 Successfully cached wrap/package-from-file-single-no-deps 1.0.0!
+[Registry since-count: 24 -> 24 (Δ0)]
 === END CACHE-05 ===
+
+[Registry since-count: 24 -> 24 (Δ0)]
+=== END ===
 
 All cache-happy tests completed successfully

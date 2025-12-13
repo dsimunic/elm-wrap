@@ -85,7 +85,7 @@ Dependent tests:
         --from-url URL PACKAGE             # Install from URL (single package only)
         --local-dev [--from-path PATH] [PACKAGE]
                                             # Install package for local development
-        --remove-local-dev                 # Remove package from local-dev tracking
+        uninstall --local-dev              # Remove current package from local-dev tracking
         -v, --verbose                      # Show progress reports (registry, connectivity)
         -q, --quiet                        # Suppress progress reports
         -y, --yes                          # Automatically confirm changes
@@ -733,7 +733,7 @@ steps:
 confirm:
  - both apps converge to the same dependency set after sync
 
-### LOCAL-05: Remove local-dev tracking with --remove-local-dev
+### LOCAL-05: Remove local-dev tracking with uninstall --local-dev
 
 create_package "$TEST_ROOT/local-pkg5" "testauthor/local-pkg-five"
 create_app "$TEST_ROOT/app05" "app05"
@@ -742,11 +742,11 @@ steps:
  - cd "$TEST_ROOT/local-pkg5" && command: wrap install --local-dev
  - confirm: local-dev tracking exists for the package
 
-command: wrap install --remove-local-dev
+command: wrap uninstall --local-dev
 
 confirm:
  - prints `Removed local-dev tracking for ...`
- - running `wrap install --remove-local-dev` again prints `No local-dev tracking found ...` (idempotent)
+ - running `wrap uninstall --local-dev` again prints `No local-dev tracking found ...` (idempotent)
 
 ### ERR-01: Install with --local-dev --from-path with non-existent path
 

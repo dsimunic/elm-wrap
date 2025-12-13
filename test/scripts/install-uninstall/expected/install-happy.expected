@@ -1,5 +1,6 @@
 Running install-happy tests...
 
+
 === BEGIN APP-01: single package install ===
 Here is my plan:
   
@@ -8,3 +9,8 @@ Here is my plan:
   
 Saving elm.json...
 Successfully installed wrap/package-single-no-deps!
+[Registry since-count: 24 -> 24 (Δ0)]
+=== END APP-01 ===
+
+[Registry since-count: 24 -> 24 (Δ0)]
+=== END ===

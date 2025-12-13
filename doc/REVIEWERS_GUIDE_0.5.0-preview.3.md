@@ -1,6 +1,6 @@
 # Reviewers Guide
 
-This document guides you through the features of **elm-wrap** version 0.5.0-preview.2, helping you evaluate the feature set in this release.
+This document guides you through the features of **elm-wrap** version 0.5.0-preview.3, helping you evaluate the feature set in this release.
 
 ## Release focus
 
@@ -11,17 +11,24 @@ Release `0.5.0` focuses on developer experience improvements, particularly for p
 - **Package and application templates**: `application init` and `package init` commands work from built-in templates, allowing quickly starting
     new Elm package projects or Elm and Lamdera projects of all supported kinds.
 
+- **elm.json** management with `install`, `uninstall`, `upgrade`, and `info` commands.
+
+- **@-separator for version** specification. One can now write `wrap install PACKAGE@VERSION PACKAGE@VERSION`.
+
 
 ## Feedback sought
 
-The goal of this preview release is to gather feedback on the usability and functionality of local package development workflows. This is our _beachhead_
-feature for developer acceptance of **elm-wrap** in real-world scenarios. Hence the initial effort to appease the Elm compiler's expectations about package
-management and dependency resolution. The mantra of this release is "it just works with your usual finger memory."
+The goal of this preview release is to gather feedback on the **usability and functionality of local package development workflows.** Your developer experience
+("DX") if you will.
 
-Due to this compiler appeasement angle, some rough edges and limitations exist. We could gain a bit more robustness and polish if we could support only 
+Package development DX is our _beachhead_ feature for developer acceptance of **elm-wrap** in real-world scenarios. Hence the initial effort to appease the 
+Elm compiler's expectations about package management and dependency resolution. The mantra of this release is "it just works with your usual finger memory."
+For example, we can just type `wrap install` or `wrap uninstall`--just like we're used to do with the compiler.
+
+Due to the compiler appeasement angle, some rough edges and limitations exist. We could gain a bit more robustness and polish if we could support only 
 "run it with `wrap`, always" workflows, but that would be a harder sell for existing Elm developers. At least for now anyway, until we fortify this beachhead.
 
-The most useful feedback you can provide is your experience going through the workflows described below, and any rough edges you encounter. The ideal case is
+The most useful feedback you can provide is **your experience** going through the workflows described below, and any rough edges you encounter. The ideal case is
 that you either conclude "Yes, this works as expected, and I can use it in my daily development!" or "No, this doesn't work for me because of REASONS." Both 
 answers are equally useful. Technical issues are inevitable and expected in a preview release, but usability and workflow acceptance is the key goal here. The 
 steps in this guide were verified manually several times, so there's confidence in the basics, at least.
@@ -30,10 +37,38 @@ For this review, the feedback channels are:
 - "Incremental Elm" Discord, channel #elm-wrap
 - Private message on "Incremental Elm" Discord to @Damir.
 
-The hope is we'll turn this `preview.2` quickly, maybe go into `preview.3` if needed, and then release `0.5.0` proper.
+The hope is we'll turn this `preview.3` quickly, maybe go into `preview.4` if needed, and then release `0.5.0` proper.
 
 The intent for `0.5.0` is to release a solid, production-grade, "daily driver"-quality foundation for local package development workflows, and then build on top 
 of it in future releases.
+
+### "Beta testing" vs "Feedback"
+
+You're not "beta testing" (well, any use of a product in development is "beta testing")--we have regression tests for that, more and more. Some rough edges might
+show up, but most are known already. 
+
+Your time investment in this review is about trying out the controls and discovering how do you feel about them. Is this how you want your experience to be in the
+future when **elm-wrap** reaches v1? If not, now is the right time to discuss anything that feels off or wrong! A great example is the change from `preview.2`:
+we started off with `wrap install author/name 1.0.0` but @jfmengels quickly pointed out that `wrap install author/name 1.0.0 author2/name2 1.0.0` looks unwieldy
+and un-ergonomic. So now we can run with `wrap install author/name@1.0.0 author2/name2@1.0.0`, which feels much nicer.
+
+Version 0.5.0 is the point where we want to fix the interface for package management commands. Nothing is set in stone, but ideally what is set for 0.5.0 will remain
+through all iterations until at least 2.x.x series. 
+
+Please, jump in, take `wrap` for a spin and report on your experience!
+
+(Of course, if you do feel like giving beta testing feedback, there are regression test
+
+## Changes since `preview.2`
+
+**multiple package specification**: `install`, `uninstall` now accept multiple packages on the command line: `wrap install PACKAGE[@VERSION] [PACKAGE[@VERSION] ...]
+
+**aliases for install/uninstall**: `wrap install` and `wrap uninstall` route to corresponding `wrap package COMMAND`. Easier to type and more _in the fingers_. 
+This obviously means that `wrap install` is not a pass-through command to the underlying compiler. Though it probably never was.
+
+**`uninstall --local-dev` instead of `install --remove-local-dev`** for symmetry.
+
+**package name suggestions** on mistyped pacakges, identical to Elm compiler's.
 
 ## Prerequisites + environment setup
 
@@ -52,6 +87,11 @@ WRAP_FEATURE_CACHE=1 wrap package cache elm/core --prime the package cache; this
 ```
 
 Export `ELM_HOME` variable in your shell to point to this new location for the duration of your review session.
+
+If you find all this new environment setup boring, you may just work with your normal `ELM_HOME` setup: `--local-dev` and other registry-index-changing commands
+now take care not to upset `elm` compiler's ability to download updates. And, you now have the option to just run `wrap debug registry_v1 reset` and it will
+delete the registry index and get you a fresh one just as `elm` would do if you manually deleted that file. This is a handy shortcut so you don't have to think
+where your ELM_HOME is.
 
 All flows in this guide assume you have a working Elm compiler (version 0.19.1) or Lamdera (version 0.19.1) installed. No additional installation/initialization is required,
 and the actions here should not upset your existing setup or projects. You may stop at any time without side effects. Created projects and package source can be published
@@ -180,7 +220,7 @@ in another application. The new dependency will show up in the install plan. (Ju
 
 Why does this work? Local application development inserts the local package into the package registry index, and points the cache to the actual package's source directory. This way, the compiler believes the package is installed into the local package cache from the registry as usual, and all dependency resolution works as expected. (That is also why the compiler will delete invalid `elm.json` files--it thinks they are corrupted in the cache and tries to redownload them, but in reality it will find the linked source directory and delete that copy.)
 
-***Removing dependencies*** from the local package synchronizes as well: running `wrap package uninstall PACKAGE` on the package directory will update all dependent applications accordingly.
+***Removing dependencies*** from the local package synchronizes as well: running `wrap uninstall PACKAGE` on the package directory will update all dependent applications accordingly.
 
 **packages that depend on packages** in local development form a cascade of updates. For example, if package A depends on local package B, and application C depends on package A, then updating dependencies in package B will also update C's indirect dependencies accordingly.
 
@@ -188,7 +228,8 @@ This scenario is NOT supported in this preview release: only updates to directly
 
 ### Removing local-dev tracking
 
-To stop tracking a package for local development, uninstall it from all applications that depend on it, and then run `wrap repository local-dev` to prune any stale tracking combinations.
+To stop tracking a package for local development, uninstall it from all applications that depend on it, and then run `wrap repository local-dev` once 
+to prune any stale tracking combinations.
 
 Alternatively, you can run this command to stop tracking a specific package for local development:
 
@@ -250,18 +291,8 @@ There is currently only one package template, so no need to specify it.
 
 ## Known issues
 
-- Local package development might lead to Elm compiler skipping downloading package index updates.  
-    
-    Elm compiler caches package index locally and tracks its freshness based on a number of locally indexed versions. Since local-dev must insert local packages into the cached package index, Elm might request packages `/since/<count_increased_by_number_of_local_dev_packages>` and receive updates that skip that many registry versions.
-
-    If you didn't set a separate environment for `ELM_HOME`, this might lead to your main Elm setup missing package index updates.
-
-    Workarounds:
-
-    - Delete the local package index `~/.elm/0.19.1/packages/registry.dat` to force a full refresh on the next use of `elm` binary.
-
 - `wrap package install --test PACKAGE` might show confusing error messages in situations with conflicting dependencies.
 
 - The `wrap application info` might continue to report a linked package even after it was removed with `wrap package remove PACKAGE`. 
 
-    Workaround: run `wrap repository local-dev` to clear stale local-dev tracking information.
+    Workaround: run `wrap repository local-dev` once to clear stale local-dev tracking information.

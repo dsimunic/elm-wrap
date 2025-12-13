@@ -13,6 +13,9 @@ set -euo pipefail
 
 # CACHE-01: Cache single package
 test_cache_01_single_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+    
     echo "=== BEGIN CACHE-01: Cache single package ==="
     
     # Create app directory (we don't need an initialized app, just a working dir)
@@ -23,11 +26,17 @@ test_cache_01_single_package() {
     # Cache a package (should download it if not already cached)
     run_wrap package cache wrap/package-single-no-deps
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END CACHE-01 ==="
 }
 
 # CACHE-02: Cache multiple packages at once
 test_cache_02_multiple_packages() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+    
     echo "=== BEGIN CACHE-02: Cache multiple packages at once ==="
     
     local work_dir="$TEST_ROOT/cache02"
@@ -37,11 +46,17 @@ test_cache_02_multiple_packages() {
     # Cache multiple packages
     run_wrap package cache wrap/package-single-no-deps wrap/package-3v-no-deps
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END CACHE-02 ==="
 }
 
 # CACHE-03: Cache specific version
 test_cache_03_specific_version() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+    
     echo "=== BEGIN CACHE-03: Cache specific version ==="
     
     local work_dir="$TEST_ROOT/cache03"
@@ -51,11 +66,17 @@ test_cache_03_specific_version() {
     # Cache specific version
     run_wrap package cache wrap/package-3v-no-deps@2.0.0
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END CACHE-03 ==="
 }
 
 # CACHE-04: Cache package that's already in cache (should be idempotent)
 test_cache_04_already_cached() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+    
     echo "=== BEGIN CACHE-04: Cache package that's already in cache ==="
     
     local work_dir="$TEST_ROOT/cache04"
@@ -68,11 +89,17 @@ test_cache_04_already_cached() {
     # Cache same package again (should not fail)
     run_wrap package cache wrap/package-single-no-deps
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END CACHE-04 ==="
 }
 
 # CACHE-05: Cache from file/directory
 test_cache_05_from_file() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+    
     echo "=== BEGIN CACHE-05: Cache from file/directory ==="
     
     local work_dir="$TEST_ROOT/cache05"
@@ -85,6 +112,9 @@ test_cache_05_from_file() {
     # Cache from local directory
     run_wrap package cache --from-file "$pkg_path" wrap/package-from-file-single-no-deps
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END CACHE-05 ==="
 }
 

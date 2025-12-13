@@ -1,16 +1,23 @@
-Usage: wrap package remove PACKAGE [PACKAGE...]
+Usage:
+  wrap uninstall PACKAGE [PACKAGE...]
+  wrap uninstall --local-dev
 
 Remove packages from your Elm project.
+
+Use --local-dev (run from within an Elm package directory) to remove the
+current package from local-dev tracking.
 
 This will also remove any indirect dependencies that are no longer
 needed by other packages.
 
-Alias: 'package uninstall' can be used instead of 'package remove'.
+Alias: 'package uninstall' can be used instead of 'uninstall'.
 
 Examples:
-  wrap package remove elm/html           # Remove elm/html from your project
-  wrap package remove elm/html elm/json  # Remove multiple packages at once
+  wrap uninstall elm/html           # Remove elm/html from your project
+  wrap uninstall elm/html elm/json  # Remove multiple packages at once
+  wrap uninstall --local-dev        # Remove current package from local-dev tracking
 
 Options:
+  --local-dev                        # Remove current package from local-dev tracking
   -y, --yes                          # Automatically confirm changes
   --help                             # Show this help

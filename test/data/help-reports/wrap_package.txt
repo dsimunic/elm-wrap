@@ -4,7 +4,7 @@ Subcommands:
   install PACKAGE                Add a dependency to current elm.json
   init PACKAGE                   Initialize a package
   upgrade PACKAGE                Upgrade packages to latest versions
-  remove | uninstall  PACKAGE    Remove a package from elm.json
+  uninstall PACKAGE              Remove a package from elm.json (alias: remove)
   info    [ PATH                 Display package information and upgrades
           | PACKAGE [VERSION]
           ]

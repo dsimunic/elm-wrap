@@ -21,7 +21,6 @@ Options:
   --from-url URL PACKAGE             # Install from URL (single package only)
   --local-dev [--from-path PATH] [PACKAGE]
                                      # Install package for local development
-  --remove-local-dev                 # Remove package from local-dev tracking
   -v, --verbose                      # Show progress reports (registry, connectivity)
   -q, --quiet                        # Suppress progress reports
   -y, --yes                          # Automatically confirm changes

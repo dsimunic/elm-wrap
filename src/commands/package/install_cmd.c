@@ -188,7 +188,6 @@ static void print_install_usage(void) {
     printf("  --from-url URL PACKAGE             # Install from URL (single package only)\n");
     printf("  --local-dev [--from-path PATH] [PACKAGE]\n");
     printf("                                     # Install package for local development\n");
-    printf("  --remove-local-dev                 # Remove package from local-dev tracking\n");
     // printf("  --pin                              # Create PIN file with package version\n");
     printf("  -v, --verbose                      # Show progress reports (registry, connectivity)\n");
     printf("  -q, --quiet                        # Suppress progress reports\n");
@@ -1060,7 +1059,6 @@ int cmd_install(int argc, char *argv[]) {
     bool cmd_quiet = false;
     bool pin_flag = false;
     bool local_dev = false;
-    bool remove_local_dev = false;
     const char *major_package_name = NULL;
     const char *from_file_path = NULL;
     const char *from_url = NULL;
@@ -1177,8 +1175,6 @@ int cmd_install(int argc, char *argv[]) {
             }
         } else if (strcmp(argv[i], "--local-dev") == 0) {
             local_dev = true;
-        } else if (strcmp(argv[i], "--remove-local-dev") == 0) {
-            remove_local_dev = true;
         } else if (strcmp(argv[i], "--from-path") == 0) {
             if (i + 1 < argc) {
                 i++;
@@ -1306,11 +1302,6 @@ int cmd_install(int argc, char *argv[]) {
         return 1;
     }
 
-    if (remove_local_dev && (from_file_path || from_url || local_dev || from_path)) {
-        fprintf(stderr, "Error: --remove-local-dev cannot be combined with other install options\n");
-        return 1;
-    }
-
     if (from_path && !local_dev) {
         fprintf(stderr, "Error: --from-path requires --local-dev flag\n");
         return 1;
@@ -1365,16 +1356,6 @@ int cmd_install(int argc, char *argv[]) {
     }
 
     int result = 0;
-
-    if (remove_local_dev) {
-        /* Handle --remove-local-dev: unregister package from local-dev tracking */
-        elm_json_free(elm_json);
-        result = unregister_local_dev_package(env);
-        arena_free(project_elm_json_path);
-        install_env_free(env);
-        log_set_level(original_level);
-        return result;
-    }
 
     if (local_dev) {
         /* Handle --local-dev installation */

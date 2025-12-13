@@ -11,8 +11,17 @@ set -euo pipefail
 # Test Cases
 # =============================================================================
 
+get_v1_since_count() {
+    local out
+    out=$(run_wrap debug registry_v1 list | head -4)
+    echo "$out" | awk -F': ' '/^Since count: /{print $2; exit}'
+}
+
 # APP-01: Upgrade single package to latest minor version
 test_app_01_upgrade_single_to_latest_minor() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-01: Upgrade single package to latest minor version ==="
     
     # Create app
@@ -32,11 +41,17 @@ test_app_01_upgrade_single_to_latest_minor() {
     # Verify upgraded to 1.2.0 (latest in major 1)
     assert_direct_dep "wrap/package-3m-no-deps" "1.2.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-01 ==="
 }
 
 # APP-02: Upgrade all packages to latest minor versions
 test_app_02_upgrade_all_to_latest_minor() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-02: Upgrade all packages to latest minor versions ==="
     
     # Create app
@@ -58,11 +73,17 @@ test_app_02_upgrade_all_to_latest_minor() {
     assert_direct_dep "wrap/package-3m-no-deps" "1.2.0" "$app_dir"
     assert_direct_dep "wrap/package-3v-no-deps" "1.0.0" "$app_dir"  # Only one version available
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-02 ==="
 }
 
 # APP-03: Upgrade with no argument (should upgrade all)
 test_app_03_upgrade_no_argument() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-03: Upgrade with no argument (should upgrade all) ==="
     
     # Create app
@@ -82,11 +103,17 @@ test_app_03_upgrade_no_argument() {
     # Verify upgraded
     assert_direct_dep "wrap/package-3m-no-deps" "1.2.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-03 ==="
 }
 
 # APP-04: Upgrade package with changing dependencies
 test_app_04_upgrade_with_changing_deps() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-04: Upgrade package with changing dependencies ==="
     
     # Create app
@@ -110,11 +137,17 @@ test_app_04_upgrade_with_changing_deps() {
     # depA should be gone (no longer needed)
     assert_no_dep "wrap/depA-single-no-deps" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-04 ==="
 }
 
 # APP-05: Upgrade single package to latest major version (--major)
 test_app_05_upgrade_single_to_major() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-05: Upgrade single package to latest major version ==="
     
     # Create app
@@ -134,11 +167,17 @@ test_app_05_upgrade_single_to_major() {
     # Verify upgraded to 3.0.0
     assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-05 ==="
 }
 
 # APP-06: Upgrade all packages to latest major versions (--major all)
 test_app_06_upgrade_all_to_major() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-06: Upgrade all packages to latest major versions ==="
     
     # Create app
@@ -160,11 +199,17 @@ test_app_06_upgrade_all_to_major() {
     assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
     assert_direct_dep "wrap/package-3m-no-deps" "1.2.0" "$app_dir"  # Stays within major
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-06 ==="
 }
 
 # APP-07: Upgrade with --major and no package (should upgrade all)
 test_app_07_upgrade_major_no_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-07: Upgrade with --major and no package (should upgrade all) ==="
     
     # Create app
@@ -184,11 +229,17 @@ test_app_07_upgrade_major_no_package() {
     # Verify upgraded
     assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-07 ==="
 }
 
 # PKG-01: Upgrade single package to latest minor (package type)
 test_pkg_01_upgrade_single_to_minor() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN PKG-01: Upgrade single package to latest minor (package type) ==="
     
     # Create package
@@ -204,11 +255,17 @@ test_pkg_01_upgrade_single_to_minor() {
     
     # Verify constraint updated
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-01 ==="
 }
 
 # PKG-02: Upgrade all packages to latest minor (package type)
 test_pkg_02_upgrade_all_to_minor() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN PKG-02: Upgrade all packages to latest minor (package type) ==="
     
     # Create package
@@ -224,11 +281,17 @@ test_pkg_02_upgrade_all_to_minor() {
     
     # Verify constraints updated
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-02 ==="
 }
 
 # PKG-03: Upgrade to major version (package type)
 test_pkg_03_upgrade_to_major() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN PKG-03: Upgrade to major version (package type) ==="
     
     # Create package
@@ -244,11 +307,17 @@ test_pkg_03_upgrade_to_major() {
     
     # Verify constraint updated to major version
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-03 ==="
 }
 
 # EDGE-01: Upgrade when already at latest version
 test_edge_01_already_at_latest() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN EDGE-01: Upgrade when already at latest version ==="
     
     # Create app
@@ -268,11 +337,17 @@ test_edge_01_already_at_latest() {
     # Verify still at latest
     assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END EDGE-01 ==="
 }
 
 # EDGE-02: Minor upgrade when major version available (shouldn't upgrade to major)
 test_edge_02_minor_when_major_available() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN EDGE-02: Minor upgrade when major version available ==="
     
     # Create app
@@ -292,6 +367,9 @@ test_edge_02_minor_when_major_available() {
     # Verify still at 2.0.0 (no major upgrade)
     assert_direct_dep "wrap/package-3v-no-deps" "2.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END EDGE-02 ==="
 }
 

@@ -11,8 +11,17 @@ set -euo pipefail
 # Test Cases
 # =============================================================================
 
+get_v1_since_count() {
+    local out
+    out=$(run_wrap debug registry_v1 list | head -4)
+    echo "$out" | awk -F': ' '/^Since count: /{print $2; exit}'
+}
+
 # APP-01: Uninstall single package
 test_app_01_uninstall_single_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-01: Uninstall single package ==="
     
     # Create app and install package first
@@ -30,11 +39,17 @@ test_app_01_uninstall_single_package() {
     # Verify it's gone
     assert_no_dep "wrap/package-single-no-deps" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-01 ==="
 }
 
 # APP-02: Uninstall package removing orphaned dependencies
 test_app_02_uninstall_removing_orphans() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-02: Uninstall package removing orphaned dependencies ==="
     
     # Create app
@@ -56,11 +71,17 @@ test_app_02_uninstall_removing_orphans() {
     assert_no_dep "wrap/package-single-1d" "$app_dir"
     assert_no_dep "wrap/dep-single-no-deps" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-02 ==="
 }
 
 # APP-03: Uninstall package keeping shared dependencies
 test_app_03_uninstall_keeping_shared() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-03: Uninstall package keeping shared dependencies ==="
     
     # Create app
@@ -84,11 +105,17 @@ test_app_03_uninstall_keeping_shared() {
     assert_direct_dep "wrap/package-B-single-1d-shared" "1.0.0" "$app_dir"
     assert_indirect_dep "wrap/dep-shared-single-no-deps" "1.0.0" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-03 ==="
 }
 
 # APP-04: Uninstall direct dependency that's still needed indirectly
 test_app_04_uninstall_direct_still_needed_indirect() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-04: Uninstall direct dependency that's still needed indirectly ==="
     
     # Create app
@@ -113,11 +140,17 @@ test_app_04_uninstall_direct_still_needed_indirect() {
     assert_no_dep "wrap/dep-single-no-deps" "$app_dir"  # Not direct anymore
     assert_indirect_dep "wrap/dep-single-no-deps" "1.0.0" "$app_dir"  # Still indirect
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-04 ==="
 }
 
 # APP-05: Uninstall test dependency
 test_app_05_uninstall_test_dependency() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN APP-05: Uninstall test dependency ==="
     
     # Create app
@@ -134,11 +167,17 @@ test_app_05_uninstall_test_dependency() {
     # Verify it's gone
     assert_no_dep "wrap/package-single-no-deps" "$app_dir"
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-05 ==="
 }
 
 # PKG-01: Uninstall single package from package type
 test_pkg_01_uninstall_single_from_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN PKG-01: Uninstall single package from package type ==="
     
     # Create package
@@ -154,11 +193,17 @@ test_pkg_01_uninstall_single_from_package() {
     
     # Verify constraint was removed
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-01 ==="
 }
 
 # PKG-02: Uninstall package from package type (with dependencies)
 test_pkg_02_uninstall_with_deps_from_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
     echo "=== BEGIN PKG-02: Uninstall package from package type (with dependencies) ==="
     
     # Create package
@@ -174,6 +219,9 @@ test_pkg_02_uninstall_with_deps_from_package() {
     
     # Verify constraint was removed (transitive deps were never added)
     
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-02 ==="
 }
 

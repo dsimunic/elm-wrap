@@ -16,21 +16,71 @@
 #include <string.h>
 #include <stdbool.h>
 
-static void print_remove_usage(void) {
-    printf("Usage: %s package remove PACKAGE [PACKAGE...]\n", global_context_program_name());
+static const char *remove_invocation_to_cmd_path(const char *invocation) {
+    if (!invocation) {
+        return "package uninstall";
+    }
+
+    if (strcmp(invocation, "uninstall") == 0) {
+        return "uninstall";
+    }
+
+    if (strcmp(invocation, "package remove") == 0) {
+        return "package remove";
+    }
+
+    if (strcmp(invocation, "package uninstall") == 0) {
+        return "package uninstall";
+    }
+
+    return "package uninstall";
+}
+
+static const char *remove_invocation_alias_line(const char *invocation) {
+    if (!invocation) {
+        return "Alias: 'package remove' can be used instead of 'package uninstall'.";
+    }
+
+    if (strcmp(invocation, "uninstall") == 0) {
+        return "Alias: 'package uninstall' can be used instead of 'uninstall'.";
+    }
+
+    if (strcmp(invocation, "package remove") == 0) {
+        return "Alias: 'package uninstall' can be used instead of 'package remove'.";
+    }
+
+    if (strcmp(invocation, "package uninstall") == 0) {
+        return "Alias: 'package remove' can be used instead of 'package uninstall'.";
+    }
+
+    return "Alias: 'package remove' can be used instead of 'package uninstall'.";
+}
+
+static void print_remove_usage(const char *invocation) {
+    const char *prog = global_context_program_name();
+    const char *cmd_path = remove_invocation_to_cmd_path(invocation);
+
+    printf("Usage:\n");
+    printf("  %s %s PACKAGE [PACKAGE...]\n", prog, cmd_path);
+    printf("  %s %s --local-dev\n", prog, cmd_path);
     printf("\n");
     printf("Remove packages from your Elm project.\n");
+    printf("\n");
+    printf("Use --local-dev (run from within an Elm package directory) to remove the\n");
+    printf("current package from local-dev tracking.\n");
     printf("\n");
     printf("This will also remove any indirect dependencies that are no longer\n");
     printf("needed by other packages.\n");
     printf("\n");
-    printf("Alias: 'package uninstall' can be used instead of 'package remove'.\n");
+    printf("%s\n", remove_invocation_alias_line(invocation));
     printf("\n");
     printf("Examples:\n");
-    printf("  %s package remove elm/html           # Remove elm/html from your project\n", global_context_program_name());
-    printf("  %s package remove elm/html elm/json  # Remove multiple packages at once\n", global_context_program_name());
+    printf("  %s %s elm/html           # Remove elm/html from your project\n", prog, cmd_path);
+    printf("  %s %s elm/html elm/json  # Remove multiple packages at once\n", prog, cmd_path);
+    printf("  %s %s --local-dev        # Remove current package from local-dev tracking\n", prog, cmd_path);
     printf("\n");
     printf("Options:\n");
+    printf("  --local-dev                        # Remove current package from local-dev tracking\n");
     printf("  -y, --yes                          # Automatically confirm changes\n");
     printf("  --help                             # Show this help\n");
 }
@@ -125,17 +175,20 @@ static void print_remove_validation_errors(MultiRemoveValidation *validation) {
     fprintf(stderr, "I didn't remove anything yet, as I can only remove all specified packages or none.\n");
 }
 
-int cmd_remove(int argc, char *argv[]) {
+int cmd_remove(int argc, char *argv[], const char *invocation) {
     /* Multi-package support: collect package names into a dynamic array */
     const char **package_names = NULL;
     int package_count = 0;
     int package_capacity = 0;
     bool auto_yes = false;
+    bool remove_local_dev = false;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            print_remove_usage();
+            print_remove_usage(invocation);
             return 0;
+        } else if (strcmp(argv[i], "--local-dev") == 0) {
+            remove_local_dev = true;
         } else if (strcmp(argv[i], "-y") == 0 || strcmp(argv[i], "--yes") == 0) {
             auto_yes = true;
         } else if (argv[i][0] != '-') {
@@ -143,14 +196,38 @@ int cmd_remove(int argc, char *argv[]) {
             DYNARRAY_PUSH(package_names, package_count, package_capacity, argv[i], const char*);
         } else {
             fprintf(stderr, "Error: Unknown option: %s\n", argv[i]);
-            print_remove_usage();
+            print_remove_usage(invocation);
             return 1;
         }
     }
 
+    if (remove_local_dev) {
+        if (package_count > 0 || auto_yes) {
+            fprintf(stderr, "Error: --local-dev cannot be combined with package removal options\n");
+            print_remove_usage(invocation);
+            return 1;
+        }
+
+        InstallEnv *env = install_env_create();
+        if (!env) {
+            log_error("Failed to create install environment");
+            return 1;
+        }
+
+        if (!install_env_init(env)) {
+            log_error("Failed to initialize install environment");
+            install_env_free(env);
+            return 1;
+        }
+
+        int result = unregister_local_dev_package(env);
+        install_env_free(env);
+        return result;
+    }
+
     if (package_count == 0) {
         fprintf(stderr, "Error: At least one package name is required\n");
-        print_remove_usage();
+        print_remove_usage(invocation);
         return 1;
     }
 

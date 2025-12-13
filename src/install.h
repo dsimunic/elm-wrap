@@ -10,7 +10,7 @@ int cmd_install(int argc, char *argv[]);
 int cmd_cache(int argc, char *argv[]);
 
 /* Remove command entry point */
-int cmd_remove(int argc, char *argv[]);
+int cmd_remove(int argc, char *argv[], const char *invocation);
 
 /* Package init command entry point */
 int cmd_package_init(int argc, char *argv[]);
