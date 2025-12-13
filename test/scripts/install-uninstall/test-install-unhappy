@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+#
+# test-install-unhappy - Install command error cases
+#
+# This script tests install operations that should fail.
+#
+
+set -euo pipefail
+
+# =============================================================================
+# Test Cases
+# =============================================================================
+
+# ERR-01: Install non-existent package (should fail)
+test_err_01_install_nonexistent_package() {
+    echo "=== BEGIN ERR-01: Install non-existent package ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err01" "err01")
+    
+    # Try to install non-existent package (should fail)
+    cd "$app_dir"
+    if run_wrap install wrap/does-not-exist 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    # Verify dependencies unchanged
+    assert_no_dep "wrap/does-not-exist" "$app_dir"
+    
+    echo "=== END ERR-01 ==="
+}
+
+# ERR-02: Install package with non-existent version (should fail)
+test_err_02_install_nonexistent_version() {
+    echo "=== BEGIN ERR-02: Install package with non-existent version ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err02" "err02")
+    
+    # Try to install non-existent version (should fail)
+    cd "$app_dir"
+    if run_wrap install wrap/package-3v-no-deps@9.9.9 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    # Verify dependencies unchanged
+    assert_no_dep "wrap/package-3v-no-deps" "$app_dir"
+    
+    echo "=== END ERR-02 ==="
+}
+
+# ERR-03: Install multiple packages with one non-existent (should fail)
+test_err_03_install_multiple_with_nonexistent() {
+    echo "=== BEGIN ERR-03: Install multiple packages with one non-existent ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err03" "err03")
+    
+    # Snapshot initial dependencies
+    cd "$app_dir"
+    local before
+    before=$(snapshot_deps "$app_dir")
+    
+    # Try to install multiple with one bad package (should fail)
+    if run_wrap install wrap/package-single-no-deps wrap/does-not-exist 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    # Verify no partial install occurred
+    assert_no_dep "wrap/package-single-no-deps" "$app_dir"
+    assert_no_dep "wrap/does-not-exist" "$app_dir"
+    
+    # Verify dependencies remain unchanged
+    local after
+    after=$(snapshot_deps "$app_dir")
+    assert_deps_unchanged "$before" "$after"
+    
+    echo "=== END ERR-03 ==="
+}
+
+# ERR-04: Install multiple packages with one having wrong version (should fail)
+test_err_04_install_multiple_with_wrong_version() {
+    echo "=== BEGIN ERR-04: Install multiple packages with one having wrong version ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err04" "err04")
+    
+    # Snapshot initial dependencies
+    cd "$app_dir"
+    local before
+    before=$(snapshot_deps "$app_dir")
+    
+    # Try to install multiple with one bad version (should fail)
+    if run_wrap install wrap/package-single-no-deps wrap/package-3v-no-deps@9.9.9 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    # Verify no partial install occurred
+    assert_no_dep "wrap/package-single-no-deps" "$app_dir"
+    assert_no_dep "wrap/package-3v-no-deps" "$app_dir"
+    
+    # Verify dependencies remain unchanged
+    local after
+    after=$(snapshot_deps "$app_dir")
+    assert_deps_unchanged "$before" "$after"
+    
+    echo "=== END ERR-04 ==="
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+    echo "Running install-unhappy tests..."
+    echo
+    
+    # Run all test cases
+    test_err_01_install_nonexistent_package
+    test_err_02_install_nonexistent_version
+    test_err_03_install_multiple_with_nonexistent
+    test_err_04_install_multiple_with_wrong_version
+    
+    echo
+    echo "All install-unhappy tests completed successfully"
+}
+
+main "$@"

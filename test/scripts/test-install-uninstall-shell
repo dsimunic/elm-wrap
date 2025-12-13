@@ -192,7 +192,7 @@ CACHE_PACKAGES=(
     "wrap/depC-single-no-deps"
     "wrap/package-single-1d"
     "wrap/package-A-single-1d-shared"
-    "wrap/package-B-single-1d-shaerd"
+    "wrap/package-B-single-1d-shared"
     "wrap/dep-shared-single-no-deps"
     "wrap/testdep-req-newer-prod-single"
 )

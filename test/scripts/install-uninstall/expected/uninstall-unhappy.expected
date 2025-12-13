@@ -1,0 +1,30 @@
+Running uninstall-unhappy tests...
+
+=== BEGIN ERR-01: Uninstall non-existent package ===
+-- PACKAGE REMOVAL FAILED -----------------------------------------------------
+
+I cannot remove these requested packages:
+
+  ✗ wrap/does-not-exist - Package not in your elm.json
+
+Please fix the specification and try again.
+
+I didn't remove anything yet, as I can only remove all specified packages or none.
+=== END ERR-01 ===
+=== BEGIN ERR-02: Uninstall package not in dependencies ===
+Here is my plan:
+  
+  Add:
+    wrap/package-single-no-deps    1.0.0
+  
+Saving elm.json...
+Successfully installed wrap/package-single-no-deps!
+-- PACKAGE REMOVAL FAILED -----------------------------------------------------
+
+I cannot remove these requested packages:
+
+  ✗ wrap/package-3v-no-deps - Package not in your elm.json
+
+Please fix the specification and try again.
+
+I didn't remove anything yet, as I can only remove all specified packages or none.

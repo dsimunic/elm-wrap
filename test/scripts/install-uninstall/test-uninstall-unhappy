@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+#
+# test-uninstall-unhappy - Uninstall command error cases
+#
+# This script tests uninstall operations that should fail.
+#
+
+set -euo pipefail
+
+# =============================================================================
+# Test Cases
+# =============================================================================
+
+# ERR-01: Uninstall non-existent package (should fail)
+test_err_01_uninstall_nonexistent_package() {
+    echo "=== BEGIN ERR-01: Uninstall non-existent package ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err01" "err01")
+    
+    # Try to uninstall non-existent package (should fail)
+    cd "$app_dir"
+    if run_wrap package uninstall wrap/does-not-exist 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    # Verify dependencies unchanged
+    assert_no_dep "wrap/does-not-exist" "$app_dir"
+    
+    echo "=== END ERR-01 ==="
+}
+
+# ERR-02: Uninstall package not in dependencies (should fail)
+test_err_02_uninstall_not_in_dependencies() {
+    echo "=== BEGIN ERR-02: Uninstall package not in dependencies ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err02" "err02")
+    
+    # Install one package
+    cd "$app_dir"
+    run_wrap install wrap/package-single-no-deps
+    
+    # Try to uninstall a different package (should fail)
+    if run_wrap package uninstall wrap/package-3v-no-deps 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    # Verify original dependency still there
+    assert_direct_dep "wrap/package-single-no-deps" "1.0.0" "$app_dir"
+    
+    echo "=== END ERR-02 ==="
+}
+
+# ERR-03: Try to uninstall elm/core (should succeed - elm/core can be removed)
+test_err_03_uninstall_elm_core() {
+    echo "=== BEGIN ERR-03: Try to uninstall elm/core ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err03" "err03")
+    
+    # Try to uninstall elm/core (should succeed)
+    cd "$app_dir"
+    run_wrap package uninstall elm/core
+    
+    # Verify elm/core is no longer in direct dependencies
+    assert_no_dep "elm/core" "$app_dir"
+    
+    echo "=== END ERR-03 ==="
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+    echo "Running uninstall-unhappy tests..."
+    echo
+    
+    # Run all test cases
+    test_err_01_uninstall_nonexistent_package
+    test_err_02_uninstall_not_in_dependencies
+    test_err_03_uninstall_elm_core
+    
+    echo
+    echo "All uninstall-unhappy tests completed successfully"
+}
+
+main "$@"

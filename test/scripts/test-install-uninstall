@@ -31,6 +31,9 @@
 
 set -euo pipefail
 
+# ShellCheck can't see cross-process use of exported functions.
+# shellcheck disable=SC2329
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -169,6 +172,8 @@ Test Suites:
   upgrade-happy      Upgrade command happy path tests
   upgrade-unhappy    Upgrade command error cases
   local-dev          Local development workflow tests
+  cache-happy        Cache command happy path tests
+  cache-unhappy      Cache command error cases
 
 Examples:
   ./test-install-uninstall                      # Run all tests
@@ -190,6 +195,8 @@ ALL_SUITES=(
     "upgrade-happy"
     "upgrade-unhappy"
     "local-dev"
+    "cache-happy"
+    "cache-unhappy"
 )
 
 list_suites() {
@@ -283,7 +290,7 @@ CACHE_PACKAGES=(
     "wrap/depC-single-no-deps"
     "wrap/package-single-1d"
     "wrap/package-A-single-1d-shared"
-    "wrap/package-B-single-1d-shaerd"
+    "wrap/package-B-single-1d-shared"
     "wrap/dep-shared-single-no-deps"
     "wrap/testdep-req-newer-prod-single"
 )
@@ -315,7 +322,7 @@ setup_test_environment() {
     local pkg_errors=0
     
     for pkg in "${CACHE_PACKAGES[@]}"; do
-        if ELM_HOME="$TEST_ELM_HOME" "$MKPKG" "$REGISTRY_FILE" "$pkg" >/dev/null 2>&1; then
+        if ELM_HOME="$TEST_ELM_HOME" ELM_VERSION="$ELM_VERSION" "$MKPKG" "$REGISTRY_FILE" "$pkg" >/dev/null 2>&1; then
             ((pkg_count++)) || true
         else
             log_warning "Failed to create package: $pkg"
@@ -410,7 +417,17 @@ normalize_output() {
 # Run a wrap command and capture normalized output
 # Usage: run_wrap <args...>
 run_wrap() {
-    "$WRAP_BIN" "$@" 2>&1 | normalize_output
+    # Note: wrap expects -y/--yes after the command (or subcommand). Keep the insertion here
+    # to avoid "Unknown command '--yes'" when tests run non-interactively.
+    if [[ "$1" == "install" || "$1" == "upgrade" || "$1" == "uninstall" ]]; then
+        local cmd="$1"; shift
+        "$WRAP_BIN" "$cmd" --yes "$@" 2>&1 | normalize_output
+    elif [[ "$1" == "package" && "$2" =~ ^(install|upgrade|uninstall)$ ]]; then
+        local group="$1"; local sub="$2"; shift 2
+        "$WRAP_BIN" "$group" "$sub" --yes "$@" 2>&1 | normalize_output
+    else
+        "$WRAP_BIN" "$@" 2>&1 | normalize_output
+    fi
 }
 
 # Assert that a package is in direct dependencies
@@ -463,15 +480,48 @@ assert_no_dep() {
     fi
 }
 
+# Assert that dependencies match exactly (for verifying no unexpected changes)
+# Usage: assert_deps_unchanged <before_snapshot> <after_snapshot>
+# Returns 0 if they match, 1 if different
+assert_deps_unchanged() {
+    local before="$1"
+    local after="$2"
+    
+    if [ "$before" = "$after" ]; then
+        return 0
+    else
+        echo "ERROR: Dependencies changed unexpectedly"
+        echo "BEFORE:"
+        echo "$before"
+        echo "AFTER:"
+        echo "$after"
+        return 1
+    fi
+}
+
+# Snapshot current dependencies
+# Usage: snapshot=$(snapshot_deps [path])
+snapshot_deps() {
+    local path="${1:-.}"
+    get_deps "$path"
+}
+
 # Export functions and variables for subscripts
 export -f create_app create_package get_deps normalize_output run_wrap
 export -f assert_direct_dep assert_indirect_dep assert_no_dep
+export -f assert_deps_unchanged snapshot_deps
 export TEST_ROOT TEST_ELM_HOME TEST_WRAP_HOME ELM_VERSION
 export WRAP_BIN INDEXMAKER MKPKG REGISTRY_FILE
 export PROJECT_ROOT TEST_SCRIPTS_DIR EXPECTED_DIR ACTUAL_DIR
+# Ensure wrap uses the same Elm version directory we populate under ELM_HOME.
+# Without this, wrap may infer a different compiler version and look in the wrong
+# $ELM_HOME/<version>/packages/registry.dat, making "happy" tests fail spuriously.
+export ELM_VERSION
 export WRAP_OFFLINE_MODE=1
 export ELM_HOME="$TEST_ELM_HOME"
 export WRAP_HOME="$TEST_WRAP_HOME"
+# Enable cache command for testing
+export WRAP_FEATURE_CACHE=1
 
 # =============================================================================
 # Test Execution
@@ -519,6 +569,16 @@ run_test_suite() {
     
     # Update expected files if requested
     if [[ "$UPDATE_EXPECTED" == "true" ]]; then
+        # Never update expected outputs from a failing run.
+        # (Unhappy-path suites should still exit 0 because they handle expected failures.)
+        if [[ $exit_code -ne 0 ]]; then
+            log_error "Refusing to update expected output for '$suite' (test script exited $exit_code)"
+            cat "$actual_file"
+            FAILED_TESTS+=("$suite (update-expected refused)")
+            ((TESTS_FAILED++))
+            return 0
+        fi
+
         mkdir -p "$EXPECTED_DIR"
         cp "$actual_file" "$expected_file"
         log_success "Updated expected output: $expected_file"

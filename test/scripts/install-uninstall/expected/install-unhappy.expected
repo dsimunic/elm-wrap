@@ -1,0 +1,46 @@
+Running install-unhappy tests...
+
+=== BEGIN ERR-01: Install non-existent package ===
+
+-- UNKNOWN PACKAGE -------------------------------------------------------------
+
+I could not find 'wrap/does-not-exist' in the package registry, but I found
+these packages with similar names:
+
+    elm/bytes
+    elm/browser
+    elm/core
+    elm/json
+
+Maybe you want one of these instead?
+
+=== END ERR-01 ===
+=== BEGIN ERR-02: Install package with non-existent version ===
+Error: Version 9.9.9 not found for package wrap/package-3v-no-deps
+
+Available versions:
+  3.0.0
+  2.0.0
+  1.0.0
+=== END ERR-02 ===
+=== BEGIN ERR-03: Install multiple packages with one non-existent ===
+-- PACKAGE VALIDATION FAILED --------------------------------------------------
+
+I cannot install these requested packages:
+
+  ✗ wrap/does-not-exist - Package not found in registry
+
+Please fix the specification and try again.
+
+I didn't install anything yet, as I can only install all specified packages or none.
+=== END ERR-03 ===
+=== BEGIN ERR-04: Install multiple packages with one having wrong version ===
+Error: Version 9.9.9 not found for package wrap/package-3v-no-deps
+
+Available versions:
+  3.0.0
+  2.0.0
+  1.0.0
+=== END ERR-04 ===
+
+All install-unhappy tests completed successfully

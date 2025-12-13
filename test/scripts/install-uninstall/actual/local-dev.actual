@@ -1,0 +1,23 @@
+Running local-dev tests...
+
+=== BEGIN LOCAL-01: Initialize package with local-dev and install to app ===
+Here is my plan:
+  
+  Register (local-dev):
+    testauthor/local-pkg1    1.0.0 (local)
+  
+  Source: /private<TEST_ROOT>/local-pkg1
+  
+To use this package in an application, run from the application directory:
+    wrap package install testauthor/local-pkg1
+  
+Successfully registered testauthor/local-pkg1 1.0.0 (local)!
+Here is my plan:
+  
+  Add (local):
+    testauthor/local-pkg1    1.0.0 (local)
+  
+  Source: /private<TEST_ROOT>/local-pkg1
+  
+Saving elm.json...
+Successfully installed testauthor/local-pkg1 1.0.0 (local)!

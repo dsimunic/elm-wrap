@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+#
+# test-cache-happy - Cache command happy path tests
+#
+# This script tests successful cache operations.
+#
+
+set -euo pipefail
+
+# =============================================================================
+# Test Cases
+# =============================================================================
+
+# CACHE-01: Cache single package
+test_cache_01_single_package() {
+    echo "=== BEGIN CACHE-01: Cache single package ==="
+    
+    # Create app directory (we don't need an initialized app, just a working dir)
+    local work_dir="$TEST_ROOT/cache01"
+    mkdir -p "$work_dir"
+    cd "$work_dir"
+    
+    # Cache a package (should download it if not already cached)
+    run_wrap package cache wrap/package-single-no-deps
+    
+    echo "=== END CACHE-01 ==="
+}
+
+# CACHE-02: Cache multiple packages at once
+test_cache_02_multiple_packages() {
+    echo "=== BEGIN CACHE-02: Cache multiple packages at once ==="
+    
+    local work_dir="$TEST_ROOT/cache02"
+    mkdir -p "$work_dir"
+    cd "$work_dir"
+    
+    # Cache multiple packages
+    run_wrap package cache wrap/package-single-no-deps wrap/package-3v-no-deps
+    
+    echo "=== END CACHE-02 ==="
+}
+
+# CACHE-03: Cache specific version
+test_cache_03_specific_version() {
+    echo "=== BEGIN CACHE-03: Cache specific version ==="
+    
+    local work_dir="$TEST_ROOT/cache03"
+    mkdir -p "$work_dir"
+    cd "$work_dir"
+    
+    # Cache specific version
+    run_wrap package cache wrap/package-3v-no-deps@2.0.0
+    
+    echo "=== END CACHE-03 ==="
+}
+
+# CACHE-04: Cache package that's already in cache (should be idempotent)
+test_cache_04_already_cached() {
+    echo "=== BEGIN CACHE-04: Cache package that's already in cache ==="
+    
+    local work_dir="$TEST_ROOT/cache04"
+    mkdir -p "$work_dir"
+    cd "$work_dir"
+    
+    # Cache package once
+    run_wrap package cache wrap/package-single-no-deps
+    
+    # Cache same package again (should not fail)
+    run_wrap package cache wrap/package-single-no-deps
+    
+    echo "=== END CACHE-04 ==="
+}
+
+# CACHE-05: Cache from file/directory
+test_cache_05_from_file() {
+    echo "=== BEGIN CACHE-05: Cache from file/directory ==="
+    
+    local work_dir="$TEST_ROOT/cache05"
+    mkdir -p "$work_dir"
+    cd "$work_dir"
+    
+    # Path to test package
+    local pkg_path="$PROJECT_ROOT/test/data/packages/install-uninstall/wrap/package-from-file-single-no-deps"
+    
+    # Cache from local directory
+    run_wrap package cache --from-file "$pkg_path" wrap/package-from-file-single-no-deps
+    
+    echo "=== END CACHE-05 ==="
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+    echo "Running cache-happy tests..."
+    echo
+    
+    # Run all test cases
+    test_cache_01_single_package
+    test_cache_02_multiple_packages
+    test_cache_03_specific_version
+    test_cache_04_already_cached
+    test_cache_05_from_file
+    
+    echo
+    echo "All cache-happy tests completed successfully"
+}
+
+main "$@"

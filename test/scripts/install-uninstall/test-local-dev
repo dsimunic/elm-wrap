@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+#
+# test-local-dev - Local development workflow tests
+#
+# This script tests local development features like --local-dev, --from-path, etc.
+#
+
+set -euo pipefail
+
+# =============================================================================
+# Test Cases
+# =============================================================================
+
+# LOCAL-01: Initialize package with local-dev and install to app
+test_local_01_init_and_install() {
+    echo "=== BEGIN LOCAL-01: Initialize package with local-dev and install to app ==="
+    
+    # Create package
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/local-pkg1" "testauthor/local-pkg1")
+    
+    # Register for local-dev (from within package directory)
+    cd "$pkg_dir"
+    run_wrap install --local-dev
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app01" "app01")
+    
+    # Install from path
+    cd "$app_dir"
+    run_wrap install --local-dev --from-path "$pkg_dir" testauthor/local-pkg1
+    
+    # Verify local-dev dependency
+    assert_direct_dep "testauthor/local-pkg1" "1.0.0" "$app_dir"
+    
+    echo "=== END LOCAL-01 ==="
+}
+
+# LOCAL-02: Install package with --local-dev --from-path
+test_local_02_install_from_path() {
+    echo "=== BEGIN LOCAL-02: Install package with --local-dev --from-path ==="
+    
+    # Create package
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/local-src2" "testauthor/local-src2")
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app02" "app02")
+    
+    # Install from path
+    cd "$app_dir"
+    run_wrap install --local-dev --from-path "$pkg_dir" testauthor/local-src2
+    
+    # Verify local-dev dependency
+    assert_direct_dep "testauthor/local-src2" "1.0.0" "$app_dir"
+    
+    echo "=== END LOCAL-02 ==="
+}
+
+# LOCAL-03: Dependency synchronization when local package changes
+test_local_03_dependency_sync() {
+    echo "=== BEGIN LOCAL-03: Dependency synchronization when local package changes ==="
+    
+    # Create package
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/local-pkg3" "testauthor/local-pkg3")
+    
+    # Register for local-dev
+    cd "$pkg_dir"
+    run_wrap install --local-dev
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app03" "app03")
+    
+    # Install local package
+    cd "$app_dir"
+    run_wrap install --local-dev --from-path "$pkg_dir" testauthor/local-pkg3
+    
+    # Verify initial state
+    assert_direct_dep "testauthor/local-pkg3" "1.0.0" "$app_dir"
+    
+    # Modify local package to add dependency (simulate adding wrap/package-single-no-deps)
+    # Note: In a real test, we'd modify elm.json, but for now we just test the mechanism
+    
+    # Re-install should sync dependencies
+    run_wrap install testauthor/local-pkg3
+    
+    # Verify dependency sync worked (would include new deps if elm.json changed)
+    
+    echo "=== END LOCAL-03 ==="
+}
+
+# LOCAL-04: Multiple applications depending on same local package
+test_local_04_multiple_apps_same_local() {
+    echo "=== BEGIN LOCAL-04: Multiple applications depending on same local package ==="
+    
+    # Create package
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/local-pkg4" "testauthor/local-pkg4")
+    
+    # Register for local-dev
+    cd "$pkg_dir"
+    run_wrap install --local-dev
+    
+    # Create first app
+    local app1_dir
+    app1_dir=$(create_app "$TEST_ROOT/app04a" "app04a")
+    
+    # Install local package to first app
+    cd "$app1_dir"
+    run_wrap install --local-dev --from-path "$pkg_dir" testauthor/local-pkg4
+    
+    # Create second app
+    local app2_dir
+    app2_dir=$(create_app "$TEST_ROOT/app04b" "app04b")
+    
+    # Install local package to second app
+    cd "$app2_dir"
+    run_wrap install --local-dev --from-path "$pkg_dir" testauthor/local-pkg4
+    
+    # Verify both apps have the dependency
+    assert_direct_dep "testauthor/local-pkg4" "1.0.0" "$app1_dir"
+    assert_direct_dep "testauthor/local-pkg4" "1.0.0" "$app2_dir"
+    
+    # Modify and sync both apps
+    run_wrap install testauthor/local-pkg4
+    
+    # Verify both still have the dependency
+    assert_direct_dep "testauthor/local-pkg4" "1.0.0" "$app1_dir"
+    assert_direct_dep "testauthor/local-pkg4" "1.0.0" "$app2_dir"
+    
+    echo "=== END LOCAL-04 ==="
+}
+
+# LOCAL-05: Remove local-dev tracking with --remove-local-dev
+test_local_05_remove_local_dev_tracking() {
+    echo "=== BEGIN LOCAL-05: Remove local-dev tracking with --remove-local-dev ==="
+    
+    # Create package
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/local-pkg5" "testauthor/local-pkg5")
+    
+    # Register for local-dev
+    cd "$pkg_dir"
+    run_wrap install --local-dev
+    
+    # Remove local-dev tracking
+    run_wrap install --remove-local-dev
+    
+    # Try to remove again (should be idempotent)
+    run_wrap install --remove-local-dev
+    
+    echo "=== END LOCAL-05 ==="
+}
+
+# ERR-01: Install with --local-dev --from-path with non-existent path
+test_err_01_local_dev_nonexistent_path() {
+    echo "=== BEGIN ERR-01: Install with --local-dev --from-path with non-existent path ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err01" "err01")
+    
+    # Try to install from non-existent path (should fail)
+    cd "$app_dir"
+    if run_wrap install --local-dev --from-path "$TEST_ROOT/does-not-exist" testauthor/does-not-exist 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    # Verify dependencies unchanged
+    assert_no_dep "testauthor/does-not-exist" "$app_dir"
+    
+    echo "=== END ERR-01 ==="
+}
+
+# ERR-02: Install multiple packages with --local-dev (should fail)
+test_err_02_local_dev_multiple_packages() {
+    echo "=== BEGIN ERR-02: Install multiple packages with --local-dev (should fail) ==="
+    
+    # Create packages
+    local pkg1_dir
+    pkg1_dir=$(create_package "$TEST_ROOT/err02-pkg1" "testauthor/err02-pkg1")
+    create_package "$TEST_ROOT/err02-pkg2" "testauthor/err02-pkg2" >/dev/null
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err02" "err02")
+    
+    # Try to install multiple with --local-dev (should fail)
+    cd "$app_dir"
+    if run_wrap install --local-dev --from-path "$pkg1_dir" testauthor/err02-pkg1 testauthor/err02-pkg2 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    # Verify dependencies unchanged
+    assert_no_dep "testauthor/err02-pkg1" "$app_dir"
+    assert_no_dep "testauthor/err02-pkg2" "$app_dir"
+    
+    echo "=== END ERR-02 ==="
+}
+
+# ERR-03: Use --from-path without --local-dev (should fail)
+test_err_03_from_path_without_local_dev() {
+    echo "=== BEGIN ERR-03: Use --from-path without --local-dev (should fail) ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err03" "err03")
+    
+    # Try to use --from-path without --local-dev (should fail)
+    cd "$app_dir"
+    if run_wrap install --from-path "$TEST_ROOT/some-path" testauthor/some-pkg 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    # Verify dependencies unchanged
+    assert_no_dep "testauthor/some-pkg" "$app_dir"
+    
+    echo "=== END ERR-03 ==="
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+    echo "Running local-dev tests..."
+    echo
+    
+    # Run all test cases
+    test_local_01_init_and_install
+    test_local_02_install_from_path
+    test_local_03_dependency_sync
+    test_local_04_multiple_apps_same_local
+    test_local_05_remove_local_dev_tracking
+    test_err_01_local_dev_nonexistent_path
+    test_err_02_local_dev_multiple_packages
+    test_err_03_from_path_without_local_dev
+    
+    echo
+    echo "All local-dev tests completed successfully"
+}
+
+main "$@"

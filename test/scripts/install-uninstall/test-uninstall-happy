@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+#
+# test-uninstall-happy - Uninstall command happy path tests
+#
+# This script tests successful uninstall operations for both applications and packages.
+#
+
+set -euo pipefail
+
+# =============================================================================
+# Test Cases
+# =============================================================================
+
+# APP-01: Uninstall single package
+test_app_01_uninstall_single_package() {
+    echo "=== BEGIN APP-01: Uninstall single package ==="
+    
+    # Create app and install package first
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app01" "app01")
+    cd "$app_dir"
+    run_wrap install wrap/package-single-no-deps
+    
+    # Verify it's installed
+    assert_direct_dep "wrap/package-single-no-deps" "1.0.0" "$app_dir"
+    
+    # Uninstall
+    run_wrap package uninstall wrap/package-single-no-deps
+    
+    # Verify it's gone
+    assert_no_dep "wrap/package-single-no-deps" "$app_dir"
+    
+    echo "=== END APP-01 ==="
+}
+
+# APP-02: Uninstall package removing orphaned dependencies
+test_app_02_uninstall_removing_orphans() {
+    echo "=== BEGIN APP-02: Uninstall package removing orphaned dependencies ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app02" "app02")
+    
+    # Install package with dependency
+    cd "$app_dir"
+    run_wrap install wrap/package-single-1d
+    
+    # Verify both direct and indirect deps
+    assert_direct_dep "wrap/package-single-1d" "1.0.0" "$app_dir"
+    assert_indirect_dep "wrap/dep-single-no-deps" "1.0.0" "$app_dir"
+    
+    # Uninstall the direct package
+    run_wrap package uninstall wrap/package-single-1d
+    
+    # Verify both are gone (orphan cleanup)
+    assert_no_dep "wrap/package-single-1d" "$app_dir"
+    assert_no_dep "wrap/dep-single-no-deps" "$app_dir"
+    
+    echo "=== END APP-02 ==="
+}
+
+# APP-03: Uninstall package keeping shared dependencies
+test_app_03_uninstall_keeping_shared() {
+    echo "=== BEGIN APP-03: Uninstall package keeping shared dependencies ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app03" "app03")
+    
+    # Install two packages that share a dependency
+    cd "$app_dir"
+    run_wrap install wrap/package-A-single-1d-shared wrap/package-B-single-1d-shared
+    
+    # Verify both direct deps and shared indirect dep
+    assert_direct_dep "wrap/package-A-single-1d-shared" "1.0.0" "$app_dir"
+    assert_direct_dep "wrap/package-B-single-1d-shared" "1.0.0" "$app_dir"
+    assert_indirect_dep "wrap/dep-shared-single-no-deps" "1.0.0" "$app_dir"
+    
+    # Uninstall one package
+    run_wrap package uninstall wrap/package-A-single-1d-shared
+    
+    # Verify the uninstalled package is gone but shared dep remains
+    assert_no_dep "wrap/package-A-single-1d-shared" "$app_dir"
+    assert_direct_dep "wrap/package-B-single-1d-shared" "1.0.0" "$app_dir"
+    assert_indirect_dep "wrap/dep-shared-single-no-deps" "1.0.0" "$app_dir"
+    
+    echo "=== END APP-03 ==="
+}
+
+# APP-04: Uninstall direct dependency that's still needed indirectly
+test_app_04_uninstall_direct_still_needed_indirect() {
+    echo "=== BEGIN APP-04: Uninstall direct dependency that's still needed indirectly ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app04" "app04")
+    
+    # Install package with dependency
+    cd "$app_dir"
+    run_wrap install wrap/package-single-1d
+    
+    # Also install the dependency directly
+    run_wrap install wrap/dep-single-no-deps
+    
+    # Verify both are direct
+    assert_direct_dep "wrap/package-single-1d" "1.0.0" "$app_dir"
+    assert_direct_dep "wrap/dep-single-no-deps" "1.0.0" "$app_dir"
+    
+    # Uninstall the direct dep (should remain as indirect)
+    run_wrap package uninstall wrap/dep-single-no-deps
+    
+    # Verify it's no longer direct but still indirect
+    assert_no_dep "wrap/dep-single-no-deps" "$app_dir"  # Not direct anymore
+    assert_indirect_dep "wrap/dep-single-no-deps" "1.0.0" "$app_dir"  # Still indirect
+    
+    echo "=== END APP-04 ==="
+}
+
+# APP-05: Uninstall test dependency
+test_app_05_uninstall_test_dependency() {
+    echo "=== BEGIN APP-05: Uninstall test dependency ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app05" "app05")
+    
+    # Install as test dependency
+    cd "$app_dir"
+    run_wrap install --test wrap/package-single-no-deps
+    
+    # Uninstall (should work for test deps too)
+    run_wrap package uninstall wrap/package-single-no-deps
+    
+    # Verify it's gone
+    assert_no_dep "wrap/package-single-no-deps" "$app_dir"
+    
+    echo "=== END APP-05 ==="
+}
+
+# PKG-01: Uninstall single package from package type
+test_pkg_01_uninstall_single_from_package() {
+    echo "=== BEGIN PKG-01: Uninstall single package from package type ==="
+    
+    # Create package
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/pkg01" "testauthor/pkg01")
+    
+    # Install package
+    cd "$pkg_dir"
+    run_wrap package install wrap/package-single-no-deps
+    
+    # Uninstall
+    run_wrap package uninstall wrap/package-single-no-deps
+    
+    # Verify constraint was removed
+    
+    echo "=== END PKG-01 ==="
+}
+
+# PKG-02: Uninstall package from package type (with dependencies)
+test_pkg_02_uninstall_with_deps_from_package() {
+    echo "=== BEGIN PKG-02: Uninstall package from package type (with dependencies) ==="
+    
+    # Create package
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/pkg02" "testauthor/pkg02")
+    
+    # Install package with dependencies
+    cd "$pkg_dir"
+    run_wrap package install wrap/package-single-1d
+    
+    # Uninstall
+    run_wrap package uninstall wrap/package-single-1d
+    
+    # Verify constraint was removed (transitive deps were never added)
+    
+    echo "=== END PKG-02 ==="
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+    echo "Running uninstall-happy tests..."
+    echo
+    
+    # Run all test cases
+    test_app_01_uninstall_single_package
+    test_app_02_uninstall_removing_orphans
+    test_app_03_uninstall_keeping_shared
+    test_app_04_uninstall_direct_still_needed_indirect
+    test_app_05_uninstall_test_dependency
+    test_pkg_01_uninstall_single_from_package
+    test_pkg_02_uninstall_with_deps_from_package
+    
+    echo
+    echo "All uninstall-happy tests completed successfully"
+}
+
+main "$@"

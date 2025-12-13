@@ -1,0 +1,324 @@
+#!/usr/bin/env bash
+#
+# test-upgrade-happy - Upgrade command happy path tests
+#
+# This script tests successful upgrade operations for both applications and packages.
+#
+
+set -euo pipefail
+
+# =============================================================================
+# Test Cases
+# =============================================================================
+
+# APP-01: Upgrade single package to latest minor version
+test_app_01_upgrade_single_to_latest_minor() {
+    echo "=== BEGIN APP-01: Upgrade single package to latest minor version ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app01" "app01")
+    
+    # Install older version
+    cd "$app_dir"
+    run_wrap install wrap/package-3m-no-deps@1.0.0
+    
+    # Verify version
+    assert_direct_dep "wrap/package-3m-no-deps" "1.0.0" "$app_dir"
+    
+    # Upgrade to latest minor
+    run_wrap package upgrade wrap/package-3m-no-deps
+    
+    # Verify upgraded to 1.2.0 (latest in major 1)
+    assert_direct_dep "wrap/package-3m-no-deps" "1.2.0" "$app_dir"
+    
+    echo "=== END APP-01 ==="
+}
+
+# APP-02: Upgrade all packages to latest minor versions
+test_app_02_upgrade_all_to_latest_minor() {
+    echo "=== BEGIN APP-02: Upgrade all packages to latest minor versions ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app02" "app02")
+    
+    # Install older versions
+    cd "$app_dir"
+    run_wrap install wrap/package-3m-no-deps@1.0.0 wrap/package-3v-no-deps@1.0.0
+    
+    # Verify versions
+    assert_direct_dep "wrap/package-3m-no-deps" "1.0.0" "$app_dir"
+    assert_direct_dep "wrap/package-3v-no-deps" "1.0.0" "$app_dir"
+    
+    # Upgrade all
+    run_wrap package upgrade
+    
+    # Verify upgrades
+    assert_direct_dep "wrap/package-3m-no-deps" "1.2.0" "$app_dir"
+    assert_direct_dep "wrap/package-3v-no-deps" "1.0.0" "$app_dir"  # Only one version available
+    
+    echo "=== END APP-02 ==="
+}
+
+# APP-03: Upgrade with no argument (should upgrade all)
+test_app_03_upgrade_no_argument() {
+    echo "=== BEGIN APP-03: Upgrade with no argument (should upgrade all) ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app03" "app03")
+    
+    # Install older version
+    cd "$app_dir"
+    run_wrap install wrap/package-3m-no-deps@1.0.0
+    
+    # Verify version
+    assert_direct_dep "wrap/package-3m-no-deps" "1.0.0" "$app_dir"
+    
+    # Upgrade with no arguments
+    run_wrap package upgrade
+    
+    # Verify upgraded
+    assert_direct_dep "wrap/package-3m-no-deps" "1.2.0" "$app_dir"
+    
+    echo "=== END APP-03 ==="
+}
+
+# APP-04: Upgrade package with changing dependencies
+test_app_04_upgrade_with_changing_deps() {
+    echo "=== BEGIN APP-04: Upgrade package with changing dependencies ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app04" "app04")
+    
+    # Install version 1.0.0 (depends on depA)
+    cd "$app_dir"
+    run_wrap install wrap/package-3v-changing-deps@1.0.0
+    
+    # Verify dependencies
+    assert_direct_dep "wrap/package-3v-changing-deps" "1.0.0" "$app_dir"
+    assert_indirect_dep "wrap/depA-single-no-deps" "1.0.0" "$app_dir"
+    
+    # Upgrade with --major
+    run_wrap package upgrade --major wrap/package-3v-changing-deps
+    
+    # Verify upgraded to 3.0.0 with new dependency
+    assert_direct_dep "wrap/package-3v-changing-deps" "3.0.0" "$app_dir"
+    assert_indirect_dep "wrap/depC-single-no-deps" "1.0.0" "$app_dir"
+    # depA should be gone (no longer needed)
+    assert_no_dep "wrap/depA-single-no-deps" "$app_dir"
+    
+    echo "=== END APP-04 ==="
+}
+
+# APP-05: Upgrade single package to latest major version (--major)
+test_app_05_upgrade_single_to_major() {
+    echo "=== BEGIN APP-05: Upgrade single package to latest major version ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app05" "app05")
+    
+    # Install version 2.0.0
+    cd "$app_dir"
+    run_wrap install wrap/package-3v-no-deps@2.0.0
+    
+    # Verify version
+    assert_direct_dep "wrap/package-3v-no-deps" "2.0.0" "$app_dir"
+    
+    # Upgrade with --major
+    run_wrap package upgrade --major wrap/package-3v-no-deps
+    
+    # Verify upgraded to 3.0.0
+    assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
+    
+    echo "=== END APP-05 ==="
+}
+
+# APP-06: Upgrade all packages to latest major versions (--major all)
+test_app_06_upgrade_all_to_major() {
+    echo "=== BEGIN APP-06: Upgrade all packages to latest major versions ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app06" "app06")
+    
+    # Install older versions
+    cd "$app_dir"
+    run_wrap install wrap/package-3v-no-deps@1.0.0 wrap/package-3m-no-deps@1.0.0
+    
+    # Verify versions
+    assert_direct_dep "wrap/package-3v-no-deps" "1.0.0" "$app_dir"
+    assert_direct_dep "wrap/package-3m-no-deps" "1.0.0" "$app_dir"
+    
+    # Upgrade all with --major
+    run_wrap package upgrade --major all
+    
+    # Verify upgrades
+    assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
+    assert_direct_dep "wrap/package-3m-no-deps" "1.2.0" "$app_dir"  # Stays within major
+    
+    echo "=== END APP-06 ==="
+}
+
+# APP-07: Upgrade with --major and no package (should upgrade all)
+test_app_07_upgrade_major_no_package() {
+    echo "=== BEGIN APP-07: Upgrade with --major and no package (should upgrade all) ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app07" "app07")
+    
+    # Install older version
+    cd "$app_dir"
+    run_wrap install wrap/package-3v-no-deps@1.0.0
+    
+    # Verify version
+    assert_direct_dep "wrap/package-3v-no-deps" "1.0.0" "$app_dir"
+    
+    # Upgrade with --major and no package
+    run_wrap package upgrade --major
+    
+    # Verify upgraded
+    assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
+    
+    echo "=== END APP-07 ==="
+}
+
+# PKG-01: Upgrade single package to latest minor (package type)
+test_pkg_01_upgrade_single_to_minor() {
+    echo "=== BEGIN PKG-01: Upgrade single package to latest minor (package type) ==="
+    
+    # Create package
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/pkg01" "testauthor/pkg01")
+    
+    # Install older version
+    cd "$pkg_dir"
+    run_wrap package install wrap/package-3m-no-deps@1.0.0
+    
+    # Upgrade
+    run_wrap package upgrade wrap/package-3m-no-deps
+    
+    # Verify constraint updated
+    
+    echo "=== END PKG-01 ==="
+}
+
+# PKG-02: Upgrade all packages to latest minor (package type)
+test_pkg_02_upgrade_all_to_minor() {
+    echo "=== BEGIN PKG-02: Upgrade all packages to latest minor (package type) ==="
+    
+    # Create package
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/pkg02" "testauthor/pkg02")
+    
+    # Install older versions
+    cd "$pkg_dir"
+    run_wrap package install wrap/package-3m-no-deps@1.0.0 wrap/package-3v-no-deps@1.0.0
+    
+    # Upgrade all
+    run_wrap package upgrade
+    
+    # Verify constraints updated
+    
+    echo "=== END PKG-02 ==="
+}
+
+# PKG-03: Upgrade to major version (package type)
+test_pkg_03_upgrade_to_major() {
+    echo "=== BEGIN PKG-03: Upgrade to major version (package type) ==="
+    
+    # Create package
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/pkg03" "testauthor/pkg03")
+    
+    # Install older version
+    cd "$pkg_dir"
+    run_wrap package install wrap/package-3v-no-deps@1.0.0
+    
+    # Upgrade with --major
+    run_wrap package upgrade --major wrap/package-3v-no-deps
+    
+    # Verify constraint updated to major version
+    
+    echo "=== END PKG-03 ==="
+}
+
+# EDGE-01: Upgrade when already at latest version
+test_edge_01_already_at_latest() {
+    echo "=== BEGIN EDGE-01: Upgrade when already at latest version ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/edge01" "edge01")
+    
+    # Install latest version
+    cd "$app_dir"
+    run_wrap install wrap/package-3v-no-deps@3.0.0
+    
+    # Verify version
+    assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
+    
+    # Try to upgrade (should be no-op)
+    run_wrap package upgrade wrap/package-3v-no-deps
+    
+    # Verify still at latest
+    assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
+    
+    echo "=== END EDGE-01 ==="
+}
+
+# EDGE-02: Minor upgrade when major version available (shouldn't upgrade to major)
+test_edge_02_minor_when_major_available() {
+    echo "=== BEGIN EDGE-02: Minor upgrade when major version available ==="
+    
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/edge02" "edge02")
+    
+    # Install version 2.0.0
+    cd "$app_dir"
+    run_wrap install wrap/package-3v-no-deps@2.0.0
+    
+    # Verify version
+    assert_direct_dep "wrap/package-3v-no-deps" "2.0.0" "$app_dir"
+    
+    # Upgrade without --major (should stay at 2.0.0)
+    run_wrap package upgrade wrap/package-3v-no-deps
+    
+    # Verify still at 2.0.0 (no major upgrade)
+    assert_direct_dep "wrap/package-3v-no-deps" "2.0.0" "$app_dir"
+    
+    echo "=== END EDGE-02 ==="
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+    echo "Running upgrade-happy tests..."
+    echo
+    
+    # Run all test cases
+    test_app_01_upgrade_single_to_latest_minor
+    test_app_02_upgrade_all_to_latest_minor
+    test_app_03_upgrade_no_argument
+    test_app_04_upgrade_with_changing_deps
+    test_app_05_upgrade_single_to_major
+    test_app_06_upgrade_all_to_major
+    test_app_07_upgrade_major_no_package
+    test_pkg_01_upgrade_single_to_minor
+    test_pkg_02_upgrade_all_to_minor
+    test_pkg_03_upgrade_to_major
+    test_edge_01_already_at_latest
+    test_edge_02_minor_when_major_available
+    
+    echo
+    echo "All upgrade-happy tests completed successfully"
+}
+
+main "$@"

@@ -25,7 +25,7 @@ package: elm/file
         elm/time  1.0.0 <= v < 2.0.0
 
 package: elm/html
-    version: 1.0.0
+    version: 1.0.1
     status: valid
     license: BSD-3-Clause
     dependencies:
@@ -77,7 +77,7 @@ package: elm/browser
         elm/virtual-dom  1.0.2 <= v < 2.0.0
 
 package: elm/svg
-    version: 1.0.0
+    version: 1.0.1
     status: valid
     license: BSD-3-Clause
     dependencies:
@@ -87,7 +87,7 @@ package: elm/svg
         elm/virtual-dom  1.0.0 <= v < 2.0.0
 
 package: elm/virtual-dom
-    version: 1.0.0
+    version: 1.0.5
     status: valid
     license: BSD-3-Clause
     dependencies:
@@ -209,15 +209,15 @@ package: wrap/package-A-single-1d-shared
     license: BSD-3-Clause
     dependencies:
         elm/core  1.0.0 <= v < 2.0.0
-        wrap/dep-single-no-deps  1.0.0 <= v < 2.0.0
+    wrap/dep-shared-single-no-deps  1.0.0 <= v < 2.0.0
 
-package: wrap/package-B-single-1d-shaerd
+package: wrap/package-B-single-1d-shared
     version: 1.0.0
     status: valid
     license: BSD-3-Clause
     dependencies:
         elm/core  1.0.0 <= v < 2.0.0
-        wrap/dep-single-no-deps  1.0.0 <= v < 2.0.0
+    wrap/dep-shared-single-no-deps  1.0.0 <= v < 2.0.0
 
 package: wrap/dep-shared-single-no-deps
     version: 1.0.0

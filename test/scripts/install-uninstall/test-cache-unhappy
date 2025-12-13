@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+#
+# test-cache-unhappy - Cache command error cases
+#
+# This script tests cache operations that should fail.
+#
+
+set -euo pipefail
+
+# =============================================================================
+# Test Cases
+# =============================================================================
+
+# ERR-01: Cache non-existent package (should fail)
+test_err_01_cache_nonexistent_package() {
+    echo "=== BEGIN ERR-01: Cache non-existent package ==="
+    
+    local work_dir="$TEST_ROOT/cache_err01"
+    mkdir -p "$work_dir"
+    cd "$work_dir"
+    
+    # Try to cache non-existent package (should fail)
+    if run_wrap package cache wrap/does-not-exist 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    echo "=== END ERR-01 ==="
+}
+
+# ERR-02: Cache package with non-existent version (should fail)
+test_err_02_cache_nonexistent_version() {
+    echo "=== BEGIN ERR-02: Cache package with non-existent version ==="
+    
+    local work_dir="$TEST_ROOT/cache_err02"
+    mkdir -p "$work_dir"
+    cd "$work_dir"
+    
+    # Try to cache non-existent version (should fail)
+    if run_wrap package cache wrap/package-3v-no-deps@9.9.9 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    echo "=== END ERR-02 ==="
+}
+
+# ERR-03: Cache from non-existent file path (should fail)
+test_err_03_cache_from_nonexistent_path() {
+    echo "=== BEGIN ERR-03: Cache from non-existent file path ==="
+    
+    local work_dir="$TEST_ROOT/cache_err03"
+    mkdir -p "$work_dir"
+    cd "$work_dir"
+    
+    # Try to cache from non-existent path (should fail)
+    if run_wrap package cache --from-file "/does/not/exist" wrap/package-single-no-deps 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    echo "=== END ERR-03 ==="
+}
+
+# ERR-04: Cache with both --from-file and --from-url (should fail)
+test_err_04_cache_both_from_file_and_url() {
+    echo "=== BEGIN ERR-04: Cache with both --from-file and --from-url ==="
+    
+    local work_dir="$TEST_ROOT/cache_err04"
+    mkdir -p "$work_dir"
+    cd "$work_dir"
+    
+    local pkg_path="$PROJECT_ROOT/test/data/packages/install-uninstall/wrap/package-from-file-single-no-deps"
+    
+    # Try to use both options (should fail)
+    if run_wrap package cache --from-file "$pkg_path" --from-url "http://example.com/pkg.zip" wrap/package-single-no-deps 2>/dev/null; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    
+    echo "=== END ERR-04 ==="
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+    echo "Running cache-unhappy tests..."
+    echo
+    
+    # Run all test cases
+    test_err_01_cache_nonexistent_package
+    test_err_02_cache_nonexistent_version
+    test_err_03_cache_from_nonexistent_path
+    test_err_04_cache_both_from_file_and_url
+    
+    echo
+    echo "All cache-unhappy tests completed successfully"
+}
+
+main "$@"
