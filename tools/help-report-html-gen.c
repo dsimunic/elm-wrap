@@ -244,29 +244,86 @@ static int compare_strings(const void *a, const void *b) {
     return strcmp(*(const char **)a, *(const char **)b);
 }
 
-/* Extract usage line from help text (first line starting with "Usage:") */
+/* Extract usage line from help text (handles multi-line Usage sections) */
 static char* extract_usage(const char *content) {
     if (!content) return strdup("");
     
-    const char *usage_start = strstr(content, "Usage: ");
-    if (!usage_start) return strdup("");
+    const char *usage_header = strstr(content, "Usage:");
+    if (!usage_header) return strdup("");
     
-    usage_start += 7;  /* Skip "Usage: " */
+    /* Check if "Usage:" is alone on its line (multi-line format) */
+    const char *after_header = usage_header + 6;  /* Skip "Usage:" */
     
-    /* Find end of line */
-    const char *line_end = strchr(usage_start, '\n');
-    if (!line_end) {
-        return strdup(usage_start);
+    /* Skip whitespace */
+    while (*after_header == ' ' || *after_header == '\t') {
+        after_header++;
     }
     
-    size_t len = line_end - usage_start;
-    char *usage = malloc(len + 1);
-    if (!usage) return strdup("");
-    
-    memcpy(usage, usage_start, len);
-    usage[len] = '\0';
-    
-    return usage;
+    /* If newline immediately follows "Usage:", it's multi-line format */
+    if (*after_header == '\n') {
+        /* Multi-line format - collect all indented lines until next section */
+        char *result = malloc(MAX_FILE_SIZE);
+        if (!result) return strdup("");
+        
+        result[0] = '\0';
+        size_t result_len = 0;
+        
+        const char *line_start = after_header + 1;  /* Skip the newline */
+        
+        while (*line_start) {
+            /* Check if line starts with whitespace (indented usage line) */
+            if (*line_start != ' ' && *line_start != '\t') {
+                /* Non-indented line means end of Usage section */
+                break;
+            }
+            
+            /* Skip leading whitespace */
+            while (*line_start == ' ' || *line_start == '\t') {
+                line_start++;
+            }
+            
+            /* Find end of this line */
+            const char *line_end = strchr(line_start, '\n');
+            if (!line_end) {
+                line_end = line_start + strlen(line_start);
+            }
+            
+            /* Add this usage line to result with separator if not first */
+            if (result_len > 0) {
+                result_len += snprintf(result + result_len, MAX_FILE_SIZE - result_len, " OR ");
+            }
+            
+            size_t line_len = line_end - line_start;
+            if (result_len + line_len + 1 < MAX_FILE_SIZE) {
+                memcpy(result + result_len, line_start, line_len);
+                result_len += line_len;
+                result[result_len] = '\0';
+            }
+            
+            if (*line_end == '\0') break;
+            line_start = line_end + 1;
+        }
+        
+        return result;
+    } else {
+        /* Single-line format: "Usage: command args" */
+        const char *usage_start = after_header;
+        
+        /* Find end of line */
+        const char *line_end = strchr(usage_start, '\n');
+        if (!line_end) {
+            return strdup(usage_start);
+        }
+        
+        size_t len = line_end - usage_start;
+        char *usage = malloc(len + 1);
+        if (!usage) return strdup("");
+        
+        memcpy(usage, usage_start, len);
+        usage[len] = '\0';
+        
+        return usage;
+    }
 }
 
 /* Generate fragment ID from filename (remove .txt extension) */

@@ -24,4 +24,5 @@ Note: Package name format (author/package) takes priority over paths.
       Use './package/author' to treat as a path instead.
 
 Options:
+  -d, --deps-only                   # Only print dependencies
   --help                             # Show this help

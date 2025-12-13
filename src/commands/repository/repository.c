@@ -30,12 +30,16 @@
 #include <unistd.h>
 
 #ifndef PATH_MAX
-#define PATH_MAX 4096
+#define PATH_MAX MAX_PATH_LENGTH
 #endif
 
 /* ============================================================================
  * Usage
  * ========================================================================== */
+
+static int is_help_flag(const char *arg) {
+    return arg && (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0);
+}
 
 static void print_repository_usage(void) {
     printf("Usage: %s repository SUBCOMMAND [OPTIONS]\n", global_context_program_name());
@@ -1120,12 +1124,19 @@ int cmd_repository_local_dev(int argc, char *argv[]) {
 
     const char *cmd = argv[1];
 
-    if (strcmp(cmd, "-h") == 0 || strcmp(cmd, "--help") == 0) {
+    if (is_help_flag(cmd)) {
         print_local_dev_usage();
         return 0;
     }
 
     if (strcmp(cmd, "clear") == 0) {
+        for (int i = 2; i < argc; i++) {
+            if (is_help_flag(argv[i])) {
+                print_local_dev_usage();
+                return 0;
+            }
+        }
+
         if (argc <= 2) {
             fprintf(stderr, "Error: 'clear' requires --all or a package specifier\n");
             print_local_dev_usage();

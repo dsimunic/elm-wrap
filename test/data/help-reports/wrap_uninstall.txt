@@ -1,0 +1,16 @@
+Usage: wrap package remove PACKAGE [PACKAGE...]
+
+Remove packages from your Elm project.
+
+This will also remove any indirect dependencies that are no longer
+needed by other packages.
+
+Alias: 'package uninstall' can be used instead of 'package remove'.
+
+Examples:
+  wrap package remove elm/html           # Remove elm/html from your project
+  wrap package remove elm/html elm/json  # Remove multiple packages at once
+
+Options:
+  -y, --yes                          # Automatically confirm changes
+  --help                             # Show this help

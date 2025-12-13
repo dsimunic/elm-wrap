@@ -1,0 +1,37 @@
+Usage:
+  wrap package cache [OPTIONS] PACKAGE[@VERSION] [PACKAGE[@VERSION]...]
+  wrap package cache check PACKAGE [OPTIONS]
+  wrap package cache full-scan [OPTIONS]
+
+Download packages into the cache so installs can run offline.
+
+Examples:
+  wrap package cache elm/html                    # Download latest elm/html
+  wrap package cache elm/html@1.0.0              # Download specific version
+  wrap package cache elm/html elm/json           # Cache multiple packages
+  wrap package cache elm/html 1.0.0 elm/json     # Mix positional version + latest
+  wrap package cache check elm/html              # Check cache status for elm/html
+  wrap package cache check elm/html --fix-broken # Re-download broken versions
+  wrap package cache full-scan                   # Scan all packages in cache
+  wrap package cache --from-file ./pkg elm/html  # Download from local directory
+  wrap package cache --from-url URL elm/html     # Download from URL to cache
+  wrap package cache --major elm/html            # Download highest major version
+
+Download Options:
+  PACKAGE[@VERSION] [PACKAGE[@VERSION]...]   # One or more packages (use @VERSION for specific release)
+  PACKAGE VERSION                           # Backwards-compatible positional version (single package)
+  --from-file PATH PACKAGE[@VERSION]        # Download from local directory/archive (single package)
+  --from-url URL PACKAGE[@VERSION]          # Download from URL to cache (single package)
+  --major PACKAGE                           # Download highest available major version (single package)
+  --ignore-hash                             # Skip SHA-1 hash verification
+  -v, --verbose                             # Show progress reports
+  -q, --quiet                               # Suppress progress reports
+  --help                                    # Show this help
+
+Check Options:
+  --purge-broken                            # Remove broken directories without re-downloading
+  --fix-broken                              # Try to re-download broken versions
+
+Full-scan Options:
+  -q, --quiet                               # Only show summary counts
+  -v, --verbose                             # Show all issues including missing latest

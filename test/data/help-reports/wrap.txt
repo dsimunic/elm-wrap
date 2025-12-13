@@ -6,6 +6,7 @@ Commands:
   reactor            Start the Elm Reactor development server
   make ELM_FILE      Compile Elm code to JavaScript or HTML
   install PACKAGE    Install packages for your Elm project
+  uninstall PACKAGE  Remove packages from your Elm project
 
   config                    Display current configuration
   info [PATH | PACKAGE [VERSION]]  Display package or application info

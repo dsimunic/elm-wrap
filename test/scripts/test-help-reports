@@ -75,10 +75,13 @@ check_html_gen() {
 
 # Extract command names from help output
 # Looks for lines like "  command    Description text" in the Commands: section
+# Also extracts subcommands from multi-line Usage sections
+# Args: help_text, current_command_path (e.g., "wrap package cache")
 # Returns a list of commands, one per line
 # Includes commands with SUBCOMMAND but excludes commands with specific args like "ELM_FILE"
 extract_commands() {
     local help_text="$1"
+    local cmd_path="${2:-}"
     local in_commands_section=false
     local commands=""
     
@@ -108,6 +111,70 @@ extract_commands() {
         fi
     done <<< "$help_text"
     
+    # If no commands found and no Commands/Subcommands section exists,
+    # try to extract subcommands from multi-line Usage section
+    if [ -z "$commands" ] && ! grep -q "^Commands:" <<< "$help_text" && ! grep -q "^Subcommands:" <<< "$help_text"; then
+        # Only proceed if we have a command path to work with
+        if [ -n "$cmd_path" ]; then
+            # Normalize command path: remove bin prefix and convert to space-separated
+            local normalized_path
+            normalized_path=$(echo "$cmd_path" | sed "s|$PROJECT_ROOT/bin/||g")
+            
+            # Count the depth of the current command
+            local current_depth
+            current_depth=$(echo "$normalized_path" | wc -w)
+            
+            # Look for Usage: followed by multiple indented usage lines
+            local in_usage=false
+            local usage_lines=()
+            
+            while IFS= read -r line; do
+                if [[ "$line" =~ ^Usage: ]]; then
+                    in_usage=true
+                    continue
+                fi
+                
+                if [ "$in_usage" = true ]; then
+                    # Check if line is indented (starts with spaces)
+                    if [[ "$line" =~ ^[[:space:]]{2,} ]]; then
+                        usage_lines+=("$line")
+                    else
+                        # Non-indented line ends Usage section
+                        break
+                    fi
+                fi
+            done <<< "$help_text"
+            
+            # Only extract subcommands if we have multiple usage lines
+            # (indicating alternative forms/subcommands)
+            if [ "${#usage_lines[@]}" -gt 1 ]; then
+                for usage_line in "${usage_lines[@]}"; do
+                    # Remove leading whitespace
+                    usage_line=$(echo "$usage_line" | sed 's/^[[:space:]]*//')
+                    
+                    # Check if this usage line starts with our current command path
+                    if [[ "$usage_line" =~ ^$normalized_path[[:space:]]+ ]]; then
+                        # Extract the word immediately after the current command path
+                        local after_path="${usage_line#$normalized_path }"
+                        
+                        # Get the first word after the path
+                        if [[ "$after_path" =~ ^([a-z][a-z-]+) ]]; then
+                            local potential_subcmd="${BASH_REMATCH[1]}"
+                            
+                            # Only add if it's not an all-caps placeholder or bracket arg
+                            if [[ ! "$potential_subcmd" =~ ^[A-Z]+$ ]] && [[ ! "$potential_subcmd" =~ ^\[.*\]$ ]]; then
+                                # Also check that we haven't already added it
+                                if ! grep -qx "$potential_subcmd" <<< "$commands"; then
+                                    commands="$commands$potential_subcmd"$'\n'
+                                fi
+                            fi
+                        fi
+                    fi
+                done
+            fi
+        fi
+    fi
+    
     echo "$commands"
 }
 
@@ -122,9 +189,10 @@ command_to_filename() {
 }
 
 # Recursively discover and capture help for a command
-# Args: command_path (e.g., "wrap" or "wrap package")
+# Args: command_path (e.g., "wrap" or "wrap package"), parent_help_hash (optional)
 capture_help_recursive() {
     local cmd_path="$1"
+    local parent_help_hash="${2:-}"
     local filename
     filename=$(command_to_filename "$cmd_path")
     local filepath="$DATA_DIR/$filename"
@@ -138,18 +206,28 @@ capture_help_recursive() {
         return
     fi
     
+    # Check if this help is identical to parent's help (prevents infinite recursion
+    # on commands like "clear" that show the same help as their parent)
+    local current_help_hash
+    current_help_hash=$(echo "$help_output" | md5 -q 2>/dev/null || echo "$help_output" | md5sum | cut -d' ' -f1)
+    
+    if [ -n "$parent_help_hash" ] && [ "$current_help_hash" = "$parent_help_hash" ]; then
+        log_warning "Skipping $cmd_path - identical help to parent"
+        return
+    fi
+    
     # Save to file
     echo "$help_output" > "$filepath"
     
-    # Extract subcommands from the help output
+    # Extract subcommands from the help output (pass cmd_path for Usage parsing)
     local subcommands
-    subcommands=$(extract_commands "$help_output")
+    subcommands=$(extract_commands "$help_output" "$cmd_path")
     
     # Recursively capture help for each subcommand
     if [ -n "$subcommands" ]; then
         while IFS= read -r subcmd; do
             if [ -n "$subcmd" ]; then
-                capture_help_recursive "$cmd_path $subcmd"
+                capture_help_recursive "$cmd_path $subcmd" "$current_help_hash"
             fi
         done <<< "$subcommands"
     fi
