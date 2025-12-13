@@ -21,7 +21,7 @@ typedef struct {
     RegistryEntry *entries;
     size_t entry_count;
     size_t capacity;
-    size_t total_versions;  /* Total count across all packages */
+    size_t since_count;  /* Canonical /since/<N> counter (header field) */
 } Registry;
 
 /* Registry lifecycle */
@@ -39,6 +39,11 @@ bool registry_contains(Registry *registry, const char *author, const char *name)
 /* Registry modification */
 bool registry_add_entry(Registry *registry, const char *author, const char *name);
 bool registry_add_version(Registry *registry, const char *author, const char *name, Version version);
+bool registry_add_version_ex(Registry *registry, const char *author, const char *name, Version version,
+                             bool count_for_since, bool *out_added);
+
+bool registry_remove_version_ex(Registry *registry, const char *author, const char *name, Version version,
+                                bool decrement_since_count, bool *out_removed);
 
 /* Compatibility aliases (deprecated - prefer version_compare and version_is_constraint from package_common.h) */
 #define registry_version_compare version_compare
@@ -58,6 +63,7 @@ bool registry_merge_local_dev(Registry *registry, const char *local_dev_path);
 void registry_sort_entries(Registry *registry);
 
 /* Utility */
+size_t registry_versions_in_map_count(const Registry *registry);
 void registry_print(const Registry *registry);
 
 #endif /* REGISTRY_H */

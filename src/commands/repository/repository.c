@@ -17,6 +17,8 @@
 #include "../../log.h"
 #include "../../protocol_v2/index_fetch.h"
 #include "../../protocol_v2/solver/v2_registry.h"
+#include "../../registry.h"
+#include "../../cache.h"
 #include "../../rulr/rulr.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"
@@ -104,6 +106,47 @@ static void print_local_dev_usage(void) {
 /* ============================================================================
  * Helper Functions
  * ========================================================================== */
+
+static void remove_local_dev_from_v1_registry_dat(const char *author, const char *name, const char *version) {
+    if (!author || !name || !version) {
+        return;
+    }
+
+    CacheConfig *cache = cache_config_init();
+    if (!cache || !cache->registry_path) {
+        if (cache) cache_config_free(cache);
+        return;
+    }
+
+    const char *registry_path = cache->registry_path;
+    struct stat st;
+    if (stat(registry_path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        cache_config_free(cache);
+        return;
+    }
+
+    Registry *registry = registry_load_from_dat(registry_path, NULL);
+    if (!registry) {
+        cache_config_free(cache);
+        return;
+    }
+
+    Version parsed = version_parse(version);
+    bool removed = false;
+    if (!registry_remove_version_ex(registry, author, name, parsed, false, &removed)) {
+        registry_free(registry);
+        cache_config_free(cache);
+        return;
+    }
+
+    if (removed) {
+        registry_sort_entries(registry);
+        registry_dat_write(registry, registry_path);
+    }
+
+    registry_free(registry);
+    cache_config_free(cache);
+}
 
 /**
  * Get the compiler name from the compiler path.
@@ -880,6 +923,77 @@ static int clear_all_tracking(void) {
         return 0;
     }
 
+    DIR *dir = opendir(tracking_dir);
+    if (dir) {
+        struct dirent *author_entry;
+        while ((author_entry = readdir(dir)) != NULL) {
+            if (author_entry->d_name[0] == '.') continue;
+
+            size_t author_path_len = strlen(tracking_dir) + strlen(author_entry->d_name) + 2;
+            char *author_path = arena_malloc(author_path_len);
+            if (!author_path) continue;
+            snprintf(author_path, author_path_len, "%s/%s", tracking_dir, author_entry->d_name);
+
+            struct stat author_st;
+            if (stat(author_path, &author_st) != 0 || !S_ISDIR(author_st.st_mode)) {
+                arena_free(author_path);
+                continue;
+            }
+
+            DIR *author_dir = opendir(author_path);
+            if (!author_dir) {
+                arena_free(author_path);
+                continue;
+            }
+
+            struct dirent *name_entry;
+            while ((name_entry = readdir(author_dir)) != NULL) {
+                if (name_entry->d_name[0] == '.') continue;
+
+                size_t name_path_len = strlen(author_path) + strlen(name_entry->d_name) + 2;
+                char *name_path = arena_malloc(name_path_len);
+                if (!name_path) continue;
+                snprintf(name_path, name_path_len, "%s/%s", author_path, name_entry->d_name);
+
+                struct stat name_st;
+                if (stat(name_path, &name_st) != 0 || !S_ISDIR(name_st.st_mode)) {
+                    arena_free(name_path);
+                    continue;
+                }
+
+                DIR *name_dir = opendir(name_path);
+                if (!name_dir) {
+                    arena_free(name_path);
+                    continue;
+                }
+
+                struct dirent *version_entry;
+                while ((version_entry = readdir(name_dir)) != NULL) {
+                    if (version_entry->d_name[0] == '.') continue;
+
+                    size_t version_path_len = strlen(name_path) + strlen(version_entry->d_name) + 2;
+                    char *version_path = arena_malloc(version_path_len);
+                    if (!version_path) continue;
+                    snprintf(version_path, version_path_len, "%s/%s", name_path, version_entry->d_name);
+
+                    struct stat version_st;
+                    if (stat(version_path, &version_st) == 0 && S_ISDIR(version_st.st_mode)) {
+                        remove_local_dev_from_v1_registry_dat(author_entry->d_name, name_entry->d_name, version_entry->d_name);
+                    }
+
+                    arena_free(version_path);
+                }
+
+                closedir(name_dir);
+                arena_free(name_path);
+            }
+
+            closedir(author_dir);
+            arena_free(author_path);
+        }
+        closedir(dir);
+    }
+
     if (remove_directory_recursive_local(tracking_dir)) {
         printf("Cleared all local-dev tracking.\n");
         arena_free(tracking_dir);
@@ -925,6 +1039,7 @@ static int clear_package_tracking(const char *package_name, const char *version)
     struct stat st;
     if (stat(pkg_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
         printf("No tracking found for %s/%s %s\n", author, name, version);
+        remove_local_dev_from_v1_registry_dat(author, name, version);
         arena_free(pkg_path);
         arena_free(tracking_dir);
         arena_free(author);
@@ -934,6 +1049,7 @@ static int clear_package_tracking(const char *package_name, const char *version)
 
     if (remove_directory_recursive_local(pkg_path)) {
         printf("Cleared tracking for %s/%s %s\n", author, name, version);
+        remove_local_dev_from_v1_registry_dat(author, name, version);
         arena_free(pkg_path);
         arena_free(tracking_dir);
         arena_free(author);

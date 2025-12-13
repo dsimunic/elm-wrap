@@ -260,18 +260,16 @@ static bool ensure_local_dev_in_registry_dat(InstallEnv *env, const char *author
         }
     }
 
-    size_t previous_total = registry->total_versions;
     Version parsed = version_parse(version);
 
-    if (!registry_add_version(registry, author, name, parsed)) {
+    bool added = false;
+    if (!registry_add_version_ex(registry, author, name, parsed, false, &added)) {
         log_error("Failed to add %s/%s %s to registry.dat", author, name, version);
         registry_free(registry);
         return false;
     }
 
-    bool changed = registry->total_versions != previous_total;
-
-    if (changed) {
+    if (added) {
         registry_sort_entries(registry);
         if (!registry_dat_write(registry, registry_path)) {
             log_error("Failed to write updated registry.dat with local-dev package");
@@ -285,6 +283,41 @@ static bool ensure_local_dev_in_registry_dat(InstallEnv *env, const char *author
 
     registry_free(registry);
     return true;
+}
+
+static void remove_local_dev_from_registry_dat(InstallEnv *env, const char *author, const char *name,
+                                               const char *version) {
+    if (!env || !env->cache || !env->cache->registry_path || !author || !name || !version) {
+        return;
+    }
+
+    const char *registry_path = env->cache->registry_path;
+    if (!file_exists(registry_path)) {
+        return;
+    }
+
+    Registry *registry = registry_load_from_dat(registry_path, NULL);
+    if (!registry) {
+        log_debug("Failed to load registry.dat for local-dev removal: %s", registry_path);
+        return;
+    }
+
+    Version parsed = version_parse(version);
+    bool removed = false;
+    if (!registry_remove_version_ex(registry, author, name, parsed, false, &removed)) {
+        registry_free(registry);
+        log_debug("Failed to remove %s/%s %s from registry.dat", author, name, version);
+        return;
+    }
+
+    if (removed) {
+        registry_sort_entries(registry);
+        if (!registry_dat_write(registry, registry_path)) {
+            log_debug("Failed to write registry.dat after local-dev removal: %s", registry_path);
+        }
+    }
+
+    registry_free(registry);
 }
 
 /**
@@ -1314,8 +1347,6 @@ int install_local_dev(const char *source_path, const char *package_name,
 }
 
 int unregister_local_dev_package(InstallEnv *env) {
-    (void)env; /* Not needed for basic removal */
-
     /* Read the current directory's elm.json to get package info */
     ElmJson *pkg_json = elm_json_read("elm.json");
     if (!pkg_json) {
@@ -1370,6 +1401,7 @@ int unregister_local_dev_package(InstallEnv *env) {
     struct stat st;
     if (stat(pkg_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
         printf("No local-dev tracking found for %s/%s %s\n", author, name, version);
+        remove_local_dev_from_registry_dat(env, author, name, version);
         arena_free(pkg_path);
         arena_free(tracking_dir);
         arena_free(author);
@@ -1380,6 +1412,7 @@ int unregister_local_dev_package(InstallEnv *env) {
 
     if (remove_directory_recursive(pkg_path)) {
         printf("Removed local-dev tracking for %s/%s %s\n", author, name, version);
+        remove_local_dev_from_registry_dat(env, author, name, version);
         arena_free(pkg_path);
         arena_free(tracking_dir);
         arena_free(author);

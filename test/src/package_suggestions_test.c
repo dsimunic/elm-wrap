@@ -33,7 +33,7 @@ static int test_v1_suggestion_order(void) {
     registry.entries = entries;
     registry.entry_count = 4;
     registry.capacity = 4;
-    registry.total_versions = 4;
+    registry.since_count = 4;
 
     InstallEnv env = {0};
     env.protocol_mode = PROTOCOL_V1;
@@ -81,7 +81,7 @@ static int test_restricted_distance_example(void) {
     registry.entries = &entry;
     registry.entry_count = 1;
     registry.capacity = 1;
-    registry.total_versions = 1;
+    registry.since_count = 1;
 
     InstallEnv env = {0};
     env.protocol_mode = PROTOCOL_V1;

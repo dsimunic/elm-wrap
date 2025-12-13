@@ -838,7 +838,8 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
         printf("\nRegistry Cache:\n");
         printf("  Location: %s\n", env->cache->registry_path);
         printf("  Packages: %zu\n", env->registry->entry_count);
-        printf("  Versions: %zu\n", env->registry->total_versions);
+        printf("  Versions: %zu\n", registry_versions_in_map_count(env->registry));
+        printf("  Since count: %zu\n", env->registry->since_count);
 
         printf("\nRegistry URL: %s\n", env->registry_url);
         if (env->offline) {

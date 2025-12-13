@@ -10,10 +10,13 @@
 #include "../../registry.h"
 #include "../../cache.h"
 #include "../../log.h"
+#include "../../fileutil.h"
+#include "../../vendor/cJSON.h"
 #include "../package/package_common.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -26,6 +29,7 @@ static void print_registry_v1_usage(void) {
     printf("  list                     Display all packages in the registry\n");
     printf("  add AUTHOR/NAME@VERSION  Add a package version to the registry\n");
     printf("  remove AUTHOR/NAME@VERSION  Remove a package version from the registry\n");
+    printf("  apply-since JSON_PATH    Apply a /since JSON response offline\n");
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help              Show this help message\n");
@@ -34,6 +38,7 @@ static void print_registry_v1_usage(void) {
     printf("  %s debug registry_v1 list\n", global_context_program_name());
     printf("  %s debug registry_v1 add elm/core@1.0.5\n", global_context_program_name());
     printf("  %s debug registry_v1 remove elm/core@1.0.5\n", global_context_program_name());
+    printf("  %s debug registry_v1 apply-since /path/to/since.json\n", global_context_program_name());
 }
 
 /**
@@ -68,7 +73,8 @@ static int cmd_registry_v1_list(void) {
     /* Display registry contents */
     printf("Registry: %s\n", registry_path);
     printf("Total packages: %zu\n", registry->entry_count);
-    printf("Total versions: %zu\n", registry->total_versions);
+    printf("Since count: %zu\n", registry->since_count);
+    printf("Versions in map: %zu\n", registry_versions_in_map_count(registry));
     printf("\n");
 
     if (registry->entry_count == 0) {
@@ -279,35 +285,17 @@ static int cmd_registry_v1_remove(const char *package_spec) {
     }
 
     /* Remove the version */
-    if (entry->version_count == 1) {
-        /* This is the last version, remove the entire entry */
-        arena_free(entry->author);
-        arena_free(entry->name);
-        arena_free(entry->versions);
-
-        /* Shift entries down */
-        size_t entry_index = (size_t)(entry - registry->entries);
-        for (size_t i = entry_index; i < registry->entry_count - 1; i++) {
-            registry->entries[i] = registry->entries[i + 1];
-        }
-        registry->entry_count--;
-        registry->total_versions--;
-    } else {
-        /* Remove just this version */
-        if (version_index < entry->version_count - 1) {
-            memmove(&entry->versions[version_index],
-                    &entry->versions[version_index + 1],
-                    sizeof(Version) * (entry->version_count - version_index - 1));
-        }
-        entry->version_count--;
-        registry->total_versions--;
-
-        /* Reallocate to shrink array */
-        Version *new_versions = arena_realloc(entry->versions,
-                                              sizeof(Version) * entry->version_count);
-        if (new_versions) {
-            entry->versions = new_versions;
-        }
+    bool removed = false;
+    if (!registry_remove_version_ex(registry, author, name, version, true, &removed) || !removed) {
+        char *ver_str = version_to_string(&version);
+        fprintf(stderr, "Error: Failed to remove %s/%s@%s from registry\n",
+                author, name, ver_str ? ver_str : "(unknown)");
+        if (ver_str) arena_free(ver_str);
+        registry_free(registry);
+        cache_config_free(cache);
+        arena_free(author);
+        arena_free(name);
+        return 1;
     }
 
     /* Write registry back to disk */
@@ -329,6 +317,138 @@ static int cmd_registry_v1_remove(const char *package_spec) {
     cache_config_free(cache);
     arena_free(author);
     arena_free(name);
+    return 0;
+}
+
+/**
+ * Apply an offline /since JSON response (array of "author/name@version" strings).
+ *
+ * This is primarily for testing and debugging the since_count advancement rules.
+ */
+static int cmd_registry_v1_apply_since(const char *json_path) {
+    if (!json_path || json_path[0] == '\0') {
+        fprintf(stderr, "Error: JSON file path required\n");
+        fprintf(stderr, "Usage: %s debug registry_v1 apply-since JSON_PATH\n", global_context_program_name());
+        return 1;
+    }
+
+    char *json_str = file_read_contents(json_path);
+    if (!json_str) {
+        fprintf(stderr, "Error: Failed to read JSON file: %s\n", json_path);
+        return 1;
+    }
+
+    cJSON *json = cJSON_Parse(json_str);
+    if (!json || !cJSON_IsArray(json)) {
+        fprintf(stderr, "Error: Failed to parse /since JSON array in %s\n", json_path);
+        if (json) cJSON_Delete(json);
+        arena_free(json_str);
+        return 1;
+    }
+
+    int count = cJSON_GetArraySize(json);
+    if (count < 0) count = 0;
+
+    CacheConfig *cache = cache_config_init();
+    if (!cache) {
+        log_error("Failed to initialize cache configuration");
+        cJSON_Delete(json);
+        arena_free(json_str);
+        return 1;
+    }
+
+    const char *registry_path = cache->registry_path;
+
+    Registry *registry = NULL;
+    struct stat st;
+    if (stat(registry_path, &st) == 0) {
+        registry = registry_load_from_dat(registry_path, NULL);
+        if (!registry) {
+            log_error("Failed to load existing registry from: %s", registry_path);
+            cache_config_free(cache);
+            cJSON_Delete(json);
+            arena_free(json_str);
+            return 1;
+        }
+    } else {
+        registry = registry_create();
+        if (!registry) {
+            log_error("Failed to create registry");
+            cache_config_free(cache);
+            cJSON_Delete(json);
+            arena_free(json_str);
+            return 1;
+        }
+    }
+
+    cJSON *item = NULL;
+    cJSON_ArrayForEach(item, json) {
+        if (!cJSON_IsString(item)) {
+            continue;
+        }
+
+        const char *entry_str = item->valuestring;
+        if (!entry_str) {
+            continue;
+        }
+
+        char *author = NULL;
+        char *name = NULL;
+        Version version;
+        if (!parse_package_with_version(entry_str, &author, &name, &version)) {
+            fprintf(stderr, "Error: Invalid /since entry: %s\n", entry_str);
+            registry_free(registry);
+            cache_config_free(cache);
+            cJSON_Delete(json);
+            arena_free(json_str);
+            return 1;
+        }
+
+        if (!registry_add_version_ex(registry, author, name, version, false, NULL)) {
+            log_error("Failed to apply /since entry: %s", entry_str);
+            arena_free(author);
+            arena_free(name);
+            registry_free(registry);
+            cache_config_free(cache);
+            cJSON_Delete(json);
+            arena_free(json_str);
+            return 1;
+        }
+
+        arena_free(author);
+        arena_free(name);
+    }
+
+    if (count > 0) {
+        size_t add = (size_t)count;
+        if (registry->since_count > SIZE_MAX - add) {
+            log_error("since_count overflow while applying /since response");
+            registry_free(registry);
+            cache_config_free(cache);
+            cJSON_Delete(json);
+            arena_free(json_str);
+            return 1;
+        }
+        registry->since_count += add;
+    }
+
+    registry_sort_entries(registry);
+    if (!registry_dat_write(registry, registry_path)) {
+        log_error("Failed to write updated registry to: %s", registry_path);
+        registry_free(registry);
+        cache_config_free(cache);
+        cJSON_Delete(json);
+        arena_free(json_str);
+        return 1;
+    }
+
+    printf("Applied /since response (%d item%s). since_count is now %zu\n",
+           count, count == 1 ? "" : "s", registry->since_count);
+
+    registry_free(registry);
+    cache_config_free(cache);
+    cJSON_Delete(json);
+    arena_free(json_str);
     return 0;
 }
 
@@ -368,6 +488,15 @@ int cmd_debug_registry_v1(int argc, char *argv[]) {
             return 1;
         }
         return cmd_registry_v1_remove(argv[2]);
+    }
+
+    if (strcmp(subcmd, "apply-since") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "Error: JSON file path required\n");
+            fprintf(stderr, "Usage: %s debug registry_v1 apply-since JSON_PATH\n", global_context_program_name());
+            return 1;
+        }
+        return cmd_registry_v1_apply_since(argv[2]);
     }
 
     fprintf(stderr, "Error: Unknown registry_v1 subcommand '%s'\n", subcmd);

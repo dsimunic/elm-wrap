@@ -11,6 +11,12 @@ set -euo pipefail
 # Test Cases
 # =============================================================================
 
+get_v1_since_count() {
+    local out
+    out=$(run_wrap debug registry_v1 list | head -4)
+    echo "$out" | awk -F': ' '/^Since count: /{print $2; exit}'
+}
+
 # LOCAL-01: Initialize package with local-dev and install to app
 test_local_01_init_and_install() {
     echo "=== BEGIN LOCAL-01: Initialize package with local-dev and install to app ==="
@@ -149,11 +155,66 @@ test_local_05_remove_local_dev_tracking() {
     
     # Remove local-dev tracking
     run_wrap install --remove-local-dev
+
+    local registry_after
+    registry_after=$(run_wrap debug registry_v1 list)
+    if echo "$registry_after" | grep -q "^testauthor/local-pkg5$"; then
+        echo "ERROR: Expected local-dev version to be removed from registry.dat"
+        exit 1
+    fi
     
     # Try to remove again (should be idempotent)
     run_wrap install --remove-local-dev
     
     echo "=== END LOCAL-05 ==="
+}
+
+# LOCAL-06: Registry since_count stability + /since advancement rules
+test_local_06_registry_since_count() {
+    echo "=== BEGIN LOCAL-06: Registry since_count stability + /since advancement rules ==="
+
+    local since_before
+    since_before=$(get_v1_since_count)
+
+    # Create package
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/local-since" "testauthor/local-since")
+
+    # Register for local-dev (from within package directory)
+    cd "$pkg_dir"
+    run_wrap install --local-dev
+
+    local since_after_local
+    since_after_local=$(get_v1_since_count)
+
+    if [[ "$since_after_local" != "$since_before" ]]; then
+        echo "ERROR: since_count changed after local-dev registration ($since_before -> $since_after_local)"
+        exit 1
+    fi
+
+    # Apply a /since response that includes a duplicate of the local version plus one new version.
+    local since_json="$TEST_ROOT/since.json"
+    cat >"$since_json" <<'EOF'
+[
+  "testauthor/local-since@1.0.0",
+  "testauthor/local-since@1.0.1"
+]
+EOF
+
+    run_wrap debug registry_v1 apply-since "$since_json"
+
+    local since_after_since
+    since_after_since=$(get_v1_since_count)
+
+    local expected_since
+    expected_since=$((since_before + 2))
+
+    if [[ "$since_after_since" != "$expected_since" ]]; then
+        echo "ERROR: since_count did not advance by /since response length (expected $expected_since, got $since_after_since)"
+        exit 1
+    fi
+
+    echo "=== END LOCAL-06 ==="
 }
 
 # ERR-01: Install with --local-dev --from-path with non-existent path
@@ -242,6 +303,7 @@ main() {
     test_err_01_local_dev_nonexistent_path
     test_err_02_local_dev_multiple_packages
     test_err_03_from_path_without_local_dev
+    test_local_06_registry_since_count
     
     echo
     echo "All local-dev tests completed successfully"

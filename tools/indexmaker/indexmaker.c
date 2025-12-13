@@ -347,8 +347,8 @@ int main(int argc, char **argv) {
     registry_sort_entries(registry);
 
     /* Write registry.dat file */
-    printf("Writing registry with %zu packages (%zu total versions) to %s\n",
-           registry->entry_count, registry->total_versions, output_path);
+    printf("Writing registry with %zu packages (%zu versions; since_count=%zu) to %s\n",
+           registry->entry_count, registry_versions_in_map_count(registry), registry->since_count, output_path);
 
     if (!registry_dat_write(registry, output_path)) {
         fprintf(stderr, "Error: Failed to write registry to %s\n", output_path);

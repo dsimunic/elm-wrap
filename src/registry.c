@@ -159,24 +159,24 @@ Registry* registry_load_from_dat(const char *path, size_t *known_count) {
         return NULL;
     }
 
-    /* Read header: total version count */
-    uint64_t total_versions;
-    if (!read_u64_be(f, &total_versions)) {
+    /* Read header: canonical /since count */
+    uint64_t since_count;
+    if (!read_u64_be(f, &since_count)) {
         log_error("Failed to read registry header from %s", path);
         registry_free(registry);
         fclose(f);
         return NULL;
     }
 
-    if (total_versions > (uint64_t)SIZE_MAX) {
-        log_error("Registry total_versions too large in %s", path);
+    if (since_count > (uint64_t)SIZE_MAX) {
+        log_error("Registry since_count too large in %s", path);
         registry_free(registry);
         fclose(f);
         return NULL;
     }
-    registry->total_versions = (size_t)total_versions;
+    registry->since_count = (size_t)since_count;
     if (known_count) {
-        *known_count = registry->total_versions;
+        *known_count = registry->since_count;
     }
 
     /* Read entry count */
@@ -347,8 +347,8 @@ bool registry_dat_write(const Registry *registry, const char *path) {
         return false;
     }
 
-    /* Write header: total version count */
-    if (!write_u64_be(f, registry->total_versions)) {
+    /* Write header: canonical /since count */
+    if (!write_u64_be(f, registry->since_count)) {
         log_error("Failed to write registry header");
         fclose(f);
         unlink(tmp_path);
@@ -487,8 +487,13 @@ bool registry_add_entry(Registry *registry, const char *author, const char *name
     return true;
 }
 
-bool registry_add_version(Registry *registry, const char *author, const char *name, Version version) {
+bool registry_add_version_ex(Registry *registry, const char *author, const char *name, Version version,
+                             bool count_for_since, bool *out_added) {
     if (!registry || !author || !name) return false;
+
+    if (out_added) {
+        *out_added = false;
+    }
 
     /* Find or create entry */
     RegistryEntry *entry = registry_find(registry, author, name);
@@ -531,7 +536,92 @@ bool registry_add_version(Registry *registry, const char *author, const char *na
 
     entry->versions[insert_pos] = version;
     entry->version_count++;
-    registry->total_versions++;
+
+    if (out_added) {
+        *out_added = true;
+    }
+
+    if (count_for_since) {
+        if (registry->since_count == SIZE_MAX) {
+            log_error("Registry since_count overflow while adding %s/%s", author, name);
+            return false;
+        }
+        registry->since_count++;
+    }
+
+    return true;
+}
+
+bool registry_add_version(Registry *registry, const char *author, const char *name, Version version) {
+    return registry_add_version_ex(registry, author, name, version, true, NULL);
+}
+
+bool registry_remove_version_ex(Registry *registry, const char *author, const char *name, Version version,
+                                bool decrement_since_count, bool *out_removed) {
+    if (!registry || !author || !name) return false;
+
+    if (out_removed) {
+        *out_removed = false;
+    }
+
+    RegistryEntry *entry = registry_find(registry, author, name);
+    if (!entry) {
+        return true;
+    }
+
+    size_t version_index = (size_t)-1;
+    for (size_t i = 0; i < entry->version_count; i++) {
+        if (registry_version_compare(&entry->versions[i], &version) == 0) {
+            version_index = i;
+            break;
+        }
+    }
+
+    if (version_index == (size_t)-1) {
+        return true;
+    }
+
+    if (entry->version_count == 1) {
+        /* Remove entire entry */
+        arena_free(entry->author);
+        arena_free(entry->name);
+        arena_free(entry->versions);
+
+        size_t entry_index = (size_t)(entry - registry->entries);
+        for (size_t i = entry_index; i + 1 < registry->entry_count; i++) {
+            registry->entries[i] = registry->entries[i + 1];
+        }
+        registry->entry_count--;
+
+        if (registry->entry_count < registry->capacity) {
+            RegistryEntry *last = &registry->entries[registry->entry_count];
+            last->author = NULL;
+            last->name = NULL;
+            last->versions = NULL;
+            last->version_count = 0;
+        }
+    } else {
+        /* Remove just this version */
+        if (version_index + 1 < entry->version_count) {
+            memmove(&entry->versions[version_index],
+                    &entry->versions[version_index + 1],
+                    sizeof(Version) * (entry->version_count - version_index - 1));
+        }
+        entry->version_count--;
+
+        Version *new_versions = arena_realloc(entry->versions, sizeof(Version) * entry->version_count);
+        if (new_versions) {
+            entry->versions = new_versions;
+        }
+    }
+
+    if (decrement_since_count && registry->since_count > 0) {
+        registry->since_count--;
+    }
+
+    if (out_removed) {
+        *out_removed = true;
+    }
 
     return true;
 }
@@ -569,11 +659,26 @@ bool registry_resolve_constraint(Registry *registry, const char *author, const c
     return false;  /* No matching version found */
 }
 
+size_t registry_versions_in_map_count(const Registry *registry) {
+    if (!registry) return 0;
+
+    size_t total = 0;
+    for (size_t i = 0; i < registry->entry_count; i++) {
+        if (total > SIZE_MAX - registry->entries[i].version_count) {
+            return SIZE_MAX;
+        }
+        total += registry->entries[i].version_count;
+    }
+    return total;
+}
+
 /* Utility */
 void registry_print(const Registry *registry) {
     if (!registry) return;
 
-    printf("Registry: %zu packages, %zu total versions\n", registry->entry_count, registry->total_versions);
+    size_t map_versions = registry_versions_in_map_count(registry);
+    printf("Registry: %zu packages, %zu since_count (%zu versions in map)\n",
+           registry->entry_count, registry->since_count, map_versions);
 
     for (size_t i = 0; i < registry->entry_count && i < 10; i++) {
         RegistryEntry *entry = &registry->entries[i];
@@ -645,7 +750,10 @@ bool registry_merge_local_dev(Registry *registry, const char *local_dev_path) {
             }
             
             if (!exists) {
-                registry_add_version(registry, local_entry->author, local_entry->name, *v);
+                if (!registry_add_version_ex(registry, local_entry->author, local_entry->name, *v, false, NULL)) {
+                    registry_free(local_dev);
+                    return false;
+                }
             }
         }
     }
@@ -654,4 +762,3 @@ bool registry_merge_local_dev(Registry *registry, const char *local_dev_path) {
     registry_free(local_dev);
     return true;
 }
-

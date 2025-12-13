@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <limits.h>
+#include <stdint.h>
 #include <errno.h>
 
 static char *registry_etag_file_path(const char *registry_dat_path) {
@@ -88,6 +89,73 @@ static bool registry_etag_write_to_disk(const char *etag_path, const char *etag)
     return true;
 }
 
+static char *registry_since_count_file_path(const char *registry_dat_path) {
+    if (!registry_dat_path) return NULL;
+
+    size_t len = strlen(registry_dat_path) + strlen(".since-count") + 1;
+    char *path = arena_malloc(len);
+    if (!path) return NULL;
+    snprintf(path, len, "%s.since-count", registry_dat_path);
+    return path;
+}
+
+static bool registry_since_count_read_from_disk(const char *since_path, size_t *out_since_count) {
+    if (!since_path || !out_since_count) return false;
+
+    char *contents = file_read_contents(since_path);
+    if (!contents) return false;
+
+    trim_trailing_ws_in_place(contents);
+
+    errno = 0;
+    char *end = NULL;
+    unsigned long long val = strtoull(contents, &end, 10);
+    if (errno != 0 || !end || end == contents || *end != '\0') {
+        arena_free(contents);
+        return false;
+    }
+
+    if (val > (unsigned long long)SIZE_MAX) {
+        arena_free(contents);
+        return false;
+    }
+
+    *out_since_count = (size_t)val;
+    arena_free(contents);
+    return true;
+}
+
+static bool registry_since_count_write_to_disk(const char *since_path, size_t since_count) {
+    if (!since_path) return false;
+
+    char tmp_path[MAX_TEMP_PATH_LENGTH];
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", since_path);
+
+    FILE *f = fopen(tmp_path, "wb");
+    if (!f) {
+        log_debug("Failed to open %s for writing: %s", tmp_path, strerror(errno));
+        return false;
+    }
+
+    if (fprintf(f, "%zu\n", since_count) < 0) {
+        fclose(f);
+        unlink(tmp_path);
+        return false;
+    }
+
+    fflush(f);
+    fsync(fileno(f));
+    fclose(f);
+
+    if (rename(tmp_path, since_path) != 0) {
+        log_debug("Failed to rename %s to %s: %s", tmp_path, since_path, strerror(errno));
+        unlink(tmp_path);
+        return false;
+    }
+
+    return true;
+}
+
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
@@ -114,11 +182,22 @@ static bool parse_all_packages_json(const char *json_str, Registry *registry) {
         return false;
     }
 
-    registry->total_versions = 0;
+    size_t canonical_since_count = 0;
 
     cJSON *package = NULL;
     cJSON_ArrayForEach(package, json) {
         if (!cJSON_IsArray(package)) continue;
+
+        int pkg_versions = cJSON_GetArraySize(package);
+        if (pkg_versions > 0) {
+            size_t add = (size_t)pkg_versions;
+            if (canonical_since_count > SIZE_MAX - add) {
+                fprintf(stderr, "Error: Registry since_count overflow while parsing all-packages JSON\n");
+                cJSON_Delete(json);
+                return false;
+            }
+            canonical_since_count += add;
+        }
 
         const char *package_name = package->string;
         if (!package_name) continue;
@@ -140,11 +219,19 @@ static bool parse_all_packages_json(const char *json_str, Registry *registry) {
             Version version = version_parse(version_str);
 
             /* Add version maintains descending order */
-            registry_add_version(registry, author, name, version);
+            if (!registry_add_version_ex(registry, author, name, version, false, NULL)) {
+                arena_free(author);
+                arena_free(name);
+                cJSON_Delete(json);
+                return false;
+            }
         }
 
         arena_free(author);
+        arena_free(name);
     }
+
+    registry->since_count = canonical_since_count;
 
     /* Ensure registry is sorted */
     registry_sort_entries(registry);
@@ -185,11 +272,23 @@ static bool parse_since_response(const char *json_str, Registry *registry) {
             continue;
         }
 
-        registry_add_version(registry, author, name, version);
+        if (!registry_add_version_ex(registry, author, name, version, false, NULL)) {
+            arena_free(author);
+            arena_free(name);
+            cJSON_Delete(json);
+            return false;
+        }
 
         arena_free(author);
         arena_free(name);
     }
+
+    size_t add = (size_t)count;
+    if (registry->since_count > SIZE_MAX - add) {
+        cJSON_Delete(json);
+        return false;
+    }
+    registry->since_count += add;
 
     cJSON_Delete(json);
     return true;
@@ -310,7 +409,7 @@ bool install_env_init(InstallEnv *env) {
 
         if (env->registry) {
             log_progress("Loaded cached registry: %zu packages, %zu versions",
-                   env->registry->entry_count, env->registry->total_versions);
+                   env->registry->entry_count, env->registry->since_count);
             
             /* Merge local-dev registry if it exists */
             /* Build path for registry-local-dev.dat next to registry.dat */
@@ -330,6 +429,30 @@ bool install_env_init(InstallEnv *env) {
                     }
                 }
                 arena_free(reg_dir);
+            }
+
+            /* Repair inflated/incorrect header since_count using the persisted canonical sidecar (Option B). */
+            char *since_path = registry_since_count_file_path(env->cache->registry_path);
+            if (since_path && file_exists(since_path)) {
+                size_t canonical_since = 0;
+                if (registry_since_count_read_from_disk(since_path, &canonical_since)) {
+                    if (canonical_since != env->registry->since_count) {
+                        fprintf(stderr,
+                                "Warning: registry.dat header since_count (%zu) differs from canonical since_count (%zu); repairing header.\n",
+                                env->registry->since_count, canonical_since);
+                        env->registry->since_count = canonical_since;
+                        env->known_version_count = canonical_since;
+
+                        if (!registry_dat_write(env->registry, env->cache->registry_path)) {
+                            fprintf(stderr, "Warning: Failed to rewrite registry.dat header for since_count repair\n");
+                        }
+                    }
+                } else {
+                    log_debug("Failed to parse since_count sidecar file: %s", since_path);
+                }
+            }
+            if (since_path) {
+                arena_free(since_path);
             }
         } else {
             log_progress("No cached registry found, will fetch from network");
@@ -448,14 +571,20 @@ bool install_env_fetch_registry(InstallEnv *env) {
     memory_buffer_free(buffer);
 
     printf("Registry loaded: %zu packages, %zu versions\n",
-           env->registry->entry_count, env->registry->total_versions);
+           env->registry->entry_count, env->registry->since_count);
 
     registry_sort_entries(env->registry);
     if (!registry_dat_write(env->registry, env->cache->registry_path)) {
         fprintf(stderr, "Warning: Failed to cache registry to %s\n", env->cache->registry_path);
     } else {
         printf("Registry cached to %s\n", env->cache->registry_path);
-        env->known_version_count = env->registry->total_versions;
+        env->known_version_count = env->registry->since_count;
+
+        char *since_path = registry_since_count_file_path(env->cache->registry_path);
+        if (since_path) {
+            registry_since_count_write_to_disk(since_path, env->known_version_count);
+            arena_free(since_path);
+        }
     }
 
     if (new_etag) {
@@ -538,7 +667,7 @@ bool install_env_update_registry(InstallEnv *env) {
 
     memory_buffer_free(buffer);
 
-    size_t new_total = env->registry->total_versions;
+    size_t new_total = env->registry->since_count;
     if (new_total > env->known_version_count) {
         log_progress("Registry updated: %zu new version(s)", new_total - env->known_version_count);
 
@@ -547,6 +676,12 @@ bool install_env_update_registry(InstallEnv *env) {
             fprintf(stderr, "Warning: Failed to cache updated registry\n");
         } else {
             env->known_version_count = new_total;
+
+            char *since_path = registry_since_count_file_path(env->cache->registry_path);
+            if (since_path) {
+                registry_since_count_write_to_disk(since_path, env->known_version_count);
+                arena_free(since_path);
+            }
         }
     } else {
         log_progress("Registry is up to date");
