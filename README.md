@@ -3,7 +3,7 @@
 This utility wraps Elm compiler and intercepts its package management commands like `install` to augment them with
 support for custom package registries and policies.
 
-**elm-wrap** is independent from Elm. It's purpose is to implement flexible package managment for Elm. 
+**elm-wrap** is independent from Elm. Its purpose is to implement flexible package management for Elm. 
 It does not seek to augment or extend Elm the language and its compiler, nor does it interface with Elm compiler's Haskell code in any way. 
 It operates its own package management logic, albeit compatible with Elm compiler's expected file layout, and calls the `elm` compiler 
 process when all package management is done. The interface to Elm is strictly through process execution.
@@ -53,24 +53,24 @@ process when all package management is done. The interface to Elm is strictly th
 
 As **elm-wrap** seeks to wrap the compiler, it intercepts all of the Elm compiler's commands:
 
-    wrap repl    
-    wrap init    
-    wrap reactor 
-    wrap make    
-    wrap install 
-    wrap bump    
-    wrap diff    
+    wrap repl
+    wrap init
+    wrap reactor
+    wrap make
+    wrap install
+    wrap bump
+    wrap diff
 
 All of these commands ultimately execute on the Elm compiler(*) after dealing
 with any needed package caching.
 
-For example, `wrap make src/Main.elm` will update `registry.dat` (cached version in formation 
+For example, `wrap make src/Main.elm` will update `registry.dat` (cached version information 
 from the package registry), read `elm.json` and download from the registry
 all packages listed if not already cached, and then call `elm make src/Main.elm` in offline mode. 
-(That is, `elm` binary won't make any network requests as it will find all needed packages already in cache).
+(That is, the `elm` binary won't make any network requests as it will find all needed packages already in cache).
 
 If you rename `wrap` to `elm` and put it in the path before the elm compiler, it will act as a drop-in
-replacement in all scripts and cli usage.
+replacement in all scripts and CLI usage.
 
 `*` Well, not all: `wrap init` re-implements the init functionality in order to extend it with new
 project templating functionality. More on that below.
@@ -101,13 +101,13 @@ Extended comands are organized in sections.
 
 
 
-**`install`** does full package dependency resolution/download/elm.json updates, without calling elm compiler. It implements
+**`install`** does full package dependency resolution/download/`elm.json` updates, without calling the `elm` compiler. It implements
 its own package dependency resolution using PubGrub algorithm. It also uses the same resolution strategy ladder as Elm internally,
 leading to identical outcomes for install actions.
 
-Most important characteristic of the extended `package install` are `--from-url` and `--from-path` switches: with these, it can install any pckage into the ELM_HOME package tree straight from GitHub or from a local package directory (maybe you are developing a package and want to test without having to push to the canonical public repository, or an author of a package you depend on deleted the version tag or renamed the github repository).
+Most important characteristic of the extended `package install` are `--from-url` and `--from-path` switches: with these, it can install any package into the `ELM_HOME` package tree straight from GitHub or from a local package directory (maybe you are developing a package and want to test without having to push to the canonical public repository, or an author of a package you depend on deleted the version tag or renamed the GitHub repository).
 
-Of note is also the ability to install new major version upgrade, something that the built-in `elm install` cannot do.
+Of note is also the ability to install new major versions of dependencies, something that the built-in `elm install` cannot do.
 
     $ wrap package install --major elm/http
     Here is my plan:
@@ -213,7 +213,7 @@ Example output:
     [minor] elm/virtual-dom                       1.0.2 -> 1.0.5
 
 
-Conveniently, `info` also takes the path to elm.json, so one can check all projects in a directory tree with:
+Conveniently, `info` also takes the path to `elm.json`, so one can check all projects in a directory tree with:
 
     find /path/to/projects -name elm.json -print -exec wrap package info {} \;
 
@@ -224,17 +224,17 @@ Conveniently, `info` also takes the path to elm.json, so one can check all proje
 `wrap` takes configuration options through environment variables and command flags.
 
 **`ELM_HOME`** is the same as `elm` compiler's home variable. It will pass it on to the compiler invocations as well.
-Defaults to `~/.elm/0.19.1`.
+Defaults to `~/.elm/0.19.1` on macOS and Linux, and `AppData\Roaming\elm` inside the home directory on Windows (ex: `C:\Users\pdamir\AppData\Roaming\elm`).
 
 **`ELM_PACKAGE_REGISTRY_URL`** configures the package registry to use in all package-download-causing commands. Behind the
 scenes `wrap` relies on cUrl library, so it will respect all of cUrl's environment variables as well.
-Defaults to `https://package.elm-lang.org.
+Defaults to `https://package.elm-lang.org`.
 
 **`WRAP_ELM_COMPILER_PATH`** specifies the `elm` binary to call from commands like `make` and others. If not specified,
-`wrap` will find the first `elm` binary in it's `PATH` environment variable.
+`wrap` will find the first `elm` binary in its `PATH` environment variable.
 
-**`WRAP_ALLOW_ELM_ONLINE`** disables `elm` compiler's "offline mode." Specify any value, the program tests for presence.
-The default is to insert an invalid proxy variable into `elm` binary's environment  (`https_proxy=http://1`) forcing the compiler
+**`WRAP_ALLOW_ELM_ONLINE`** disables `elm` compiler's "offline mode". Specify any value, the program tests for presence.
+The default is to insert an invalid proxy variable into `elm` binary's environment (`https_proxy=http://1`) forcing the compiler
 to go into "offline mode" as it cannot connect to the said address. The only reason `elm` compiler binary needs to go online
 is to contact the package registry that is hard-coded to `package.elm-lang.org`. Obviously not very useful if our goal is to 
 use our own package registry.
@@ -253,13 +253,13 @@ Package development-related commands (`bump` and `publish`) were not tested. Obv
 
 Re-implementation of both commands is planned shortly.
 
-The code builds on macOS and linux, and is mildly manually tested on a sample of author's elm projects. A more thorough testing must encompass much wider use.
+The code builds on macOS and Linux, and is mildly manually tested on a sample of author's Elm projects. A more thorough testing must encompass much wider use.
 
-The core motivation for writing this tool is to install lydell's forks of elm/core, elm/virtual-dom and friends. This works now, but it makes sense to continue to complete the tool. Most work should happen on separate package registry implementations, though. See [an initial writeup on the subject](doc/registry_support.md).
+The core motivation for writing this tool is to install [@lydell](https://github.com/lydell)'s forks of `elm/core`, `elm/virtual-dom` and friends. This works now, but it makes sense to continue to complete the tool. Most work should happen on separate package registry implementations, though. See [an initial writeup on the subject](doc/registry_support.md).
 
 Pinning is still not in place: the idea being that we don't want to forget and upgrade an override package we installed, and then wonder what went wrong. There's more to say about pinning, including permanently looking for updates on the overriden location. But that's not yet here. Hopefully soon.
 
-As expected, tests are behind. `make check` just runs a couple of tests. The real work will be to test PubGrub algorithm thoroughly.
+As expected, tests are behind. `make check` just runs a couple of tests. The real work will be to test the PubGrub algorithm thoroughly.
 
 ## Installation
 
@@ -308,12 +308,10 @@ Then unpack and build with `make all install` or `make all install-user` as appr
 
 You'll probably need to install a few dependencies first.
 
-### Docker development environment.
+### Docker development environment
 
-Follow the advice here on installing Docker,
-[install docker](https://docs.docker.com/engine/install/debian/)
-as well as setting up non-root users to be able to use it,
-[non-root users](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
+Follow the advice [here on installing Docker](https://docs.docker.com/engine/install/debian/)
+as well as setting up [non-root users to be able to use it](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
 
 To confirm it is working correctly run these commands (`newgrp docker` only
 needs to be run if you are not logging out and back in again):
@@ -337,7 +335,7 @@ Build the code with make:
 
 **elm-wrap** is independently thought of and created. 
 
-Obviously, it depends on the awesome `elm` compiler and would serve no purpose without it. This program uses a few prompts from the elm compiler under [BSD 3-clause license](doc/licenses/elm-compiler-LICENSE).
+Obviously, it depends on the awesome `elm` compiler and would serve no purpose without it. This program uses a few prompts from the Elm compiler under [BSD 3-clause license](doc/licenses/elm-compiler-LICENSE).
 
 **elm-wrap** implements PubGrub algorithtm for version dependency resolution based on [PubGrub description](https://github.com/dart-lang/pub/blob/master/doc/solver.md). The text is also copied to this repository under [BSD 3-clause license](doc/licenses/pubgrub-solver-spec.md-LICENSE). 
 
