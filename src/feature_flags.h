@@ -1,5 +1,5 @@
-#ifndef FEATURES_H
-#define FEATURES_H
+#ifndef FEATURE_FLAGS_H
+#define FEATURE_FLAGS_H
 
 #include <stdbool.h>
 
@@ -30,4 +30,4 @@ bool feature_policy_enabled(void);
 /* Check if the 'package cache' subcommand is enabled */
 bool feature_cache_enabled(void);
 
-#endif /* FEATURES_H */
+#endif /* FEATURE_FLAGS_H */

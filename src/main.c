@@ -1,3 +1,7 @@
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -27,7 +31,7 @@
 #include "commands/info/info.h"
 #include "alloc.h"
 #include "log.h"
-#include "features.h"
+#include "feature_flags.h"
 #include "rulr/builtin_rules.h"
 #include "global_context.h"
 #include "embedded_archive.h"

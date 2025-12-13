@@ -8,7 +8,7 @@ FEATURE_REVIEW ?= 0
 FEATURE_POLICY ?= 0
 FEATURE_CACHE ?= 1
 
-CFLAGS = -Wall -Wextra -Werror -Wunused-result -std=c99 -D_POSIX_C_SOURCE=200809L -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -O2 -flto
+CFLAGS = -Wall -Wextra -Werror -Wunused-result -std=gnu99 -D_GNU_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -O2 -flto
 CFLAGS += -DFEATURE_CODE_DEFAULT=$(FEATURE_CODE) -DFEATURE_PUBLISH_DEFAULT=$(FEATURE_PUBLISH)
 CFLAGS += -DFEATURE_REVIEW_DEFAULT=$(FEATURE_REVIEW) -DFEATURE_POLICY_DEFAULT=$(FEATURE_POLICY)
 CFLAGS += -DFEATURE_CACHE_DEFAULT=$(FEATURE_CACHE)
@@ -381,7 +381,7 @@ $(BUILDDIR)/log.o: $(SRCDIR)/log.c $(SRCDIR)/log.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build features object
-$(BUILDDIR)/features.o: $(SRCDIR)/features.c $(SRCDIR)/features.h | $(BUILDDIR)
+$(BUILDDIR)/features.o: $(SRCDIR)/features.c $(SRCDIR)/feature_flags.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build embedded_archive object
