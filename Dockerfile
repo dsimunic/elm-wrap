@@ -5,7 +5,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates git build-essential python3 pkg-config \
     cmake ninja-build clang lld zlib1g-dev libxml2-dev \
-    libcurl4-openssl-dev libnghttp2-dev libidn2-dev \
+    libcurl4-openssl-dev libnghttp2-dev libidn2-dev libunistring-dev libgpg-error-dev libgcrypt20-dev libgmp-dev libnettle-dev \
     librtmp-dev libssh2-1-dev libpsl-dev libssl-dev \
     libkrb5-dev libldap2-dev libzstd-dev libbrotli-dev \
     gosu \

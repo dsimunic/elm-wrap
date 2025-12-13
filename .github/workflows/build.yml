@@ -42,3 +42,17 @@ jobs:
     - name: Display version
       run: |
         ./bin/wrap --version || echo "Version command not available"
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git make build-essential libcurl4-openssl-dev libnghttp2-dev libidn2-dev libunistring-dev libgpg-error-dev \
+            rsync libgcrypt20-dev libssl-dev 
+      - name: Build on Linux
+        run: make clean all
+

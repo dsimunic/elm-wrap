@@ -8,8 +8,8 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#define DEFAULT_TIMEOUT_MS 10000
-#define CONNECT_TEST_TIMEOUT_MS 2000
+#define DEFAULT_TIMEOUT_MS 10000L
+#define CONNECT_TEST_TIMEOUT_MS 2000L
 
 struct CurlSession {
     CURL *handle;
@@ -202,8 +202,8 @@ bool curl_session_can_connect(CurlSession *session, const char *test_url) {
 
     curl_session_prepare_request(session);
 
-    curl_easy_setopt(handle, CURLOPT_TIMEOUT_MS, CONNECT_TEST_TIMEOUT_MS);
-    curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT_MS, CONNECT_TEST_TIMEOUT_MS);
+    curl_easy_setopt(handle, CURLOPT_TIMEOUT_MS, (long)CONNECT_TEST_TIMEOUT_MS);
+    curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT_MS, (long)CONNECT_TEST_TIMEOUT_MS);
     curl_easy_setopt(handle, CURLOPT_URL, test_url);
     curl_easy_setopt(handle, CURLOPT_NOBODY, 1L);  /* HEAD request */
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, NULL);
