@@ -277,6 +277,12 @@ You can confirm you have the latest version with:
 
 ```bash
 wrap --version
+
+Version: 0.5.0-preview.3@detached-abcc73e9-2025-12-13T18:25:34Z
+  Base version: 0.5.0-preview.3
+  Commit: abcc73e9becffdbaf2310c7be4ff849b65ee9080
+  Compiler: Apple clang version 15.0.0 (clang-1500.3.9.4)
+  Platform: Darwin/arm64
 ```
 
 Later updates:
@@ -330,6 +336,43 @@ To run an interactive session as your user inside the docker container:
 Build the code with make:
 
     make
+
+## Building on Linux
+
+Until a `.deb` package is available, building on linux requires the following incantations:
+
+### Ubuntu 24.04 LTS
+
+```bash
+sudo apt update
+sudo apt install -y --no-install-recommends \
+  git make build-essential libcurl4-openssl-dev libnghttp2-dev \
+  libidn2-dev libunistring-dev libgpg-error-dev libgcrypt20-dev \
+  libssl-dev libldap2-dev libbrotli-dev librtmp-dev libssh-dev \
+  libpsl-dev libkrb5-dev libzstd-dev zlib1g-dev rsync
+
+git clone https://github.com/dsimunic/elm-wrap
+cd elm-wrap
+make clean all
+make install-user   # if your ~/.local/bin is in the path
+sudo make install   # otherwise 
+```
+
+### Ubuntu 25.10
+
+```bash
+sudo apt update
+sudo apt install -y --no-install-recommends \
+  git make build-essential libcurl4-openssl-dev libnghttp2-dev \
+  libunistring-dev libgpg-error-dev rsync 
+
+git clone https://github.com/dsimunic/elm-wrap
+cd elm-wrap
+
+make all
+make install-user   # if your ~/.local/bin is in the path
+sudo make install   # otherwise 
+```
 
 ## Prior art and similar utilities
 
