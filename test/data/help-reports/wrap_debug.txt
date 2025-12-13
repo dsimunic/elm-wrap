@@ -5,7 +5,7 @@ Diagnostic tools for development.
 Subcommands:
   include-tree PATH      Show import dependency tree for a file or package
   install-plan PACKAGE   Show what packages would be installed for a package (dry-run)
-  registry_v1  CMD       Manage V1 protocol registry.dat file
+  registry_v1  COMMAND   Manage V1 protocol registry.dat file
 
 Options:
   -h, --help           Show this help message

@@ -1,0 +1,21 @@
+Usage: wrap debug registry_v1 SUBCOMMAND [OPTIONS]
+
+Manage the V1 protocol registry.dat file.
+
+Subcommands:
+  list                     Display all packages in the registry
+  add AUTHOR/NAME@VERSION  Add a package version to the registry
+  remove AUTHOR/NAME@VERSION  Remove a package version from the registry
+  apply-since JSON_PATH    Apply a /since JSON response offline
+  reset [--yes|-y]         Delete registry.dat and re-download it
+
+Options:
+  -h, --help              Show this help message
+  -y, --yes               Assume yes for prompts
+
+Examples:
+  wrap debug registry_v1 list
+  wrap debug registry_v1 add elm/core@1.0.5
+  wrap debug registry_v1 remove elm/core@1.0.5
+  wrap debug registry_v1 apply-since /path/to/since.json
+  wrap debug registry_v1 reset

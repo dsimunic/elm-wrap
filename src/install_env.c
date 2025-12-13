@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <errno.h>
 
-static char *registry_etag_file_path(const char *registry_dat_path) {
+char *install_env_registry_etag_file_path(const char *registry_dat_path) {
     if (!registry_dat_path) return NULL;
 
     size_t len = strlen(registry_dat_path) + strlen(".etag") + 1;
@@ -89,7 +89,7 @@ static bool registry_etag_write_to_disk(const char *etag_path, const char *etag)
     return true;
 }
 
-static char *registry_since_count_file_path(const char *registry_dat_path) {
+char *install_env_registry_since_count_file_path(const char *registry_dat_path) {
     if (!registry_dat_path) return NULL;
 
     size_t len = strlen(registry_dat_path) + strlen(".since-count") + 1;
@@ -294,12 +294,7 @@ static bool parse_since_response(const char *json_str, Registry *registry) {
     return true;
 }
 
-InstallEnv* install_env_create(void) {
-    InstallEnv *env = arena_calloc(1, sizeof(InstallEnv));
-    return env;
-}
-
-bool install_env_init(InstallEnv *env) {
+static bool install_env_init_cache_common(InstallEnv *env) {
     if (!env) return false;
 
     bool forced_offline = env_get_offline_mode();
@@ -308,7 +303,6 @@ bool install_env_init(InstallEnv *env) {
         log_progress("WRAP_OFFLINE_MODE=1: Network operations disabled");
     }
 
-    /* Initialize cache configuration (shared by both protocols) */
     env->cache = cache_config_init();
     if (!env->cache) {
         fprintf(stderr, "Error: Failed to initialize cache configuration\n");
@@ -317,6 +311,200 @@ bool install_env_init(InstallEnv *env) {
 
     if (!cache_ensure_directories(env->cache)) {
         fprintf(stderr, "Error: Failed to create cache directories\n");
+        return false;
+    }
+
+    return true;
+}
+
+static bool install_env_init_v1_resources(InstallEnv *env) {
+    if (!env) return false;
+
+    env->curl_session = curl_session_create();
+    if (!env->curl_session) {
+        fprintf(stderr, "Error: Failed to initialize HTTP client\n");
+        return false;
+    }
+
+    const char *registry_url_env = getenv("ELM_PACKAGE_REGISTRY_URL");
+    if (registry_url_env && registry_url_env[0] != '\0') {
+        env->registry_url = arena_strdup(registry_url_env);
+    } else {
+        env->registry_url = arena_strdup(DEFAULT_REGISTRY_URL);
+    }
+
+    if (!env->registry_url) {
+        fprintf(stderr, "Error: Failed to allocate registry URL\n");
+        return false;
+    }
+
+    return true;
+}
+
+static void install_env_v1_probe_offline(InstallEnv *env) {
+    if (!env || !env->registry_url || !env->curl_session) return;
+
+    char health_check_url[URL_MAX];
+    snprintf(health_check_url, sizeof(health_check_url), "%s/all-packages", env->registry_url);
+
+    if (env->offline_forced) {
+        log_progress("Offline mode forced via WRAP_OFFLINE_MODE=1");
+        env->offline = true;
+        return;
+    }
+
+    log_progress("Testing connectivity to %s...", env->registry_url);
+    env->offline = !curl_session_can_connect(env->curl_session, health_check_url);
+}
+
+bool install_env_prepare_v1(InstallEnv *env) {
+    if (!env) return false;
+
+    env->protocol_mode = PROTOCOL_V1;
+    env->v2_registry = NULL;
+
+    if (!install_env_init_cache_common(env)) {
+        return false;
+    }
+
+    log_progress("Using V1 protocol mode");
+
+    if (!install_env_init_v1_resources(env)) {
+        return false;
+    }
+
+    install_env_v1_probe_offline(env);
+    return true;
+}
+
+bool install_env_ensure_v1_registry(InstallEnv *env) {
+    if (!env || !env->cache || !env->curl_session || !env->registry_url) return false;
+
+    env->protocol_mode = PROTOCOL_V1;
+    env->v2_registry = NULL;
+
+    if (env->registry) {
+        registry_free(env->registry);
+        env->registry = NULL;
+    }
+    if (env->registry_etag) {
+        arena_free(env->registry_etag);
+        env->registry_etag = NULL;
+    }
+
+    env->registry = registry_load_from_dat(env->cache->registry_path, &env->known_version_count);
+
+    /* Load cached ETag (best-effort) */
+    char *etag_path = install_env_registry_etag_file_path(env->cache->registry_path);
+    if (etag_path) {
+        env->registry_etag = registry_etag_read_from_disk(etag_path);
+        arena_free(etag_path);
+    }
+
+    if (env->registry) {
+        log_progress("Loaded cached registry: %zu packages, %zu versions",
+                     env->registry->entry_count, env->registry->since_count);
+
+        /* Merge local-dev registry if it exists */
+        /* Build path for registry-local-dev.dat next to registry.dat */
+        char *reg_dir = arena_strdup(env->cache->registry_path);
+        if (reg_dir) {
+            char *last_slash = strrchr(reg_dir, '/');
+            if (last_slash) {
+                *last_slash = '\0';
+                size_t local_dev_path_len = strlen(reg_dir) + strlen("/registry-local-dev.dat") + 1;
+                char *local_dev_path = arena_malloc(local_dev_path_len);
+                if (local_dev_path) {
+                    snprintf(local_dev_path, local_dev_path_len, "%s/registry-local-dev.dat", reg_dir);
+                    if (!registry_merge_local_dev(env->registry, local_dev_path)) {
+                        log_progress("Warning: Failed to merge local-dev registry");
+                    }
+                    arena_free(local_dev_path);
+                }
+            }
+            arena_free(reg_dir);
+        }
+
+        /* Repair inflated/incorrect header since_count using the persisted canonical sidecar (Option B). */
+        char *since_path = install_env_registry_since_count_file_path(env->cache->registry_path);
+        if (since_path && file_exists(since_path)) {
+            size_t canonical_since = 0;
+            if (registry_since_count_read_from_disk(since_path, &canonical_since)) {
+                if (canonical_since != env->registry->since_count) {
+                    fprintf(stderr,
+                            "Warning: registry.dat header since_count (%zu) differs from canonical since_count (%zu); repairing header.\n",
+                            env->registry->since_count, canonical_since);
+                    env->registry->since_count = canonical_since;
+                    env->known_version_count = canonical_since;
+
+                    if (!registry_dat_write(env->registry, env->cache->registry_path)) {
+                        fprintf(stderr, "Warning: Failed to rewrite registry.dat header for since_count repair\n");
+                    }
+                }
+            } else {
+                log_debug("Failed to parse since_count sidecar file: %s", since_path);
+            }
+        }
+        if (since_path) {
+            arena_free(since_path);
+        }
+    } else {
+        log_progress("No cached registry found, will fetch from network");
+        env->registry = registry_create();
+        if (!env->registry) {
+            fprintf(stderr, "Error: Failed to create registry\n");
+            return false;
+        }
+        env->known_version_count = 0;
+    }
+
+    if (env->offline) {
+        if (env->offline_forced) {
+            log_progress("Using cached registry (offline mode forced)");
+        } else {
+            log_progress("Warning: Cannot connect to package registry (offline mode)");
+        }
+
+        if (env->known_version_count == 0) {
+            fprintf(stderr, "Error: No cached registry and offline mode is active\n");
+            if (env->offline_forced) {
+                fprintf(stderr, "Hint: Unset WRAP_OFFLINE_MODE or run online first to cache registry data\n");
+            } else {
+                fprintf(stderr, "Please run again when online to download package registry\n");
+            }
+            return false;
+        }
+
+        log_progress("Using cached registry data");
+        return true;
+    }
+
+    log_progress("Connected to package registry");
+
+    if (env->known_version_count == 0) {
+        if (!install_env_fetch_registry(env)) {
+            fprintf(stderr, "Error: Failed to fetch registry from network\n");
+            return false;
+        }
+    } else {
+        if (!install_env_update_registry(env)) {
+            fprintf(stderr, "Warning: Failed to update registry (using cached data)\n");
+        }
+    }
+
+    return true;
+}
+
+InstallEnv* install_env_create(void) {
+    InstallEnv *env = arena_calloc(1, sizeof(InstallEnv));
+    return env;
+}
+
+bool install_env_init(InstallEnv *env) {
+    if (!env) return false;
+
+    /* Initialize cache configuration (shared by both protocols) */
+    if (!install_env_init_cache_common(env)) {
         return false;
     }
 
@@ -380,136 +568,15 @@ bool install_env_init(InstallEnv *env) {
         log_progress("Using V1 protocol mode");
 
         /* Initialize V1-specific resources */
-        env->curl_session = curl_session_create();
-        if (!env->curl_session) {
-            fprintf(stderr, "Error: Failed to initialize HTTP client\n");
+        if (!install_env_init_v1_resources(env)) {
             return false;
         }
 
-        const char *registry_url_env = getenv("ELM_PACKAGE_REGISTRY_URL");
-        if (registry_url_env && registry_url_env[0] != '\0') {
-            env->registry_url = arena_strdup(registry_url_env);
-        } else {
-            env->registry_url = arena_strdup(DEFAULT_REGISTRY_URL);
-        }
+        install_env_v1_probe_offline(env);
 
-        if (!env->registry_url) {
-            fprintf(stderr, "Error: Failed to allocate registry URL\n");
+        if (!install_env_ensure_v1_registry(env)) {
             return false;
         }
-
-        env->registry = registry_load_from_dat(env->cache->registry_path, &env->known_version_count);
-
-        /* Load cached ETag (best-effort) */
-        char *etag_path = registry_etag_file_path(env->cache->registry_path);
-        if (etag_path) {
-            env->registry_etag = registry_etag_read_from_disk(etag_path);
-            arena_free(etag_path);
-        }
-
-        if (env->registry) {
-            log_progress("Loaded cached registry: %zu packages, %zu versions",
-                   env->registry->entry_count, env->registry->since_count);
-            
-            /* Merge local-dev registry if it exists */
-            /* Build path for registry-local-dev.dat next to registry.dat */
-            char *reg_dir = arena_strdup(env->cache->registry_path);
-            if (reg_dir) {
-                char *last_slash = strrchr(reg_dir, '/');
-                if (last_slash) {
-                    *last_slash = '\0';
-                    size_t local_dev_path_len = strlen(reg_dir) + strlen("/registry-local-dev.dat") + 1;
-                    char *local_dev_path = arena_malloc(local_dev_path_len);
-                    if (local_dev_path) {
-                        snprintf(local_dev_path, local_dev_path_len, "%s/registry-local-dev.dat", reg_dir);
-                        if (!registry_merge_local_dev(env->registry, local_dev_path)) {
-                            log_progress("Warning: Failed to merge local-dev registry");
-                        }
-                        arena_free(local_dev_path);
-                    }
-                }
-                arena_free(reg_dir);
-            }
-
-            /* Repair inflated/incorrect header since_count using the persisted canonical sidecar (Option B). */
-            char *since_path = registry_since_count_file_path(env->cache->registry_path);
-            if (since_path && file_exists(since_path)) {
-                size_t canonical_since = 0;
-                if (registry_since_count_read_from_disk(since_path, &canonical_since)) {
-                    if (canonical_since != env->registry->since_count) {
-                        fprintf(stderr,
-                                "Warning: registry.dat header since_count (%zu) differs from canonical since_count (%zu); repairing header.\n",
-                                env->registry->since_count, canonical_since);
-                        env->registry->since_count = canonical_since;
-                        env->known_version_count = canonical_since;
-
-                        if (!registry_dat_write(env->registry, env->cache->registry_path)) {
-                            fprintf(stderr, "Warning: Failed to rewrite registry.dat header for since_count repair\n");
-                        }
-                    }
-                } else {
-                    log_debug("Failed to parse since_count sidecar file: %s", since_path);
-                }
-            }
-            if (since_path) {
-                arena_free(since_path);
-            }
-        } else {
-            log_progress("No cached registry found, will fetch from network");
-            env->registry = registry_create();
-            if (!env->registry) {
-                fprintf(stderr, "Error: Failed to create registry\n");
-                return false;
-            }
-            env->known_version_count = 0;
-        }
-
-        char health_check_url[URL_MAX];
-        snprintf(health_check_url, sizeof(health_check_url), "%s/all-packages", env->registry_url);
-
-        if (env->offline_forced) {
-            log_progress("Offline mode forced via WRAP_OFFLINE_MODE=1");
-            env->offline = true;
-        } else {
-            log_progress("Testing connectivity to %s...", env->registry_url);
-            env->offline = !curl_session_can_connect(env->curl_session, health_check_url);
-        }
-
-        if (env->offline) {
-            if (env->offline_forced) {
-                log_progress("Using cached registry (offline mode forced)");
-            } else {
-                log_progress("Warning: Cannot connect to package registry (offline mode)");
-            }
-
-            if (env->known_version_count == 0) {
-                fprintf(stderr, "Error: No cached registry and offline mode is active\n");
-                if (env->offline_forced) {
-                    fprintf(stderr, "Hint: Unset WRAP_OFFLINE_MODE or run online first to cache registry data\n");
-                } else {
-                    fprintf(stderr, "Please run again when online to download package registry\n");
-                }
-                return false;
-            }
-
-            log_progress("Using cached registry data");
-        } else {
-            log_progress("Connected to package registry");
-
-            if (env->known_version_count == 0) {
-                if (!install_env_fetch_registry(env)) {
-                    fprintf(stderr, "Error: Failed to fetch registry from network\n");
-                    return false;
-                }
-            } else {
-                if (!install_env_update_registry(env)) {
-                    fprintf(stderr, "Warning: Failed to update registry (using cached data)\n");
-                }
-            }
-        }
-
-        /* V2-specific fields remain NULL/uninitialized */
-        env->v2_registry = NULL;
     }
 
     return true;
@@ -551,7 +618,7 @@ bool install_env_fetch_registry(InstallEnv *env) {
         if (new_etag) {
             if (env->registry_etag) arena_free(env->registry_etag);
             env->registry_etag = new_etag;
-            char *etag_path = registry_etag_file_path(env->cache->registry_path);
+            char *etag_path = install_env_registry_etag_file_path(env->cache->registry_path);
             if (etag_path) {
                 registry_etag_write_to_disk(etag_path, env->registry_etag);
                 arena_free(etag_path);
@@ -580,7 +647,7 @@ bool install_env_fetch_registry(InstallEnv *env) {
         printf("Registry cached to %s\n", env->cache->registry_path);
         env->known_version_count = env->registry->since_count;
 
-        char *since_path = registry_since_count_file_path(env->cache->registry_path);
+        char *since_path = install_env_registry_since_count_file_path(env->cache->registry_path);
         if (since_path) {
             registry_since_count_write_to_disk(since_path, env->known_version_count);
             arena_free(since_path);
@@ -592,7 +659,7 @@ bool install_env_fetch_registry(InstallEnv *env) {
             arena_free(env->registry_etag);
         }
         env->registry_etag = new_etag;
-        char *etag_path = registry_etag_file_path(env->cache->registry_path);
+        char *etag_path = install_env_registry_etag_file_path(env->cache->registry_path);
         if (etag_path) {
             registry_etag_write_to_disk(etag_path, env->registry_etag);
             arena_free(etag_path);
@@ -618,7 +685,7 @@ bool install_env_update_registry(InstallEnv *env) {
                 /* Some servers include ETag on 304; keep it */
                 arena_free(env->registry_etag);
                 env->registry_etag = head_etag;
-                char *etag_path = registry_etag_file_path(env->cache->registry_path);
+                char *etag_path = install_env_registry_etag_file_path(env->cache->registry_path);
                 if (etag_path) {
                     registry_etag_write_to_disk(etag_path, env->registry_etag);
                     arena_free(etag_path);
@@ -677,7 +744,7 @@ bool install_env_update_registry(InstallEnv *env) {
         } else {
             env->known_version_count = new_total;
 
-            char *since_path = registry_since_count_file_path(env->cache->registry_path);
+            char *since_path = install_env_registry_since_count_file_path(env->cache->registry_path);
             if (since_path) {
                 registry_since_count_write_to_disk(since_path, env->known_version_count);
                 arena_free(since_path);
@@ -689,7 +756,7 @@ bool install_env_update_registry(InstallEnv *env) {
 
     /* Persist ETag from latest HEAD check (best-effort) */
     if (env->registry_etag && env->registry_etag[0] != '\0') {
-        char *etag_path = registry_etag_file_path(env->cache->registry_path);
+        char *etag_path = install_env_registry_etag_file_path(env->cache->registry_path);
         if (etag_path) {
             registry_etag_write_to_disk(etag_path, env->registry_etag);
             arena_free(etag_path);

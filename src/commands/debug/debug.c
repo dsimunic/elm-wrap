@@ -13,7 +13,7 @@ static void print_debug_usage(void) {
     printf("Subcommands:\n");
     printf("  include-tree PATH      Show import dependency tree for a file or package\n");
     printf("  install-plan PACKAGE   Show what packages would be installed for a package (dry-run)\n");
-    printf("  registry_v1  CMD       Manage V1 protocol registry.dat file\n");
+    printf("  registry_v1  COMMAND   Manage V1 protocol registry.dat file\n");
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help           Show this help message\n");

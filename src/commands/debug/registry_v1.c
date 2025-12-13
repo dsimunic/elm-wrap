@@ -9,8 +9,10 @@
 #include "../../global_context.h"
 #include "../../registry.h"
 #include "../../cache.h"
+#include "../../install_env.h"
 #include "../../log.h"
 #include "../../fileutil.h"
+#include "../../constants.h"
 #include "../../vendor/cJSON.h"
 #include "../package/package_common.h"
 
@@ -19,6 +21,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <errno.h>
 
 static void print_registry_v1_usage(void) {
     printf("Usage: %s debug registry_v1 SUBCOMMAND [OPTIONS]\n", global_context_program_name());
@@ -30,21 +34,35 @@ static void print_registry_v1_usage(void) {
     printf("  add AUTHOR/NAME@VERSION  Add a package version to the registry\n");
     printf("  remove AUTHOR/NAME@VERSION  Remove a package version from the registry\n");
     printf("  apply-since JSON_PATH    Apply a /since JSON response offline\n");
+    printf("  reset [--yes|-y]         Delete registry.dat and re-download it\n");
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help              Show this help message\n");
+    printf("  -y, --yes               Assume yes for prompts\n");
     printf("\n");
     printf("Examples:\n");
     printf("  %s debug registry_v1 list\n", global_context_program_name());
     printf("  %s debug registry_v1 add elm/core@1.0.5\n", global_context_program_name());
     printf("  %s debug registry_v1 remove elm/core@1.0.5\n", global_context_program_name());
     printf("  %s debug registry_v1 apply-since /path/to/since.json\n", global_context_program_name());
+    printf("  %s debug registry_v1 reset\n", global_context_program_name());
 }
 
 /**
  * List all packages in the registry.
  */
-static int cmd_registry_v1_list(void) {
+static int cmd_registry_v1_list(int argc, char *argv[]) {
+    /* Check for help flag */
+    if (argc > 1 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
+        printf("Usage: %s debug registry_v1 list\n", global_context_program_name());
+        printf("\n");
+        printf("Display all packages in the registry.\n");
+        printf("\n");
+        printf("This command lists all packages and their versions currently\n");
+        printf("registered in the V1 protocol registry.dat file.\n");
+        return 0;
+    }
+
     /* Get cache config to find registry path */
     CacheConfig *cache = cache_config_init();
     if (!cache) {
@@ -94,6 +112,143 @@ static int cmd_registry_v1_list(void) {
 
     registry_free(registry);
     cache_config_free(cache);
+    return 0;
+}
+
+static bool prompt_offline_reset_proceed(void) {
+    fprintf(stderr,
+            "You are in offline mode and will not be able to download a fresh registry index after the reset. Proceed [Y/n] ");
+
+    char response[MAX_TEMP_BUFFER_LENGTH];
+    if (!fgets(response, sizeof(response), stdin)) {
+        return false;
+    }
+
+    for (size_t i = 0; response[i] != '\0'; i++) {
+        char c = response[i];
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            continue;
+        }
+        if (c == 'n' || c == 'N') {
+            return false;
+        }
+        return true;
+    }
+
+    /* Default to yes on empty response */
+    return true;
+}
+
+static bool has_yes_flag(int argc, char *argv[]) {
+    for (int i = 0; i < argc; i++) {
+        const char *arg = argv[i];
+        if (!arg) continue;
+        if (strcmp(arg, "-y") == 0 || strcmp(arg, "--yes") == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool has_help_flag(int argc, char *argv[]) {
+    for (int i = 0; i < argc; i++) {
+        const char *arg = argv[i];
+        if (!arg) continue;
+        if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool delete_regular_file_if_exists(const char *path) {
+    if (!path || path[0] == '\0') return true;
+    if (!file_exists(path)) return true;
+    if (unlink(path) != 0) {
+        log_error("Failed to delete %s: %s", path, strerror(errno));
+        return false;
+    }
+    return true;
+}
+
+static int cmd_registry_v1_reset(int argc, char *argv[]) {
+    /* Check for help flag */
+    if (has_help_flag(argc, argv)) {
+        printf("Usage: %s debug registry_v1 reset [--yes|-y]\n", global_context_program_name());
+        printf("\n");
+        printf("Delete registry.dat and re-download it.\n");
+        printf("\n");
+        printf("This command removes the local V1 protocol registry.dat file\n");
+        printf("and its associated metadata (ETag, since count), then downloads\n");
+        printf("a fresh copy from the registry server. This is useful when the\n");
+        printf("local registry cache becomes corrupted or out of sync.\n");
+        printf("\n");
+        printf("Options:\n");
+        printf("  -y, --yes    Assume yes for prompts (skip confirmation)\n");
+        printf("  -h, --help   Show this help message\n");
+        return 0;
+    }
+
+    bool assume_yes = has_yes_flag(argc, argv);
+
+    InstallEnv *env = install_env_create();
+    if (!env) {
+        log_error("Failed to allocate install environment");
+        return 1;
+    }
+
+    if (!install_env_prepare_v1(env)) {
+        log_error("Failed to initialize V1 registry environment");
+        install_env_free(env);
+        return 1;
+    }
+
+    if (env->offline) {
+        if (!assume_yes && !prompt_offline_reset_proceed()) {
+            log_progress("Aborted");
+            install_env_free(env);
+            return 0;
+        }
+    }
+
+    const char *registry_path = env->cache ? env->cache->registry_path : NULL;
+    if (!registry_path) {
+        log_error("Registry path is not available");
+        install_env_free(env);
+        return 1;
+    }
+
+    char *etag_path = install_env_registry_etag_file_path(registry_path);
+    char *since_path = install_env_registry_since_count_file_path(registry_path);
+
+    bool deleted_ok = delete_regular_file_if_exists(registry_path) &&
+                      delete_regular_file_if_exists(etag_path) &&
+                      delete_regular_file_if_exists(since_path);
+
+    if (etag_path) arena_free(etag_path);
+    if (since_path) arena_free(since_path);
+
+    if (!deleted_ok) {
+        install_env_free(env);
+        return 1;
+    }
+
+    log_progress("Deleted registry cache: %s", registry_path);
+
+    if (env->offline) {
+        log_warn("Offline mode: cannot download a fresh registry index until you are online");
+        install_env_free(env);
+        return 0;
+    }
+
+    if (!install_env_ensure_v1_registry(env)) {
+        log_error("Failed to download a fresh registry index after reset");
+        install_env_free(env);
+        return 1;
+    }
+
+    log_progress("Registry reset complete");
+    install_env_free(env);
     return 0;
 }
 
@@ -469,10 +624,21 @@ int cmd_debug_registry_v1(int argc, char *argv[]) {
     }
 
     if (strcmp(subcmd, "list") == 0) {
-        return cmd_registry_v1_list();
+        return cmd_registry_v1_list(argc - 1, argv + 1);
     }
 
     if (strcmp(subcmd, "add") == 0) {
+        /* Check for help flag */
+        if (argc >= 3 && (strcmp(argv[2], "-h") == 0 || strcmp(argv[2], "--help") == 0)) {
+            printf("Usage: %s debug registry_v1 add AUTHOR/NAME@VERSION\n", global_context_program_name());
+            printf("\n");
+            printf("Add a package version to the registry.\n");
+            printf("\n");
+            printf("This command adds a new package version to the V1 protocol\n");
+            printf("registry.dat file. The package must be specified in the\n");
+            printf("format AUTHOR/NAME@VERSION (e.g., elm/core@1.0.5).\n");
+            return 0;
+        }
         if (argc < 3) {
             fprintf(stderr, "Error: Package specification required\n");
             fprintf(stderr, "Usage: %s debug registry_v1 add AUTHOR/NAME@VERSION\n", global_context_program_name());
@@ -482,6 +648,17 @@ int cmd_debug_registry_v1(int argc, char *argv[]) {
     }
 
     if (strcmp(subcmd, "remove") == 0) {
+        /* Check for help flag */
+        if (argc >= 3 && (strcmp(argv[2], "-h") == 0 || strcmp(argv[2], "--help") == 0)) {
+            printf("Usage: %s debug registry_v1 remove AUTHOR/NAME@VERSION\n", global_context_program_name());
+            printf("\n");
+            printf("Remove a package version from the registry.\n");
+            printf("\n");
+            printf("This command removes a package version from the V1 protocol\n");
+            printf("registry.dat file. The package must be specified in the\n");
+            printf("format AUTHOR/NAME@VERSION (e.g., elm/core@1.0.5).\n");
+            return 0;
+        }
         if (argc < 3) {
             fprintf(stderr, "Error: Package specification required\n");
             fprintf(stderr, "Usage: %s debug registry_v1 remove AUTHOR/NAME@VERSION\n", global_context_program_name());
@@ -491,12 +668,28 @@ int cmd_debug_registry_v1(int argc, char *argv[]) {
     }
 
     if (strcmp(subcmd, "apply-since") == 0) {
+        /* Check for help flag */
+        if (argc >= 3 && (strcmp(argv[2], "-h") == 0 || strcmp(argv[2], "--help") == 0)) {
+            printf("Usage: %s debug registry_v1 apply-since JSON_PATH\n", global_context_program_name());
+            printf("\n");
+            printf("Apply a /since JSON response offline.\n");
+            printf("\n");
+            printf("This command processes a registry /since endpoint JSON response\n");
+            printf("that has been saved to a file, and applies the updates to the\n");
+            printf("local registry.dat file. This is useful for testing or debugging\n");
+            printf("registry synchronization without making network requests.\n");
+            return 0;
+        }
         if (argc < 3) {
             fprintf(stderr, "Error: JSON file path required\n");
             fprintf(stderr, "Usage: %s debug registry_v1 apply-since JSON_PATH\n", global_context_program_name());
             return 1;
         }
         return cmd_registry_v1_apply_since(argv[2]);
+    }
+
+    if (strcmp(subcmd, "reset") == 0) {
+        return cmd_registry_v1_reset(argc - 2, argv + 2);
     }
 
     fprintf(stderr, "Error: Unknown registry_v1 subcommand '%s'\n", subcmd);

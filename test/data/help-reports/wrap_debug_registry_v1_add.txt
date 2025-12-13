@@ -1,0 +1,7 @@
+Usage: wrap debug registry_v1 add AUTHOR/NAME@VERSION
+
+Add a package version to the registry.
+
+This command adds a new package version to the V1 protocol
+registry.dat file. The package must be specified in the
+format AUTHOR/NAME@VERSION (e.g., elm/core@1.0.5).

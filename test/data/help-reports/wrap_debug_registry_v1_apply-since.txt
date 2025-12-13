@@ -1,0 +1,8 @@
+Usage: wrap debug registry_v1 apply-since JSON_PATH
+
+Apply a /since JSON response offline.
+
+This command processes a registry /since endpoint JSON response
+that has been saved to a file, and applies the updates to the
+local registry.dat file. This is useful for testing or debugging
+registry synchronization without making network requests.

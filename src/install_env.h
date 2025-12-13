@@ -40,6 +40,12 @@ void install_env_free(InstallEnv *env);
 /* Solver parameter helper - returns true if network operations are allowed */
 bool install_env_solver_online(const InstallEnv *env);
 
+/* V1 registry helpers (used by debug tools and shared init paths) */
+bool install_env_prepare_v1(InstallEnv *env);
+bool install_env_ensure_v1_registry(InstallEnv *env);
+char *install_env_registry_etag_file_path(const char *registry_dat_path);
+char *install_env_registry_since_count_file_path(const char *registry_dat_path);
+
 /* Registry operations */
 bool install_env_fetch_registry(InstallEnv *env);
 bool install_env_update_registry(InstallEnv *env);

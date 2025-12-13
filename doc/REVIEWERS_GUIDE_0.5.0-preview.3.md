@@ -13,7 +13,6 @@ Release `0.5.0` focuses on developer experience improvements, particularly for p
 
 - **elm.json** management with `install`, `uninstall`, `upgrade`, and `info` commands.
 
-- **@-separator for version** specification. One can now write `wrap install PACKAGE@VERSION PACKAGE@VERSION`.
 
 
 ## Feedback sought
@@ -21,17 +20,16 @@ Release `0.5.0` focuses on developer experience improvements, particularly for p
 The goal of this preview release is to gather feedback on the **usability and functionality of local package development workflows.** Your developer experience
 ("DX") if you will.
 
-Package development DX is our _beachhead_ feature for developer acceptance of **elm-wrap** in real-world scenarios. Hence the initial effort to appease the 
-Elm compiler's expectations about package management and dependency resolution. The mantra of this release is "it just works with your usual finger memory."
-For example, we can just type `wrap install` or `wrap uninstall`--just like we're used to do with the compiler.
+Package development DX is our _beachhead_ feature for developer acceptance of **elm-wrap** in real-world scenarios. That entails the "you don't have to change 
+your usual ways of doing things" attitude. Meaning it's easy try it out for this specific workflow without having to buy in into the full upgrade to new repository
+format that we can't go back from. One can use `wrap` just to manage local package dev and elm.json, and otherwise forget it exissts. Hence the initial effort to appease the Elm compiler's expectations about package management and dependency resolution. The mantra of this release is "it just works with your usual 
+finger memory." For example, we can type `wrap install` or `wrap uninstall`--just like we're used to do with the `elm` command.
 
 Due to the compiler appeasement angle, some rough edges and limitations exist. We could gain a bit more robustness and polish if we could support only 
-"run it with `wrap`, always" workflows, but that would be a harder sell for existing Elm developers. At least for now anyway, until we fortify this beachhead.
+"run it with `wrap`, always" workflows, but that would be a harder sell for existing Elm developers. At least for now anyway, until the set of useful features
+outweighs the pain of change.
 
-The most useful feedback you can provide is **your experience** going through the workflows described below, and any rough edges you encounter. The ideal case is
-that you either conclude "Yes, this works as expected, and I can use it in my daily development!" or "No, this doesn't work for me because of REASONS." Both 
-answers are equally useful. Technical issues are inevitable and expected in a preview release, but usability and workflow acceptance is the key goal here. The 
-steps in this guide were verified manually several times, so there's confidence in the basics, at least.
+The most useful feedback you can provide is **your experience** going through the workflows described below. The ideal case is that you either conclude "Yes, this works as expected, and I can use it in my daily development!" or "No, this doesn't work for me because of REASONS." Both answers are equally useful. Technical issues are inevitable and expected in a preview release, but usability and workflow acceptance is the key goal here. The steps in this guide were verified manually several times, and there are regression tests now, so there's confidence in the basics.
 
 For this review, the feedback channels are:
 - "Incremental Elm" Discord, channel #elm-wrap
@@ -39,29 +37,28 @@ For this review, the feedback channels are:
 
 The hope is we'll turn this `preview.3` quickly, maybe go into `preview.4` if needed, and then release `0.5.0` proper.
 
-The intent for `0.5.0` is to release a solid, production-grade, "daily driver"-quality foundation for local package development workflows, and then build on top 
-of it in future releases.
+The intent for `0.5.0` is to release a solid, production-grade, "daily driver"-quality foundation for local package development workflows and `elm.json` maintenance, and then build on top of it in future releases.
 
 ### "Beta testing" vs "Feedback"
 
-You're not "beta testing" (well, any use of a product in development is "beta testing")--we have regression tests for that, more and more. Some rough edges might
-show up, but most are known already. 
+You're not "beta testing"--we have specifications and regression tests for that. Some rough edges might show up, but most are known already. 
 
-Your time investment in this review is about trying out the controls and discovering how do you feel about them. Is this how you want your experience to be in the
-future when **elm-wrap** reaches v1? If not, now is the right time to discuss anything that feels off or wrong! A great example is the change from `preview.2`:
-we started off with `wrap install author/name 1.0.0` but @jfmengels quickly pointed out that `wrap install author/name 1.0.0 author2/name2 1.0.0` looks unwieldy
-and un-ergonomic. So now we can run with `wrap install author/name@1.0.0 author2/name2@1.0.0`, which feels much nicer.
+Your time investment in this review is about trying out the controls and discovering how they feel. Is this how you want your experience to be in the
+future when **elm-wrap** reaches v1? If not, now is the right time to discuss anything that feels off or wrong! 
 
-Version 0.5.0 is the point where we want to fix the interface for package management commands. Nothing is set in stone, but ideally what is set for 0.5.0 will remain
-through all iterations until at least 2.x.x series. 
+A great example is the change from `preview.2`: we started off with `wrap install author/name 1.0.0` but @jfmengels quickly pointed out that `wrap install author/name 1.0.0 author2/name2 1.0.0` looks unwieldy and un-ergonomic. So now we can run with `wrap install author/name@1.0.0 author2/name2@1.0.0`, which feels much nicer.
+Then @wolfadex pointed out his experience when mistyping a package name degraded: `wrap` returned a generic error, where `elm` compiler helpfully tries to propose
+some fuzzy matches. Well, `wrap` now does the same!
 
-Please, jump in, take `wrap` for a spin and report on your experience!
+Version 0.5.0 is the point where we want to fix the interface for package management commands. Nothing is set in stone, but ideally once we is release 0.5.0, the interface will remain unchanged through all iterations until at least 2.x.x series. 
 
-(Of course, if you do feel like giving beta testing feedback, there are regression test
+Please, jump in, take `wrap` for a spin and share your experience!
 
 ## Changes since `preview.2`
 
 **multiple package specification**: `install`, `uninstall` now accept multiple packages on the command line: `wrap install PACKAGE[@VERSION] [PACKAGE[@VERSION] ...]
+
+**@-separator for versioned package** specification. One can now write `PACKAGE@VERSION` whenever package version specification is allowed.
 
 **aliases for install/uninstall**: `wrap install` and `wrap uninstall` route to corresponding `wrap package COMMAND`. Easier to type and more _in the fingers_. 
 This obviously means that `wrap install` is not a pass-through command to the underlying compiler. Though it probably never was.

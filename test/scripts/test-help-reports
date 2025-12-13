@@ -101,7 +101,8 @@ extract_commands() {
         if [ "$in_commands_section" = true ]; then
             # Match lines like "  command  " or "  command ARGS" or "  command SUBCOMMAND"
             # Also handle lines with "remove | uninstall"
-            if [[ "$line" =~ ^[[:space:]]{2}([a-z][a-z-]+)([[:space:]|]|$) ]]; then
+            # Allow lowercase letters, digits, hyphens, and underscores in command names
+            if [[ "$line" =~ ^[[:space:]]{2}([a-z][a-z0-9_-]+)([[:space:]|]|$) ]]; then
                 local cmd="${BASH_REMATCH[1]}"
                 # Skip if it's an option flag
                 if [[ ! "$cmd" =~ ^- ]]; then
