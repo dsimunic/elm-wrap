@@ -215,7 +215,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         }
         
         if (pkg_json->type != ELM_PROJECT_PACKAGE) {
-            fprintf(stderr, "Error: %s is not a package project\n", source_elm_json);
+            fprintf(stderr, "Error: %s is not a package project. Please add --from-path PATH to see the install plan for a local-dev package.\n", source_elm_json);
             elm_json_free(pkg_json);
             return 1;
         }

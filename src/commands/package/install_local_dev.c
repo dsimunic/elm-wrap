@@ -1021,6 +1021,19 @@ int install_local_dev(const char *source_path, const char *package_name,
         return 1;
     }
 
+    /* Check if source elm.json is a package project before reading */
+    ElmJson *check_json = elm_json_read(source_elm_json);
+    if (!check_json) {
+        log_error("Failed to read elm.json: %s", source_elm_json);
+        return 1;
+    }
+    if (check_json->type != ELM_PROJECT_PACKAGE) {
+        log_error("Please write '--from-path PATH' to specify the path to your local-dev package.");
+        elm_json_free(check_json);
+        return 1;
+    }
+    elm_json_free(check_json);
+
     /* Read package info from source elm.json */
     char *actual_author = NULL;
     char *actual_name = NULL;
