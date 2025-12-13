@@ -124,8 +124,8 @@ void print_package_usage(const char *prog) {
     printf("          ]\n");
     if (feature_publish_enabled()) {
         printf("  publish PATH                   Show files that would be published from a package\n");
+        printf("  docs    PATH                   Generate documentation JSON for a package\n");
     }
-    printf("  docs    PATH                   Generate documentation JSON for a package\n");
     if (feature_cache_enabled()) {
         printf("  cache   PACKAGE                Download package to ELM_HOME without adding it to elm.json\n");
     }
@@ -195,6 +195,10 @@ int cmd_package(int argc, char *argv[], const char *prog) {
     }
 
     if (strcmp(subcmd, "docs") == 0) {
+        if (!feature_publish_enabled()) {
+            log_error("Subcommand 'docs' is not available in this build.");
+            return 1;
+        }
         // Pass remaining args to docs command
         return cmd_publish_docs(argc - 1, argv + 1);
     }
