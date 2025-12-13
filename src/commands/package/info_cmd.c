@@ -10,11 +10,13 @@
 #include "../../protocol_v1/install.h"
 #include "../../protocol_v2/install.h"
 #include "../../protocol_v2/solver/v2_registry.h"
+#include "../../package_suggestions.h"
 #include "../../global_context.h"
 #include "../../alloc.h"
 #include "../../constants.h"
 #include "../../log.h"
 #include "../../fileutil.h"
+#include "../../terminal_colors.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -263,6 +265,44 @@ static bool is_local_dev_version(int major, int minor, int patch) {
            (major == 999 && minor == 0 && patch == 0);
 }
 
+static void print_package_suggestions_block(
+    const char *author,
+    const char *name,
+    const PackageSuggestion *suggestions,
+    size_t count
+) {
+    if (!author || !name || !suggestions || count == 0) {
+        return;
+    }
+
+    fprintf(stderr, "\n%s-- UNKNOWN PACKAGE -------------------------------------------------------------%s\n\n",
+            ANSI_DULL_CYAN, ANSI_RESET);
+    fprintf(stderr, "I could not find '%s/%s' in the package registry, but I found\n", author, name);
+    fprintf(stderr, "these packages with similar names:\n\n");
+
+    for (size_t i = 0; i < count && i < MAX_PACKAGE_SUGGESTIONS; i++) {
+        fprintf(stderr, "    %s/%s\n", suggestions[i].author, suggestions[i].name);
+    }
+
+    fprintf(stderr, "\nMaybe you want one of these instead?\n\n");
+}
+
+static int report_package_not_found_with_suggestions(InstallEnv *env, const char *author, const char *name) {
+    if (!author || !name) {
+        return 1;
+    }
+
+    PackageSuggestion suggestions[MAX_PACKAGE_SUGGESTIONS];
+    size_t suggestion_count = package_suggest_nearby_from_env(env, author, name, suggestions);
+    if (suggestion_count > 0) {
+        print_package_suggestions_block(author, name, suggestions, suggestion_count);
+        return 1;
+    }
+
+    fprintf(stderr, "Error: Package '%s/%s' not found in registry\n", author, name);
+    return 1;
+}
+
 
 /**
  * Print tracking information for a package.
@@ -317,10 +357,10 @@ static int show_package_info_from_registry(const char *package_name, const char 
     if (global_context_is_v2() && env->v2_registry) {
         V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
         if (!entry) {
-            fprintf(stderr, "Error: Package '%s/%s' not found in registry\n", author, name);
+            int result = report_package_not_found_with_suggestions(env, author, name);
             arena_free(author);
             arena_free(name);
-            return 1;
+            return result;
         }
 
         if (entry->version_count == 0) {
@@ -445,10 +485,10 @@ static int show_package_info_from_registry(const char *package_name, const char 
 
     RegistryEntry *registry_entry = registry_find(env->registry, author, name);
     if (!registry_entry) {
-        fprintf(stderr, "Error: Package '%s/%s' not found in registry\n", author, name);
+        int result = report_package_not_found_with_suggestions(env, author, name);
         arena_free(author);
         arena_free(name);
-        return 1;
+        return result;
     }
 
     if (registry_entry->version_count == 0) {
