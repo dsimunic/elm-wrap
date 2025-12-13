@@ -94,6 +94,7 @@ void print_usage(const char *prog) {
     printf("\n");
     printf("  config                    Display current configuration\n");
     printf("  info [PATH | PACKAGE [VERSION]]  Display package or application info\n");
+    printf("  version                   Show detailed version information\n");
     printf("  application SUBCOMMAND    Application management commands\n");
     printf("  package SUBCOMMAND        Package management commands\n");
     printf("  repository SUBCOMMAND     Repository management commands\n");
@@ -299,7 +300,7 @@ int main(int argc, char *argv[]) {
             return 0;
         }
 
-        if (strcmp(argv[1], "--version") == 0) {
+        if (strcmp(argv[1], "version") == 0 || strcmp(argv[1], "--version") == 0) {
             print_version_info();
             return 0;
         }
