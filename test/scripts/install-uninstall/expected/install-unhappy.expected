@@ -15,7 +15,7 @@ these packages with similar names:
 
 Maybe you want one of these instead?
 
-[Registry since-count: 24 -> 24 (Δ0)]
+[Registry since-count: 30 -> 30 (Δ0)]
 === END ERR-01 ===
 
 === BEGIN ERR-02: Install package with non-existent version ===
@@ -25,7 +25,7 @@ Available versions:
   3.0.0
   2.0.0
   1.0.0
-[Registry since-count: 24 -> 24 (Δ0)]
+[Registry since-count: 30 -> 30 (Δ0)]
 === END ERR-02 ===
 
 === BEGIN ERR-03: Install multiple packages with one non-existent ===
@@ -38,7 +38,7 @@ I cannot install these requested packages:
 Please fix the specification and try again.
 
 I didn't install anything yet, as I can only install all specified packages or none.
-[Registry since-count: 24 -> 24 (Δ0)]
+[Registry since-count: 30 -> 30 (Δ0)]
 === END ERR-03 ===
 
 === BEGIN ERR-04: Install multiple packages with one having wrong version ===
@@ -48,10 +48,11 @@ Available versions:
   3.0.0
   2.0.0
   1.0.0
-[Registry since-count: 24 -> 24 (Δ0)]
+[Registry since-count: 30 -> 30 (Δ0)]
 === END ERR-04 ===
 
-[Registry since-count: 24 -> 24 (Δ0)]
+
+[Registry since-count: 30 -> 30 (Δ0)]
 === END ===
 
 All install-unhappy tests completed successfully

@@ -149,7 +149,7 @@ package: wrap/package-3v-changing-deps
     license: BSD-3-Clause
     dependencies:
         elm/core  1.0.0 <= v < 2.0.0
-        wrap/depC-single-no-deps  1.0.0 <= v < 2.0.0
+        wrap/depc-single-no-deps  1.0.0 <= v < 2.0.0
 
 package: wrap/package-3v-changing-deps
     version: 2.0.0
@@ -157,7 +157,7 @@ package: wrap/package-3v-changing-deps
     license: BSD-3-Clause
     dependencies:
         elm/core  1.0.0 <= v < 2.0.0
-        wrap/depB-single-no-deps  1.0.0 <= v < 2.0.0
+        wrap/depb-single-no-deps  1.0.0 <= v < 2.0.0
 
 package: wrap/package-3v-changing-deps
     version: 1.0.0
@@ -165,7 +165,7 @@ package: wrap/package-3v-changing-deps
     license: BSD-3-Clause
     dependencies:
         elm/core  1.0.0 <= v < 2.0.0
-        wrap/depA-single-no-deps  1.0.0 <= v < 2.0.0
+        wrap/depa-single-no-deps  1.0.0 <= v < 2.0.0
 
 package: wrap/dep-single-no-deps
     version: 1.0.0
@@ -174,21 +174,21 @@ package: wrap/dep-single-no-deps
     dependencies:
         elm/core  1.0.0 <= v < 2.0.0
 
-package: wrap/depA-single-no-deps
+package: wrap/depa-single-no-deps
     version: 1.0.0
     status: valid
     license: BSD-3-Clause
     dependencies:
         elm/core  1.0.0 <= v < 2.0.0
 
-package: wrap/depB-single-no-deps
+package: wrap/depb-single-no-deps
     version: 1.0.0
     status: valid
     license: BSD-3-Clause
     dependencies:
         elm/core  1.0.0 <= v < 2.0.0
 
-package: wrap/depC-single-no-deps
+package: wrap/depc-single-no-deps
     version: 1.0.0
     status: valid
     license: BSD-3-Clause
@@ -203,21 +203,21 @@ package: wrap/package-single-1d
         elm/core  1.0.0 <= v < 2.0.0
         wrap/dep-single-no-deps  1.0.0 <= v < 2.0.0
 
-package: wrap/package-A-single-1d-shared
+package: wrap/package-a-single-1d-shared
     version: 1.0.0
     status: valid
     license: BSD-3-Clause
     dependencies:
         elm/core  1.0.0 <= v < 2.0.0
-    wrap/dep-shared-single-no-deps  1.0.0 <= v < 2.0.0
+        wrap/dep-shared-single-no-deps  1.0.0 <= v < 2.0.0
 
-package: wrap/package-B-single-1d-shared
+package: wrap/package-b-single-1d-shared
     version: 1.0.0
     status: valid
     license: BSD-3-Clause
     dependencies:
         elm/core  1.0.0 <= v < 2.0.0
-    wrap/dep-shared-single-no-deps  1.0.0 <= v < 2.0.0
+        wrap/dep-shared-single-no-deps  1.0.0 <= v < 2.0.0
 
 package: wrap/dep-shared-single-no-deps
     version: 1.0.0

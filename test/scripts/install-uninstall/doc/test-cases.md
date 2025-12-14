@@ -44,12 +44,12 @@ Dependent tests:
 - `wrap/dep-single-no-deps` (single version, no deps beyond required `elm/core`)
 - `wrap/package-3m-no-deps` (three versions within a single major, e.g. `1.0.0`, `1.1.0`, `1.2.0`)
 - `wrap/package-3v-changing-deps`
-  - `1.0.0` depends on `wrap/depA-single-no-deps`
-  - `2.0.0` depends on `wrap/depB-single-no-deps`
-  - `3.0.0` depends on `wrap/depC-single-no-deps`
-- `wrap/depA-single-no-deps`, `wrap/depB-single-no-deps`, `wrap/depC-single-no-deps` (single version)
+-  - `1.0.0` depends on `wrap/depa-single-no-deps`
+-  - `2.0.0` depends on `wrap/depb-single-no-deps`
+-  - `3.0.0` depends on `wrap/depc-single-no-deps`
+- `wrap/depa-single-no-deps`, `wrap/depb-single-no-deps`, `wrap/depc-single-no-deps` (single version)
 - `wrap/dep-shared-single-no-deps` (single version)
-- `wrap/package-A-single-1d-shared` and `wrap/package-B-single-1d-shared`
+- `wrap/package-a-single-1d-shared` and `wrap/package-b-single-1d-shared`
   - both depend on `wrap/dep-shared-single-no-deps`
 - `wrap/testdep-req-newer-prod-single`
   - used to test `wrap install --test` failing without `--upgrade-all` when production deps are pinned.
@@ -377,12 +377,12 @@ confirm:
 create_app "$TEST_ROOT/app03" "app03"
 
 steps:
- - command: wrap install wrap/package-A-single-1d-shared wrap/package-B-single-1d-shared
+ - command: wrap install wrap/package-a-single-1d-shared wrap/package-b-single-1d-shared
  - confirm:
    - both packages are direct deps
    - wrap/dep-shared-single-no-deps is present as an indirect dep
 
-command: wrap package remove wrap/package-A-single-1d-shared
+command: wrap package remove wrap/package-a-single-1d-shared
 
 confirm:
  - removed package-A from direct deps
@@ -525,7 +525,7 @@ create_app "$TEST_ROOT/app04" "app04"
 
 steps:
  - command: wrap install wrap/package-3v-changing-deps@1.0.0
- - confirm: indirect deps include wrap/depA-single-no-deps
+ - confirm: indirect deps include wrap/depa-single-no-deps
 
 command: wrap package upgrade --major wrap/package-3v-changing-deps
 

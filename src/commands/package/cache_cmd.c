@@ -253,7 +253,6 @@ int cmd_cache(int argc, char *argv[]) {
                     has_version = true;
                 } else {
                     if (!parse_package_name(argv[i], &author, &name)) {
-                        fprintf(stderr, "Error: Invalid package name '%s'\n", argv[i]);
                         print_cache_usage();
                         free_package_specs(specs, specs_count);
                         return 1;
@@ -295,7 +294,6 @@ int cmd_cache(int argc, char *argv[]) {
                     has_version = true;
                 } else {
                     if (!parse_package_name(argv[i], &author, &name)) {
-                        fprintf(stderr, "Error: Invalid package name '%s'\n", argv[i]);
                         print_cache_usage();
                         free_package_specs(specs, specs_count);
                         return 1;
@@ -362,7 +360,6 @@ int cmd_cache(int argc, char *argv[]) {
                 char *author = NULL;
                 char *name = NULL;
                 if (!parse_package_name(argv[i], &author, &name)) {
-                    fprintf(stderr, "Error: Invalid package name '%s'\n", argv[i]);
                     print_cache_usage();
                     free_package_specs(specs, specs_count);
                     return 1;
@@ -418,7 +415,6 @@ int cmd_cache(int argc, char *argv[]) {
                     author, name, version.major, version.minor, version.patch);
         } else {
             if (!parse_package_name(major_package_name, &author, &name)) {
-                fprintf(stderr, "Error: Invalid package name '%s'\n", major_package_name);
                 print_cache_usage();
                 free_package_specs(specs, specs_count);
                 return 1;

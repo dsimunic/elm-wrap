@@ -45,6 +45,7 @@ test_app_01_upgrade_single_to_latest_minor() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-01 ==="
+    echo
 }
 
 # APP-02: Upgrade all packages to latest minor versions
@@ -77,6 +78,7 @@ test_app_02_upgrade_all_to_latest_minor() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-02 ==="
+    echo
 }
 
 # APP-03: Upgrade with no argument (should upgrade all)
@@ -107,6 +109,7 @@ test_app_03_upgrade_no_argument() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-03 ==="
+    echo
 }
 
 # APP-04: Upgrade package with changing dependencies
@@ -126,21 +129,22 @@ test_app_04_upgrade_with_changing_deps() {
     
     # Verify dependencies
     assert_direct_dep "wrap/package-3v-changing-deps" "1.0.0" "$app_dir"
-    assert_indirect_dep "wrap/depA-single-no-deps" "1.0.0" "$app_dir"
+    assert_indirect_dep "wrap/depa-single-no-deps" "1.0.0" "$app_dir"
     
     # Upgrade with --major
     run_wrap package upgrade --major wrap/package-3v-changing-deps
     
     # Verify upgraded to 3.0.0 with new dependency
     assert_direct_dep "wrap/package-3v-changing-deps" "3.0.0" "$app_dir"
-    assert_indirect_dep "wrap/depC-single-no-deps" "1.0.0" "$app_dir"
+    assert_indirect_dep "wrap/depc-single-no-deps" "1.0.0" "$app_dir"
     # depA should be gone (no longer needed)
-    assert_no_dep "wrap/depA-single-no-deps" "$app_dir"
+    assert_no_dep "wrap/depa-single-no-deps" "$app_dir"
     
     since_after=$(get_v1_since_count)
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-04 ==="
+    echo
 }
 
 # APP-05: Upgrade single package to latest major version (--major)
@@ -171,6 +175,7 @@ test_app_05_upgrade_single_to_major() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-05 ==="
+    echo
 }
 
 # APP-06: Upgrade all packages to latest major versions (--major all)
@@ -203,6 +208,7 @@ test_app_06_upgrade_all_to_major() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-06 ==="
+    echo
 }
 
 # APP-07: Upgrade with --major and no package (should upgrade all)
@@ -233,6 +239,7 @@ test_app_07_upgrade_major_no_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-07 ==="
+    echo
 }
 
 # PKG-01: Upgrade single package to latest minor (package type)
@@ -259,6 +266,7 @@ test_pkg_01_upgrade_single_to_minor() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-01 ==="
+    echo
 }
 
 # PKG-02: Upgrade all packages to latest minor (package type)
@@ -285,6 +293,7 @@ test_pkg_02_upgrade_all_to_minor() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-02 ==="
+    echo
 }
 
 # PKG-03: Upgrade to major version (package type)
@@ -311,6 +320,7 @@ test_pkg_03_upgrade_to_major() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-03 ==="
+    echo
 }
 
 # EDGE-01: Upgrade when already at latest version
@@ -341,6 +351,7 @@ test_edge_01_already_at_latest() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END EDGE-01 ==="
+    echo
 }
 
 # EDGE-02: Minor upgrade when major version available (shouldn't upgrade to major)
@@ -371,6 +382,7 @@ test_edge_02_minor_when_major_available() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END EDGE-02 ==="
+    echo
 }
 
 # =============================================================================
@@ -379,6 +391,7 @@ test_edge_02_minor_when_major_available() {
 
 main() {
     echo "Running upgrade-happy tests..."
+    echo
     echo
     
     # Run all test cases
@@ -395,6 +408,12 @@ main() {
     test_edge_01_already_at_latest
     test_edge_02_minor_when_major_available
     
+    local since_after delta
+    since_after=$(get_v1_since_count)
+    delta=0
+    echo
+    echo "[Registry since-count: $since_after -> $since_after (Δ$delta)]"
+    echo "=== END ==="
     echo
     echo "All upgrade-happy tests completed successfully"
 }

@@ -1104,7 +1104,6 @@ int cmd_install(int argc, char *argv[]) {
                     has_version = true;
                 } else {
                     if (!parse_package_name(argv[i], &author, &name)) {
-                        fprintf(stderr, "Error: Invalid package name '%s'\n", argv[i]);
                         print_install_usage();
                         return 1;
                     }
@@ -1143,7 +1142,6 @@ int cmd_install(int argc, char *argv[]) {
                     has_version = true;
                 } else {
                     if (!parse_package_name(argv[i], &author, &name)) {
-                        fprintf(stderr, "Error: Invalid package name '%s'\n", argv[i]);
                         print_install_usage();
                         return 1;
                     }
@@ -1216,7 +1214,6 @@ int cmd_install(int argc, char *argv[]) {
                 char *author = NULL;
                 char *name = NULL;
                 if (!parse_package_name(argv[i], &author, &name)) {
-                    fprintf(stderr, "Error: Invalid package name '%s'\n", argv[i]);
                     print_install_usage();
                     return 1;
                 }
@@ -1266,7 +1263,6 @@ int cmd_install(int argc, char *argv[]) {
                     author, name, ver.major, ver.minor, ver.patch);
         } else {
             if (!parse_package_name(major_package_name, &author, &name)) {
-                fprintf(stderr, "Error: Invalid package name '%s'\n", major_package_name);
                 print_install_usage();
                 return 1;
             }

@@ -32,6 +32,7 @@ test_err_01_cache_nonexistent_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-01 ==="
+    echo
 }
 
 # ERR-02: Cache package with non-existent version (should fail)
@@ -55,6 +56,7 @@ test_err_02_cache_nonexistent_version() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-02 ==="
+    echo
 }
 
 # ERR-03: Cache from non-existent file path (should fail)
@@ -78,6 +80,7 @@ test_err_03_cache_from_nonexistent_path() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-03 ==="
+    echo
 }
 
 # ERR-04: Cache with both --from-file and --from-url (should fail)
@@ -103,6 +106,7 @@ test_err_04_cache_both_from_file_and_url() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-04 ==="
+    echo
 }
 
 # =============================================================================
@@ -112,6 +116,7 @@ test_err_04_cache_both_from_file_and_url() {
 main() {
     echo "Running cache-unhappy tests..."
     echo
+    echo
     
     # Run all test cases
     test_err_01_cache_nonexistent_package
@@ -119,6 +124,12 @@ main() {
     test_err_03_cache_from_nonexistent_path
     test_err_04_cache_both_from_file_and_url
     
+    local since_after delta
+    since_after=$(get_v1_since_count)
+    delta=0
+    echo
+    echo "[Registry since-count: $since_after -> $since_after (Δ$delta)]"
+    echo "=== END ==="
     echo
     echo "All cache-unhappy tests completed successfully"
 }

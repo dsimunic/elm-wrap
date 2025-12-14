@@ -47,6 +47,7 @@ test_local_01_init_and_install() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END LOCAL-01 ==="
+    echo
 }
 
 # LOCAL-02: Install package with --local-dev --from-path
@@ -75,6 +76,7 @@ test_local_02_install_from_path() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END LOCAL-02 ==="
+    echo
 }
 
 # LOCAL-03: Dependency synchronization when local package changes
@@ -115,6 +117,7 @@ test_local_03_dependency_sync() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END LOCAL-03 ==="
+    echo
 }
 
 # LOCAL-04: Multiple applications depending on same local package
@@ -163,6 +166,7 @@ test_local_04_multiple_apps_same_local() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END LOCAL-04 ==="
+    echo
 }
 
 # LOCAL-05: Remove local-dev tracking with uninstall --local-dev
@@ -197,6 +201,7 @@ test_local_05_remove_local_dev_tracking() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END LOCAL-05 ==="
+    echo
 }
 
 # LOCAL-06: Registry since_count stability + /since advancement rules
@@ -245,6 +250,7 @@ EOF
     fi
 
     echo "=== END LOCAL-06 ==="
+    echo
 }
 
 # ERR-01: Install with --local-dev --from-path with non-existent path
@@ -272,6 +278,7 @@ test_err_01_local_dev_nonexistent_path() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-01 ==="
+    echo
 }
 
 # ERR-02: Install multiple packages with --local-dev (should fail)
@@ -305,6 +312,7 @@ test_err_02_local_dev_multiple_packages() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-02 ==="
+    echo
 }
 
 # ERR-03: Use --from-path without --local-dev (should fail)
@@ -332,6 +340,7 @@ test_err_03_from_path_without_local_dev() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-03 ==="
+    echo
 }
 
 # =============================================================================
@@ -340,6 +349,7 @@ test_err_03_from_path_without_local_dev() {
 
 main() {
     echo "Running local-dev tests..."
+    echo
     echo
     
     # Run all test cases
@@ -353,6 +363,12 @@ main() {
     test_err_03_from_path_without_local_dev
     test_local_06_registry_since_count
     
+    local since_after delta
+    since_after=$(get_v1_since_count)
+    delta=0
+    echo
+    echo "[Registry since-count: $since_after -> $since_after (Δ$delta)]"
+    echo "=== END ==="
     echo
     echo "All local-dev tests completed successfully"
 }

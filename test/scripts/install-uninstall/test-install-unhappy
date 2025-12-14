@@ -42,6 +42,7 @@ test_err_01_install_nonexistent_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-01 ==="
+    echo
 }
 
 # ERR-02: Install package with non-existent version (should fail)
@@ -69,6 +70,7 @@ test_err_02_install_nonexistent_version() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-02 ==="
+    echo
 }
 
 # ERR-03: Install multiple packages with one non-existent (should fail)
@@ -106,6 +108,7 @@ test_err_03_install_multiple_with_nonexistent() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-03 ==="
+    echo
 }
 
 # ERR-04: Install multiple packages with one having wrong version (should fail)
@@ -143,6 +146,7 @@ test_err_04_install_multiple_with_wrong_version() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-04 ==="
+    echo
 }
 
 # =============================================================================
@@ -152,6 +156,7 @@ test_err_04_install_multiple_with_wrong_version() {
 main() {
     echo "Running install-unhappy tests..."
     echo
+    echo
     
     # Run all test cases
     test_err_01_install_nonexistent_package
@@ -159,6 +164,12 @@ main() {
     test_err_03_install_multiple_with_nonexistent
     test_err_04_install_multiple_with_wrong_version
     
+    local since_after delta
+    since_after=$(get_v1_since_count)
+    delta=0
+    echo
+    echo "[Registry since-count: $since_after -> $since_after (Δ$delta)]"
+    echo "=== END ==="
     echo
     echo "All install-unhappy tests completed successfully"
 }

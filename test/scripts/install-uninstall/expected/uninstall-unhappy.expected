@@ -11,7 +11,7 @@ I cannot remove these requested packages:
 Please fix the specification and try again.
 
 I didn't remove anything yet, as I can only remove all specified packages or none.
-[Registry since-count: 24 -> 24 (Δ0)]
+[Registry since-count: 30 -> 30 (Δ0)]
 === END ERR-01 ===
 
 === BEGIN ERR-02: Uninstall package not in dependencies ===
@@ -31,8 +31,3 @@ I cannot remove these requested packages:
 Please fix the specification and try again.
 
 I didn't remove anything yet, as I can only remove all specified packages or none.
-[Registry since-count: 24 -> 24 (Δ0)]
-=== END ERR-02 ===
-
-[Registry since-count: 24 -> 24 (Δ0)]
-=== END ===

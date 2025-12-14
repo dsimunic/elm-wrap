@@ -42,6 +42,7 @@ test_err_01_uninstall_nonexistent_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-01 ==="
+    echo
 }
 
 # ERR-02: Uninstall package not in dependencies (should fail)
@@ -72,6 +73,7 @@ test_err_02_uninstall_not_in_dependencies() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-02 ==="
+    echo
 }
 
 # ERR-03: Try to uninstall elm/core (should succeed - elm/core can be removed)
@@ -96,6 +98,7 @@ test_err_03_uninstall_elm_core() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-03 ==="
+    echo
 }
 
 # =============================================================================
@@ -105,13 +108,18 @@ test_err_03_uninstall_elm_core() {
 main() {
     echo "Running uninstall-unhappy tests..."
     echo
+    echo
     
     # Run all test cases
     test_err_01_uninstall_nonexistent_package
     test_err_02_uninstall_not_in_dependencies
     test_err_03_uninstall_elm_core
-    
+        local since_after delta
+    since_after=$(get_v1_since_count)
+    delta=0
     echo
+    echo "[Registry since-count: $since_after -> $since_after (Δ$delta)]"
+    echo "=== END ==="    echo
     echo "All uninstall-unhappy tests completed successfully"
 }
 

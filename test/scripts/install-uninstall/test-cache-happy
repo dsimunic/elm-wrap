@@ -30,6 +30,7 @@ test_cache_01_single_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END CACHE-01 ==="
+    echo
 }
 
 # CACHE-02: Cache multiple packages at once
@@ -50,6 +51,7 @@ test_cache_02_multiple_packages() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END CACHE-02 ==="
+    echo
 }
 
 # CACHE-03: Cache specific version
@@ -70,6 +72,7 @@ test_cache_03_specific_version() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END CACHE-03 ==="
+    echo
 }
 
 # CACHE-04: Cache package that's already in cache (should be idempotent)
@@ -93,6 +96,7 @@ test_cache_04_already_cached() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END CACHE-04 ==="
+    echo
 }
 
 # CACHE-05: Cache from file/directory
@@ -116,6 +120,7 @@ test_cache_05_from_file() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END CACHE-05 ==="
+    echo
 }
 
 # =============================================================================
@@ -125,6 +130,7 @@ test_cache_05_from_file() {
 main() {
     echo "Running cache-happy tests..."
     echo
+    echo
     
     # Run all test cases
     test_cache_01_single_package
@@ -133,6 +139,12 @@ main() {
     test_cache_04_already_cached
     test_cache_05_from_file
     
+    local since_after delta
+    since_after=$(get_v1_since_count)
+    delta=0
+    echo
+    echo "[Registry since-count: $since_after -> $since_after (Δ$delta)]"
+    echo "=== END ==="
     echo
     echo "All cache-happy tests completed successfully"
 }

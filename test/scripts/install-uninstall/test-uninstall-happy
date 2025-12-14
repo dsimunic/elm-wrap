@@ -43,6 +43,7 @@ test_app_01_uninstall_single_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-01 ==="
+    echo
 }
 
 # APP-02: Uninstall package removing orphaned dependencies
@@ -75,6 +76,7 @@ test_app_02_uninstall_removing_orphans() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-02 ==="
+    echo
 }
 
 # APP-03: Uninstall package keeping shared dependencies
@@ -90,25 +92,26 @@ test_app_03_uninstall_keeping_shared() {
     
     # Install two packages that share a dependency
     cd "$app_dir"
-    run_wrap install wrap/package-A-single-1d-shared wrap/package-B-single-1d-shared
+    run_wrap install wrap/package-a-single-1d-shared wrap/package-b-single-1d-shared
     
     # Verify both direct deps and shared indirect dep
-    assert_direct_dep "wrap/package-A-single-1d-shared" "1.0.0" "$app_dir"
-    assert_direct_dep "wrap/package-B-single-1d-shared" "1.0.0" "$app_dir"
+    assert_direct_dep "wrap/package-a-single-1d-shared" "1.0.0" "$app_dir"
+    assert_direct_dep "wrap/package-b-single-1d-shared" "1.0.0" "$app_dir"
     assert_indirect_dep "wrap/dep-shared-single-no-deps" "1.0.0" "$app_dir"
     
     # Uninstall one package
-    run_wrap package uninstall wrap/package-A-single-1d-shared
+    run_wrap package uninstall wrap/package-a-single-1d-shared
     
     # Verify the uninstalled package is gone but shared dep remains
-    assert_no_dep "wrap/package-A-single-1d-shared" "$app_dir"
-    assert_direct_dep "wrap/package-B-single-1d-shared" "1.0.0" "$app_dir"
+    assert_no_dep "wrap/package-a-single-1d-shared" "$app_dir"
+    assert_direct_dep "wrap/package-b-single-1d-shared" "1.0.0" "$app_dir"
     assert_indirect_dep "wrap/dep-shared-single-no-deps" "1.0.0" "$app_dir"
     
     since_after=$(get_v1_since_count)
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-03 ==="
+    echo
 }
 
 # APP-04: Uninstall direct dependency that's still needed indirectly
@@ -144,6 +147,7 @@ test_app_04_uninstall_direct_still_needed_indirect() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-04 ==="
+    echo
 }
 
 # APP-05: Uninstall test dependency
@@ -171,6 +175,7 @@ test_app_05_uninstall_test_dependency() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-05 ==="
+    echo
 }
 
 # PKG-01: Uninstall single package from package type
@@ -197,6 +202,7 @@ test_pkg_01_uninstall_single_from_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-01 ==="
+    echo
 }
 
 # PKG-02: Uninstall package from package type (with dependencies)
@@ -223,6 +229,7 @@ test_pkg_02_uninstall_with_deps_from_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-02 ==="
+    echo
 }
 
 # =============================================================================
@@ -231,6 +238,7 @@ test_pkg_02_uninstall_with_deps_from_package() {
 
 main() {
     echo "Running uninstall-happy tests..."
+    echo
     echo
     
     # Run all test cases
@@ -242,6 +250,12 @@ main() {
     test_pkg_01_uninstall_single_from_package
     test_pkg_02_uninstall_with_deps_from_package
     
+    local since_after delta
+    since_after=$(get_v1_since_count)
+    delta=0
+    echo
+    echo "[Registry since-count: $since_after -> $since_after (Δ$delta)]"
+    echo "=== END ==="
     echo
     echo "All uninstall-happy tests completed successfully"
 }

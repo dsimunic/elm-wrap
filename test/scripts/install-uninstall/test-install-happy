@@ -39,6 +39,7 @@ test_app_01_single_package_install() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-01 ==="
+    echo
 }
 
 # APP-02: install multiple packages at once
@@ -64,6 +65,7 @@ test_app_02_install_multiple_packages() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-02 ==="
+    echo
 }
 
 # APP-03: Install package with targeted version (PACKAGE@VERSION)
@@ -88,6 +90,7 @@ test_app_03_install_targeted_version() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-03 ==="
+    echo
 }
 
 # APP-04: Install package with dependencies
@@ -113,6 +116,7 @@ test_app_04_install_with_dependencies() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-04 ==="
+    echo
 }
 
 # APP-05: Move package from indirect to direct
@@ -144,6 +148,7 @@ test_app_05_move_indirect_to_direct() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-05 ==="
+    echo
 }
 
 # APP-07: Install multiple packages with mixed version specifications
@@ -171,6 +176,7 @@ test_app_07_mixed_version_specs() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-07 ==="
+    echo
 }
 
 # APP-08: Re-install does not cross major without --major
@@ -201,6 +207,7 @@ test_app_08_reinstall_no_cross_major() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-08 ==="
+    echo
 }
 
 # APP-09: Re-install crosses major with --major (single package)
@@ -224,6 +231,7 @@ test_app_09_reinstall_cross_major() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-09 ==="
+    echo
 }
 
 # APP-10: Install as test dependency (--test)
@@ -249,6 +257,7 @@ test_app_10_install_as_test_dep() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-10 ==="
+    echo
 }
 
 # APP-11: Install test dep requiring prod upgrade (requires --upgrade-all)
@@ -288,6 +297,7 @@ test_app_11_test_dep_requires_prod_upgrade() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-11 ==="
+    echo
 }
 
 # PKG-01: Install single package to package type
@@ -312,6 +322,7 @@ test_pkg_01_install_single_to_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-01 ==="
+    echo
 }
 
 # PKG-02: Install multiple packages to package type
@@ -335,6 +346,7 @@ test_pkg_02_install_multiple_to_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-02 ==="
+    echo
 }
 
 # PKG-03: Install package with targeted version to package type
@@ -358,6 +370,7 @@ test_pkg_03_install_targeted_version_to_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-03 ==="
+    echo
 }
 
 # PKG-04: Install package with dependencies to package type
@@ -381,6 +394,7 @@ test_pkg_04_install_with_deps_to_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END PKG-04 ==="
+    echo
 }
 
 # APP-12: Install from local file/directory (--from-file)
@@ -408,6 +422,7 @@ test_app_12_install_from_file() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-12 ==="
+    echo
 }
 
 # =============================================================================
@@ -416,6 +431,7 @@ test_app_12_install_from_file() {
 
 main() {
     echo "Running install-happy tests..."
+    echo
     echo
     
     # Run all test cases
@@ -435,6 +451,12 @@ main() {
     test_pkg_03_install_targeted_version_to_package
     test_pkg_04_install_with_deps_to_package
     
+    local since_after delta
+    since_after=$(get_v1_since_count)
+    delta=0
+    echo
+    echo "[Registry since-count: $since_after -> $since_after (Δ$delta)]"
+    echo "=== END ==="
     echo
     echo "All install-happy tests completed successfully"
 }

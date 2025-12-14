@@ -441,16 +441,36 @@ int cmd_package_init(int argc, char *argv[]) {
             print_package_init_usage();
             return 1;
         }
-        if (!parse_package_with_version(package_spec, &author, &name, &requested_version)) {
+        const char *at = strchr(package_spec, '@');
+        if (at == package_spec || at[1] == '\0') {
             fprintf(stderr, "Error: Invalid package specification '%s'\n", package_spec);
-            print_package_init_usage();
+            return 1;
+        }
+
+        size_t pkg_part_len = (size_t)(at - package_spec);
+        char *pkg_part = arena_malloc(pkg_part_len + 1);
+        if (!pkg_part) {
+            fprintf(stderr, "Error: Out of memory while parsing package name\n");
+            return 1;
+        }
+        strncpy(pkg_part, package_spec, pkg_part_len);
+        pkg_part[pkg_part_len] = '\0';
+
+        if (!parse_package_name_init_verbose(pkg_part, &author, &name)) {
+            arena_free(pkg_part);
+            return 1;
+        }
+        arena_free(pkg_part);
+
+        if (!version_parse_safe(at + 1, &requested_version)) {
+            fprintf(stderr, "Error: Invalid version '%s' (expected X.Y.Z)\n", at + 1);
+            arena_free(author);
+            arena_free(name);
             return 1;
         }
         has_version = true;
     } else {
-        if (!parse_package_name(package_spec, &author, &name)) {
-            fprintf(stderr, "Error: Invalid package name '%s'\n", package_spec);
-            print_package_init_usage();
+        if (!parse_package_name_init_verbose(package_spec, &author, &name)) {
             return 1;
         }
         if (package_version_arg) {

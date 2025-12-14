@@ -3,8 +3,3 @@ Running uninstall-happy tests...
 
 === BEGIN APP-01: Uninstall single package ===
 It is already installed!
-[Registry since-count: 24 -> 24 (Δ0)]
-=== END APP-01 ===
-
-[Registry since-count: 24 -> 24 (Δ0)]
-=== END ===

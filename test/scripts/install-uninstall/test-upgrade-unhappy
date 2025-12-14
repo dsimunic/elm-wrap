@@ -42,6 +42,7 @@ test_err_01_upgrade_nonexistent_package() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-01 ==="
+    echo
 }
 
 # ERR-02: Upgrade package not in dependencies (should fail)
@@ -72,6 +73,7 @@ test_err_02_upgrade_not_in_dependencies() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END ERR-02 ==="
+    echo
 }
 
 # =============================================================================
@@ -81,11 +83,18 @@ test_err_02_upgrade_not_in_dependencies() {
 main() {
     echo "Running upgrade-unhappy tests..."
     echo
+    echo
     
     # Run all test cases
     test_err_01_upgrade_nonexistent_package
     test_err_02_upgrade_not_in_dependencies
     
+    local since_after delta
+    since_after=$(get_v1_since_count)
+    delta=0
+    echo
+    echo "[Registry since-count: $since_after -> $since_after (Δ$delta)]"
+    echo "=== END ==="
     echo
     echo "All upgrade-unhappy tests completed successfully"
 }

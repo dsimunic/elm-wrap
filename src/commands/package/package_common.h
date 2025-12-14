@@ -135,6 +135,9 @@ VersionRange version_range_any(void);
 VersionRange version_range_intersect(VersionRange a, VersionRange b);
 
 bool parse_package_name(const char *package, char **author, char **name);
+/* Like parse_package_name(), but prints the detailed Elm-style rules message.
+ * Intended for `wrap package init` UX only. */
+bool parse_package_name_init_verbose(const char *package, char **author, char **name);
 bool parse_package_name_silent(const char *package, char **author, char **name);
 Package* find_existing_package(ElmJson *elm_json, const char *author, const char *name);
 

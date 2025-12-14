@@ -1013,7 +1013,6 @@ static int clear_package_tracking(const char *package_name, const char *version)
     char *author = NULL;
     char *name = NULL;
     if (!parse_package_name(package_name, &author, &name)) {
-        fprintf(stderr, "Error: Invalid package name '%s'. Expected author/name format.\n", package_name);
         return 1;
     }
 
@@ -1085,7 +1084,6 @@ static int clear_path_tracking(const char *package_name, const char *version, co
     char *author = NULL;
     char *name = NULL;
     if (!parse_package_name(package_name, &author, &name)) {
-        fprintf(stderr, "Error: Invalid package name '%s'. Expected author/name format.\n", package_name);
         return 1;
     }
 

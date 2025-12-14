@@ -742,12 +742,41 @@ VersionRange version_range_intersect(VersionRange a, VersionRange b) {
  * Existing functionality
  * ======================================================================== */
 
-static bool is_valid_package_segment(const char *segment, size_t len) {
+static void print_invalid_package_name_header(const char *package) {
+    fprintf(stderr, "Error: Invalid package name '%s'.\n\n", package);
+}
+
+static void print_invalid_project_name_rules_body(void) {
+    fprintf(stderr,
+            "The project name needs to follow these rules:\n"
+            "    +--------------------------------------+-----------+-----------+\n"
+            "    | RULE                                 | BAD       | GOOD      |\n"
+            "    +--------------------------------------+-----------+-----------+\n"
+            "    | only lower case, digits, and hyphens | elm-HTTP  | elm-http  |\n"
+            "    | no leading digits                    | 3D        | elm-3d    |\n"
+            "    | no non-ASCII characters              | elm-bj\xC3\xB8rn | elm-bear  |\n"
+            "    | no underscores                       | elm_ui    | elm-ui    |\n"
+            "    | no double hyphens                    | elm--hash | elm-hash  |\n"
+            "    | no starting or ending hyphen         | -elm-tar- | elm-tar   |\n"
+            "    +--------------------------------------+-----------+-----------+\n");
+}
+
+static void print_invalid_author_rules_body(void) {
+    fprintf(stderr,
+            "The author part must be a valid URL path component (think GitHub username).\n"
+            "It must be non-empty and contain only ASCII letters/digits and URL-safe\n"
+            "characters.\n"
+            "\n"
+            "Allowed characters: A-Z a-z 0-9 - . _ ~\n"
+            "Percent-encoding is not allowed.\n");
+}
+
+static bool is_valid_url_path_component_like(const char *segment, size_t len) {
     if (!segment || len == 0) {
         return false;
     }
 
-    /* Prevent "." and ".." segments (path traversal / ambiguous names) */
+    /* Prevent "." and ".." segments */
     if ((len == 1 && segment[0] == '.') ||
         (len == 2 && segment[0] == '.' && segment[1] == '.')) {
         return false;
@@ -756,11 +785,62 @@ static bool is_valid_package_segment(const char *segment, size_t len) {
     for (size_t i = 0; i < len; i++) {
         unsigned char c = (unsigned char)segment[i];
 
-        if (c == '@' || c == '/' || c == '\\' || isspace(c)) {
+        if (c == '%') {
             return false;
         }
 
-        if (!(isalnum(c) || c == '-' || c == '_' || c == '.')) {
+        /* ASCII-only */
+        if (c > 0x7F) {
+            return false;
+        }
+
+        bool is_upper = (c >= 'A' && c <= 'Z');
+        bool is_lower = (c >= 'a' && c <= 'z');
+        bool is_digit = (c >= '0' && c <= '9');
+        bool is_unreserved_symbol = (c == '-' || c == '.' || c == '_' || c == '~');
+
+        if (!(is_upper || is_lower || is_digit || is_unreserved_symbol)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool is_valid_elm_project_name(const char *name, size_t len) {
+    if (!name || len == 0) {
+        return false;
+    }
+
+    /* No leading digits */
+    if (name[0] >= '0' && name[0] <= '9') {
+        return false;
+    }
+
+    /* No starting or ending hyphen */
+    if (name[0] == '-' || name[len - 1] == '-') {
+        return false;
+    }
+
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)name[i];
+
+        /* ASCII-only */
+        if (c > 0x7F) {
+            return false;
+        }
+
+        /* Only lower-case letters, digits, and hyphens */
+        bool is_lower = (c >= 'a' && c <= 'z');
+        bool is_digit = (c >= '0' && c <= '9');
+        bool is_hyphen = (c == '-');
+
+        if (!(is_lower || is_digit || is_hyphen)) {
+            return false;
+        }
+
+        /* No double hyphens */
+        if (is_hyphen && i > 0 && name[i - 1] == '-') {
             return false;
         }
     }
@@ -793,9 +873,67 @@ bool parse_package_name(const char *package, char **author, char **name) {
         return false;
     }
 
-    if (!is_valid_package_segment(package, author_len) ||
-        !is_valid_package_segment(slash + 1, name_len)) {
+    bool author_ok = is_valid_url_path_component_like(package, author_len);
+    bool project_ok = is_valid_elm_project_name(slash + 1, name_len);
+
+    if (!author_ok || !project_ok) {
         fprintf(stderr, "Error: Invalid package name '%s' (expected author/name)\n", package);
+        return false;
+    }
+
+    *author = arena_malloc(author_len + 1);
+    if (!*author) return false;
+    strncpy(*author, package, author_len);
+    (*author)[author_len] = '\0';
+
+    *name = arena_strdup(slash + 1);
+    if (!*name) {
+        arena_free(*author);
+        return false;
+    }
+
+    return true;
+}
+
+bool parse_package_name_init_verbose(const char *package, char **author, char **name) {
+    if (!package || !author || !name) {
+        return false;
+    }
+
+    size_t package_len = strlen(package);
+    if (package_len == 0 || package_len >= MAX_PACKAGE_NAME_LENGTH) {
+        fprintf(stderr, "Error: Invalid package name '%s' (too long)\n", package);
+        return false;
+    }
+
+    const char *slash = strchr(package, '/');
+    if (!slash) {
+        fprintf(stderr, "Error: Package name must be in format 'author/package'\n");
+        return false;
+    }
+
+    size_t author_len = slash - package;
+    size_t name_len = strlen(slash + 1);
+
+    if (author_len == 0 || name_len == 0 || strchr(slash + 1, '/')) {
+        fprintf(stderr, "Error: Package name must be in format 'author/package'\n");
+        return false;
+    }
+
+    bool author_ok = is_valid_url_path_component_like(package, author_len);
+    bool project_ok = is_valid_elm_project_name(slash + 1, name_len);
+
+    if (!author_ok || !project_ok) {
+        print_invalid_package_name_header(package);
+        if (!author_ok) {
+            print_invalid_author_rules_body();
+            if (!project_ok) {
+                fprintf(stderr, "\n");
+            }
+        }
+        if (!project_ok) {
+            print_invalid_project_name_rules_body();
+        }
         return false;
     }
 
@@ -835,8 +973,11 @@ bool parse_package_name_silent(const char *package, char **author, char **name) 
         return false;
     }
 
-    if (!is_valid_package_segment(package, author_len) ||
-        !is_valid_package_segment(slash + 1, name_len)) {
+    if (!is_valid_url_path_component_like(package, author_len)) {
+        return false;
+    }
+
+    if (!is_valid_elm_project_name(slash + 1, name_len)) {
         return false;
     }
 

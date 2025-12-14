@@ -533,7 +533,6 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
             char *pkg_author = NULL;
             char *pkg_name = NULL;
             if (!parse_package_name(packages[i], &pkg_author, &pkg_name)) {
-                fprintf(stderr, "Error: Invalid package name '%s'\n", packages[i]);
                 solver_free(solver);
                 install_env_free(install_env);
                 elm_json_free(elm_json);
