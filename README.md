@@ -1,7 +1,7 @@
 # elm-wrap - elm package management wrapper
 
-This utility wraps Elm compiler and intercepts its package management commands like `install` to augment them with
-support for custom package registries and policies.
+This utility is a comprehensive package management solution for Elm programming language packages and code. It wraps Elm compiler and intercepts 
+its package management commands like `install` to augment them with support for custom package registries and policies.
 
 **elm-wrap** is independent from Elm. Its purpose is to implement flexible package management for Elm. 
 It does not seek to augment or extend Elm the language and its compiler, nor does it interface with Elm compiler's Haskell code in any way. 
@@ -51,21 +51,19 @@ process when all package management is done. The interface to Elm is strictly th
 
 ### Pass-through
 
-As **elm-wrap** seeks to wrap the compiler, it intercepts all of the Elm compiler's commands:
+As **elm-wrap** seeks to wrap the compiler, it intercepts the Elm compiler's commands:
 
     wrap repl
     wrap init
     wrap reactor
     wrap make
     wrap install
-    wrap bump
-    wrap diff
 
 All of these commands ultimately execute on the Elm compiler(*) after dealing
 with any needed package caching.
 
-For example, `wrap make src/Main.elm` will update `registry.dat` (cached version information 
-from the package registry), read `elm.json` and download from the registry
+For example, `wrap make src/Main.elm` will update cached version information 
+from the package registry, read `elm.json` and download from the registry
 all packages listed if not already cached, and then call `elm make src/Main.elm` in offline mode. 
 (That is, the `elm` binary won't make any network requests as it will find all needed packages already in cache).
 
@@ -77,35 +75,36 @@ project templating functionality. More on that below.
 
 ### Extended commands
 
-Extended comands are organized in sections.
+Extended commands are organized in sections.
 
 **package** section deals with all package management commands:
 
     Usage: wrap package SUBCOMMAND [OPTIONS]
 
     Subcommands:
-    install [PACKAGE]              Add a dependency to current elm.json
-    upgrade [PACKAGE]              Upgrade packages to latest versions
-    remove   PACKAGE               Remove a package from elm.json
-    info    [ PATH                 Display package information and upgrades
-            | PACKAGE [VERSION]
-            ]
-    publish PATH                   Show files that would be published from a package
-    docs    PATH                   Generate documentation JSON for a package
-    cache   [PACKAGE]              Download package to ELM_HOME without adding it to elm.json
+      install PACKAGE                Add a dependency to current elm.json
+      init PACKAGE                   Initialize a package
+      upgrade PACKAGE                Upgrade packages to latest versions
+      uninstall PACKAGE              Remove a package from elm.json (alias: remove)
+      info    [ PATH                 Display package information and upgrades
+              | PACKAGE [VERSION]
+              ]
+      cache   PACKAGE                Download package to ELM_HOME without adding it to elm.json
 
     Options:
-    -y, --yes            Automatically confirm changes
-    -v, --verbose        Show detailed logging output
-    -h, --help           Show this help message
-
+      -y, --yes            Automatically confirm changes
+      -v, --verbose        Show detailed logging output
+      -vv                  Show extra verbose (trace) logging output
+      -h, --help           Show this help message
 
 
 **`install`** does full package dependency resolution/download/`elm.json` updates, without calling the `elm` compiler. It implements
 its own package dependency resolution using PubGrub algorithm. It also uses the same resolution strategy ladder as Elm internally,
 leading to identical outcomes for install actions.
 
-Most important characteristic of the extended `package install` are `--from-url` and `--from-path` switches: with these, it can install any package into the `ELM_HOME` package tree straight from GitHub or from a local package directory (maybe you are developing a package and want to test without having to push to the canonical public repository, or an author of a package you depend on deleted the version tag or renamed the GitHub repository).
+Most important characteristic of the extended `package install` are `--from-url` and `--from-path` switches: with these, it can install any package 
+into the `ELM_HOME` package tree straight from GitHub or from a local package directory (maybe you are developing a package and want to test without 
+having to push to the canonical public repository, or an author of a package you depend on deleted the version tag or renamed the GitHub repository).
 
 Of note is also the ability to install new major versions of dependencies, something that the built-in `elm install` cannot do.
 
@@ -116,34 +115,39 @@ Of note is also the ability to install new major versions of dependencies, somet
         elm/core    1.0.4 => 1.0.5
         elm/http    1.0.0 => 2.0.0
 
-    Would you like me to update your elm.json accordingly? [Y/n]: 
+    Would you like me to update your elm.json accordingly? [Y/n] 
 
 Synopsis:
 
-    Usage: wrap package install [PACKAGE]
-
+    Usage: wrap install PACKAGE[@VERSION] [PACKAGE[@VERSION]...]
+    
     Install packages for your Elm project.
-
+    
     Examples:
-    wrap install elm/html              # Add elm/html to your project
-    wrap install elm/json --test       # Add elm/json as a test dependency
-    wrap install --major elm/html      # Upgrade elm/html to next major version
-    wrap install --from-file ./pkg.zip elm/html  # Install from local file
-    wrap install --from-url <url> elm/html       # Install from URL
-
+      wrap install elm/html                     # Add elm/html to your project
+      wrap install elm/html@1.0.0               # Add elm/html at specific version
+      wrap install elm/html elm/json elm/url    # Add multiple packages at once
+      wrap install elm/html@1.0.0 elm/json      # Mix versioned and latest
+      wrap install --test elm/json              # Add elm/json as a test dependency
+      wrap install --major elm/html             # Upgrade elm/html to next major version
+      wrap install --from-file ./pkg.zip elm/html  # Install from local file
+      wrap install --from-url URL elm/html         # Install from URL
+    
     Options:
-    --test                             # Install as test dependency
-    --major <package>                  # Allow major version upgrade for package
-    --from-file <path> <package>       # Install from local file/directory
-    --from-url <url> <package>         # Install from URL (skip SHA check)
-    --pin                              # Create PIN file with package version
-    -v, --verbose                      # Show progress reports (registry, connectivity)
-    -q, --quiet                        # Suppress progress reports
-    -y, --yes                          # Automatically confirm changes
-    --help                             # Show this help
+      --test                             # Install as test dependency
+      --upgrade-all                      # Allow upgrading production deps (with --test)
+      --major PACKAGE                    # Allow major version upgrade for package (single package only)
+      --from-file PATH PACKAGE           # Install from local file/directory (single package only)
+      --from-url URL PACKAGE             # Install from URL (single package only)
+      --local-dev [--from-path PATH] [PACKAGE]
+                                         # Install package for local development
+      -v, --verbose                      # Show progress reports (registry, connectivity)
+      -q, --quiet                        # Suppress progress reports
+      -y, --yes                          # Automatically confirm changes
+      --help                             # Show this help
 
 
-**`remove`** removes a package from `elm.json`, together with any indirect dependencies that would become orphaned.
+**`uninstall`** removes a package from `elm.json`, together with any indirect dependencies that would become orphaned.
 
 **`upgrade`** does minor and major version upgrades of packages in a project's elm.json:
 
@@ -161,39 +165,41 @@ Synopsis:
         elm-explorations/test                1.0.0 => 1.2.2
     
 
-    Would you like me to update your elm.json accordingly? [Y/n]: 
+    Would you like me to update your elm.json accordingly? [Y/n] 
 
 **`info`** sub-command that can check for available upgrades, both minor and major:
 
 Synopsis:
 
-    Usage: wrap package info [PATH | <author/package> [VERSION]]
-
+    Usage: wrap info [PATH | PACKAGE [VERSION]]
+    
     Display package management information.
-
+    
     Shows:
-    - Current ELM_HOME directory
-    - Registry cache statistics
-    - Package registry connectivity
-    - Installed packages (if run in a project directory)
-    - Available updates (if run in a project directory)
-
+      - Current ELM_HOME directory
+      - Registry cache statistics
+      - Package registry connectivity
+      - Installed packages (if run in a project directory)
+      - Available updates (if run in a project directory)
+    
     Version resolution (for package lookup):
-    - If package is in elm.json: uses that version
-    - If not in elm.json and no VERSION specified: uses latest from registry
-    - If VERSION specified: uses that specific version
-
+      - If package is in elm.json: uses that version
+      - If not in elm.json and no VERSION specified: uses latest from registry
+      - If VERSION specified: uses that specific version
+    
     Examples:
-    wrap package info                  # Show general package info
-    wrap package info ./path/to/dir    # Show info for elm.json at path
-    wrap package info elm/core         # Show info for elm/core package
-    wrap package info elm/http 2.0.0   # Show info for elm/http 2.0.0
-
+      wrap info                  # Show general package info
+      wrap info ./path/to/dir    # Show info for elm.json at path
+      wrap info elm/core         # Show info for elm/core package
+      wrap info elm/core@1.0.0   # Show info for elm/core 1.0.0
+    
     Note: Package name format (author/package) takes priority over paths.
-        Use './package/author' to treat as a path instead.
-
+          Use './package/author' to treat as a path instead.
+    
     Options:
-    --help                             # Show this help
+      -d, --deps-only                   # Only print dependencies
+      --help                            # Show this help
+
 
 Example output:
 
@@ -217,7 +223,7 @@ Conveniently, `info` also takes the path to `elm.json`, so one can check all pro
 
     find /path/to/projects -name elm.json -print -exec wrap package info {} \;
 
-**`deps <package>`** lists the dependencies of a package.
+**`wrap info -d`** lists only the dependencies of a package.
 
 ## Configuration
 
@@ -230,8 +236,8 @@ Defaults to `~/.elm/0.19.1` on macOS and Linux, and `AppData\Roaming\elm` inside
 scenes `wrap` relies on cUrl library, so it will respect all of cUrl's environment variables as well.
 Defaults to `https://package.elm-lang.org`.
 
-**`WRAP_ELM_COMPILER_PATH`** specifies the `elm` binary to call from commands like `make` and others. If not specified,
-`wrap` will find the first `elm` binary in its `PATH` environment variable.
+**`WRAP_ELM_COMPILER_PATH`** specifies the binary to call from commands like `make` and others. If not specified,
+`wrap` will find the first `elm` binary in its `PATH` environment variable. It supports `lamdera` as well.
 
 **`WRAP_ALLOW_ELM_ONLINE`** disables `elm` compiler's "offline mode". Specify any value, the program tests for presence.
 The default is to insert an invalid proxy variable into `elm` binary's environment (`https_proxy=http://1`) forcing the compiler
@@ -247,22 +253,11 @@ populate the cache.
 
 ## Status
 
-`wrap` is functional as described above except for `wrap diff`, `bump` and `publish` commands. `elm`'s handling of `diff` command insists on access to the online registry despite all available information being in the package cache.
+`wrap` is functional and production grade for package authoring as of `v0.5.0`.
 
-Package development-related commands (`bump` and `publish`) were not tested. Obviously, `publish` won't work as is.
-
-Re-implementation of both commands is planned shortly.
-
-The code builds on macOS and Linux, and is mildly manually tested on a sample of author's Elm projects. A more thorough testing must encompass much wider use.
-
-The core motivation for writing this tool is to install [@lydell](https://github.com/lydell)'s forks of `elm/core`, `elm/virtual-dom` and friends. This works now, but it makes sense to continue to complete the tool. Most work should happen on separate package registry implementations, though. See [an initial writeup on the subject](doc/registry_support.md).
-
-Pinning is still not in place: the idea being that we don't want to forget and upgrade an override package we installed, and then wonder what went wrong. There's more to say about pinning, including permanently looking for updates on the overriden location. But that's not yet here. Hopefully soon.
-
-As expected, tests are behind. `make check` just runs a couple of tests. The real work will be to test the PubGrub algorithm thoroughly.
+The code builds on macOS and Linux.
 
 ## Installation
-
 
 ### Homebrew
 
@@ -306,13 +301,45 @@ sudo mv wrap /usr/local/bin/
 
 ### Linux
 
-Sadly, for now you'll need to make your own. Get the source from the release page:
+Sadly, for now you'll need to make your own. A `.deb` and a PPA are coming soon.
 
-**Build from source**: [Source code (tar.gz)](https://github.com/dsimunic/elm-wrap/archive/refs/tags/v0.5.0-preview.1.tar.gz)
+**Build from source**
 
-Then unpack and build with `make all install` or `make all install-user` as appropriate.
+### Ubuntu 24.04 LTS
 
-You'll probably need to install a few dependencies first.
+```bash
+sudo apt update
+sudo apt install -y --no-install-recommends \
+  make build-essential libcurl4-openssl-dev libnghttp2-dev \
+  libidn2-dev libunistring-dev libgpg-error-dev libgcrypt20-dev \
+  libssl-dev libldap2-dev libbrotli-dev librtmp-dev libssh-dev \
+  libpsl-dev libkrb5-dev libzstd-dev zlib1g-dev rsync
+
+curl -sL https://github.com/dsimunic/elm-wrap/archive/refs/tags/v0.5.0-preview.3.tar.gz | tar -zxv
+
+SRC=elm-wrap-0.5.0-preview.3
+make -C $SRC clean all
+make -C $SRC install-user   # if your ~/.local/bin is in the path
+sudo make -C $SRC install   # otherwise 
+rm -rf $SRC
+```
+
+### Ubuntu 25.10
+
+```bash
+sudo apt update
+sudo apt install -y --no-install-recommends \
+  make build-essential libcurl4-openssl-dev libnghttp2-dev \
+  libunistring-dev libgpg-error-dev rsync 
+
+curl -sL https://github.com/dsimunic/elm-wrap/archive/refs/tags/v0.5.0-preview.3.tar.gz | tar -zxv
+
+SRC=elm-wrap-0.5.0-preview.3
+make -C $SRC clean all
+make -C $SRC install-user   # if your ~/.local/bin is in the path
+sudo make -C $SRC install   # otherwise 
+rm -rf $SRC
+```
 
 ### Docker development environment
 
@@ -341,45 +368,12 @@ Build the code with make:
 
 Until a `.deb` package is available, building on linux requires the following incantations:
 
-### Ubuntu 24.04 LTS
-
-```bash
-sudo apt update
-sudo apt install -y --no-install-recommends \
-  git make build-essential libcurl4-openssl-dev libnghttp2-dev \
-  libidn2-dev libunistring-dev libgpg-error-dev libgcrypt20-dev \
-  libssl-dev libldap2-dev libbrotli-dev librtmp-dev libssh-dev \
-  libpsl-dev libkrb5-dev libzstd-dev zlib1g-dev rsync
-
-git clone https://github.com/dsimunic/elm-wrap
-cd elm-wrap
-make clean all
-make install-user   # if your ~/.local/bin is in the path
-sudo make install   # otherwise 
-```
-
-### Ubuntu 25.10
-
-```bash
-sudo apt update
-sudo apt install -y --no-install-recommends \
-  git make build-essential libcurl4-openssl-dev libnghttp2-dev \
-  libunistring-dev libgpg-error-dev rsync 
-
-git clone https://github.com/dsimunic/elm-wrap
-cd elm-wrap
-
-make all
-make install-user   # if your ~/.local/bin is in the path
-sudo make install   # otherwise 
-```
-
 ## Prior art and similar utilities
 
 **elm-wrap** is independently thought of and created. 
 
 Obviously, it depends on the awesome `elm` compiler and would serve no purpose without it. This program uses a few prompts from the Elm compiler under [BSD 3-clause license](doc/licenses/elm-compiler-LICENSE).
 
-**elm-wrap** implements PubGrub algorithtm for version dependency resolution based on [PubGrub description](https://github.com/dart-lang/pub/blob/master/doc/solver.md). The text is also copied to this repository under [BSD 3-clause license](doc/licenses/pubgrub-solver-spec.md-LICENSE). 
+**elm-wrap** implements PubGrub algorithm for version dependency resolution based on [PubGrub description](https://github.com/dart-lang/pub/blob/master/doc/solver.md). The text is also copied to this repository under [BSD 3-clause license](doc/licenses/pubgrub-solver-spec.md-LICENSE). 
 
 [elm-json](https://github.com/zwilias/elm-json) deals with editing `elm.json` configuration. The project has a focus on editing `elm.json` in sophisticated ways. While **elm-wrap** provides similar functionality, its main objective is package management through custom registries and policies.

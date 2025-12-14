@@ -172,7 +172,6 @@ static void print_install_usage(void) {
     printf("Examples:\n");
     printf("  %s install elm/html                     # Add elm/html to your project\n", global_context_program_name());
     printf("  %s install elm/html@1.0.0               # Add elm/html at specific version\n", global_context_program_name());
-    printf("  %s install elm/html 1.0.0               # Same (single package only)\n", global_context_program_name());
     printf("  %s install elm/html elm/json elm/url    # Add multiple packages at once\n", global_context_program_name());
     printf("  %s install elm/html@1.0.0 elm/json      # Mix versioned and latest\n", global_context_program_name());
     printf("  %s install --test elm/json              # Add elm/json as a test dependency\n", global_context_program_name());

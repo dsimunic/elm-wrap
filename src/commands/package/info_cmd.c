@@ -118,14 +118,13 @@ static void print_info_usage(const char *invocation) {
     printf("  %s %s ./path/to/dir    # Show info for elm.json at path\n", global_context_program_name(), command_label);
     printf("  %s %s elm/core         # Show info for elm/core package\n", global_context_program_name(), command_label);
     printf("  %s %s elm/core@1.0.0   # Show info for elm/core 1.0.0\n", global_context_program_name(), command_label);
-    printf("  %s %s elm/http 2.0.0   # Show info for elm/http 2.0.0\n", global_context_program_name(), command_label);
     printf("\n");
     printf("Note: Package name format (author/package) takes priority over paths.\n");
     printf("      Use './package/author' to treat as a path instead.\n");
     printf("\n");
     printf("Options:\n");
     printf("  -d, --deps-only                   # Only print dependencies\n");
-    printf("  --help                             # Show this help\n");
+    printf("  --help                            # Show this help\n");
 }
 
 static void update_max_name_len_from_package_map(const PackageMap *map, size_t *max_name_len) {
