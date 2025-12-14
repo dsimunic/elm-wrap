@@ -21,3 +21,5 @@ rulr/doc/
 www/full_index/
 test/scripts/dep_sync.actual
 test/manual-test/
+test/scripts/install-uninstall/actual/
+
