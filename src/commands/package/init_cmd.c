@@ -18,9 +18,7 @@
 #define TEMPLATE_PREFIX "templates/package/init"
 
 static void print_package_init_usage(void) {
-    printf("Usage:\n");
-    printf("  %s package init [OPTIONS] PACKAGE[@VERSION]\n", global_context_program_name());
-    printf("  %s package init [OPTIONS] PACKAGE VERSION\n", global_context_program_name());
+    printf("Usage: %s package init [OPTIONS] PACKAGE[@VERSION]\n", global_context_program_name());
     printf("\n");
     printf("Initialize a new Elm package from embedded templates.\n");
     printf("\nOptions:\n");

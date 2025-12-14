@@ -10,6 +10,7 @@ Commands:
 
   config                    Display current configuration
   info [PATH | PACKAGE [VERSION]]  Display package or application info
+  version                   Show detailed version information
   application SUBCOMMAND    Application management commands
   package SUBCOMMAND        Package management commands
   repository SUBCOMMAND     Repository management commands

@@ -5,7 +5,6 @@ Install packages for your Elm project.
 Examples:
   wrap install elm/html                     # Add elm/html to your project
   wrap install elm/html@1.0.0               # Add elm/html at specific version
-  wrap install elm/html 1.0.0               # Same (single package only)
   wrap install elm/html elm/json elm/url    # Add multiple packages at once
   wrap install elm/html@1.0.0 elm/json      # Mix versioned and latest
   wrap install --test elm/json              # Add elm/json as a test dependency

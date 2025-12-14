@@ -18,11 +18,11 @@ Examples:
   wrap info                  # Show general package info
   wrap info ./path/to/dir    # Show info for elm.json at path
   wrap info elm/core         # Show info for elm/core package
-  wrap info elm/http 2.0.0   # Show info for elm/http 2.0.0
+  wrap info elm/core@1.0.0   # Show info for elm/core 1.0.0
 
 Note: Package name format (author/package) takes priority over paths.
       Use './package/author' to treat as a path instead.
 
 Options:
   -d, --deps-only                   # Only print dependencies
-  --help                             # Show this help
+  --help                            # Show this help

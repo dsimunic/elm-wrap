@@ -1,4 +1,4 @@
-Usage: wrap package init [OPTIONS] PACKAGE
+Usage: wrap package init [OPTIONS] PACKAGE[@VERSION]
 
 Initialize a new Elm package from embedded templates.
 
