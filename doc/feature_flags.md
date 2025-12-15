@@ -5,8 +5,8 @@ Feature flags in **elm-wrap** allow hiding development or experimental commands 
 ## How Feature Flags Work
 
 Each feature flag has:
-- A compile-time default set in the `Makefile` (e.g., `FEATURE_CODE ?= 0`)
-- A runtime override via environment variable (e.g., `WRAP_FEATURE_CODE=1`)
+- A compile-time default set in the `Makefile` (e.g., `FEATURE_CACHE ?= 0`)
+- A runtime override via environment variable (e.g., `WRAP_FEATURE_CACHE=1`)
 - Conditional display in help/usage output
 - Conditional command routing with error messages when disabled
 
@@ -103,17 +103,10 @@ make clean all  # Uses ?= defaults (0 = hidden)
 
 **Runtime override:**
 ```bash
-WRAP_FEATURE_CODE=1 wrap code format src/main.elm
+WRAP_FEATURE_CACHE=1 wrap code cache elm/core 
 ```
 
 ## Inventory of Existing Feature Flags
-
-### `code` Feature Flag
-- **Purpose**: Hides the `wrap code` command group for code analysis and transformation
-- **Commands Hidden**: `wrap code SUBCOMMAND`
-- **Environment Variable**: `WRAP_FEATURE_CODE`
-- **Default**: Hidden (0)
-- **Implementation**: Full command group routing in `main.c`
 
 ### `publish` Feature Flag
 - **Purpose**: Hides publishing-related commands

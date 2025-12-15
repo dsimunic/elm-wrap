@@ -20,7 +20,6 @@
 #include "commands/wrappers/publish.h"
 #include "commands/wrappers/live.h"
 #include "config.h"
-#include "commands/code/code.h"
 #include "commands/debug/debug.h"
 #include "commands/policy/policy.h"
 #include "commands/review/review.h"
@@ -98,9 +97,6 @@ void print_usage(const char *prog) {
     printf("  application SUBCOMMAND    Application management commands\n");
     printf("  package SUBCOMMAND        Package management commands\n");
     printf("  repository SUBCOMMAND     Repository management commands\n");
-    if (feature_code_enabled()) {
-        printf("  code SUBCOMMAND           Code analysis and transformation commands\n");
-    }
     if (feature_policy_enabled()) {
         printf("  policy SUBCOMMAND         View and manage rulr policy rules\n");
     }
@@ -374,14 +370,6 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "config") == 0) {
             return cmd_config(argc - 1, argv + 1);
-        }
-
-        if (strcmp(argv[1], "code") == 0) {
-            if (!feature_code_enabled()) {
-                log_error("Command 'code' is not available in this build.");
-                return 1;
-            }
-            return cmd_code(argc - 1, argv + 1);
         }
 
         if (strcmp(argv[1], "policy") == 0) {

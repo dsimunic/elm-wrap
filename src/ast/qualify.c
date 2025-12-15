@@ -10,7 +10,6 @@
 #include "../commands/publish/docs/type_maps.h"
 
 #include "qualify.h"
-#include "canonicalize.h"
 #include "util.h"
 #include "../alloc.h"
 #include "../constants.h"
@@ -548,6 +547,53 @@ static char *qualify_single_type_name(const char *type_name, const char *module_
 
     /* Not found - return unqualified (may be a type variable or unknown) */
     return arena_strdup(type_name);
+}
+
+/* ============================================================================
+ * Helper predicates (formerly in canonicalize.c)
+ * ========================================================================== */
+
+static bool type_contains_arrow(TSNode node, const char *source_code) {
+    (void)source_code;
+    uint32_t child_count = ts_node_child_count(node);
+    for (uint32_t i = 0; i < child_count; i++) {
+        TSNode child = ts_node_child(node, i);
+        const char *type = ts_node_type(child);
+        if (strcmp(type, "arrow") == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool type_is_tuple(TSNode node, const char *source_code) {
+    (void)source_code;
+    return strcmp(ts_node_type(node), "tuple_type") == 0;
+}
+
+static bool type_is_application(TSNode node, const char *source_code) {
+    (void)source_code;
+    const char *node_type = ts_node_type(node);
+
+    /* A type application is a type_ref with more than one named child */
+    if (strcmp(node_type, "type_ref") == 0) {
+        return ts_node_named_child_count(node) > 1;
+    }
+
+    /* Also check type_expression containing a type_ref with args */
+    if (strcmp(node_type, "type_expression") == 0) {
+        uint32_t child_count = ts_node_child_count(node);
+        for (uint32_t i = 0; i < child_count; i++) {
+            TSNode child = ts_node_child(node, i);
+            if (strcmp(ts_node_type(child), "type_ref") == 0) {
+                if (ts_node_named_child_count(child) > 1) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
 }
 
 /* ============================================================================

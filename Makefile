@@ -2,14 +2,13 @@ CC = gcc
 AR = ar
 
 # Feature flags: 0=hidden, 1=visible (can be overridden at runtime via env vars)
-FEATURE_CODE ?= 0
 FEATURE_PUBLISH ?= 0
 FEATURE_REVIEW ?= 0
 FEATURE_POLICY ?= 0
 FEATURE_CACHE ?= 1
 
 CFLAGS = -Wall -Wextra -Werror -Wunused-result -std=gnu99 -D_GNU_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -O2 -flto
-CFLAGS += -DFEATURE_CODE_DEFAULT=$(FEATURE_CODE) -DFEATURE_PUBLISH_DEFAULT=$(FEATURE_PUBLISH)
+CFLAGS += -DFEATURE_PUBLISH_DEFAULT=$(FEATURE_PUBLISH)
 CFLAGS += -DFEATURE_REVIEW_DEFAULT=$(FEATURE_REVIEW) -DFEATURE_POLICY_DEFAULT=$(FEATURE_POLICY)
 CFLAGS += -DFEATURE_CACHE_DEFAULT=$(FEATURE_CACHE)
 
@@ -116,8 +115,6 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/publish/docs/dependency_cache.c \
           $(SRCDIR)/commands/publish/docs/path_util.c \
           $(SRCDIR)/commands/publish/package/package_publish.c \
-          $(SRCDIR)/commands/code/code.c \
-          $(SRCDIR)/commands/code/format.c \
           $(SRCDIR)/commands/policy/policy.c \
           $(SRCDIR)/commands/review/review.c \
           $(SRCDIR)/commands/review/reporter.c \
@@ -175,7 +172,6 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/pgsolver/pg_elm.c \
           $(SRCDIR)/ast/skeleton.c \
           $(SRCDIR)/ast/qualify.c \
-          $(SRCDIR)/ast/canonicalize.c \
           $(SRCDIR)/ast/util.c \
           $(SRCDIR)/vendor/sha1.c \
           $(SRCDIR)/vendor/sha256.c \
@@ -210,8 +206,6 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/dependency_cache.o \
           $(BUILDDIR)/path_util.o \
           $(BUILDDIR)/package_publish.o \
-          $(BUILDDIR)/code.o \
-          $(BUILDDIR)/format.o \
           $(BUILDDIR)/policy.o \
           $(BUILDDIR)/review.o \
           $(BUILDDIR)/reporter.o \
@@ -269,7 +263,6 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/pg_elm.o \
           $(BUILDDIR)/ast_skeleton.o \
           $(BUILDDIR)/ast_qualify.o \
-          $(BUILDDIR)/ast_canonicalize.o \
           $(BUILDDIR)/ast_util.o \
           $(BUILDDIR)/sha1.o \
           $(BUILDDIR)/sha256.o \
@@ -484,14 +477,6 @@ $(BUILDDIR)/path_util.o: $(SRCDIR)/commands/publish/docs/path_util.c $(SRCDIR)/c
 $(BUILDDIR)/package_publish.o: $(SRCDIR)/commands/publish/package/package_publish.c $(SRCDIR)/commands/publish/package/package_publish.h $(SRCDIR)/alloc.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/dyn_array.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/rulr/rulr.h $(SRCDIR)/rulr/rulr_dl.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -I$(SRCDIR)/rulr -c $< -o $@
 
-# Build code command object
-$(BUILDDIR)/code.o: $(SRCDIR)/commands/code/code.c $(SRCDIR)/commands/code/code.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-# Build format command object
-$(BUILDDIR)/format.o: $(SRCDIR)/commands/code/format.c $(SRCDIR)/commands/code/code.h $(SRCDIR)/commands/publish/docs/tree_util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
-
 # Build review command object
 $(BUILDDIR)/review.o: $(SRCDIR)/commands/review/review.c $(SRCDIR)/commands/review/review.h $(SRCDIR)/commands/review/reporter.h $(SRCDIR)/alloc.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/rulr/rulr.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -I$(SRCDIR)/rulr -c $< -o $@
@@ -633,10 +618,6 @@ $(BUILDDIR)/ast_skeleton.o: $(SRCDIR)/ast/skeleton.c $(SRCDIR)/ast/skeleton.h $(
 
 # Build AST qualify object
 $(BUILDDIR)/ast_qualify.o: $(SRCDIR)/ast/qualify.c $(SRCDIR)/ast/qualify.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/ast/util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
-	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
-
-# Build AST canonicalize object
-$(BUILDDIR)/ast_canonicalize.o: $(SRCDIR)/ast/canonicalize.c $(SRCDIR)/ast/canonicalize.h $(SRCDIR)/ast/util.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build AST util object

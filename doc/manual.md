@@ -226,16 +226,6 @@ the folder layout that `wrap` expects for a local repository.
 List all repositories found at the given path. Helpful for discovering what's available in a shared repository location.
 
 
-### `code` Group
-
-Commands for code analysis and transformation.
-
-#### **`format FILE`**
-
-Parse and canonicalize an Elm source file, outputting its AST (Abstract Syntax Tree). This is primarily useful for debugging
-or for building tooling that needs to understand Elm source structure.
-
-
 ### `policy` Group
 
 Commands for viewing and managing rulr policy rules. Rulr is `wrap`'s built-in linting and validation system.
