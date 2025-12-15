@@ -508,9 +508,11 @@ snapshot_deps() {
 
 # Get V1 registry since_count
 # Usage: count=$(get_v1_since_count)
+# Note: Always reads from local registry.dat (offline mode) to avoid triggering
+# a full registry download when called from online tests like cache-happy.
 get_v1_since_count() {
     local out
-    out=$("$WRAP_BIN" debug registry_v1 list 2>&1 | head -4)
+    out=$(WRAP_OFFLINE_MODE=1 "$WRAP_BIN" debug registry_v1 list 2>&1 | head -4)
     echo "$out" | awk -F': ' '/^Since count: /{print $2; exit}'
 }
 
@@ -530,6 +532,10 @@ export ELM_HOME="$TEST_ELM_HOME"
 export WRAP_HOME="$TEST_WRAP_HOME"
 # Enable cache command for testing
 export WRAP_FEATURE_CACHE=1
+# Skip registry updates but allow online operations (used by cache tests).
+# This prevents the /since endpoint check that would download 16k+ versions
+# while still allowing package downloads from the test registry.
+export WRAP_SKIP_REGISTRY_UPDATE=1
 
 # =============================================================================
 # Test Execution

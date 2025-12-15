@@ -3,9 +3,14 @@
 # test-cache-happy - Cache command happy path tests
 #
 # This script tests successful cache operations.
+# Uses WRAP_OFFLINE_MODE=0 to allow online package downloads from GitHub,
+# but WRAP_SKIP_REGISTRY_UPDATE=1 (from driver) prevents the 16k+ registry update.
 #
 
 set -euo pipefail
+
+# Allow online package downloads (registry update is skipped via WRAP_SKIP_REGISTRY_UPDATE=1)
+export WRAP_OFFLINE_MODE=0
 
 # =============================================================================
 # Test Cases
@@ -23,8 +28,8 @@ test_cache_01_single_package() {
     mkdir -p "$work_dir"
     cd "$work_dir"
     
-    # Cache a package (should download it if not already cached)
-    run_wrap package cache wrap/package-single-no-deps
+    # Cache a package (downloads from GitHub if not already cached)
+    run_wrap package cache elm/core
     
     since_after=$(get_v1_since_count)
     delta=$((since_after - since_before))
@@ -44,8 +49,8 @@ test_cache_02_multiple_packages() {
     mkdir -p "$work_dir"
     cd "$work_dir"
     
-    # Cache multiple packages
-    run_wrap package cache wrap/package-single-no-deps wrap/package-3v-no-deps
+    # Cache multiple packages (downloads from GitHub if not already cached)
+    run_wrap package cache elm/bytes elm/json
     
     since_after=$(get_v1_since_count)
     delta=$((since_after - since_before))
@@ -65,8 +70,8 @@ test_cache_03_specific_version() {
     mkdir -p "$work_dir"
     cd "$work_dir"
     
-    # Cache specific version
-    run_wrap package cache wrap/package-3v-no-deps@2.0.0
+    # Cache specific version (downloads from GitHub if not already cached)
+    run_wrap package cache elm/core@1.0.5
     
     since_after=$(get_v1_since_count)
     delta=$((since_after - since_before))
@@ -86,11 +91,11 @@ test_cache_04_already_cached() {
     mkdir -p "$work_dir"
     cd "$work_dir"
     
-    # Cache package once
-    run_wrap package cache wrap/package-single-no-deps
+    # Cache package once (downloads from GitHub if not already cached)
+    run_wrap package cache elm/core
     
-    # Cache same package again (should not fail)
-    run_wrap package cache wrap/package-single-no-deps
+    # Cache same package again (should not re-download)
+    run_wrap package cache elm/core
     
     since_after=$(get_v1_since_count)
     delta=$((since_after - since_before))

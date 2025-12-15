@@ -36,6 +36,9 @@ typedef struct {
 
     /* V2 repository path (only set when protocol_mode == PROTOCOL_V2) */
     char *repository_path;   /* Full path to active repository */
+
+    /* Registry update flag (cached from WRAP_SKIP_REGISTRY_UPDATE environment variable) */
+    bool skip_registry_update; /* true if WRAP_SKIP_REGISTRY_UPDATE=1 */
 } GlobalContext;
 
 /**
@@ -125,5 +128,16 @@ const char *global_context_compiler_name(void);
  * @return The program name, or "wrap" if not initialized
  */
 const char *global_context_program_name(void);
+
+/**
+ * Check if registry updates should be skipped.
+ *
+ * This returns the cached value of WRAP_SKIP_REGISTRY_UPDATE=1.
+ * When true, commands should skip downloading/updating registry indices
+ * while still allowing other online operations like package downloads.
+ *
+ * @return true if registry updates should be skipped
+ */
+bool global_context_skip_registry_update(void);
 
 #endif /* GLOBAL_CONTEXT_H */

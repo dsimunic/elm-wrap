@@ -27,4 +27,10 @@ char *env_get_elm_compiler_path(void);
 /* Check if offline mode is forced via WRAP_OFFLINE_MODE=1 */
 bool env_get_offline_mode(void);
 
+/* Check if registry updates should be skipped via WRAP_SKIP_REGISTRY_UPDATE=1
+ * This allows online operations (e.g., downloading packages) while skipping
+ * the incremental registry update check. Useful for testing with a pre-populated
+ * registry. */
+bool env_get_skip_registry_update(void);
+
 #endif /* ENV_DEFAULTS_H */

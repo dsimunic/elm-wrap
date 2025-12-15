@@ -102,3 +102,11 @@ bool env_get_offline_mode(void) {
     }
     return false;
 }
+
+bool env_get_skip_registry_update(void) {
+    const char *env_val = getenv("WRAP_SKIP_REGISTRY_UPDATE");
+    if (env_val && env_val[0] == '1' && env_val[1] == '\0') {
+        return true;
+    }
+    return false;
+}

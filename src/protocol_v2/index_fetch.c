@@ -10,6 +10,7 @@
 #include "../buildinfo.h"
 #include "../constants.h"
 #include "../env_defaults.h"
+#include "../global_context.h"
 #include "../http_client.h"
 #include "../http_constants.h"
 #include "../log.h"
@@ -82,6 +83,12 @@ bool v2_index_fetch(const char *repo_path, const char *compiler, const char *ver
     if (!repo_path || !compiler || !version) {
         log_error("Invalid arguments to v2_index_fetch");
         return false;
+    }
+
+    /* Skip registry index download if WRAP_SKIP_REGISTRY_UPDATE=1 */
+    if (global_context_skip_registry_update()) {
+        log_progress("Skipping registry index download (WRAP_SKIP_REGISTRY_UPDATE=1)");
+        return true;
     }
 
     /* Get base URL from environment/defaults */

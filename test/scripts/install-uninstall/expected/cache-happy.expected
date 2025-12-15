@@ -2,24 +2,24 @@ Running cache-happy tests...
 
 
 === BEGIN CACHE-01: Cache single package ===
-Package wrap/package-single-no-deps 1.0.0 and all dependencies already cached
+Package elm/core 1.0.5 and all dependencies already cached
 [Registry since-count: 30 -> 30 (Δ0)]
 === END CACHE-01 ===
 
 === BEGIN CACHE-02: Cache multiple packages at once ===
-Package wrap/package-single-no-deps 1.0.0 and all dependencies already cached
-Package wrap/package-3v-no-deps 3.0.0 and all dependencies already cached
+Package elm/bytes 1.0.8 and all dependencies already cached
+Package elm/json 1.1.4 and all dependencies already cached
 [Registry since-count: 30 -> 30 (Δ0)]
 === END CACHE-02 ===
 
 === BEGIN CACHE-03: Cache specific version ===
-Package wrap/package-3v-no-deps 2.0.0 and all dependencies already cached
+Package elm/core 1.0.5 and all dependencies already cached
 [Registry since-count: 30 -> 30 (Δ0)]
 === END CACHE-03 ===
 
 === BEGIN CACHE-04: Cache package that's already in cache ===
-Package wrap/package-single-no-deps 1.0.0 and all dependencies already cached
-Package wrap/package-single-no-deps 1.0.0 and all dependencies already cached
+Package elm/core 1.0.5 and all dependencies already cached
+Package elm/core 1.0.5 and all dependencies already cached
 [Registry since-count: 30 -> 30 (Δ0)]
 === END CACHE-04 ===
 

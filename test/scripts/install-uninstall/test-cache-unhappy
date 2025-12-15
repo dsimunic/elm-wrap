@@ -3,9 +3,14 @@
 # test-cache-unhappy - Cache command error cases
 #
 # This script tests cache operations that should fail.
+# Uses WRAP_OFFLINE_MODE=0 to allow online operations,
+# but WRAP_SKIP_REGISTRY_UPDATE=1 (from driver) prevents the 16k+ registry update.
 #
 
 set -euo pipefail
+
+# Allow online operations (registry update is skipped via WRAP_SKIP_REGISTRY_UPDATE=1)
+export WRAP_OFFLINE_MODE=0
 
 # =============================================================================
 # Test Cases
@@ -47,7 +52,7 @@ test_err_02_cache_nonexistent_version() {
     cd "$work_dir"
     
     # Try to cache non-existent version (should fail)
-    if run_wrap package cache wrap/package-3v-no-deps@9.9.9 2>/dev/null; then
+    if run_wrap package cache elm/core@9.9.9 2>/dev/null; then
         echo "ERROR: Expected command to fail"
         exit 1
     fi

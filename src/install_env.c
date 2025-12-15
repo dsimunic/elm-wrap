@@ -487,7 +487,12 @@ bool install_env_ensure_v1_registry(InstallEnv *env) {
             return false;
         }
     } else {
-        if (!install_env_update_registry(env)) {
+        /* Skip incremental registry update if WRAP_SKIP_REGISTRY_UPDATE=1.
+         * This allows online operations (downloading packages) while using
+         * a pre-populated registry without contacting the upstream /since endpoint. */
+        if (env_get_skip_registry_update()) {
+            log_progress("Skipping registry update (WRAP_SKIP_REGISTRY_UPDATE=1)");
+        } else if (!install_env_update_registry(env)) {
             fprintf(stderr, "Warning: Failed to update registry (using cached data)\n");
         }
     }

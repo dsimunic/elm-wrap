@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>wrap Help Reports</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #e0e0e0;
+            background: #1e1e1e;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            width: 25vw;
+            min-width: 320px;
+            background: #252526;
+            border-right: 1px solid #3e3e42;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        
+        .sidebar-header {
+            padding: 16px 16px 0;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            font-weight: 600;
+            color: #cccccc;
+            min-height: 4rem;
+        }
+        
+        .file-list {
+            list-style: none;
+        }
+        
+        .file-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #2d2d30;
+            transition: background 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .file-item:hover {
+            background: #2d2d30;
+        }
+        
+        .file-item.active {
+            background: #094771;
+            border-left: 2px solid #007acc;
+        }
+        
+        .file-item.changed {
+            color: #f48771;
+        }
+        
+        .file-item.new {
+            color: #89d185;
+        }
+        
+        .status-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-badge.changed {
+            background: #5a1d1d;
+            color: #f48771;
+        }
+        
+        .status-badge.new {
+            background: #1d3b1d;
+            color: #89d185;
+        }
+        
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .content-header {
+            padding: 16px;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 4rem;
+        }
+        
+        .content-title {
+            font-weight: 600;
+            color: #cccccc;
+            font-size: 14px;
+        }
+        
+        .view-toggle {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .view-button {
+            padding: 4px 12px;
+            background: #3e3e42;
+            border: 1px solid #555;
+            color: #cccccc;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 11px;
+            transition: all 0.1s;
+        }
+        
+        .view-button:hover {
+            background: #505050;
+        }
+        
+        .view-button.active {
+            background: #094771;
+            border-color: #007acc;
+            color: #fff;
+        }
+        
+        .content-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #1e1e1e;
+        }
+        
+        .help-content {
+            white-space: pre-wrap;
+            font-family: inherit;
+            color: #d4d4d4;
+        }
+        
+        .diff-content {
+            font-family: inherit;
+            color: #d4d4d4;
+            white-space: pre-wrap;
+        }
+        
+        .diff-add {
+            color: #89d185;
+            background: #1d3b1d;
+            display: block;
+            padding: 0 4px;
+        }
+        
+        .diff-del {
+            color: #f48771;
+            background: #5a1d1d;
+            display: block;
+            padding: 0 4px;
+        }
+        
+        .diff-hunk {
+            color: #569cd6;
+            display: block;
+            padding: 8px 4px 4px;
+            font-weight: 600;
+        }
+        
+        .no-diff {
+            color: #89d185;
+            font-weight: 600;
+        }
+        
+        .empty-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #6a6a6a;
+            font-size: 14px;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 5px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4e4e4e;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div>Help Reports</div>
+            <small style="font-size: 10px; font-weight: normal; color: #888; margin-top: 4px;">version 0.5.0-preview.4</small>
+        </div>
+        <ul class="file-list" id="fileList"></ul>
+    </div>
+    
+    <div class="content-area">
+        <div class="content-header">
+            <div class="content-title" id="contentTitle">Select a help report</div>
+            <div class="view-toggle" id="viewToggle" style="display: none;">
+                <button class="view-button active" data-view="content">Help Text</button>
+                <button class="view-button" data-view="diff">Diff</button>
+            </div>
+        </div>
+        <div class="content-body" id="contentBody">
+            <div class="empty-state">Select a help report from the sidebar</div>
+        </div>
+    </div>
+    
+    <script>
+        const data = {"files":[{"filename":"wrap.txt","fragment":"wrap","usage":"wrap COMMAND [OPTIONS]","status":"unchanged","content":"Usage: wrap COMMAND [OPTIONS]\n\nCommands:\n  repl               Open an interactive Elm REPL\n  init               Initialize a new Elm project\n  reactor            Start the Elm Reactor development server\n  make ELM_FILE      Compile Elm code to JavaScript or HTML\n  install PACKAGE    Install packages for your Elm project\n  uninstall PACKAGE  Remove packages from your Elm project\n\n  config                    Display current configuration\n  info [PATH | PACKAGE [VERSION]]  Display package or application info\n  version                   Show detailed version information\n  application SUBCOMMAND    Application management commands\n  package SUBCOMMAND        Package management commands\n  repository SUBCOMMAND     Repository management commands\n  debug SUBCOMMAND          Diagnostic tools for development\n\nOptions:\n  -v, --verbose      Show detailed logging output\n  -vv                Show extra verbose (trace) logging output\n  -V                 Show version number\n  --version          Show detailed version information\n  --sbom, --spdx     Show Software Bill of Materials (SBOM)\n  -h, --help         Show this help message\n","diff":""},{"filename":"wrap_application.txt","fragment":"wrap_application","usage":"wrap application SUBCOMMAND [OPTIONS]","status":"unchanged","content":"Usage: wrap application SUBCOMMAND [OPTIONS]\n\nApplication management commands.\n\nSubcommands:\n  init [TEMPLATE]    Initialize a new Elm application (default: application)\n  info [PATH]        Display application information and upgrades\n  list-templates     List available application templates\n\nOptions:\n  -h, --help         Show this help message\n","diff":""},{"filename":"wrap_application_info.txt","fragment":"wrap_application_info","usage":"wrap application info [PATH]","status":"unchanged","content":"Usage: wrap application info [PATH]\n\nDisplay application information.\n\nShows:\n  - Current ELM_HOME directory\n  - Registry cache statistics\n  - Package registry connectivity\n  - Installed packages\n  - Available updates\n\nExamples:\n  wrap application info              # Show info for current directory\n  wrap application info ./path/to    # Show info for elm.json at path\n\nOptions:\n  -h, --help   Show this help message\n","diff":""},{"filename":"wrap_application_init.txt","fragment":"wrap_application_init","usage":"wrap application init [OPTIONS] [TEMPLATE]","status":"unchanged","content":"Usage: wrap application init [OPTIONS] [TEMPLATE]\n\nInitialize a new Elm application project from an embedded template.\n\nTemplates:\n  application        Full Browser.application with URL handling (default)\n  document           Browser.document with title and body\n  element            Browser.element for embedding in HTML\n  sandbox            Browser.sandbox for simple programs\n\nOptions:\n  -y, --yes          Skip confirmation prompt\n  -q, --no-report    Skip printing application info after initialization\n  -h, --help         Show this help message\n\nExamples:\n  wrap application init             # Create application template\n  wrap application init sandbox     # Create sandbox template\n  wrap application init -y element  # Create element template, no prompt\n","diff":""},{"filename":"wrap_application_list-templates.txt","fragment":"wrap_application_list-templates","usage":"wrap application list-templates","status":"unchanged","content":"Usage: wrap application list-templates\n\nList available application templates for the current compiler.\n","diff":""},{"filename":"wrap_config.txt","fragment":"wrap_config","usage":"wrap config","status":"unchanged","content":"Usage: wrap config\n\nDisplay current configuration.\n\nShows:\n  - Protocol mode (V1 or V2)\n  - ELM_HOME directory\n  - Elm compiler version\n  - Elm compiler binary path\n","diff":""},{"filename":"wrap_debug.txt","fragment":"wrap_debug","usage":"wrap debug SUBCOMMAND [OPTIONS]","status":"unchanged","content":"Usage: wrap debug SUBCOMMAND [OPTIONS]\n\nDiagnostic tools for development.\n\nSubcommands:\n  include-tree PATH      Show import dependency tree for a file or package\n  install-plan PACKAGE   Show what packages would be installed for a package (dry-run)\n  registry_v1  COMMAND   Manage V1 protocol registry.dat file\n\nOptions:\n  -h, --help           Show this help message\n","diff":""},{"filename":"wrap_debug_include-tree.txt","fragment":"wrap_debug_include-tree","usage":"wrap debug include-tree PATH","status":"unchanged","content":"Usage: wrap debug include-tree PATH\n\nShow import dependency tree for an Elm file or package at PATH.\n\nArguments:\n  PATH       Path to an Elm file (.elm)\n             or a path to a package directory with elm.json\n\nFor packages:\n  - Shows import tree for each exposed module\n  - Lists redundant files not imported by any exposed module\n\nOptions:\n  -h, --help        Show this help message\n","diff":""},{"filename":"wrap_debug_install-plan.txt","fragment":"wrap_debug_install-plan","usage":"wrap debug install-plan PACKAGE [PACKAGE ...] [OPTIONS]","status":"unchanged","content":"Usage: wrap debug install-plan PACKAGE [PACKAGE ...] [OPTIONS]\n\nShow what packages would be installed for one or more packages (dry-run).\nThis exercises the dependency solver without actually installing anything.\n\nArguments:\n  PACKAGE           Package name in author/name format (e.g., elm/html)\n                     Multiple packages can be specified.\n\nOptions:\n  --test             Show plan for test dependencies\n  --major            Allow major version upgrades (single package only)\n  --local-dev        Debug local development package installation\n  --from-path PATH   Path to local package (requires --local-dev)\n  -v, --verbose      Show detailed logging output (default)\n  -vv                Show extra verbose (trace) logging output\n  -q, --quiet        Suppress statistics output\n  -h, --help         Show this help message\n","diff":""},{"filename":"wrap_debug_registry_v1.txt","fragment":"wrap_debug_registry_v1","usage":"wrap debug registry_v1 SUBCOMMAND [OPTIONS]","status":"unchanged","content":"Usage: wrap debug registry_v1 SUBCOMMAND [OPTIONS]\n\nManage the V1 protocol registry.dat file.\n\nSubcommands:\n  list                     Display all packages in the registry\n  add AUTHOR/NAME@VERSION  Add a package version to the registry\n  remove AUTHOR/NAME@VERSION  Remove a package version from the registry\n  apply-since JSON_PATH    Apply a /since JSON response offline\n  reset [--yes|-y]         Delete registry.dat and re-download it\n\nOptions:\n  -h, --help              Show this help message\n  -y, --yes               Assume yes for prompts\n\nExamples:\n  wrap debug registry_v1 list\n  wrap debug registry_v1 add elm/core@1.0.5\n  wrap debug registry_v1 remove elm/core@1.0.5\n  wrap debug registry_v1 apply-since /path/to/since.json\n  wrap debug registry_v1 reset\n","diff":""},{"filename":"wrap_debug_registry_v1_add.txt","fragment":"wrap_debug_registry_v1_add","usage":"wrap debug registry_v1 add AUTHOR/NAME@VERSION","status":"unchanged","content":"Usage: wrap debug registry_v1 add AUTHOR/NAME@VERSION\n\nAdd a package version to the registry.\n\nThis command adds a new package version to the V1 protocol\nregistry.dat file. The package must be specified in the\nformat AUTHOR/NAME@VERSION (e.g., elm/core@1.0.5).\n","diff":""},{"filename":"wrap_debug_registry_v1_apply-since.txt","fragment":"wrap_debug_registry_v1_apply-since","usage":"wrap debug registry_v1 apply-since JSON_PATH","status":"unchanged","content":"Usage: wrap debug registry_v1 apply-since JSON_PATH\n\nApply a /since JSON response offline.\n\nThis command processes a registry /since endpoint JSON response\nthat has been saved to a file, and applies the updates to the\nlocal registry.dat file. This is useful for testing or debugging\nregistry synchronization without making network requests.\n","diff":""},{"filename":"wrap_debug_registry_v1_list.txt","fragment":"wrap_debug_registry_v1_list","usage":"wrap debug registry_v1 list","status":"unchanged","content":"Usage: wrap debug registry_v1 list\n\nDisplay all packages in the registry.\n\nThis command lists all packages and their versions currently\nregistered in the V1 protocol registry.dat file.\n","diff":""},{"filename":"wrap_debug_registry_v1_remove.txt","fragment":"wrap_debug_registry_v1_remove","usage":"wrap debug registry_v1 remove AUTHOR/NAME@VERSION","status":"unchanged","content":"Usage: wrap debug registry_v1 remove AUTHOR/NAME@VERSION\n\nRemove a package version from the registry.\n\nThis command removes a package version from the V1 protocol\nregistry.dat file. The package must be specified in the\nformat AUTHOR/NAME@VERSION (e.g., elm/core@1.0.5).\n","diff":""},{"filename":"wrap_debug_registry_v1_reset.txt","fragment":"wrap_debug_registry_v1_reset","usage":"wrap debug registry_v1 reset [--yes|-y]","status":"unchanged","content":"Usage: wrap debug registry_v1 reset [--yes|-y]\n\nDelete registry.dat and re-download it.\n\nThis command removes the local V1 protocol registry.dat file\nand its associated metadata (ETag, since count), then downloads\na fresh copy from the registry server. This is useful when the\nlocal registry cache becomes corrupted or out of sync.\n\nOptions:\n  -y, --yes    Assume yes for prompts (skip confirmation)\n  -h, --help   Show this help message\n","diff":""},{"filename":"wrap_info.txt","fragment":"wrap_info","usage":"wrap info [PATH | PACKAGE [VERSION]]","status":"unchanged","content":"Usage: wrap info [PATH | PACKAGE [VERSION]]\n\nDisplay package management information.\n\nShows:\n  - Current ELM_HOME directory\n  - Registry cache statistics\n  - Package registry connectivity\n  - Installed packages (if run in a project directory)\n  - Available updates (if run in a project directory)\n\nVersion resolution (for package lookup):\n  - If package is in elm.json: uses that version\n  - If not in elm.json and no VERSION specified: uses latest from registry\n  - If VERSION specified: uses that specific version\n\nExamples:\n  wrap info                  # Show general package info\n  wrap info ./path/to/dir    # Show info for elm.json at path\n  wrap info elm/core         # Show info for elm/core package\n  wrap info elm/core@1.0.0   # Show info for elm/core 1.0.0\n\nNote: Package name format (author/package) takes priority over paths.\n      Use './package/author' to treat as a path instead.\n\nOptions:\n  -d, --deps-only                   # Only print dependencies\n  --help                            # Show this help\n","diff":""},{"filename":"wrap_init.txt","fragment":"wrap_init","usage":"wrap application init [OPTIONS] [TEMPLATE]","status":"unchanged","content":"Usage: wrap application init [OPTIONS] [TEMPLATE]\n\nInitialize a new Elm application project from an embedded template.\n\nTemplates:\n  application        Full Browser.application with URL handling (default)\n  document           Browser.document with title and body\n  element            Browser.element for embedding in HTML\n  sandbox            Browser.sandbox for simple programs\n\nOptions:\n  -y, --yes          Skip confirmation prompt\n  -q, --no-report    Skip printing application info after initialization\n  -h, --help         Show this help message\n\nExamples:\n  wrap application init             # Create application template\n  wrap application init sandbox     # Create sandbox template\n  wrap application init -y element  # Create element template, no prompt\n","diff":""},{"filename":"wrap_install.txt","fragment":"wrap_install","usage":"wrap install PACKAGE[@VERSION] [PACKAGE[@VERSION]...]","status":"unchanged","content":"Usage: wrap install PACKAGE[@VERSION] [PACKAGE[@VERSION]...]\n\nInstall packages for your Elm project.\n\nExamples:\n  wrap install elm/html                     # Add elm/html to your project\n  wrap install elm/html@1.0.0               # Add elm/html at specific version\n  wrap install elm/html elm/json elm/url    # Add multiple packages at once\n  wrap install elm/html@1.0.0 elm/json      # Mix versioned and latest\n  wrap install --test elm/json              # Add elm/json as a test dependency\n  wrap install --major elm/html             # Upgrade elm/html to next major version\n  wrap install --from-file ./pkg.zip elm/html  # Install from local file\n  wrap install --from-url URL elm/html         # Install from URL\n\nOptions:\n  --test                             # Install as test dependency\n  --upgrade-all                      # Allow upgrading production deps (with --test)\n  --major PACKAGE                    # Allow major version upgrade for package (single package only)\n  --from-file PATH PACKAGE           # Install from local file/directory (single package only)\n  --from-url URL PACKAGE             # Install from URL (single package only)\n  --local-dev [--from-path PATH] [PACKAGE]\n                                     # Install package for local development\n  -v, --verbose                      # Show progress reports (registry, connectivity)\n  -q, --quiet                        # Suppress progress reports\n  -y, --yes                          # Automatically confirm changes\n  --help                             # Show this help\n","diff":""},{"filename":"wrap_make.txt","fragment":"wrap_make","usage":"wrap make ELM_FILE [OPTIONS]","status":"unchanged","content":"Usage: wrap make ELM_FILE [OPTIONS]\n\nCompile Elm code to JavaScript or HTML.\n\nThis command ensures all package dependencies are downloaded and cached\nbefore calling 'elm make' to perform the actual compilation.\n\nExamples:\n  wrap make src/Main.elm                 # Compile Main.elm\n  wrap make src/Main.elm --output=main.js\n  wrap make src/Main.elm --optimize\n\nAll options are passed through to 'elm make'.\n","diff":""},{"filename":"wrap_package.txt","fragment":"wrap_package","usage":"wrap package SUBCOMMAND [OPTIONS]","status":"unchanged","content":"Usage: wrap package SUBCOMMAND [OPTIONS]\n\nSubcommands:\n  install PACKAGE                Add a dependency to current elm.json\n  init PACKAGE                   Initialize a package\n  upgrade PACKAGE                Upgrade packages to latest versions\n  uninstall PACKAGE              Remove a package from elm.json (alias: remove)\n  info    [ PATH                 Display package information and upgrades\n          | PACKAGE [VERSION]\n          ]\n  cache   PACKAGE                Download package to ELM_HOME without adding it to elm.json\n\nOptions:\n  -y, --yes            Automatically confirm changes\n  -v, --verbose        Show detailed logging output\n  -vv                  Show extra verbose (trace) logging output\n  -h, --help           Show this help message\n","diff":""},{"filename":"wrap_package_cache.txt","fragment":"wrap_package_cache","usage":"wrap package cache [OPTIONS] PACKAGE[@VERSION] [PACKAGE[@VERSION]...] OR wrap package cache check PACKAGE [OPTIONS] OR wrap package cache full-scan [OPTIONS]","status":"unchanged","content":"Usage:\n  wrap package cache [OPTIONS] PACKAGE[@VERSION] [PACKAGE[@VERSION]...]\n  wrap package cache check PACKAGE [OPTIONS]\n  wrap package cache full-scan [OPTIONS]\n\nDownload packages into the cache so installs can run offline.\n\nExamples:\n  wrap package cache elm/html                    # Download latest elm/html\n  wrap package cache elm/html@1.0.0              # Download specific version\n  wrap package cache elm/html elm/json           # Cache multiple packages\n  wrap package cache elm/html 1.0.0 elm/json     # Mix positional version + latest\n  wrap package cache check elm/html              # Check cache status for elm/html\n  wrap package cache check elm/html --fix-broken # Re-download broken versions\n  wrap package cache full-scan                   # Scan all packages in cache\n  wrap package cache --from-file ./pkg elm/html  # Download from local directory\n  wrap package cache --from-url URL elm/html     # Download from URL to cache\n  wrap package cache --major elm/html            # Download highest major version\n\nDownload Options:\n  PACKAGE[@VERSION] [PACKAGE[@VERSION]...]   # One or more packages (use @VERSION for specific release)\n  PACKAGE VERSION                           # Backwards-compatible positional version (single package)\n  --from-file PATH PACKAGE[@VERSION]        # Download from local directory/archive (single package)\n  --from-url URL PACKAGE[@VERSION]          # Download from URL to cache (single package)\n  --major PACKAGE                           # Download highest available major version (single package)\n  --ignore-hash                             # Skip SHA-1 hash verification\n  -v, --verbose                             # Show progress reports\n  -q, --quiet                               # Suppress progress reports\n  --help                                    # Show this help\n\nCheck Options:\n  --purge-broken                            # Remove broken directories without re-downloading\n  --fix-broken                              # Try to re-download broken versions\n\nFull-scan Options:\n  -q, --quiet                               # Only show summary counts\n  -v, --verbose                             # Show all issues including missing latest\n","diff":""},{"filename":"wrap_package_cache_check.txt","fragment":"wrap_package_cache_check","usage":"wrap package cache check PACKAGE [OPTIONS]","status":"unchanged","content":"Usage: wrap package cache check PACKAGE [OPTIONS]\n\nCheck cache status for a specific package.\n\nThis command will:\n  - Search registry.dat and list known versions\n  - Search ELM_HOME for cached versions with valid src/ directory\n  - Report broken packages (missing or empty src/ directory)\n\nExamples:\n  wrap package cache check elm/json            # Check cache status for elm/json\n  wrap package cache check elm/html --purge-broken  # Remove broken cached versions\n  wrap package cache check elm/html --fix-broken    # Re-download broken versions\n  wrap package cache check elm/html --no-check-redundant  # Skip redundant file check\n\nOptions:\n  --purge-broken            Remove broken directories without re-downloading\n  --fix-broken              Try to re-download broken versions from registry\n  --no-check-redundant      Skip analyzing import tree for unused files\n  -v, --verbose             Show detailed output\n  --help                    Show this help\n","diff":""},{"filename":"wrap_package_cache_full-scan.txt","fragment":"wrap_package_cache_full-scan","usage":"wrap package cache full-scan [OPTIONS]","status":"unchanged","content":"Usage: wrap package cache full-scan [OPTIONS]\n\nScan the entire package cache and verify all packages.\n\nThis command will:\n  - Scan all packages in the cache\n  - Report broken packages (missing or empty src/ directory)\n  - Count packages missing the latest version\n  - Provide a summary of cache health\n\nExamples:\n  wrap package cache full-scan           # Scan and report broken packages\n  wrap package cache full-scan -q        # Quiet mode - only show summary\n  wrap package cache full-scan -v        # Verbose - show all issues\n  wrap package cache full-scan --no-check-redundant  # Skip redundant file check\n\nOptions:\n  -q, --quiet               Only show summary counts\n  -v, --verbose             Show all issues including missing latest\n  --no-check-redundant      Skip analyzing import trees for unused files\n  --help                Show this help\n","diff":""},{"filename":"wrap_package_docs.txt","fragment":"wrap_package_docs","usage":"wrap package docs PATH","status":"unchanged","content":"Usage: wrap package docs PATH\n\nGenerate json documentation for an Elm package.\n\nArguments:\n  PATH               Path to package directory containing elm.json and src/\n\nOptions:\n  -h, --help         Show this help message\n  -v, --verbose      Show verbose output including skipped modules\n","diff":""},{"filename":"wrap_package_info.txt","fragment":"wrap_package_info","usage":"wrap package info [PATH | PACKAGE [VERSION]]","status":"unchanged","content":"Usage: wrap package info [PATH | PACKAGE [VERSION]]\n\nDisplay package management information.\n\nShows:\n  - Current ELM_HOME directory\n  - Registry cache statistics\n  - Package registry connectivity\n  - Installed packages (if run in a project directory)\n  - Available updates (if run in a project directory)\n\nVersion resolution (for package lookup):\n  - If package is in elm.json: uses that version\n  - If not in elm.json and no VERSION specified: uses latest from registry\n  - If VERSION specified: uses that specific version\n\nExamples:\n  wrap package info                  # Show general package info\n  wrap package info ./path/to/dir    # Show info for elm.json at path\n  wrap package info elm/core         # Show info for elm/core package\n  wrap package info elm/core@1.0.0   # Show info for elm/core 1.0.0\n\nNote: Package name format (author/package) takes priority over paths.\n      Use './package/author' to treat as a path instead.\n\nOptions:\n  -d, --deps-only                   # Only print dependencies\n  --help                            # Show this help\n","diff":""},{"filename":"wrap_package_init.txt","fragment":"wrap_package_init","usage":"wrap package init [OPTIONS] PACKAGE[@VERSION]","status":"unchanged","content":"Usage: wrap package init [OPTIONS] PACKAGE[@VERSION]\n\nInitialize a new Elm package from embedded templates.\n\nOptions:\n  --no-local-dev  Skip registering the package in the local-dev registry\n  -y, --yes       Skip confirmation prompt\n  -h, --help      Show this help message\n","diff":""},{"filename":"wrap_package_install.txt","fragment":"wrap_package_install","usage":"wrap install PACKAGE[@VERSION] [PACKAGE[@VERSION]...]","status":"unchanged","content":"Usage: wrap install PACKAGE[@VERSION] [PACKAGE[@VERSION]...]\n\nInstall packages for your Elm project.\n\nExamples:\n  wrap install elm/html                     # Add elm/html to your project\n  wrap install elm/html@1.0.0               # Add elm/html at specific version\n  wrap install elm/html elm/json elm/url    # Add multiple packages at once\n  wrap install elm/html@1.0.0 elm/json      # Mix versioned and latest\n  wrap install --test elm/json              # Add elm/json as a test dependency\n  wrap install --major elm/html             # Upgrade elm/html to next major version\n  wrap install --from-file ./pkg.zip elm/html  # Install from local file\n  wrap install --from-url URL elm/html         # Install from URL\n\nOptions:\n  --test                             # Install as test dependency\n  --upgrade-all                      # Allow upgrading production deps (with --test)\n  --major PACKAGE                    # Allow major version upgrade for package (single package only)\n  --from-file PATH PACKAGE           # Install from local file/directory (single package only)\n  --from-url URL PACKAGE             # Install from URL (single package only)\n  --local-dev [--from-path PATH] [PACKAGE]\n                                     # Install package for local development\n  -v, --verbose                      # Show progress reports (registry, connectivity)\n  -q, --quiet                        # Suppress progress reports\n  -y, --yes                          # Automatically confirm changes\n  --help                             # Show this help\n","diff":""},{"filename":"wrap_package_uninstall.txt","fragment":"wrap_package_uninstall","usage":"wrap package uninstall PACKAGE [PACKAGE...] OR wrap package uninstall --local-dev","status":"unchanged","content":"Usage:\n  wrap package uninstall PACKAGE [PACKAGE...]\n  wrap package uninstall --local-dev\n\nRemove packages from your Elm project.\n\nUse --local-dev (run from within an Elm package directory) to remove the\ncurrent package from local-dev tracking.\n\nThis will also remove any indirect dependencies that are no longer\nneeded by other packages.\n\nAlias: 'package remove' can be used instead of 'package uninstall'.\n\nExamples:\n  wrap package uninstall elm/html           # Remove elm/html from your project\n  wrap package uninstall elm/html elm/json  # Remove multiple packages at once\n  wrap package uninstall --local-dev        # Remove current package from local-dev tracking\n\nOptions:\n  --local-dev                        # Remove current package from local-dev tracking\n  -y, --yes                          # Automatically confirm changes\n  --help                             # Show this help\n","diff":""},{"filename":"wrap_package_upgrade.txt","fragment":"wrap_package_upgrade","usage":"wrap package upgrade [PACKAGE|all]","status":"unchanged","content":"Usage: wrap package upgrade [PACKAGE|all]\n\nUpgrade packages to their latest available versions.\n\nExamples:\n  wrap package upgrade                        # Upgrade all packages to latest minor versions\n  wrap package upgrade all                    # Same as above\n  wrap package upgrade elm/html               # Upgrade elm/html to latest minor version\n  wrap package upgrade --major elm/html       # Upgrade elm/html to latest major version\n  wrap package upgrade --major all            # Upgrade all packages to latest major versions\n  wrap package upgrade --major-ignore-test elm/html # Major upgrade, ignore test deps\n\nOptions:\n  --major                              # Allow major version upgrades\n  --major-ignore-test                  # Allow major upgrades, ignore test dependency conflicts\n  -y, --yes                            # Automatically confirm changes\n  -v, --verbose                        # Show progress reports (registry, connectivity)\n  -q, --quiet                          # Suppress progress reports\n  --help                               # Show this help\n","diff":""},{"filename":"wrap_reactor.txt","fragment":"wrap_reactor","usage":"wrap reactor [OPTIONS]","status":"unchanged","content":"Usage: wrap reactor [OPTIONS]\n\nStart the Elm Reactor development server.\n\nThis command ensures all package dependencies are downloaded and cached\nbefore calling 'elm reactor'.\n\nAll options are passed through to 'elm reactor'.\n","diff":""},{"filename":"wrap_repl.txt","fragment":"wrap_repl","usage":"wrap repl","status":"unchanged","content":"Usage: wrap repl\n\nStart an interactive Elm REPL (Read-Eval-Print Loop).\n\nThis command ensures all package dependencies are downloaded and cached\nbefore calling 'elm repl'.\n\nAll options are passed through to 'elm repl'.\n","diff":""},{"filename":"wrap_repository.txt","fragment":"wrap_repository","usage":"wrap repository SUBCOMMAND [OPTIONS]","status":"unchanged","content":"Usage: wrap repository SUBCOMMAND [OPTIONS]\n\nManage local package repositories.\n\nSubcommands:\n  init [ROOT_PATH]      Create a new repository directory\n  list [ROOT_PATH]      List repositories at path\n  local-dev             Manage local development tracking\n\nOptions:\n  -h, --help            Show this help message\n","diff":""},{"filename":"wrap_repository_init.txt","fragment":"wrap_repository_init","usage":"wrap repository init [ROOT_PATH] [OPTIONS]","status":"unchanged","content":"Usage: wrap repository init [ROOT_PATH] [OPTIONS]\n\nCreate a new repository directory for the current (or specified) compiler.\n\nArguments:\n  ROOT_PATH             Root path for repositories (default: WRAP_REPOSITORY_LOCAL_PATH)\n\nOptions:\n  --compiler NAME       Compiler name (elm, lamdera, wrapc, etc.)\n  --version VERSION     Compiler version (e.g., 0.19.1)\n  -h, --help            Show this help message\n\nThe repository path is: ROOT_PATH/NAME/VERSION\nFor example: ~/.elm-wrap/repository/elm/0.19.1/\n","diff":""},{"filename":"wrap_repository_list.txt","fragment":"wrap_repository_list","usage":"wrap repository list [ROOT_PATH]","status":"unchanged","content":"Usage: wrap repository list [ROOT_PATH]\n\nList all repositories at the given path.\n\nArguments:\n  ROOT_PATH             Root path for repositories (default: WRAP_REPOSITORY_LOCAL_PATH)\n\nOptions:\n  -h, --help            Show this help message\n","diff":""},{"filename":"wrap_repository_local-dev.txt","fragment":"wrap_repository_local-dev","usage":"wrap repository local-dev [COMMAND]","status":"unchanged","content":"Usage: wrap repository local-dev [COMMAND]\n\nManage local development package tracking.\n\nCommands:\n  (no command)          List all tracked local-dev packages and their dependents\n  clear --all           Clear all dependency tracking\n  clear PACKAGE VERSION\n                        Clear tracking for a specific package version\n  clear PACKAGE VERSION PATH\n                        Clear tracking for a specific path only\n\nOptions:\n  -h, --help            Show this help message\n","diff":""},{"filename":"wrap_uninstall.txt","fragment":"wrap_uninstall","usage":"wrap uninstall PACKAGE [PACKAGE...] OR wrap uninstall --local-dev","status":"unchanged","content":"Usage:\n  wrap uninstall PACKAGE [PACKAGE...]\n  wrap uninstall --local-dev\n\nRemove packages from your Elm project.\n\nUse --local-dev (run from within an Elm package directory) to remove the\ncurrent package from local-dev tracking.\n\nThis will also remove any indirect dependencies that are no longer\nneeded by other packages.\n\nAlias: 'package uninstall' can be used instead of 'uninstall'.\n\nExamples:\n  wrap uninstall elm/html           # Remove elm/html from your project\n  wrap uninstall elm/html elm/json  # Remove multiple packages at once\n  wrap uninstall --local-dev        # Remove current package from local-dev tracking\n\nOptions:\n  --local-dev                        # Remove current package from local-dev tracking\n  -y, --yes                          # Automatically confirm changes\n  --help                             # Show this help\n","diff":""},{"filename":"wrap_version.txt","fragment":"wrap_version","usage":"","status":"changed","content":"Version: 0.5.0-preview.4@main-HEAD\n  Base version: 0.5.0-preview.4\n  Commit: 1fe5f47427b94e62638f056e60d9a36686e9b621\n  Built: 2025-12-15T10:11:58Z\n  Compiler: Apple clang version 17.0.0 (clang-1700.4.4.1)\n  Platform: Darwin/arm64\n","diff":"<span class=\"diff-del\">-Version: 0.5.0-preview.3@main-HEAD</span>\n<span class=\"diff-add\">+Version: 0.5.0-preview.4@main-HEAD</span>\n<span class=\"diff-del\">-  Base version: 0.5.0-preview.4</span>\n<span class=\"diff-add\">+  Commit: 1fe5f47427b94e62638f056e60d9a36686e9b621</span>\n<span class=\"diff-del\">-  Built: 2025-12-15T10:11:58Z</span>\n<span class=\"diff-add\">+  Compiler: Apple clang version 17.0.0 (clang-1700.4.4.1)</span>\n<span class=\"diff-del\">-  Platform: Darwin/arm64</span>\n"}],"changed":["wrap_version.txt"]};
+        
+        let currentFile = null;
+        let currentView = 'content';
+        
+        // Initialize file list
+        function initFileList() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+            
+            data.files.forEach(file => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.dataset.fragment = file.fragment;
+                if (file.status !== 'unchanged') {
+                    li.classList.add(file.status);
+                }
+                
+                const filename = document.createElement('span');
+                filename.textContent = file.usage || file.filename;
+                filename.title = file.content;
+                li.appendChild(filename);
+                
+                if (file.status !== 'unchanged') {
+                    const badge = document.createElement('span');
+                    badge.className = `status-badge ${file.status}`;
+                    badge.textContent = file.status;
+                    li.appendChild(badge);
+                }
+                
+                li.addEventListener('click', () => {
+                    window.location.hash = file.fragment;
+                    showFile(file);
+                });
+                
+                li.addEventListener('mouseenter', () => {
+                    if (currentFile !== file) {
+                        showFilePreview(file);
+                    }
+                });
+                
+                li.addEventListener('mouseleave', () => {
+                    if (currentFile !== file) {
+                        restoreCurrentFile();
+                    }
+                });
+                
+                fileList.appendChild(li);
+            });
+        }
+        
+        // Show file preview on hover (without changing fragment)
+        function showFilePreview(file) {
+            document.getElementById('contentTitle').textContent = file.usage || file.filename;
+            
+            const contentBody = document.getElementById('contentBody');
+            const pre = document.createElement('pre');
+            pre.className = 'help-content';
+            pre.textContent = file.content;
+            contentBody.innerHTML = '';
+            contentBody.appendChild(pre);
+        }
+        
+        // Restore the current file after hover
+        function restoreCurrentFile() {
+            if (currentFile) {
+                document.getElementById('contentTitle').textContent = currentFile.usage || currentFile.filename;
+                showCurrentView();
+            } else {
+                document.getElementById('contentTitle').textContent = 'Select a help report';
+                document.getElementById('contentBody').innerHTML = '<div class="empty-state">Select a help report from the sidebar</div>';
+            }
+        }
+        
+        // Show file content
+        function showFile(file) {
+            currentFile = file;
+            currentView = 'content';
+            
+            // Update active state
+            document.querySelectorAll('.file-item').forEach((item, idx) => {
+                item.classList.toggle('active', data.files[idx] === file);
+            });
+            
+            // Update header
+            document.getElementById('contentTitle').textContent = file.usage || file.filename;
+            
+            // Show/hide view toggle
+            const viewToggle = document.getElementById('viewToggle');
+            if (file.status === 'changed') {
+                viewToggle.style.display = 'flex';
+            } else {
+                viewToggle.style.display = 'none';
+            }
+            
+            // Reset view buttons
+            document.querySelectorAll('.view-button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === 'content');
+            });
+            
+            // Show content
+            showCurrentView();
+        }
+        
+        // Show current view (content or diff)
+        function showCurrentView() {
+            const contentBody = document.getElementById('contentBody');
+            
+            if (currentView === 'content') {
+                const pre = document.createElement('pre');
+                pre.className = 'help-content';
+                pre.textContent = currentFile.content;
+                contentBody.innerHTML = '';
+                contentBody.appendChild(pre);
+            } else if (currentView === 'diff') {
+                if (currentFile.diff && currentFile.diff.trim()) {
+                    contentBody.innerHTML = `<pre class="diff-content">${currentFile.diff}</pre>`;
+                } else {
+                    contentBody.innerHTML = `<div class="empty-state"><span class="no-diff">No differences</span></div>`;
+                }
+            }
+        }
+        
+        // Load file from fragment
+        function loadFromFragment() {
+            const hash = window.location.hash.slice(1);
+            if (hash) {
+                const file = data.files.find(f => f.fragment === hash);
+                if (file) {
+                    showFile(file);
+                }
+            }
+        }
+        
+        // View toggle handlers
+        document.getElementById('viewToggle').addEventListener('click', (e) => {
+            if (e.target.classList.contains('view-button')) {
+                currentView = e.target.dataset.view;
+                document.querySelectorAll('.view-button').forEach(btn => {
+                    btn.classList.toggle('active', btn === e.target);
+                });
+                showCurrentView();
+            }
+        });
+        
+        // Handle fragment changes
+        window.addEventListener('hashchange', loadFromFragment);
+        
+        // Initialize
+        initFileList();
+        loadFromFragment();
+    </script>
+</body>
+</html>

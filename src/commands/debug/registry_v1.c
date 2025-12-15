@@ -241,6 +241,13 @@ static int cmd_registry_v1_reset(int argc, char *argv[]) {
         return 0;
     }
 
+    if (global_context_skip_registry_update()) {
+        log_progress("Skipping registry download (WRAP_SKIP_REGISTRY_UPDATE=1)");
+        log_progress("Registry reset complete");
+        install_env_free(env);
+        return 0;
+    }
+
     if (!install_env_ensure_v1_registry(env)) {
         log_error("Failed to download a fresh registry index after reset");
         install_env_free(env);

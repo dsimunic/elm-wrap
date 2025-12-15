@@ -8,6 +8,7 @@
 #
 # The shell has:
 #   - WRAP_OFFLINE_MODE=1 (no network access)
+#   - WRAP_OFFLINE_MODE=0 if CACHE_ELM_PACKAGES=1 is set
 #   - Custom ELM_HOME with pre-populated package cache
 #   - Custom WRAP_HOME for local-dev tracking
 #   - A distinct prompt "$ " to indicate you're in the test environment
@@ -91,6 +92,9 @@ Examples inside the shell:
   mkdir app1 && cd app1 && wrap application init -y
   wrap install wrap/package-single-no-deps
   wrap info -d
+
+Environment variables:
+  CACHE_ELM_PACKAGES=1  # Cache elm/ packages (may use network). Default: not set
 EOF
             exit 0
             ;;
@@ -201,21 +205,39 @@ WRAP_PACKAGES=(
     "wrap/testdep-req-newer-prod-single"
 )
 
-echo -e "${CYAN}Caching elm/ packages with full source code...${NC}"
-elm_count=0
-elm_errors=0
+if [[ "${CACHE_ELM_PACKAGES:-0}" =~ ^([Tt]rue|1)$ ]]; then
+    echo -e "${CYAN}Caching elm/ packages with full source code...${NC}"
+    elm_count=0
+    elm_errors=0
 
-# Cache elm/ packages with full source code
-for pkg in "${ELM_PACKAGES[@]}"; do
-    if ELM_HOME="$TEST_ELM_HOME" "$WRAP_BIN" package cache "$pkg" --quiet >/dev/null 2>&1; then
-        ((elm_count++)) || true
-    else
-        ((elm_errors++)) || true
-        echo -e "${YELLOW}Warning: Failed to cache $pkg${NC}"
-    fi
-done
+    # Cache elm/ packages with full source code (may use network)
+    # Temporarily allow network access but skip registry updates to avoid downloading full registry
+    for pkg in "${ELM_PACKAGES[@]}"; do
+        if WRAP_OFFLINE_MODE=0 WRAP_SKIP_REGISTRY_UPDATE=1 ELM_HOME="$TEST_ELM_HOME" "$WRAP_BIN" package cache "$pkg" --quiet >/dev/null 2>&1; then
+            ((elm_count++)) || true
+        else
+            ((elm_errors++)) || true
+            echo -e "${YELLOW}Warning: Failed to cache $pkg${NC}"
+        fi
+    done
 
-echo -e "${GREEN}✓${NC} Cached $elm_count elm/ packages ($elm_errors errors)"
+    echo -e "${GREEN}✓${NC} Cached $elm_count elm/ packages ($elm_errors errors)"
+else
+    echo -e "${CYAN}CACHE_ELM_PACKAGES not set - creating skeleton elm/ packages with mkpkg (no network)...${NC}"
+    elm_mkpkg_count=0
+    elm_mkpkg_errors=0
+
+    for pkg in "${ELM_PACKAGES[@]}"; do
+        if ELM_HOME="$TEST_ELM_HOME" "$MKPKG" "$REGISTRY_FILE" "$pkg" >/dev/null 2>&1; then
+            ((elm_mkpkg_count++)) || true
+        else
+            ((elm_mkpkg_errors++)) || true
+            echo -e "${YELLOW}Warning: mkpkg failed for $pkg${NC}"
+        fi
+    done
+
+    echo -e "${GREEN}✓${NC} Created $elm_mkpkg_count elm/ packages ($elm_mkpkg_errors errors)"
+fi
 
 echo -e "${CYAN}Creating wrap/ test packages (skeleton only)...${NC}"
 wrap_count=0
@@ -239,7 +261,8 @@ echo -e "${GREEN}✓${NC} Created $wrap_count wrap/ packages ($wrap_errors error
 # Set environment variables before reporting them
 export ELM_HOME="$TEST_ELM_HOME"
 export WRAP_HOME="$TEST_WRAP_HOME"
-export WRAP_OFFLINE_MODE=0
+export WRAP_OFFLINE_MODE=1
+export WRAP_SKIP_REGISTRY_UPDATE=1
 export PATH="$PROJECT_ROOT/bin:$PATH"
 
 echo ""
@@ -308,8 +331,14 @@ init-pkg() { wrap package init -y --no-local-dev "\$1"; }
 cd "$WORKSPACE"
 EOF
 
-# Cleanup function
+# Cleanup function (idempotent)
+CLEANED_UP=false
 cleanup() {
+    if [ "$CLEANED_UP" = "true" ]; then
+        return
+    fi
+    CLEANED_UP=true
+
     if [[ "$KEEP_ENV" != "true" ]]; then
         echo ""
         echo -e "${CYAN}Cleaning up test environment...${NC}"
@@ -322,7 +351,9 @@ cleanup() {
     fi
 }
 
-trap cleanup EXIT
+# Ensure cleanup runs on exit and common signals. Running bash as a child
+# (no exec) ensures this script resumes and can run cleanup after the shell exits.
+trap cleanup EXIT INT TERM HUP
 
 # Start bash with our rc file
-exec bash --rcfile "$RC_FILE" -i
+bash --rcfile "$RC_FILE" -i

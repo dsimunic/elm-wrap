@@ -8,11 +8,9 @@ Running cache-unhappy tests...
 === END ERR-01 ===
 
 === BEGIN ERR-02: Cache package with non-existent version ===
-[ERROR] Version 9.9.9 not found for package wrap/package-3v-no-deps
+[ERROR] Version 9.9.9 not found for package elm/core
 [ERROR] Available versions:
-[ERROR]   3.0.0
-[ERROR]   2.0.0
-[ERROR]   1.0.0
+[ERROR]   1.0.5
 [Registry since-count: 30 -> 30 (Δ0)]
 === END ERR-02 ===
 

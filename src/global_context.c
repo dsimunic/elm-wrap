@@ -135,6 +135,9 @@ GlobalContext *global_context_init(const char *argv0) {
     g_context->compiler_version = NULL;
     g_context->compiler_type = COMPILER_UNKNOWN;
     g_context->repository_path = NULL;
+
+    /* Cache WRAP_SKIP_REGISTRY_UPDATE flag */
+    g_context->skip_registry_update = env_get_skip_registry_update();
     
     /* Get repository root path */
     char *repo_root = env_get_repository_local_path();
@@ -237,4 +240,11 @@ const char *global_context_program_name(void) {
         return build_program_name;
     }
     return g_context->program_name;
+}
+
+bool global_context_skip_registry_update(void) {
+    if (!g_context) {
+        return false;
+    }
+    return g_context->skip_registry_update;
 }
