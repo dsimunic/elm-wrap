@@ -284,3 +284,31 @@ char **local_dev_get_tracking_apps(const char *author, const char *name,
     *out_count = count;
     return count > 0 ? paths : NULL;
 }
+//REVIEW: This seems very inefficient when called from a loop. Maybe it will make sense to cache all packages in the context?
+bool is_package_local_dev(const char *author, const char *name, const char *version) {
+    if (!author || !name || !version) {
+        return false;
+    }
+
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        return false;
+    }
+
+    /* Build path: tracking_dir/author/name/version */
+    size_t dir_len = strlen(tracking_dir) + strlen(author) + strlen(name) + strlen(version) + 4;
+    char *version_dir = arena_malloc(dir_len);
+    if (!version_dir) {
+        arena_free(tracking_dir);
+        return false;
+    }
+    snprintf(version_dir, dir_len, "%s/%s/%s/%s", tracking_dir, author, name, version);
+    arena_free(tracking_dir);
+
+    /* Check if the directory exists */
+    struct stat st;
+    bool exists = (stat(version_dir, &st) == 0 && S_ISDIR(st.st_mode));
+    arena_free(version_dir);
+
+    return exists;
+}

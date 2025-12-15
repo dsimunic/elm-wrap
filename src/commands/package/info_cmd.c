@@ -259,11 +259,7 @@ static bool is_package_name_format(const char *str) {
     return slash_count == 1;
 }
 
-/* Check if a version is a local-dev version (0.0.0 or 999.0.0) */
-static bool is_local_dev_version(int major, int minor, int patch) {
-    return (major == 0 && minor == 0 && patch == 0) ||
-           (major == 999 && minor == 0 && patch == 0);
-}
+
 
 static void print_package_suggestions_block(
     const char *author,
@@ -438,11 +434,7 @@ static int show_package_info_from_registry(const char *package_name, const char 
         }
 
         /* Check if this is a local-dev package */
-        bool is_local_dev = false;
-        Version parsed_v;
-        if (version_parse_safe(version_to_use, &parsed_v)) {
-            is_local_dev = is_local_dev_version(parsed_v.major, parsed_v.minor, parsed_v.patch);
-        }
+        bool is_local_dev = is_package_local_dev(author, name, version_to_use);
 
         char *latest_buf = NULL;
         for (size_t i = 0; i < entry->version_count; i++) {
@@ -560,11 +552,7 @@ static int show_package_info_from_registry(const char *package_name, const char 
     }
 
     /* Check if this is a local-dev package */
-    bool is_local_dev = false;
-    Version parsed_v;
-    if (version_parse_safe(version_to_use, &parsed_v)) {
-        is_local_dev = is_local_dev_version(parsed_v.major, parsed_v.minor, parsed_v.patch);
-    }
+    bool is_local_dev = is_package_local_dev(author, name, version_to_use);
 
     char *latest_version = version_to_string(&registry_entry->versions[0]);
 
@@ -836,13 +824,8 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
                 char *name = NULL;
                 if (parse_package_name(elm_json->package_name, &author, &name)) {
                     /* Check if this package has a local-dev version */
-                    if (elm_json->package_version) {
-                        Version parsed_v;
-                        if (version_parse_safe(elm_json->package_version, &parsed_v)) {
-                            if (is_local_dev_version(parsed_v.major, parsed_v.minor, parsed_v.patch)) {
-                                print_package_tracking_info(author, name, elm_json->package_version);
-                            }
-                        }
+                    if (elm_json->package_version && is_package_local_dev(author, name, elm_json->package_version)) {
+                        print_package_tracking_info(author, name, elm_json->package_version);
                     }
                     arena_free(author);
                     arena_free(name);

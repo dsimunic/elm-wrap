@@ -169,8 +169,8 @@ if ! "$INDEXMAKER" "$REGISTRY_FILE" "$TEST_ELM_HOME/$ELM_VERSION/packages/regist
 fi
 echo -e "${GREEN}✓${NC} registry.dat created"
 
-# List of packages to pre-populate
-CACHE_PACKAGES=(
+# List of elm/ packages to fully cache (with source code)
+ELM_PACKAGES=(
     "elm/core"
     "elm/bytes"
     "elm/file"
@@ -182,6 +182,10 @@ CACHE_PACKAGES=(
     "elm/browser"
     "elm/svg"
     "elm/virtual-dom"
+)
+
+# List of wrap/ test packages to create (skeleton only via mkpkg)
+WRAP_PACKAGES=(
     "wrap/package-single-no-deps"
     "wrap/package-3v-no-deps"
     "wrap/package-3m-no-deps"
@@ -197,23 +201,46 @@ CACHE_PACKAGES=(
     "wrap/testdep-req-newer-prod-single"
 )
 
-echo -e "${CYAN}Populating package cache...${NC}"
-pkg_count=0
-pkg_errors=0
+echo -e "${CYAN}Caching elm/ packages with full source code...${NC}"
+elm_count=0
+elm_errors=0
 
-for pkg in "${CACHE_PACKAGES[@]}"; do
-    if ELM_HOME="$TEST_ELM_HOME" "$MKPKG" "$REGISTRY_FILE" "$pkg" >/dev/null 2>&1; then
-        ((pkg_count++)) || true
+# Cache elm/ packages with full source code
+for pkg in "${ELM_PACKAGES[@]}"; do
+    if ELM_HOME="$TEST_ELM_HOME" "$WRAP_BIN" package cache "$pkg" --quiet >/dev/null 2>&1; then
+        ((elm_count++)) || true
     else
-        ((pkg_errors++)) || true
+        ((elm_errors++)) || true
+        echo -e "${YELLOW}Warning: Failed to cache $pkg${NC}"
     fi
 done
 
-echo -e "${GREEN}✓${NC} Created $pkg_count packages ($pkg_errors errors)"
+echo -e "${GREEN}✓${NC} Cached $elm_count elm/ packages ($elm_errors errors)"
+
+echo -e "${CYAN}Creating wrap/ test packages (skeleton only)...${NC}"
+wrap_count=0
+wrap_errors=0
+
+# Create wrap/ test packages with mkpkg (skeleton only)
+for pkg in "${WRAP_PACKAGES[@]}"; do
+    if ELM_HOME="$TEST_ELM_HOME" "$MKPKG" "$REGISTRY_FILE" "$pkg" >/dev/null 2>&1; then
+        ((wrap_count++)) || true
+    else
+        ((wrap_errors++)) || true
+    fi
+done
+
+echo -e "${GREEN}✓${NC} Created $wrap_count wrap/ packages ($wrap_errors errors)"
 
 # =============================================================================
 # Shell Information
 # =============================================================================
+
+# Set environment variables before reporting them
+export ELM_HOME="$TEST_ELM_HOME"
+export WRAP_HOME="$TEST_WRAP_HOME"
+export WRAP_OFFLINE_MODE=0
+export PATH="$PROJECT_ROOT/bin:$PATH"
 
 echo ""
 echo -e "${BOLD}${CYAN}════════════════════════════════════════════════════════════════${NC}"
@@ -221,7 +248,11 @@ echo -e "${BOLD}${CYAN}  elm-wrap Test Shell${NC}"
 echo -e "${BOLD}${CYAN}════════════════════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "${BOLD}Environment:${NC}"
-echo -e "  WRAP_OFFLINE_MODE=1  ${YELLOW}(network access disabled)${NC}"
+if [[ "$WRAP_OFFLINE_MODE" == "1" ]]; then
+    echo -e "  WRAP_OFFLINE_MODE=1  ${YELLOW}(network access disabled)${NC}"
+else
+    echo -e "  WRAP_OFFLINE_MODE=0  ${GREEN}(network access enabled)${NC}"
+fi
 echo -e "  ELM_HOME=$TEST_ELM_HOME"
 echo -e "  WRAP_HOME=$TEST_WRAP_HOME"
 echo ""
@@ -265,10 +296,6 @@ echo ""
 RC_FILE="$TEST_ROOT/.bashrc"
 cat > "$RC_FILE" << EOF
 # Test environment for elm-wrap
-export ELM_HOME="$TEST_ELM_HOME"
-export WRAP_HOME="$TEST_WRAP_HOME"
-export WRAP_OFFLINE_MODE=1
-export PATH="$PROJECT_ROOT/bin:\$PATH"
 
 # Custom prompt to indicate test environment
 export PS1='\[\033[1;33m\][elm-wrap-test]\[\033[0m\] \w \$ '

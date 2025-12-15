@@ -9,8 +9,29 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <dirent.h>
 
 #define DEFAULT_ELM_VERSION "0.19.1"
+
+/* Check if a directory is empty */
+static bool is_directory_empty(const char *path) {
+    DIR *dir = opendir(path);
+    if (!dir) return true;
+
+    struct dirent *entry;
+    int count = 0;
+    while ((entry = readdir(dir)) != NULL) {
+        /* Skip . and .. */
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        count++;
+        break;
+    }
+    closedir(dir);
+
+    return count == 0;
+}
 
 /* Platform-specific home directory detection */
 static char* get_default_elm_home(const char *elm_version) {
@@ -238,15 +259,27 @@ bool cache_package_fully_downloaded(CacheConfig *config, const char *author, con
     snprintf(src_path, src_len, "%s/src", pkg_path);
     bool has_src = (stat(src_path, &st) == 0 && S_ISDIR(st.st_mode));
 
-    if (has_src) {
-        log_debug("Package src/ directory exists: %s", src_path);
-    } else {
+    if (!has_src) {
         log_debug("Package src/ directory MISSING: %s (package incomplete!)", src_path);
+        arena_free(pkg_path);
+        arena_free(src_path);
+        return false;
     }
+
+    /* Check if src/ directory is empty (mkpkg creates empty src/ directories) */
+    bool src_is_empty = is_directory_empty(src_path);
+    if (src_is_empty) {
+        log_debug("Package src/ directory is EMPTY: %s (package incomplete!)", src_path);
+        arena_free(pkg_path);
+        arena_free(src_path);
+        return false;
+    }
+
+    log_debug("Package src/ directory exists and has content: %s", src_path);
 
     arena_free(pkg_path);
     arena_free(src_path);
-    return has_src;
+    return true;
 }
 
 bool cache_registry_exists(CacheConfig *config) {

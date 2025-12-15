@@ -7,8 +7,12 @@
 #include "../../registry.h"
 #include "../../alloc.h"
 #include "../../log.h"
+#include "../../constants.h"
+#include "../../commands/package/package_common.h"
+#include "../../local_dev/local_dev_tracking.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 char **build_elm_environment(void) {
     extern char **environ;
@@ -46,10 +50,61 @@ char **build_elm_environment(void) {
     return new_env;
 }
 
+/**
+ * LocalDevPackageInfo - Information about a package tracked for local development
+ */
+typedef struct {
+    char *author;
+    char *name;
+    char *version;
+} LocalDevPackageInfo;
+
+/**
+ * Helper function to track a package if it's a local-dev package.
+ * Returns true if the package was tracked, false otherwise.
+ */
+static bool track_if_local_dev(
+    Package *pkg,
+    LocalDevPackageInfo **local_dev_packages,
+    int *local_dev_count,
+    int *local_dev_capacity
+) {
+    if (!is_package_local_dev(pkg->author, pkg->name, pkg->version)) {
+        return false;
+    }
+
+    /* Expand capacity if needed */
+    if (*local_dev_count >= *local_dev_capacity) {
+        *local_dev_capacity *= 2;
+        *local_dev_packages = arena_realloc(*local_dev_packages, (*local_dev_capacity) * sizeof(LocalDevPackageInfo));
+        if (!*local_dev_packages) {
+            log_error("Failed to reallocate memory for local-dev package tracking");
+            return false;
+        }
+    }
+
+    /* Track the package */
+    (*local_dev_packages)[*local_dev_count].author = pkg->author;
+    (*local_dev_packages)[*local_dev_count].name = pkg->name;
+    (*local_dev_packages)[*local_dev_count].version = pkg->version;
+    (*local_dev_count)++;
+
+    return true;
+}
+
 int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
     log_debug("Downloading all packages from elm.json");
 
     int total = 0;
+    
+    /* Track local-dev packages to re-insert into registry.dat if needed */
+    int local_dev_count = 0;
+    int local_dev_capacity = INITIAL_SMALL_CAPACITY;
+    LocalDevPackageInfo *local_dev_packages = arena_malloc(local_dev_capacity * sizeof(LocalDevPackageInfo));
+    if (!local_dev_packages) {
+        log_error("Failed to allocate memory for local-dev package tracking");
+        return 1;
+    }
 
     if (elm_json->type == ELM_PROJECT_APPLICATION) {
         total = elm_json->dependencies_direct->count +
@@ -62,6 +117,10 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
         // Download direct dependencies
         for (int i = 0; i < elm_json->dependencies_direct->count; i++) {
             Package *pkg = &elm_json->dependencies_direct->packages[i];
+            
+            /* Track if this is a local-dev package */
+            track_if_local_dev(pkg, &local_dev_packages, &local_dev_count, &local_dev_capacity);
+            
             if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
                 printf("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
                 if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
@@ -76,6 +135,10 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
         // Download indirect dependencies
         for (int i = 0; i < elm_json->dependencies_indirect->count; i++) {
             Package *pkg = &elm_json->dependencies_indirect->packages[i];
+            
+            /* Track if this is a local-dev package */
+            track_if_local_dev(pkg, &local_dev_packages, &local_dev_count, &local_dev_capacity);
+            
             if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
                 printf("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
                 if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
@@ -90,6 +153,10 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
         // Download test direct dependencies
         for (int i = 0; i < elm_json->dependencies_test_direct->count; i++) {
             Package *pkg = &elm_json->dependencies_test_direct->packages[i];
+            
+            /* Track if this is a local-dev package */
+            track_if_local_dev(pkg, &local_dev_packages, &local_dev_count, &local_dev_capacity);
+            
             if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
                 printf("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
                 if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
@@ -104,6 +171,10 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
         // Download test indirect dependencies
         for (int i = 0; i < elm_json->dependencies_test_indirect->count; i++) {
             Package *pkg = &elm_json->dependencies_test_indirect->packages[i];
+            
+            /* Track if this is a local-dev package */
+            track_if_local_dev(pkg, &local_dev_packages, &local_dev_count, &local_dev_capacity);
+            
             if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
                 printf("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
                 if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
@@ -185,6 +256,56 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
             if (version_str != pkg->version) arena_free(version_str);
         }
     }
+
+    /* Re-insert local-dev packages into registry.dat if they were found */
+    if (local_dev_count > 0) {
+        log_debug("Re-inserting %d local-dev package(s) into registry.dat", local_dev_count);
+        
+        /* Load the current registry.dat */
+        if (env->cache && env->cache->registry_path) {
+            Registry *registry = registry_load_from_dat(env->cache->registry_path, NULL);
+            if (registry) {
+                bool registry_modified = false;
+                
+                for (int i = 0; i < local_dev_count; i++) {
+                    Version parsed_version = version_parse(local_dev_packages[i].version);
+                    bool added = false;
+                    
+                    if (registry_add_version_ex(registry, local_dev_packages[i].author, 
+                                               local_dev_packages[i].name, parsed_version, 
+                                               false, &added)) {
+                        if (added) {
+                            log_debug("Re-inserted local-dev package: %s/%s %s", 
+                                     local_dev_packages[i].author, 
+                                     local_dev_packages[i].name, 
+                                     local_dev_packages[i].version);
+                            registry_modified = true;
+                        }
+                    } else {
+                        log_error("Failed to re-insert local-dev package: %s/%s %s",
+                                 local_dev_packages[i].author,
+                                 local_dev_packages[i].name,
+                                 local_dev_packages[i].version);
+                    }
+                }
+                
+                if (registry_modified) {
+                    registry_sort_entries(registry);
+                    if (!registry_dat_write(registry, env->cache->registry_path)) {
+                        log_error("Failed to write registry.dat with local-dev packages");
+                    } else {
+                        log_debug("Successfully updated registry.dat with local-dev packages");
+                    }
+                }
+                
+                registry_free(registry);
+            } else {
+                log_error("Failed to load registry.dat for local-dev package re-insertion");
+            }
+        }
+    }
+    
+    arena_free(local_dev_packages);
 
     log_debug("All dependencies downloaded successfully");
     return 0;

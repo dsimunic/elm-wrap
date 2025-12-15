@@ -64,4 +64,17 @@ void local_dev_package_free(LocalDevPackage *pkg);
  */
 void local_dev_packages_free(LocalDevPackage *pkgs, int count);
 
+/**
+ * Check if a specific package version is registered for local development.
+ *
+ * This checks if the package exists in the local-dev tracking directory,
+ * which indicates it's been installed with --local-dev flag.
+ *
+ * @param author  Package author
+ * @param name    Package name
+ * @param version Package version
+ * @return true if the package is registered for local-dev, false otherwise
+ */
+bool is_package_local_dev(const char *author, const char *name, const char *version);
+
 #endif /* LOCAL_DEV_TRACKING_H */
