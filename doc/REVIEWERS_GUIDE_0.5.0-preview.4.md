@@ -1,6 +1,6 @@
 # Reviewers Guide
 
-This document guides you through the features of **elm-wrap** version 0.5.0-preview.3, helping you evaluate the feature set in this release.
+This document guides you through the features of **elm-wrap** version 0.5.0-preview.4, helping you evaluate the feature set in this release.
 
 ## Release focus
 
@@ -31,7 +31,7 @@ For this review, the feedback channels are:
 - "Incremental Elm" Discord, channel #elm-wrap
 - Private message on "Incremental Elm" Discord to @Damir.
 
-We hope to iterate on `preview.3` quickly, possibly release `preview.4` if needed, and then release `0.5.0`.
+We hope to iterate on `preview.4` quickly, possibly release `preview.5` if needed, and then release `0.5.0`.
 
 The intent for `0.5.0` is to release a solid, production-grade, **daily driver**-quality foundation for local package development workflows and `elm.json` maintenance, and then build on top of it in future releases.
 
@@ -47,6 +47,7 @@ Great examples are the changes from `preview.2`:
 some fuzzy matches. Well, `wrap` now does the same!
 - We started off with `wrap install author/name 1.0.0` but @jfmengels quickly pointed out that `wrap install author/name 1.0.0 author2/name2 1.0.0` looks unwieldy and unintuitive. Now you can run `wrap install author/name@1.0.0 author2/name2@1.0.0`, which feels much nicer.
 
+All that said, a big Thank You! to @wolfadex for actually beta testing `wrap` and discovering a bunch of issues.
 
 Version 0.5.0 is the point where we want to fix the interface for package management commands. Nothing will be set in stone, but ideally once we release 0.5.0, the package management interface will remain unchanged through future releases up to at least the 2.x.x series. 
 
