@@ -1,6 +1,6 @@
 # Reviewers Guide
 
-This document guides you through the features of **elm-wrap** version 0.5.0-preview.4, helping you evaluate the feature set in this release.
+This document guides you through the features of **elm-wrap** version 0.5.0, helping you evaluate the feature set in this release.
 
 ## Release focus
 
@@ -16,7 +16,7 @@ Release `0.5.0` focuses on developer experience improvements, particularly for p
 
 ## Feedback sought
 
-The goal of this preview release is to gather feedback on the **usability and functionality of local package development workflows.** Your developer experience
+The goal of this release is to gather feedback on the **usability and functionality of local package development workflows.** Your developer experience
 ("DX") if you will.
 
 Package development DX is our _beachhead_ feature for developer acceptance of **elm-wrap** in real-world scenarios. That entails the "you don't have to change 
@@ -25,15 +25,13 @@ your usual ways of doing things" attitude. Meaning it's easy to try it out for t
 Due to the compatibility-focused approach with the Elm compiler, some rough edges and limitations exist. We could gain more robustness and polish if we only supported
 "run it with `wrap`, always" workflows, but that is a harder sell for for now, until the set of useful features greatly outweighs the pain of change.
 
-The most useful feedback you can provide is **your experience** going through the workflows described below. The ideal case is that you either conclude "Yes, this works as expected, and I can use it in my daily development!" or "No, this doesn't work for me because of reasons." Both answers are useful. Technical issues are inevitable and expected in a preview release, but usability and workflow acceptance is the key goal here. The steps in this guide were verified manually several times, and there are regression tests now, so there's confidence in the basics.
+The most useful feedback you can provide is **your experience** going through the workflows described below. The ideal case is that you either conclude "Yes, this works as expected, and I can use it in my daily development!" or "No, this doesn't work for me because of reasons." Both answers are useful. Technical issues are inevitable and expected in a release, but usability and workflow acceptance is the key goal here. The steps in this guide were verified manually several times, and there are regression tests now, so there's confidence in the basics.
 
 For this review, the feedback channels are:
 - "Incremental Elm" Discord, channel #elm-wrap
 - Private message on "Incremental Elm" Discord to @Damir.
 
-We hope to iterate on `preview.4` quickly, possibly release `preview.5` if needed, and then release `0.5.0`.
-
-The intent for `0.5.0` is to release a solid, production-grade, **daily driver**-quality foundation for local package development workflows and `elm.json` maintenance, and then build on top of it in future releases.
+The intent for `0.5.0` is to serve as a **daily driver**-quality foundation for local package development workflows and `elm.json` maintenance, and then build on top of it in future releases.
 
 ### "Beta testing" vs "Feedback"
 
@@ -52,21 +50,6 @@ All that said, a big Thank You! to @wolfadex for actually beta testing `wrap` an
 Version 0.5.0 is the point where we want to fix the interface for package management commands. Nothing will be set in stone, but ideally once we release 0.5.0, the package management interface will remain unchanged through future releases up to at least the 2.x.x series. 
 
 Please, jump in, take `wrap` for a spin and share your experience!
-
-## Changes since `preview.2`
-
-**multiple package specification**: `install`, `uninstall` now accept multiple packages on the command line: `wrap install PACKAGE[@VERSION] [PACKAGE[@VERSION] ...]`
-
-**@-separator for versioned package** specification. One can now write `PACKAGE@VERSION` whenever package version specification is allowed.
-
-**aliases for install/uninstall**: `wrap install` and `wrap uninstall` route to corresponding `wrap package COMMAND`. Easier to type and more _in the fingers_. 
-Consequently, `wrap install` is not a pass-through command to the underlying compiler.
-
-**`uninstall --local-dev` instead of `install --remove-local-dev`** for symmetry.
-
-**package name suggestions** for mistyped packages, identical to the Elm compiler's suggestions.
-
-**`cache` command group** is now visible, so you don't need to specify `WRAP_FEATURE_CACHE=1` feature flag.
 
 ## Prerequisites + environment setup
 
@@ -292,8 +275,6 @@ in another application. The new dependency will show up in the install plan. (An
 Why does this work? Local application development inserts the local package into the package registry index, and points the cache to the actual package's source directory. This way, the compiler believes the package is installed into the local package cache from the registry as usual, and all dependency resolution works as expected. (That is also why the compiler will delete invalid `elm.json` files--it thinks they are corrupted in the cache and tries to redownload them, but in reality it will find the linked source directory and delete that copy).
 
 ***Removing dependencies*** from the local package synchronizes as well: running `wrap uninstall PACKAGE` on the package directory will update all dependent applications accordingly.
-
-**packages that depend on packages** in local development form a cascade of updates. For example, if package A depends on local package B, and application C depends on package A, then updating dependencies in package B will also update C's indirect dependencies accordingly. **This scenario is not supported in this preview release.** Only updates to directly linked packages update an application's indirect dependencies.
 
 ### Removing local-dev tracking
 
