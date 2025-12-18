@@ -1,6 +1,6 @@
 # Public Roadmap
 
-## 0.5.0 Local package development support
+## 0.5.0 Local package development support -- DONE
 - Init from templates
 - Develop packages locally (local-dev)
 - Install from git/zip/path
