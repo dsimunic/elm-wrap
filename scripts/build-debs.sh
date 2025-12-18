@@ -71,9 +71,10 @@ select_image() {
 }
 
 # Packages required to build (full set from README); if installing fails we try minimal set
+# Note: libssh-dev AND libssh2-1-dev needed because curl uses different SSH backends on different distros
 FULL_DEPS=(build-essential git curl ca-certificates pkg-config \
   libcurl4-openssl-dev libnghttp2-dev libidn2-dev libunistring-dev libgpg-error-dev libgcrypt20-dev \
-  libssl-dev libldap2-dev libbrotli-dev librtmp-dev libssh2-1-dev libpsl-dev libkrb5-dev libzstd-dev zlib1g-dev rsync dpkg-dev fakeroot)
+  libssl-dev libldap2-dev libbrotli-dev librtmp-dev libssh-dev libssh2-1-dev libpsl-dev libkrb5-dev libzstd-dev zlib1g-dev rsync dpkg-dev fakeroot)
 MINIMAL_DEPS=(build-essential curl ca-certificates rsync dpkg-dev fakeroot)
 
 # Join arrays into strings for in-container use
@@ -133,9 +134,10 @@ fi
 
 # Build from cloned tree (capture output, show only on error)
 if [ "\$SKIP_BUILD" != "1" ]; then
-  if ! make clean all > /tmp/make.log 2>&1; then
-    echo "=== make failed ==="
-    tail -50 /tmp/make.log
+  echo "Building..."
+  if ! make -s clean all > /tmp/make.log 2>&1; then
+    echo "=== make failed (last 15 lines) ==="
+    tail -15 /tmp/make.log
     exit 1
   fi
 fi

@@ -271,13 +271,12 @@ Note the binary command is called `wrap`.
 You can confirm you have the latest version with:
 
 ```bash
-wrap --version
+wrap version
 
-Version: 0.5.0-preview.3@detached-abcc73e9-2025-12-13T18:25:34Z
-  Base version: 0.5.0-preview.3
-  Commit: abcc73e9becffdbaf2310c7be4ff849b65ee9080
-  Compiler: Apple clang version 15.0.0 (clang-1500.3.9.4)
-  Platform: Darwin/arm64
+Version: 0.5.0@detached-63f56413-2025-12-18T18:21:15Z
+  Base version: 0.5.0
+  Commit: 63f564137e8e2975fdaa11736dc70aabde468bb5
+
 ```
 
 Later updates:
@@ -301,7 +300,7 @@ sudo mv wrap /usr/local/bin/
 
 ### Linux
 
-Sadly, for now you'll need to make your own. A `.deb` and a PPA are coming soon.
+Get your .deb files for Debian and Ubuntu at https://deb.wrap.pm
 
 **Build from source**
 
@@ -315,9 +314,9 @@ sudo apt install -y --no-install-recommends \
   libssl-dev libldap2-dev libbrotli-dev librtmp-dev libssh-dev \
   libpsl-dev libkrb5-dev libzstd-dev zlib1g-dev rsync
 
-curl -sL https://github.com/dsimunic/elm-wrap/archive/refs/tags/v0.5.0-preview.3.tar.gz | tar -zxv
+curl -sL https://github.com/dsimunic/elm-wrap/archive/refs/tags/v0.5.0.tar.gz | tar -zxv
 
-SRC=elm-wrap-0.5.0-preview.3
+SRC=elm-wrap-0.5.0
 make -C $SRC clean all
 make -C $SRC install-user   # if your ~/.local/bin is in the path
 sudo make -C $SRC install   # otherwise 
@@ -332,9 +331,9 @@ sudo apt install -y --no-install-recommends \
   make build-essential libcurl4-openssl-dev libnghttp2-dev \
   libunistring-dev libgpg-error-dev rsync 
 
-curl -sL https://github.com/dsimunic/elm-wrap/archive/refs/tags/v0.5.0-preview.3.tar.gz | tar -zxv
+curl -sL https://github.com/dsimunic/elm-wrap/archive/refs/tags/v0.5.0.tar.gz | tar -zxv
 
-SRC=elm-wrap-0.5.0-preview.3
+SRC=elm-wrap-0.5.0
 make -C $SRC clean all
 make -C $SRC install-user   # if your ~/.local/bin is in the path
 sudo make -C $SRC install   # otherwise 
@@ -364,9 +363,6 @@ Build the code with make:
 
     make
 
-## Building on Linux
-
-Until a `.deb` package is available, building on linux requires the following incantations:
 
 ## Prior art and similar utilities
 
