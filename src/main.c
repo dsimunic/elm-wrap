@@ -103,7 +103,9 @@ void print_usage(const char *prog) {
     if (feature_review_enabled()) {
         printf("  review SUBCOMMAND         Run review rules against Elm files\n");
     }
-    printf("  debug SUBCOMMAND          Diagnostic tools for development\n");
+    if (feature_debug_enabled()) {
+        printf("  debug SUBCOMMAND          Diagnostic tools for development\n");
+    }
     printf("\nOptions:\n");
     printf("  -v, --verbose      Show detailed logging output\n");
     printf("  -vv                Show extra verbose (trace) logging output\n");
@@ -393,6 +395,10 @@ int main(int argc, char *argv[]) {
         }
 
         if (strcmp(argv[1], "debug") == 0) {
+            if (!feature_debug_enabled()) {
+                log_error("Command 'debug' is not available in this build.");
+                return 1;
+            }
             return cmd_debug(argc - 1, argv + 1);
         }
 
