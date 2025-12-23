@@ -13,6 +13,7 @@
 #include "../../dyn_array.h"
 #include "../../commands/cache/check/cache_check.h"
 #include "../../commands/cache/full_scan/cache_full_scan.h"
+#include "../../commands/cache/download_missing/cache_download_missing.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -168,6 +169,7 @@ static void print_cache_usage(void) {
     printf("  %s package cache [OPTIONS] PACKAGE[@VERSION] [PACKAGE[@VERSION]...]\n", prog);
     printf("  %s package cache check PACKAGE [OPTIONS]\n", prog);
     printf("  %s package cache full-scan [OPTIONS]\n", prog);
+    printf("  %s package cache missing [OPTIONS]\n", prog);
     printf("\n");
     printf("Download packages into the cache so installs can run offline.\n");
     printf("\n");
@@ -179,6 +181,7 @@ static void print_cache_usage(void) {
     printf("  %s package cache check elm/html              # Check cache status for elm/html\n", prog);
     printf("  %s package cache check elm/html --fix-broken # Re-download broken versions\n", prog);
     printf("  %s package cache full-scan                   # Scan all packages in cache\n", prog);
+    printf("  %s package cache missing                     # Download all missing deps from elm.json\n", prog);
     printf("  %s package cache --from-file ./pkg elm/html  # Download from local directory\n", prog);
     printf("  %s package cache --from-url URL elm/html     # Download from URL to cache\n", prog);
     printf("  %s package cache --major elm/html            # Download highest major version\n", prog);
@@ -209,6 +212,9 @@ int cmd_cache(int argc, char *argv[]) {
     }
     if (argc >= 2 && strcmp(argv[1], "full-scan") == 0) {
         return cmd_cache_full_scan(argc - 1, argv + 1);
+    }
+    if (argc >= 2 && strcmp(argv[1], "missing") == 0) {
+        return cmd_cache_download_missing(argc - 1, argv + 1);
     }
 
     const char *from_file_path = NULL;

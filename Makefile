@@ -144,6 +144,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/import_tree.c \
           $(SRCDIR)/commands/cache/check/cache_check.c \
           $(SRCDIR)/commands/cache/full_scan/cache_full_scan.c \
+          $(SRCDIR)/commands/cache/download_missing/cache_download_missing.c \
           $(SRCDIR)/vendor/tree-sitter/lib.c \
           $(SRCDIR)/vendor/tree-sitter-elm/parser.c \
           $(SRCDIR)/vendor/tree-sitter-elm/scanner.c \
@@ -235,6 +236,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/import_tree.o \
           $(BUILDDIR)/cache_check.o \
           $(BUILDDIR)/cache_full_scan.o \
+          $(BUILDDIR)/cache_download_missing.o \
           $(BUILDDIR)/ts_lib.o \
           $(BUILDDIR)/ts_elm_parser.o \
           $(BUILDDIR)/ts_elm_scanner.o \
@@ -530,6 +532,10 @@ $(BUILDDIR)/cache_full_scan.o: $(SRCDIR)/commands/cache/full_scan/cache_full_sca
 	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Build cache_download_missing object
+$(BUILDDIR)/cache_download_missing.o: $(SRCDIR)/commands/cache/download_missing/cache_download_missing.c $(SRCDIR)/commands/cache/download_missing/cache_download_missing.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/commands/package/package_common.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # Build tree-sitter lib object
 $(BUILDDIR)/ts_lib.o: $(SRCDIR)/vendor/tree-sitter/lib.c | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
@@ -561,7 +567,7 @@ $(BUILDDIR)/local_dev_tracking.o: $(SRCDIR)/local_dev/local_dev_tracking.c $(SRC
 $(BUILDDIR)/init_cmd.o: $(SRCDIR)/commands/package/init_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install_env.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/embedded_archive.h $(SRCDIR)/fileutil.h $(SRCDIR)/vendor/cJSON.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/cache_cmd.o: $(SRCDIR)/commands/package/cache_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/http_client.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/commands/cache/check/cache_check.h $(SRCDIR)/commands/cache/full_scan/cache_full_scan.h | $(BUILDDIR)
+$(BUILDDIR)/cache_cmd.o: $(SRCDIR)/commands/package/cache_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/http_client.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/commands/cache/check/cache_check.h $(SRCDIR)/commands/cache/full_scan/cache_full_scan.h $(SRCDIR)/commands/cache/download_missing/cache_download_missing.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILDDIR)/remove_cmd.o: $(SRCDIR)/commands/package/remove_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/solver.h $(SRCDIR)/alloc.h $(SRCDIR)/log.h | $(BUILDDIR)
