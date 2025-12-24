@@ -3,7 +3,7 @@
 #include "elm_compiler.h"
 #include "alloc.h"
 #include "constants.h"
-#include "log.h"
+#include "shared/log.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

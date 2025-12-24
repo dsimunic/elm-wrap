@@ -10,7 +10,7 @@
 #include "../elm_json.h"
 #include "../cache.h"
 #include "../constants.h"
-#include "../log.h"
+#include "../shared/log.h"
 #include "../alloc.h"
 #include "../fileutil.h"
 #include <stdio.h>
@@ -171,15 +171,19 @@ int v1_show_package_dependencies(const char *author, const char *name, const cha
     if (elm_json_path) arena_free(elm_json_path);
     arena_free(pkg_path);
 
-    printf("\n");
-    printf("Package: %s/%s %s\n", author, name, version);
-    printf("========================================\n\n");
+    LogLevel old_level = g_log_level;
+    log_set_level(LOG_LEVEL_PROGRESS);
+
+    log_progress("");
+    log_progress("Package: %s/%s %s", author, name, version);
+    log_progress("========================================");
+    log_progress("");
 
     if (elm_json->type == ELM_PROJECT_PACKAGE && elm_json->package_dependencies) {
         PackageMap *deps = elm_json->package_dependencies;
 
         if (deps->count == 0) {
-            printf("No dependencies\n");
+            log_progress("No dependencies");
         } else {
             int max_width = 0;
             for (int i = 0; i < deps->count; i++) {
@@ -197,12 +201,12 @@ int v1_show_package_dependencies(const char *author, const char *name, const cha
                 }
             }
 
-            printf("Dependencies (%d):\n", deps->count);
+            log_progress("Dependencies (%d):", deps->count);
             for (int i = 0; i < deps->count; i++) {
                 Package *pkg = &deps->packages[i];
                 char pkg_name[MAX_PACKAGE_NAME_LENGTH];
                 snprintf(pkg_name, sizeof(pkg_name), "%s/%s", pkg->author, pkg->name);
-                printf("  %-*s    %s\n", max_width, pkg_name, pkg->version);
+                log_progress("  %-*s    %s", max_width, pkg_name, pkg->version);
             }
         }
 
@@ -224,17 +228,20 @@ int v1_show_package_dependencies(const char *author, const char *name, const cha
                 }
             }
 
-            printf("\nTest Dependencies (%d):\n", test_deps->count);
+            log_progress("");
+            log_progress("Test Dependencies (%d):", test_deps->count);
             for (int i = 0; i < test_deps->count; i++) {
                 Package *pkg = &test_deps->packages[i];
                 char pkg_name[MAX_PACKAGE_NAME_LENGTH];
                 snprintf(pkg_name, sizeof(pkg_name), "%s/%s", pkg->author, pkg->name);
-                printf("  %-*s    %s\n", max_width, pkg_name, pkg->version);
+                log_progress("  %-*s    %s", max_width, pkg_name, pkg->version);
             }
         }
     } else {
-        printf("(Not a package - this is an application)\n");
+        log_progress("(Not a package - this is an application)");
     }
+
+    log_set_level(old_level);
 
     /* Check for reverse dependencies in current elm.json */
     ElmJson *current_elm_json = elm_json_read(ELM_JSON_PATH);
@@ -305,12 +312,13 @@ int v1_show_package_dependencies(const char *author, const char *name, const cha
                 if (pkg_len > max_width) max_width = pkg_len;
             }
 
-            printf("\nPackages in elm.json that depend on %s/%s (%d):\n", author, name, reverse_deps->count);
+            log_progress("");
+            log_progress("Packages in elm.json that depend on %s/%s (%d):", author, name, reverse_deps->count);
             for (int i = 0; i < reverse_deps->count; i++) {
                 Package *pkg = &reverse_deps->packages[i];
                 char pkg_name[MAX_PACKAGE_NAME_LENGTH];
                 snprintf(pkg_name, sizeof(pkg_name), "%s/%s", pkg->author, pkg->name);
-                printf("  %-*s    %s\n", max_width, pkg_name, pkg->version);
+                log_progress("  %-*s    %s", max_width, pkg_name, pkg->version);
             }
         }
 

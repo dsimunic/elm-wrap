@@ -7,7 +7,7 @@
 #include "../fileutil.h"
 #include "../vendor/cJSON.h"
 #include "../vendor/sha1.h"
-#include "../log.h"
+#include "../shared/log.h"
 #include "../http_client.h"
 #include <stdlib.h>
 #include <string.h>
@@ -214,11 +214,12 @@ bool verify_file_sha1(const char *filepath, const char *expected_hex) {
     if (memcmp(actual_hash, expected_hash, SHA1_BLOCK_SIZE) != 0) {
         log_error("SHA-1 hash mismatch");
         log_error("  Expected: %s", expected_hex);
-        fprintf(stderr, "  Actual:   ");
+        char actual_hex[SHA1_BLOCK_SIZE * 2 + 1];
         for (int i = 0; i < SHA1_BLOCK_SIZE; i++) {
-            fprintf(stderr, "%02x", actual_hash[i]);
+            sprintf(actual_hex + i * 2, "%02x", actual_hash[i]);
         }
-        fprintf(stderr, "\n");
+        actual_hex[SHA1_BLOCK_SIZE * 2] = '\0';
+        log_error("  Actual:   %s", actual_hex);
         return false;
     }
 

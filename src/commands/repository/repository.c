@@ -14,7 +14,7 @@
 #include "../../env_defaults.h"
 #include "../../elm_compiler.h"
 #include "../../elm_json.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../protocol_v2/index_fetch.h"
 #include "../../protocol_v2/solver/v2_registry.h"
 #include "../../registry.h"

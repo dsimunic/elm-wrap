@@ -2,7 +2,7 @@
 #include "../registry.h"
 #include "pg_elm.h"
 #include "../alloc.h"
-#include "../log.h"
+#include "../shared/log.h"
 
 #include <stdlib.h>
 #include <stdio.h>

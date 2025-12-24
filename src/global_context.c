@@ -13,7 +13,7 @@
 #include "env_defaults.h"
 #include "elm_compiler.h"
 #include "buildinfo.h"
-#include "log.h"
+#include "shared/log.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

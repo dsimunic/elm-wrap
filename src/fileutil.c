@@ -2,7 +2,7 @@
 #include "vendor/miniz.h"
 #include "alloc.h"
 #include "constants.h"
-#include "log.h"
+#include "shared/log.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -365,7 +365,7 @@ static bool move_item(const char *src, const char *dest) {
 bool move_directory_contents(const char *src_dir, const char *dest_dir) {
     DIR *dir = opendir(src_dir);
     if (!dir) {
-        fprintf(stderr, "Error: Failed to open directory: %s\n", src_dir);
+        log_error("Failed to open directory: %s", src_dir);
         return false;
     }
 
@@ -383,7 +383,7 @@ bool move_directory_contents(const char *src_dir, const char *dest_dir) {
         snprintf(dest_path, sizeof(dest_path), "%s/%s", dest_dir, entry->d_name);
 
         if (!move_item(src_path, dest_path)) {
-            fprintf(stderr, "Warning: Failed to move %s to %s\n", src_path, dest_path);
+            log_warn("Failed to move %s to %s", src_path, dest_path);
             /* Continue with other files even if one fails */
         }
     }
@@ -516,7 +516,7 @@ bool copy_directory_selective(const char *src_path, const char *dest_path) {
     }
 
     if (!S_ISDIR(st.st_mode)) {
-        fprintf(stderr, "Error: Source path must be a directory: %s\n", src_path);
+        log_error("Source path must be a directory: %s", src_path);
         return false;
     }
 
@@ -541,7 +541,7 @@ bool copy_directory_selective(const char *src_path, const char *dest_path) {
             FILE *src_fp = fopen(src_file, "rb");
             if (!src_fp) {
                 /* File exists but can't be opened - treat as error */
-                fprintf(stderr, "Error: Failed to open %s for reading\n", src_file);
+                log_error("Failed to open %s for reading", src_file);
                 success = false;
                 continue;
             }
@@ -549,7 +549,7 @@ bool copy_directory_selective(const char *src_path, const char *dest_path) {
             FILE *dest_fp = fopen(dest_file, "wb");
             if (!dest_fp) {
                 fclose(src_fp);
-                fprintf(stderr, "Error: Failed to open %s for writing\n", dest_file);
+                log_error("Failed to open %s for writing", dest_file);
                 success = false;
                 continue;
             }
@@ -568,7 +568,7 @@ bool copy_directory_selective(const char *src_path, const char *dest_path) {
             fclose(dest_fp);
 
             if (!copy_success) {
-                fprintf(stderr, "Error: Failed to copy %s\n", files_to_copy[i]);
+                log_error("Failed to copy %s", files_to_copy[i]);
                 success = false;
             } else {
                 /* Preserve permissions */
@@ -586,11 +586,11 @@ bool copy_directory_selective(const char *src_path, const char *dest_path) {
 
     if (stat(src_dir, &st) == 0 && S_ISDIR(st.st_mode)) {
         if (!copy_directory_recursive(src_dir, dest_dir)) {
-            fprintf(stderr, "Error: Failed to copy src/ directory\n");
+            log_error("Failed to copy src/ directory");
             success = false;
         }
     } else {
-        fprintf(stderr, "Error: src/ directory not found in %s\n", src_path);
+        log_error("src/ directory not found in %s", src_path);
         success = false;
     }
 

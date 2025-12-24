@@ -8,7 +8,7 @@
 #include "../../http_client.h"
 #include "../../alloc.h"
 #include "../../constants.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../fileutil.h"
 #include "../../dyn_array.h"
 #include "../../commands/cache/check/cache_check.h"
@@ -112,7 +112,7 @@ static bool cache_download_package_recursive(InstallEnv *env, const char *author
 
     log_progress("Downloading %s/%s %s...", author, name, version);
     if (!install_env_download_package(env, author, name, version)) {
-        fprintf(stderr, "Error: Failed to download %s/%s %s\n", author, name, version);
+        log_error("Failed to download %s/%s %s", author, name, version);
         return false;
     }
 
@@ -120,7 +120,7 @@ static bool cache_download_package_recursive(InstallEnv *env, const char *author
 
     char *pkg_path = cache_get_package_path(env->cache, author, name, version);
     if (!pkg_path) {
-        fprintf(stderr, "Error: Failed to get package path for %s/%s %s\n", author, name, version);
+        log_error("Failed to get package path for %s/%s %s", author, name, version);
         return false;
     }
 
@@ -164,46 +164,49 @@ static bool cache_download_package_recursive(InstallEnv *env, const char *author
 }
 
 static void print_cache_usage(void) {
+    LogLevel old_level = g_log_level;
+    log_set_level(LOG_LEVEL_PROGRESS);
     const char *prog = global_context_program_name();
-    printf("Usage:\n");
-    printf("  %s package cache [OPTIONS] PACKAGE[@VERSION] [PACKAGE[@VERSION]...]\n", prog);
-    printf("  %s package cache check PACKAGE [OPTIONS]\n", prog);
-    printf("  %s package cache full-scan [OPTIONS]\n", prog);
-    printf("  %s package cache missing [OPTIONS]\n", prog);
-    printf("\n");
-    printf("Download packages into the cache so installs can run offline.\n");
-    printf("\n");
-    printf("Examples:\n");
-    printf("  %s package cache elm/html                    # Download latest elm/html\n", prog);
-    printf("  %s package cache elm/html@1.0.0              # Download specific version\n", prog);
-    printf("  %s package cache elm/html elm/json           # Cache multiple packages\n", prog);
-    printf("  %s package cache elm/html 1.0.0 elm/json     # Mix positional version + latest\n", prog);
-    printf("  %s package cache check elm/html              # Check cache status for elm/html\n", prog);
-    printf("  %s package cache check elm/html --fix-broken # Re-download broken versions\n", prog);
-    printf("  %s package cache full-scan                   # Scan all packages in cache\n", prog);
-    printf("  %s package cache missing                     # Download all missing deps from elm.json\n", prog);
-    printf("  %s package cache --from-file ./pkg elm/html  # Download from local directory\n", prog);
-    printf("  %s package cache --from-url URL elm/html     # Download from URL to cache\n", prog);
-    printf("  %s package cache --major elm/html            # Download highest major version\n", prog);
-    printf("\n");
-    printf("Download Options:\n");
-    printf("  PACKAGE[@VERSION] [PACKAGE[@VERSION]...]   # One or more packages (use @VERSION for specific release)\n");
-    printf("  PACKAGE VERSION                           # Backwards-compatible positional version (single package)\n");
-    printf("  --from-file PATH PACKAGE[@VERSION]        # Download from local directory/archive (single package)\n");
-    printf("  --from-url URL PACKAGE[@VERSION]          # Download from URL to cache (single package)\n");
-    printf("  --major PACKAGE                           # Download highest available major version (single package)\n");
-    printf("  --ignore-hash                             # Skip SHA-1 hash verification\n");
-    printf("  -v, --verbose                             # Show progress reports\n");
-    printf("  -q, --quiet                               # Suppress progress reports\n");
-    printf("  --help                                    # Show this help\n");
-    printf("\n");
-    printf("Check Options:\n");
-    printf("  --purge-broken                            # Remove broken directories without re-downloading\n");
-    printf("  --fix-broken                              # Try to re-download broken versions\n");
-    printf("\n");
-    printf("Full-scan Options:\n");
-    printf("  -q, --quiet                               # Only show summary counts\n");
-    printf("  -v, --verbose                             # Show all issues including missing latest\n");
+    log_progress("Usage:");
+    log_progress("  %s package cache [OPTIONS] PACKAGE[@VERSION] [PACKAGE[@VERSION]...]", prog);
+    log_progress("  %s package cache check PACKAGE [OPTIONS]", prog);
+    log_progress("  %s package cache full-scan [OPTIONS]", prog);
+    log_progress("  %s package cache missing [OPTIONS]", prog);
+    log_progress("");
+    log_progress("Download packages into the cache so installs can run offline.");
+    log_progress("");
+    log_progress("Examples:");
+    log_progress("  %s package cache elm/html                    # Download latest elm/html", prog);
+    log_progress("  %s package cache elm/html@1.0.0              # Download specific version", prog);
+    log_progress("  %s package cache elm/html elm/json           # Cache multiple packages", prog);
+    log_progress("  %s package cache elm/html 1.0.0 elm/json     # Mix positional version + latest", prog);
+    log_progress("  %s package cache check elm/html              # Check cache status for elm/html", prog);
+    log_progress("  %s package cache check elm/html --fix-broken # Re-download broken versions", prog);
+    log_progress("  %s package cache full-scan                   # Scan all packages in cache", prog);
+    log_progress("  %s package cache missing                     # Download all missing deps from elm.json", prog);
+    log_progress("  %s package cache --from-file ./pkg elm/html  # Download from local directory", prog);
+    log_progress("  %s package cache --from-url URL elm/html     # Download from URL to cache", prog);
+    log_progress("  %s package cache --major elm/html            # Download highest major version", prog);
+    log_progress("");
+    log_progress("Download Options:");
+    log_progress("  PACKAGE[@VERSION] [PACKAGE[@VERSION]...]   # One or more packages (use @VERSION for specific release)");
+    log_progress("  PACKAGE VERSION                           # Backwards-compatible positional version (single package)");
+    log_progress("  --from-file PATH PACKAGE[@VERSION]        # Download from local directory/archive (single package)");
+    log_progress("  --from-url URL PACKAGE[@VERSION]          # Download from URL to cache (single package)");
+    log_progress("  --major PACKAGE                           # Download highest available major version (single package)");
+    log_progress("  --ignore-hash                             # Skip SHA-1 hash verification");
+    log_progress("  -v, --verbose                             # Show progress reports");
+    log_progress("  -q, --quiet                               # Suppress progress reports");
+    log_progress("  --help                                    # Show this help");
+    log_progress("");
+    log_progress("Check Options:");
+    log_progress("  --purge-broken                            # Remove broken directories without re-downloading");
+    log_progress("  --fix-broken                              # Try to re-download broken versions");
+    log_progress("");
+    log_progress("Full-scan Options:");
+    log_progress("  -q, --quiet                               # Only show summary counts");
+    log_progress("  -v, --verbose                             # Show all issues including missing latest");
+    log_set_level(old_level);
 }
 
 int cmd_cache(int argc, char *argv[]) {

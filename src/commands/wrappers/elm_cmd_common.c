@@ -6,7 +6,7 @@
 #include "../../cache.h"
 #include "../../registry.h"
 #include "../../alloc.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../constants.h"
 #include "../../commands/package/package_common.h"
 #include "../../local_dev/local_dev_tracking.h"

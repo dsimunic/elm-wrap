@@ -6,7 +6,7 @@
 #include "../../../global_context.h"
 #include "../../../alloc.h"
 #include "../../../constants.h"
-#include "../../../log.h"
+#include "../../../shared/log.h"
 #include "../../package/package_common.h"
 #include <stdio.h>
 #include <stdlib.h>

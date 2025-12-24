@@ -10,7 +10,7 @@
 #include "../../registry.h"
 #include "../../cache.h"
 #include "../../install_env.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../fileutil.h"
 #include "../../constants.h"
 #include "../../vendor/cJSON.h"

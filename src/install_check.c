@@ -6,7 +6,7 @@
 #include "fileutil.h"
 #include "exit_codes.h"
 #include "terminal_colors.h"
-#include "log.h"
+#include "shared/log.h"
 #include "commands/package/package_common.h"
 #include <stdio.h>
 #include <stdlib.h>

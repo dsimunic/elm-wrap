@@ -12,7 +12,7 @@
 #include "../../global_context.h"
 #include "../../elm_json.h"
 #include "../../install_env.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

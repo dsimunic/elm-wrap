@@ -1,7 +1,7 @@
 #include "http_client.h"
 #include "alloc.h"
 #include "http_constants.h"
-#include "log.h"
+#include "shared/log.h"
 #include <curl/curl.h>
 #include <stdlib.h>
 #include <string.h>

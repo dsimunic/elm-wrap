@@ -3,7 +3,7 @@
 #include "constants.h"
 #include "fileutil.h"
 #include "vendor/cJSON.h"
-#include "log.h"
+#include "shared/log.h"
 #include "commands/package/package_common.h"
 #include <stdlib.h>
 #include <string.h>
@@ -138,7 +138,7 @@ void package_map_print(PackageMap *map) {
     if (!map) return;
     
     for (int i = 0; i < map->count; i++) {
-        printf("    \"%s/%s\": \"%s\"\n", 
+        log_progress("    \"%s/%s\": \"%s\"", 
                map->packages[i].author, 
                map->packages[i].name,
                map->packages[i].version);
@@ -889,7 +889,7 @@ bool elm_json_promote_package(ElmJson *elm_json, const char *author, const char 
                 if (pkg) {
                     package_map_add(elm_json->dependencies_direct, author, name, pkg->version);
                     package_map_remove(elm_json->dependencies_indirect, author, name);
-                    printf("Promoted %s/%s from indirect to direct dependencies.\n", author, name);
+                    log_progress("Promoted %s/%s from indirect to direct dependencies", author, name);
                     return true;
                 }
                 break;
@@ -900,7 +900,7 @@ bool elm_json_promote_package(ElmJson *elm_json, const char *author, const char 
                 if (pkg) {
                     package_map_add(elm_json->dependencies_direct, author, name, pkg->version);
                     package_map_remove(elm_json->dependencies_test_direct, author, name);
-                    printf("Promoted %s/%s from test to direct dependencies.\n", author, name);
+                    log_progress("Promoted %s/%s from test to direct dependencies", author, name);
                     return true;
                 }
                 break;
@@ -911,7 +911,7 @@ bool elm_json_promote_package(ElmJson *elm_json, const char *author, const char 
                 if (pkg) {
                     package_map_add(elm_json->dependencies_test_direct, author, name, pkg->version);
                     package_map_remove(elm_json->dependencies_test_indirect, author, name);
-                    printf("Promoted %s/%s from test-indirect to test-direct dependencies.\n", author, name);
+                    log_progress("Promoted %s/%s from test-indirect to test-direct dependencies", author, name);
                     return true;
                 }
                 break;
@@ -925,7 +925,7 @@ bool elm_json_promote_package(ElmJson *elm_json, const char *author, const char 
             if (pkg) {
                 package_map_add(elm_json->package_dependencies, author, name, pkg->version);
                 package_map_remove(elm_json->package_test_dependencies, author, name);
-                printf("Promoted %s/%s from test to main dependencies.\n", author, name);
+                log_progress("Promoted %s/%s from test to main dependencies", author, name);
                 return true;
             }
         }

@@ -1,7 +1,7 @@
 #include "registry.h"
 #include "alloc.h"
 #include "constants.h"
-#include "log.h"
+#include "shared/log.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -676,28 +676,33 @@ size_t registry_versions_in_map_count(const Registry *registry) {
 void registry_print(const Registry *registry) {
     if (!registry) return;
 
+    LogLevel old_level = g_log_level;
+    log_set_level(LOG_LEVEL_PROGRESS);
+
     size_t map_versions = registry_versions_in_map_count(registry);
-    printf("Registry: %zu packages, %zu since_count (%zu versions in map)\n",
+    log_progress("Registry: %zu packages, %zu since_count (%zu versions in map)",
            registry->entry_count, registry->since_count, map_versions);
 
     for (size_t i = 0; i < registry->entry_count && i < 10; i++) {
         RegistryEntry *entry = &registry->entries[i];
-        printf("  %s/%s: %zu versions\n", entry->author, entry->name, entry->version_count);
+        log_progress("  %s/%s: %zu versions", entry->author, entry->name, entry->version_count);
 
         for (size_t j = 0; j < entry->version_count && j < 5; j++) {
             char *ver_str = version_to_string(&entry->versions[j]);
-            printf("    - %s\n", ver_str);
+            log_progress("    - %s", ver_str);
             arena_free(ver_str);
         }
 
         if (entry->version_count > 5) {
-            printf("    ... and %zu more\n", entry->version_count - 5);
+            log_progress("    ... and %zu more", entry->version_count - 5);
         }
     }
 
     if (registry->entry_count > 10) {
-        printf("  ... and %zu more packages\n", registry->entry_count - 10);
+        log_progress("  ... and %zu more packages", registry->entry_count - 10);
     }
+
+    log_set_level(old_level);
 }
 
 /* Merge local-dev registry into main registry */

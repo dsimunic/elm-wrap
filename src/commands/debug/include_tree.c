@@ -1,7 +1,7 @@
 #include "debug.h"
 #include "../../alloc.h"
 #include "../../global_context.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../fileutil.h"
 #include "../../dyn_array.h"
 #include "../../constants.h"

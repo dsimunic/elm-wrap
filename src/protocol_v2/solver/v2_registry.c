@@ -9,7 +9,7 @@
 #include "../../alloc.h"
 #include "../../constants.h"
 #include "../../fileutil.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../vendor/miniz.h"
 #include "../../dyn_array.h"
 #include "../../commands/package/package_common.h"

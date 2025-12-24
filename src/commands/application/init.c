@@ -10,7 +10,7 @@
 #include "../../elm_compiler.h"
 #include "../../alloc.h"
 #include "../../constants.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../embedded_archive.h"
 #include "../../fileutil.h"
 #include "../../vendor/cJSON.h"

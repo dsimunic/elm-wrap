@@ -12,6 +12,7 @@
 #include "dyn_array.h"
 #include "vendor/cJSON.h"
 #include "ast/skeleton.h"
+#include "shared/log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -325,13 +326,9 @@ static void print_tree_recursive(const char *file_path, const char *src_dir,
         int is_last = (current_index == total_imports - 1);
         current_index++;
         
-        printf("%s%s", prefix, is_last ? TREE_LAST : TREE_BRANCH);
-
-        if (already_visited) {
-            printf("%s (↩ already shown)\n", module_name);
-        } else {
-            printf("%s\n", module_name);
-            
+        log_progress("%s%s%s%s", prefix, is_last ? TREE_LAST : TREE_BRANCH, module_name, already_visited ? " (↩ already shown)" : "");
+        
+        if (!already_visited) {
             int prefix_len = strlen(prefix);
             const char *suffix = is_last ? TREE_SPACE : TREE_VERT;
             size_t suffix_len = strlen(suffix);
@@ -341,8 +338,8 @@ static void print_tree_recursive(const char *file_path, const char *src_dir,
             }
             memcpy(child_prefix, prefix, (size_t)prefix_len);
             memcpy(child_prefix + prefix_len, suffix, suffix_len + 1);
-            
-            print_tree_recursive(mod_abs_path, src_dir, visited, 
+
+            print_tree_recursive(mod_abs_path, src_dir, visited,
                                 visited_count, visited_capacity, child_prefix, show_external);
         }
     }
@@ -353,8 +350,7 @@ static void print_tree_recursive(const char *file_path, const char *src_dir,
             int is_last = (current_index == total_imports - 1);
             current_index++;
             
-            printf("%s%s", prefix, is_last ? TREE_LAST : TREE_BRANCH);
-            printf("%s (📦 external)\n", external_import_names[i]);
+            log_progress("%s%s%s (📦 external)", prefix, is_last ? TREE_LAST : TREE_BRANCH, external_import_names[i]);
         }
     }
 }
@@ -469,13 +465,21 @@ bool import_tree_is_included(ImportTreeAnalysis *analysis, const char *file_path
  * Print import tree to stdout
  */
 void import_tree_print(ImportTreeAnalysis *analysis, bool show_external) {
-    if (!analysis) return;
+    LogLevel old_level = g_log_level;
+    if (!analysis) {
+        return;
+    }
 
-    printf("\n📦 Import tree for package: %s\n", analysis->package_dir);
-    printf("   Source directory: %s\n\n", analysis->src_dir);
+    log_set_level(LOG_LEVEL_PROGRESS);
+
+    log_progress("");
+    log_progress("📦 Import tree for package: %s", analysis->package_dir);
+    log_progress("   Source directory: %s", analysis->src_dir);
+    log_progress("");
 
     if (analysis->exposed_count > 0) {
-        printf("📚 Exposed Modules (%d):\n\n", analysis->exposed_count);
+        log_progress("📚 Exposed Modules (%d):", analysis->exposed_count);
+        log_progress("");
 
         for (int i = 0; i < analysis->exposed_count; i++) {
             const char *module_name = analysis->exposed_modules[i];
@@ -488,41 +492,53 @@ void import_tree_print(ImportTreeAnalysis *analysis, bool show_external) {
 
                 char abs_path[MAX_PATH_LENGTH];
                 if (realpath(module_path, abs_path)) {
-                    printf("%s (%s)\n", module_name, abs_path);
+                    log_progress("%s (%s)", module_name, abs_path);
 
                     print_tree_recursive(abs_path, analysis->src_dir, &visited,
                                         &visited_count, &visited_capacity, "", show_external);
-                    printf("\n");
+                    log_progress("");
                 }
             } else {
-                printf("%s (❌ NOT FOUND: %s)\n\n", module_name, 
+                log_progress("%s (❌ NOT FOUND: %s)", module_name, 
                        module_path ? module_path : "unknown");
+                log_progress("");
             }
         }
     } else {
-        printf("⚠️  No exposed modules found in elm.json\n\n");
+        log_progress("⚠️  No exposed modules found in elm.json");
+        log_progress("");
     }
+
+    log_set_level(old_level);
 }
 
 /**
  * Print just the redundant files summary
  */
 void import_tree_print_redundant(ImportTreeAnalysis *analysis) {
+    LogLevel old_level = g_log_level;
     if (!analysis) return;
 
-    printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-    printf("🔍 Scanning for redundant files...\n\n");
+    log_set_level(LOG_LEVEL_PROGRESS);
+
+    log_progress("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    log_progress("🔍 Scanning for redundant files...");
+    log_progress("");
 
     if (analysis->redundant_count == 0) {
-        printf("✅ No redundant files found. All files are included.\n");
+        log_progress("✅ No redundant files found. All files are included.");
     } else {
-        printf("⚠️  Redundant files (not imported by any exposed module):\n\n");
+        log_progress("⚠️  Redundant files (not imported by any exposed module):");
+        log_progress("");
         for (int i = 0; i < analysis->redundant_count; i++) {
-            printf("   • %s\n", analysis->redundant_files[i]);
+            log_progress("   • %s", analysis->redundant_files[i]);
         }
-        printf("\n   Total: %d redundant file(s)\n", analysis->redundant_count);
+        log_progress("");
+        log_progress("   Total: %d redundant file(s)", analysis->redundant_count);
     }
-    printf("\n");
+    log_progress("");
+
+    log_set_level(old_level);
 }
 
 /**

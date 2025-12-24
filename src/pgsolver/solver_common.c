@@ -2,7 +2,7 @@
 #include "../solver.h"
 #include "../install_env.h"
 #include "../alloc.h"
-#include "../log.h"
+#include "../shared/log.h"
 #include "../commands/package/package_common.h"
 #include <stdlib.h>
 #include <string.h>

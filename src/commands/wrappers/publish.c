@@ -7,7 +7,7 @@
 
 #include "publish.h"
 #include "../../global_context.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include <stdio.h>
 
 int cmd_publish(int argc, char *argv[]) {

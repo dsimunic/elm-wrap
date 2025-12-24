@@ -11,7 +11,7 @@
 #include "../../install_env.h"
 #include "../../elm_compiler.h"
 #include "../../alloc.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../global_context.h"
 #include <stdio.h>
 #include <stdlib.h>

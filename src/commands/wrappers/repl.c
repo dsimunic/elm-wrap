@@ -5,7 +5,7 @@
 #include "../../install_env.h"
 #include "../../elm_compiler.h"
 #include "../../alloc.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

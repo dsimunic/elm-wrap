@@ -17,7 +17,7 @@
 #include "../../protocol_v2/solver/v2_registry.h"
 #include "../../alloc.h"
 #include "../../constants.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

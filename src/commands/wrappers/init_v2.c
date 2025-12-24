@@ -8,7 +8,7 @@
 #include "../../install_env.h"
 #include "../../elm_json.h"
 #include "../../alloc.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../pgsolver/pg_core.h"
 #include "../../protocol_v2/solver/pg_elm_v2.h"
 #include <stdio.h>

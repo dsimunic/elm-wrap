@@ -4,7 +4,7 @@
 #include "../../../registry.h"
 #include "../../../install_env.h"
 #include "../../../alloc.h"
-#include "../../../log.h"
+#include "../../../shared/log.h"
 #include "../../../fileutil.h"
 #include "../../../import_tree.h"
 #include "../../package/package_common.h"

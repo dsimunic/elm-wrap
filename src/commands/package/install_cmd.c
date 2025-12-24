@@ -13,7 +13,7 @@
 #include "../../alloc.h"
 #include "../../constants.h"
 #include "../../dyn_array.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../fileutil.h"
 #include "../../terminal_colors.h"
 #include <stdio.h>
@@ -29,9 +29,12 @@
 #define AVAILABLE_VERSION_DISPLAY_LIMIT 10
 
 static void print_available_versions_for_package(InstallEnv *env, const char *author, const char *name, size_t limit) {
-    fprintf(stderr, "Available versions:\n");
+    LogLevel old_level = g_log_level;
+    log_set_level(LOG_LEVEL_PROGRESS);
+    log_progress("Available versions:");
     if (!env) {
-        fprintf(stderr, "  (registry unavailable)\n");
+        log_progress("  (registry unavailable)");
+        log_set_level(old_level);
         return;
     }
 
@@ -40,13 +43,15 @@ static void print_available_versions_for_package(InstallEnv *env, const char *au
 
     if (env->protocol_mode == PROTOCOL_V2) {
         if (!env->v2_registry) {
-            fprintf(stderr, "  (registry data unavailable)\n");
+            log_progress("  (registry data unavailable)");
+            log_set_level(old_level);
             return;
         }
 
         V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
         if (!entry) {
-            fprintf(stderr, "  (package not found in registry)\n");
+            log_progress("  (package not found in registry)");
+            log_set_level(old_level);
             return;
         }
 
@@ -58,7 +63,7 @@ static void print_available_versions_for_package(InstallEnv *env, const char *au
             total++;
             if (printed < limit) {
                 char *ver_str = version_format(ver->major, ver->minor, ver->patch);
-                fprintf(stderr, "  %s\n", ver_str ? ver_str : "(invalid)");
+                log_progress("  %s", ver_str ? ver_str : "(invalid)");
                 if (ver_str) {
                     arena_free(ver_str);
                 }
@@ -67,39 +72,44 @@ static void print_available_versions_for_package(InstallEnv *env, const char *au
         }
 
         if (total == 0) {
-            fprintf(stderr, "  (no published versions)\n");
+            log_progress("  (no published versions)");
+            log_set_level(old_level);
             return;
         }
 
         if (total > printed) {
-            fprintf(stderr, "  ... and %zu more\n", total - printed);
+            log_progress("  ... and %zu more", total - printed);
         }
+        log_set_level(old_level);
         return;
     }
 
     if (!env->registry) {
-        fprintf(stderr, "  (registry data unavailable)\n");
+        log_progress("  (registry data unavailable)");
+        log_set_level(old_level);
         return;
     }
 
     RegistryEntry *entry = registry_find(env->registry, author, name);
     if (!entry || entry->version_count == 0) {
-        fprintf(stderr, "  (no published versions)\n");
+        log_progress("  (no published versions)");
+        log_set_level(old_level);
         return;
     }
 
     size_t show_count = entry->version_count < limit ? entry->version_count : limit;
     for (size_t i = 0; i < show_count; i++) {
         char *ver_str = version_to_string(&entry->versions[i]);
-        fprintf(stderr, "  %s\n", ver_str ? ver_str : "(invalid)");
+        log_progress("  %s", ver_str ? ver_str : "(invalid)");
         if (ver_str) {
             arena_free(ver_str);
         }
     }
 
     if (entry->version_count > limit) {
-        fprintf(stderr, "  ... and %zu more\n", entry->version_count - limit);
+        log_progress("  ... and %zu more", entry->version_count - limit);
     }
+    log_set_level(old_level);
 }
 
 static void print_package_suggestions_block(const char *author, const char *name, const PackageSuggestion *suggestions, size_t count) {
@@ -107,16 +117,23 @@ static void print_package_suggestions_block(const char *author, const char *name
         return;
     }
 
-    fprintf(stderr, "\n%s-- UNKNOWN PACKAGE -------------------------------------------------------------%s\n\n",
-            ANSI_DULL_CYAN, ANSI_RESET);
-    fprintf(stderr, "I could not find '%s/%s' in the package registry, but I found\n", author, name);
-    fprintf(stderr, "these packages with similar names:\n\n");
+    LogLevel old_level = g_log_level;
+    log_set_level(LOG_LEVEL_PROGRESS);
+    log_progress("");
+    log_progress("%s-- UNKNOWN PACKAGE -------------------------------------------------------------%s", ANSI_DULL_CYAN, ANSI_RESET);
+    log_progress("");
+    log_progress("I could not find '%s/%s' in the package registry, but I found", author, name);
+    log_progress("these packages with similar names:");
+    log_progress("");
 
     for (size_t i = 0; i < count && i < MAX_PACKAGE_SUGGESTIONS; i++) {
-        fprintf(stderr, "    %s/%s\n", suggestions[i].author, suggestions[i].name);
+        log_progress("    %s/%s", suggestions[i].author, suggestions[i].name);
     }
 
-    fprintf(stderr, "\nMaybe you want one of these instead?\n\n");
+    log_progress("");
+    log_progress("Maybe you want one of these instead?");
+    log_progress("");
+    log_set_level(old_level);
 }
 
 static void print_target_version_conflict(const char *author, const char *name, const Version *version, bool include_guidance) {
@@ -133,11 +150,16 @@ static void print_target_version_conflict(const char *author, const char *name, 
         arena_free(ver_str);
     }
     if (include_guidance) {
-        fprintf(stderr, "\nThe requested version has dependencies that conflict with your\n");
-        fprintf(stderr, "current elm.json. You may need to:\n\n");
-        fprintf(stderr, "  1. Try a different version\n");
-        fprintf(stderr, "  2. Upgrade conflicting packages first\n");
-        fprintf(stderr, "  3. Use --major to allow major version upgrades of dependencies\n");
+        LogLevel old_level = g_log_level;
+        log_set_level(LOG_LEVEL_PROGRESS);
+        log_progress("");
+        log_progress("The requested version has dependencies that conflict with your");
+        log_progress("current elm.json. You may need to:");
+        log_progress("");
+        log_progress("  1. Try a different version");
+        log_progress("  2. Upgrade conflicting packages first");
+        log_progress("  3. Use --major to allow major version upgrades of dependencies");
+        log_set_level(old_level);
     }
 }
 
@@ -145,53 +167,60 @@ static void print_target_version_conflict(const char *author, const char *name, 
  * are now in package_common.c/h */
 
 static void print_install_what(const char *elm_home) {
-    fprintf(stderr, "%s-- INSTALL WHAT? ---------------------------------------------------------------%s\n\n",
-            ANSI_DULL_CYAN, ANSI_RESET);
-    fprintf(stderr, "I am expecting commands like:\n\n");
-    fprintf(stderr, "    elm install elm/http\n");
-    fprintf(stderr, "    elm install elm/json\n");
-    fprintf(stderr, "    elm install elm/random\n\n");
-    fprintf(stderr, "Hint: In JavaScript folks run `npm install` to start projects. \"Gotta download\n");
-    fprintf(stderr, "everything!\" But why download packages again and again? Instead, Elm caches\n");
-    fprintf(stderr, "packages in %s%s%s so each one is downloaded and built ONCE on\n",
-            ANSI_DULL_YELLOW, elm_home ? elm_home : "$ELM_HOME", ANSI_RESET);
-    fprintf(stderr, "your machine. Elm projects check that cache before trying the internet. This\n");
-    fprintf(stderr, "reduces build times, reduces server costs, and makes it easier to work offline.\n");
-    fprintf(stderr, "As a result %selm install%s is only for adding dependencies to elm.json, whereas\n",
-            ANSI_DULL_CYAN, ANSI_RESET);
-    fprintf(stderr, "%selm make%s is in charge of gathering dependencies and building everything. So\n",
-            ANSI_DULL_CYAN, ANSI_RESET);
-    fprintf(stderr, "maybe try elm make instead?\n\n");
+    LogLevel old_level = g_log_level;
+    log_set_level(LOG_LEVEL_PROGRESS);
+    log_progress("");
+    log_progress("%s-- INSTALL WHAT? ---------------------------------------------------------------%s", ANSI_DULL_CYAN, ANSI_RESET);
+    log_progress("");
+    log_progress("I am expecting commands like:");
+    log_progress("");
+    log_progress("    elm install elm/http");
+    log_progress("    elm install elm/json");
+    log_progress("    elm install elm/random");
+    log_progress("");
+    log_progress("Hint: In JavaScript folks run `npm install` to start projects. \"Gotta download");
+    log_progress("everything!\" But why download packages again and again? Instead, Elm caches");
+    log_progress("packages in %s%s%s so each one is downloaded and built ONCE on", ANSI_DULL_YELLOW, elm_home ? elm_home : "$ELM_HOME", ANSI_RESET);
+    log_progress("your machine. Elm projects check that cache before trying the internet. This");
+    log_progress("reduces build times, reduces server costs, and makes it easier to work offline.");
+    log_progress("As a result %selm install%s is only for adding dependencies to elm.json, whereas", ANSI_DULL_CYAN, ANSI_RESET);
+    log_progress("%selm make%s is in charge of gathering dependencies and building everything. So", ANSI_DULL_CYAN, ANSI_RESET);
+    log_progress("maybe try elm make instead?");
+    log_progress("");
+    log_set_level(old_level);
 }
 
 static void print_install_usage(void) {
-    printf("Usage: %s install PACKAGE[@VERSION] [PACKAGE[@VERSION]...]\n", global_context_program_name());
-    printf("\n");
-    printf("Install packages for your Elm project.\n");
-    printf("\n");
-    printf("Examples:\n");
-    printf("  %s install elm/html                     # Add elm/html to your project\n", global_context_program_name());
-    printf("  %s install elm/html@1.0.0               # Add elm/html at specific version\n", global_context_program_name());
-    printf("  %s install elm/html elm/json elm/url    # Add multiple packages at once\n", global_context_program_name());
-    printf("  %s install elm/html@1.0.0 elm/json      # Mix versioned and latest\n", global_context_program_name());
-    printf("  %s install --test elm/json              # Add elm/json as a test dependency\n", global_context_program_name());
-    printf("  %s install --major elm/html             # Upgrade elm/html to next major version\n", global_context_program_name());
-    printf("  %s install --from-file ./pkg.zip elm/html  # Install from local file\n", global_context_program_name());
-    printf("  %s install --from-url URL elm/html         # Install from URL\n", global_context_program_name());
-    printf("\n");
-    printf("Options:\n");
-    printf("  --test                             # Install as test dependency\n");
-    printf("  --upgrade-all                      # Allow upgrading production deps (with --test)\n");
-    printf("  --major PACKAGE                    # Allow major version upgrade for package (single package only)\n");
-    printf("  --from-file PATH PACKAGE           # Install from local file/directory (single package only)\n");
-    printf("  --from-url URL PACKAGE             # Install from URL (single package only)\n");
-    printf("  --local-dev [--from-path PATH] [PACKAGE]\n");
-    printf("                                     # Install package for local development\n");
-    // printf("  --pin                              # Create PIN file with package version\n");
-    printf("  -v, --verbose                      # Show progress reports (registry, connectivity)\n");
-    printf("  -q, --quiet                        # Suppress progress reports\n");
-    printf("  -y, --yes                          # Automatically confirm changes\n");
-    printf("  --help                             # Show this help\n");
+    LogLevel old_level = g_log_level;
+    log_set_level(LOG_LEVEL_PROGRESS);
+    log_progress("Usage: %s install PACKAGE[@VERSION] [PACKAGE[@VERSION]...]", global_context_program_name());
+    log_progress("");
+    log_progress("Install packages for your Elm project.");
+    log_progress("");
+    log_progress("Examples:");
+    log_progress("  %s install elm/html                     # Add elm/html to your project", global_context_program_name());
+    log_progress("  %s install elm/html@1.0.0               # Add elm/html at specific version", global_context_program_name());
+    log_progress("  %s install elm/html elm/json elm/url    # Add multiple packages at once", global_context_program_name());
+    log_progress("  %s install elm/html@1.0.0 elm/json      # Mix versioned and latest", global_context_program_name());
+    log_progress("  %s install --test elm/json              # Add elm/json as a test dependency", global_context_program_name());
+    log_progress("  %s install --major elm/html             # Upgrade elm/html to next major version", global_context_program_name());
+    log_progress("  %s install --from-file ./pkg.zip elm/html  # Install from local file", global_context_program_name());
+    log_progress("  %s install --from-url URL elm/html         # Install from URL", global_context_program_name());
+    log_progress("");
+    log_progress("Options:");
+    log_progress("  --test                             # Install as test dependency");
+    log_progress("  --upgrade-all                      # Allow upgrading production deps (with --test)");
+    log_progress("  --major PACKAGE                    # Allow major version upgrade for package (single package only)");
+    log_progress("  --from-file PATH PACKAGE           # Install from local file/directory (single package only)");
+    log_progress("  --from-url URL PACKAGE             # Install from URL (single package only)");
+    log_progress("  --local-dev [--from-path PATH] [PACKAGE]");
+    log_progress("                                     # Install package for local development");
+    // log_progress("  --pin                              # Create PIN file with package version\n");
+    log_progress("  -v, --verbose                      # Show progress reports (registry, connectivity)");
+    log_progress("  -q, --quiet                        # Suppress progress reports");
+    log_progress("  -y, --yes                          # Automatically confirm changes");
+    log_progress("  --help                             # Show this help");
+    log_set_level(old_level);
 }
 
 static bool create_pin_file(const char *pkg_path, const char *version) {
@@ -204,7 +233,7 @@ static bool create_pin_file(const char *pkg_path, const char *version) {
 
     FILE *pin_file = fopen(pin_path, "w");
     if (!pin_file) {
-        fprintf(stderr, "Warning: Failed to create PIN file at %s\n", pin_path);
+        log_warn("Failed to create PIN file at %s", pin_path);
         arena_free(pin_path);
         return false;
     }
@@ -236,8 +265,10 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
             }
 
             if (parsed_existing && version_equals(&existing_ver, target_version)) {
-                printf("%s/%s is already installed at version %s\n",
-                       author, name, existing_pkg->version);
+                LogLevel old_level = g_log_level;
+                log_set_level(LOG_LEVEL_PROGRESS);
+                log_progress("%s/%s is already installed at version %s", author, name, existing_pkg->version);
+                log_set_level(old_level);
                 return 0;
             }
 
@@ -268,7 +299,10 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
             if (is_test && elm_json->type == ELM_PROJECT_APPLICATION) {
                 /* Check if already in test-dependencies/direct */
                 if (package_map_find(elm_json->dependencies_test_direct, author, name)) {
-                    printf("It is already a direct test dependency!\n");
+                    LogLevel old_level = g_log_level;
+                    log_set_level(LOG_LEVEL_PROGRESS);
+                    log_progress("It is already a direct test dependency!");
+                    log_set_level(old_level);
                     return 0;
                 }
                 
@@ -277,7 +311,10 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
                 if (test_indirect) {
                     package_map_add(elm_json->dependencies_test_direct, author, name, test_indirect->version);
                     package_map_remove(elm_json->dependencies_test_indirect, author, name);
-                    printf("Promoted %s/%s from test-indirect to test-direct dependencies.\n", author, name);
+                    LogLevel old_level = g_log_level;
+                    log_set_level(LOG_LEVEL_PROGRESS);
+                    log_progress("Promoted %s/%s from test-indirect to test-direct dependencies.", author, name);
+                    log_set_level(old_level);
                     if (!elm_json_write(elm_json, elm_json_path)) {
                         log_error("Failed to write elm.json");
                         return 1;
@@ -287,7 +324,10 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
                 
                 /* Package is in production deps (direct or indirect) - add to test-direct */
                 package_map_add(elm_json->dependencies_test_direct, author, name, existing_pkg->version);
-                printf("Added %s/%s to test-direct dependencies (already available as production dependency).\n", author, name);
+                LogLevel old_level = g_log_level;
+                log_set_level(LOG_LEVEL_PROGRESS);
+                log_progress("Added %s/%s to test-direct dependencies (already available as production dependency).", author, name);
+                log_set_level(old_level);
                 if (!elm_json_write(elm_json, elm_json_path)) {
                     log_error("Failed to write elm.json");
                     return 1;
@@ -296,13 +336,19 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
             } else if (is_test && elm_json->type == ELM_PROJECT_PACKAGE) {
                 /* For packages: check if already in test-dependencies */
                 if (package_map_find(elm_json->package_test_dependencies, author, name)) {
-                    printf("It is already a test dependency!\n");
+                    LogLevel old_level = g_log_level;
+                    log_set_level(LOG_LEVEL_PROGRESS);
+                    log_progress("It is already a test dependency!");
+                    log_set_level(old_level);
                     return 0;
                 }
                 
                 /* Package is in main deps - add to test deps */
                 package_map_add(elm_json->package_test_dependencies, author, name, existing_pkg->version);
-                printf("Added %s/%s to test-dependencies (already available as main dependency).\n", author, name);
+                LogLevel old_level = g_log_level;
+                log_set_level(LOG_LEVEL_PROGRESS);
+                log_progress("Added %s/%s to test-dependencies (already available as main dependency).", author, name);
+                log_set_level(old_level);
                 if (!elm_json_write(elm_json, elm_json_path)) {
                     log_error("Failed to write elm.json");
                     return 1;
@@ -321,7 +367,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
                     log_debug("Done");
                 }
             } else {
-                printf("It is already installed!\n");
+                log_progress("It is already installed!");
             }
 
             return 0;
@@ -352,7 +398,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
     if (target_version &&
         !version_exists_in_registry(env, author, name, target_version)) {
         char *ver_str = version_to_string(target_version);
-        fprintf(stderr, "Error: Version %s not found for package %s/%s\n\n",
+        log_error("Version %s not found for package %s/%s",
                 ver_str ? ver_str : "(invalid)",
                 author,
                 name);
@@ -386,18 +432,18 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
                     report_missing_registry_versions_for_elm_json(env, elm_json);
                 }
                 if (is_test && !upgrade_all) {
-                    fprintf(stderr, "\n");
-                    fprintf(stderr, "When installing a test dependency, production dependencies are pinned\n");
-                    fprintf(stderr, "to their current versions. The package %s/%s may require newer\n", author, name);
-                    fprintf(stderr, "versions of packages you already have in your production dependencies.\n");
-                    fprintf(stderr, "\n");
-                    fprintf(stderr, "To see what versions %s/%s requires, run:\n", author, name);
-                    fprintf(stderr, "    %s package info %s/%s\n", global_context_program_name(), author, name);
-                    fprintf(stderr, "\n");
-                    fprintf(stderr, "If there's a version conflict, you can either:\n");
-                    fprintf(stderr, "  1. Use --upgrade-all to allow upgrading production dependencies\n");
-                    fprintf(stderr, "  2. Upgrade the conflicting production dependency first\n");
-                    fprintf(stderr, "  3. Use a different version or alternative package for testing\n");
+                    log_progress("");
+                    log_progress("When installing a test dependency, production dependencies are pinned");
+                    log_progress("to their current versions. The package %s/%s may require newer", author, name);
+                    log_progress("versions of packages you already have in your production dependencies.");
+                    log_progress("");
+                    log_progress("To see what versions %s/%s requires, run:", author, name);
+                    log_progress("    %s package info %s/%s", global_context_program_name(), author, name);
+                    log_progress("");
+                    log_progress("If there's a version conflict, you can either:");
+                    log_progress("  1. Use --upgrade-all to allow upgrading production dependencies");
+                    log_progress("  2. Upgrade the conflicting production dependency first");
+                    log_progress("  3. Use a different version or alternative package for testing");
                 }
                 break;
             case SOLVER_NO_OFFLINE_SOLUTION:
@@ -485,11 +531,13 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
     qsort(adds, add_count, sizeof(PackageChange), compare_package_changes);
     qsort(changes, change_count, sizeof(PackageChange), compare_package_changes);
 
-    printf("Here is my plan:\n");
-    printf("  \n");
+    LogLevel old_level = g_log_level;
+    log_set_level(LOG_LEVEL_PROGRESS);
+    log_progress("Here is my plan:");
+    log_progress("  ");
 
     if (add_count > 0) {
-        printf("  Add:\n");
+        log_progress("  Add:");
         for (int i = 0; i < add_count; i++) {
             PackageChange *c = &adds[i];
             char pkg_name[256];
@@ -498,23 +546,23 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
             /* For packages, display as constraint; for applications, as pinned version */
             if (is_package) {
                 char *constraint = version_to_constraint(c->new_version);
-                printf("    %-*s    %s\n", max_width, pkg_name,
+                log_progress("    %-*s    %s", max_width, pkg_name,
                        constraint ? constraint : c->new_version);
                 if (constraint) arena_free(constraint);
             } else {
-                printf("    %-*s    %s\n", max_width, pkg_name, c->new_version);
+                log_progress("    %-*s    %s", max_width, pkg_name, c->new_version);
             }
         }
-        printf("  \n");
+        log_progress("  ");
     }
 
     if (change_count > 0) {
-        printf("  Change:\n");
+        log_progress("  Change:");
         for (int i = 0; i < change_count; i++) {
             PackageChange *c = &changes[i];
             char pkg_name[256];
             snprintf(pkg_name, sizeof(pkg_name), "%s/%s", c->author, c->name);
-            printf("    %-*s    %s => %s\n", max_width, pkg_name,
+            log_progress("    %-*s    %s => %s", max_width, pkg_name,
                    c->old_version, c->new_version);
         }
     }
@@ -522,19 +570,21 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
     arena_free(adds);
     arena_free(changes);
 
+    log_set_level(old_level);
+
     if (!auto_yes) {
         printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
         fflush(stdout);
         
         char response[10];
         if (!fgets(response, sizeof(response), stdin)) {
-            fprintf(stderr, "Error reading input\n");
+            log_error("Error reading input");
             install_plan_free(out_plan);
             return 1;
         }
         
         if (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n') {
-            printf("Aborted.\n");
+            log_progress("Aborted.");
             install_plan_free(out_plan);
             return 0;
         }
@@ -593,9 +643,9 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
         }
     }
 
-    printf("Saving elm.json...\n");
+    log_progress("Saving elm.json...");
     if (!elm_json_write(elm_json, elm_json_path)) {
-        fprintf(stderr, "Error: Failed to write elm.json\n");
+        log_error("Failed to write elm.json");
         install_plan_free(out_plan);
         return 1;
     }
@@ -672,7 +722,7 @@ static int install_multiple_packages(
         if (spec->has_version &&
             !version_exists_in_registry(env, spec->author, spec->name, &spec->version)) {
             char *ver_str = version_to_string(&spec->version);
-            fprintf(stderr, "Error: Version %s not found for package %s/%s\n\n",
+            log_error("Version %s not found for package %s/%s",
                     ver_str ? ver_str : "(invalid)",
                     spec->author,
                     spec->name);
@@ -1018,9 +1068,9 @@ static int install_multiple_packages(
         }
     }
 
-    printf("Saving elm.json...\n");
+    log_progress("Saving elm.json...");
     if (!elm_json_write(elm_json, elm_json_path)) {
-        fprintf(stderr, "Error: Failed to write elm.json\n");
+        log_error("Failed to write elm.json");
         if (out_plan) install_plan_free(out_plan);
         arena_free(promotions);
         return 1;
@@ -1097,7 +1147,7 @@ int cmd_install(int argc, char *argv[]) {
 
                 if (strchr(argv[i], '@')) {
                     if (!parse_package_with_version(argv[i], &author, &name, &version)) {
-                        fprintf(stderr, "Error: Invalid package specification '%s'\n", argv[i]);
+                        log_error("Invalid package specification '%s'", argv[i]);
                         print_install_usage();
                         return 1;
                     }
@@ -1118,7 +1168,7 @@ int cmd_install(int argc, char *argv[]) {
                     }),
                     PackageInstallSpec);
             } else {
-                fprintf(stderr, "Error: --from-file requires PATH and PACKAGE arguments\n");
+                log_error("--from-file requires PATH and PACKAGE arguments");
                 print_install_usage();
                 return 1;
             }
@@ -1135,7 +1185,7 @@ int cmd_install(int argc, char *argv[]) {
 
                 if (strchr(argv[i], '@')) {
                     if (!parse_package_with_version(argv[i], &author, &name, &version)) {
-                        fprintf(stderr, "Error: Invalid package specification '%s'\n", argv[i]);
+                        log_error("Invalid package specification '%s'", argv[i]);
                         print_install_usage();
                         return 1;
                     }
@@ -1156,7 +1206,7 @@ int cmd_install(int argc, char *argv[]) {
                     }),
                     PackageInstallSpec);
             } else {
-                fprintf(stderr, "Error: --from-url requires URL and PACKAGE arguments\n");
+                log_error("--from-url requires URL and PACKAGE arguments");
                 print_install_usage();
                 return 1;
             }
@@ -1166,7 +1216,7 @@ int cmd_install(int argc, char *argv[]) {
                 i++;
                 major_package_name = argv[i];
             } else {
-                fprintf(stderr, "Error: --major requires a package name\n");
+                log_error("--major requires a package name");
                 print_install_usage();
                 return 1;
             }
@@ -1177,7 +1227,7 @@ int cmd_install(int argc, char *argv[]) {
                 i++;
                 from_path = argv[i];
             } else {
-                fprintf(stderr, "Error: --from-path requires a PATH argument\n");
+                log_error("--from-path requires a PATH argument");
                 print_install_usage();
                 return 1;
             }
@@ -1197,7 +1247,7 @@ int cmd_install(int argc, char *argv[]) {
                 char *name = NULL;
                 Version ver;
                 if (!parse_package_with_version(argv[i], &author, &name, &ver)) {
-                    fprintf(stderr, "Error: Invalid package specification '%s'\n", argv[i]);
+                    log_error("Invalid package specification '%s'", argv[i]);
                     print_install_usage();
                     return 1;
                 }
@@ -1227,7 +1277,7 @@ int cmd_install(int argc, char *argv[]) {
                     PackageInstallSpec);
             }
         } else {
-            fprintf(stderr, "Error: Unknown option: %s\n", argv[i]);
+            log_error("Unknown option: %s", argv[i]);
             print_install_usage();
             return 1;
         }
@@ -1236,12 +1286,12 @@ int cmd_install(int argc, char *argv[]) {
     /* Handle --major: requires single package */
     if (major_upgrade) {
         if (!major_package_name) {
-            fprintf(stderr, "Error: --major requires a package name\n");
+            log_error("--major requires a package name");
             print_install_usage();
             return 1;
         }
         if (specs_count > 0) {
-            fprintf(stderr, "Error: --major can only be used with a single package\n");
+            log_error("--major can only be used with a single package");
             return 1;
         }
         /* Parse major package spec */
@@ -1252,14 +1302,14 @@ int cmd_install(int argc, char *argv[]) {
 
         if (strchr(major_package_name, '@')) {
             if (!parse_package_with_version(major_package_name, &author, &name, &ver)) {
-                fprintf(stderr, "Error: Invalid package specification '%s'\n", major_package_name);
+                log_error("Invalid package specification '%s'", major_package_name);
                 print_install_usage();
                 return 1;
             }
             has_version = true;
             /* Warn when both --major and explicit version are specified */
-            fprintf(stderr, "Warning: --major flag is ignored when an explicit version is specified\n");
-            fprintf(stderr, "         Installing %s/%s at version %u.%u.%u\n",
+            log_warn("--major flag is ignored when an explicit version is specified");
+            log_progress("Installing %s/%s at version %u.%u.%u",
                     author, name, ver.major, ver.minor, ver.patch);
         } else {
             if (!parse_package_name(major_package_name, &author, &name)) {
@@ -1281,29 +1331,29 @@ int cmd_install(int argc, char *argv[]) {
     /* Validate flag combinations for single-package-only options */
     if (from_file_path || from_url) {
         if (specs_count > 1) {
-            fprintf(stderr, "Error: %s can only install one package at a time\n",
+            log_error("%s can only install one package at a time",
                     from_file_path ? "--from-file" : "--from-url");
             return 1;
         }
     }
 
     if (from_file_path && from_url) {
-        fprintf(stderr, "Error: Cannot use both --from-file and --from-url\n");
+        log_error("Cannot use both --from-file and --from-url");
         return 1;
     }
 
     if (local_dev && (from_file_path || from_url)) {
-        fprintf(stderr, "Error: Cannot use --local-dev with --from-file or --from-url\n");
+        log_error("Cannot use --local-dev with --from-file or --from-url");
         return 1;
     }
 
     if (from_path && !local_dev) {
-        fprintf(stderr, "Error: --from-path requires --local-dev flag\n");
+        log_error("--from-path requires --local-dev flag");
         return 1;
     }
 
     if (upgrade_all && !is_test) {
-        fprintf(stderr, "Error: --upgrade-all can only be used with --test\n");
+        log_error("--upgrade-all can only be used with --test");
         print_install_usage();
         return 1;
     }
@@ -1392,7 +1442,7 @@ int cmd_install(int argc, char *argv[]) {
         return result;
     } else if (from_file_path || from_url) {
         if (specs_count == 0) {
-            fprintf(stderr, "Error: Package name required for --from-file or --from-url\n");
+            log_error("Package name required for --from-file or --from-url");
             elm_json_free(elm_json);
             install_env_free(env);
             log_set_level(original_level);
@@ -1415,10 +1465,10 @@ int cmd_install(int argc, char *argv[]) {
             char temp_file[1024];
             snprintf(temp_file, sizeof(temp_file), "%s/package.zip", temp_dir_buf);
 
-            printf("Downloading from %s...\n", from_url);
+            log_progress("Downloading from %s...", from_url);
             HttpResult http_result = http_download_file(env->curl_session, from_url, temp_file);
             if (http_result != HTTP_OK) {
-                fprintf(stderr, "Error: Failed to download from URL: %s\n", http_result_to_string(http_result));
+                log_error("Failed to download from URL: %s", http_result_to_string(http_result));
                 arena_free(author);
                 arena_free(name);
                 elm_json_free(elm_json);
@@ -1429,7 +1479,7 @@ int cmd_install(int argc, char *argv[]) {
             }
 
             if (!extract_zip_selective(temp_file, temp_dir_buf)) {
-                fprintf(stderr, "Error: Failed to extract archive\n");
+                log_error("Failed to extract archive");
                 arena_free(author);
                 arena_free(name);
                 elm_json_free(elm_json);
@@ -1446,7 +1496,7 @@ int cmd_install(int argc, char *argv[]) {
 
         struct stat st;
         if (stat(from_file_path, &st) != 0) {
-            fprintf(stderr, "Error: Path does not exist: %s\n", from_file_path);
+            log_error("Path does not exist: %s", from_file_path);
             arena_free(author);
             arena_free(name);
             elm_json_free(elm_json);
@@ -1460,7 +1510,7 @@ int cmd_install(int argc, char *argv[]) {
         if (S_ISDIR(st.st_mode)) {
             snprintf(pkg_elm_json_path, sizeof(pkg_elm_json_path), "%s/elm.json", from_file_path);
         } else {
-            fprintf(stderr, "Error: --from-file requires a directory path\n");
+            log_error("--from-file requires a directory path");
             arena_free(author);
             arena_free(name);
             elm_json_free(elm_json);
@@ -1476,7 +1526,7 @@ int cmd_install(int argc, char *argv[]) {
                 snprintf(pkg_elm_json_path, sizeof(pkg_elm_json_path), "%s", found_path);
                 arena_free(found_path);
             } else {
-                fprintf(stderr, "Error: Could not find elm.json in %s\n", from_file_path);
+                log_error("Could not find elm.json in %s", from_file_path);
                 arena_free(author);
                 arena_free(name);
                 elm_json_free(elm_json);
@@ -1520,7 +1570,7 @@ int cmd_install(int argc, char *argv[]) {
             name = actual_name;
             version = actual_version;
         } else {
-            fprintf(stderr, "Error: Could not read package information from %s\n", pkg_elm_json_path);
+            log_error("Could not read package information from %s", pkg_elm_json_path);
             arena_free(author);
             arena_free(name);
             elm_json_free(elm_json);
@@ -1562,7 +1612,7 @@ int cmd_install(int argc, char *argv[]) {
         }
 
         if (!install_from_file(from_file_path, env, author, name, version)) {
-            fprintf(stderr, "Error: Failed to install package from file\n");
+            log_error("Failed to install package from file");
             if (version) arena_free(version);
             elm_json_free(elm_json);
             arena_free(project_elm_json_path);
@@ -1590,7 +1640,7 @@ int cmd_install(int argc, char *argv[]) {
                 true,   /* always treat as direct dependency */
                 true))  /* remove from other maps before adding */
         {
-            fprintf(stderr, "Error: Failed to record %s/%s %s in elm.json\n", author, name, version);
+            log_error("Failed to record %s/%s %s in elm.json", author, name, version);
             if (version) arena_free(version);
             elm_json_free(elm_json);
             arena_free(project_elm_json_path);
@@ -1599,9 +1649,9 @@ int cmd_install(int argc, char *argv[]) {
             return 1;
         }
 
-        printf("Saving elm.json...\n");
+        log_progress("Saving elm.json...");
         if (!elm_json_write(elm_json, project_elm_json_path)) {
-            fprintf(stderr, "Error: Failed to write elm.json\n");
+            log_error("Failed to write elm.json");
             if (version) arena_free(version);
             elm_json_free(elm_json);
             arena_free(project_elm_json_path);

@@ -12,7 +12,7 @@
 #include "../../cache.h"
 #include "../../alloc.h"
 #include "../../constants.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../fileutil.h"
 
 #include <stdio.h>

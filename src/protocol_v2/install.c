@@ -6,7 +6,7 @@
  */
 
 #include "install.h"
-#include "../log.h"
+#include "../shared/log.h"
 #include "../constants.h"
 #include "../commands/package/package_common.h"
 #include <stdio.h>

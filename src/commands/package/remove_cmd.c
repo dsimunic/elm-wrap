@@ -8,7 +8,7 @@
 #include "../../alloc.h"
 #include "../../dyn_array.h"
 #include "../../constants.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../cache.h"
 #include "../../terminal_colors.h"
 #include <stdio.h>

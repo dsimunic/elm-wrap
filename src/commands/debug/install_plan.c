@@ -2,7 +2,7 @@
 #include "../../alloc.h"
 #include "../../constants.h"
 #include "../../dyn_array.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../solver.h"
 #include "../../install_env.h"
 #include "../../elm_json.h"

@@ -7,7 +7,7 @@
 #include "../../registry.h"
 #include "../../solver.h"
 #include "../../protocol_v2/solver/v2_registry.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../rulr/rulr.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"

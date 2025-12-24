@@ -29,7 +29,7 @@
 #include "commands/repository/repository.h"
 #include "commands/info/info.h"
 #include "alloc.h"
-#include "log.h"
+#include "shared/log.h"
 #include "feature_flags.h"
 #include "rulr/builtin_rules.h"
 #include "global_context.h"

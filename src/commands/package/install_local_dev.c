@@ -10,7 +10,7 @@
 #include "../../local_dev/local_dev_tracking.h"
 #include "../../alloc.h"
 #include "../../constants.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../fileutil.h"
 #include "../../env_defaults.h"
 #include "../../elm_json.h"

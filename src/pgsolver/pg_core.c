@@ -2,7 +2,7 @@
 #include "solver_common.h"
 #include "../alloc.h"
 #include "../constants.h"
-#include "../log.h"
+#include "../shared/log.h"
 #include "../commands/package/package_common.h"
 
 #include <limits.h>

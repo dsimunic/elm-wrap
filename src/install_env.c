@@ -4,7 +4,7 @@
 #include "env_defaults.h"
 #include "vendor/cJSON.h"
 #include "vendor/sha1.h"
-#include "log.h"
+#include "shared/log.h"
 #include "fileutil.h"
 #include "global_context.h"
 #include "registry.h"

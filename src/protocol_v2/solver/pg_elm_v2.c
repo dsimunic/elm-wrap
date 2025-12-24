@@ -10,7 +10,7 @@
 #include "v2_registry.h"
 #include "../../pgsolver/solver_common.h"
 #include "../../alloc.h"
-#include "../../log.h"
+#include "../../shared/log.h"
 #include "../../commands/package/package_common.h"
 
 #include <stdlib.h>

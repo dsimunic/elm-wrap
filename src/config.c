@@ -3,7 +3,7 @@
 #include "elm_compiler.h"
 #include "global_context.h"
 #include "alloc.h"
-#include "log.h"
+#include "shared/log.h"
 #include "env_defaults.h"
 #include <stdio.h>
 #include <stdlib.h>
