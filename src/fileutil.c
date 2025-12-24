@@ -602,13 +602,31 @@ bool file_exists(const char *path) {
     return stat(path, &st) == 0 && S_ISREG(st.st_mode);
 }
 
-char *file_read_contents(const char *filepath) {
-    FILE *f = fopen(filepath, "r");
-    if (!f) return NULL;
+char *file_read_contents_bounded(const char *filepath, size_t max_bytes, size_t *out_size) {
+    if (!filepath || max_bytes == 0) {
+        return NULL;
+    }
 
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    fseek(f, 0, SEEK_SET);
+    struct stat st;
+    if (stat(filepath, &st) != 0) {
+        return NULL;
+    }
+    if (!S_ISREG(st.st_mode)) {
+        return NULL;
+    }
+    if (st.st_size < 0) {
+        return NULL;
+    }
+
+    size_t fsize = (size_t)st.st_size;
+    if (fsize > max_bytes) {
+        return NULL;
+    }
+
+    FILE *f = fopen(filepath, "rb");
+    if (!f) {
+        return NULL;
+    }
 
     char *content = arena_malloc(fsize + 1);
     if (!content) {
@@ -616,7 +634,66 @@ char *file_read_contents(const char *filepath) {
         return NULL;
     }
 
-    size_t read_size = fread(content, 1, fsize, f);
+    size_t read_size = 0;
+    if (fsize > 0) {
+        read_size = fread(content, 1, fsize, f);
+        if (read_size != fsize && ferror(f)) {
+            fclose(f);
+            arena_free(content);
+            return NULL;
+        }
+    }
+    content[read_size] = '\0';
+
+    fclose(f);
+
+    if (out_size) {
+        *out_size = read_size;
+    }
+
+    return content;
+}
+
+char *file_read_contents(const char *filepath) {
+    if (!filepath) {
+        return NULL;
+    }
+
+    FILE *f = fopen(filepath, "rb");
+    if (!f) {
+        return NULL;
+    }
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return NULL;
+    }
+    long fsize_long = ftell(f);
+    if (fsize_long < 0) {
+        fclose(f);
+        return NULL;
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return NULL;
+    }
+
+    size_t fsize = (size_t)fsize_long;
+    char *content = arena_malloc(fsize + 1);
+    if (!content) {
+        fclose(f);
+        return NULL;
+    }
+
+    size_t read_size = 0;
+    if (fsize > 0) {
+        read_size = fread(content, 1, fsize, f);
+        if (read_size != fsize && ferror(f)) {
+            fclose(f);
+            arena_free(content);
+            return NULL;
+        }
+    }
     content[read_size] = '\0';
     fclose(f);
 
@@ -631,8 +708,11 @@ char *strip_trailing_slash(const char *path) {
         len--;
     }
     
-    char *result = arena_malloc(len + 1);
-    strncpy(result, path, len);
+    char *result = arena_malloc((size_t)len + 1);
+    if (!result) {
+        return NULL;
+    }
+    strncpy(result, path, (size_t)len);
     result[len] = '\0';
     
     return result;

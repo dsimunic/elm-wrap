@@ -85,6 +85,32 @@
 #define PG_DEPENDENCY_BUFFER 128
 
 /*
+ * Security hardening limits
+ *
+ * These bounds exist to prevent pathological inputs (or corrupted caches)
+ * from causing excessive CPU/memory usage.
+ */
+
+/* Maximum size for an elm.json file we will read/parse. */
+#define MAX_ELM_JSON_FILE_BYTES (1 * BYTES_PER_MB)
+
+/* Maximum number of dependency entries we will accept from an elm.json. */
+#define MAX_ELM_JSON_DEPENDENCY_ENTRIES 4096
+
+/* Maximum length of a dependency version/constraint string from elm.json. */
+#define MAX_ELM_JSON_VERSION_VALUE_LENGTH MAX_RANGE_STRING_LENGTH
+
+/* PubGrub solve-loop budgets (DoS protection). */
+#define PG_MAX_DECISIONS 200000
+#define PG_MAX_PROPAGATIONS 1000000
+#define PG_MAX_CONFLICTS 200000
+
+/* Memory-growth budgets (additional DoS protection). */
+#define PG_MAX_PACKAGES 10000
+#define PG_MAX_TRAIL_ASSIGNMENTS 200000
+#define PG_MAX_INCOMPATIBILITIES 200000
+
+/*
  * Large buffer constants
  */
 #define MAX_LARGE_BUFFER_LENGTH 65536  /* 64KB for large records/data */

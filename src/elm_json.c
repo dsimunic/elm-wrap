@@ -1,6 +1,7 @@
 #include "elm_json.h"
 #include "alloc.h"
 #include "constants.h"
+#include "fileutil.h"
 #include "vendor/cJSON.h"
 #include "log.h"
 #include "commands/package/package_common.h"
@@ -70,18 +71,28 @@ bool package_map_add(PackageMap *map, const char *author, const char *name, cons
     
     // Expand capacity if needed
     if (map->count >= map->capacity) {
-        map->capacity *= 2;
-        Package *new_packages = arena_realloc(map->packages, sizeof(Package) * map->capacity);
+        int new_capacity = map->capacity * 2;
+        Package *new_packages = arena_realloc(map->packages, sizeof(Package) * (size_t)new_capacity);
         if (!new_packages) return false;
         map->packages = new_packages;
+        map->capacity = new_capacity;
     }
-    
+
+    char *author_copy = arena_strdup(author);
+    char *name_copy = arena_strdup(name);
+    char *version_copy = arena_strdup(version);
+    if (!author_copy || !name_copy || !version_copy) {
+        arena_free(author_copy);
+        arena_free(name_copy);
+        arena_free(version_copy);
+        return false;
+    }
+
     // Add package
-    map->packages[map->count].author = arena_strdup(author);
-    map->packages[map->count].name = arena_strdup(name);
-    map->packages[map->count].version = arena_strdup(version);
+    map->packages[map->count].author = author_copy;
+    map->packages[map->count].name = name_copy;
+    map->packages[map->count].version = version_copy;
     map->count++;
-    
     return true;
 }
 
@@ -136,41 +147,24 @@ void package_map_print(PackageMap *map) {
 
 /* Elm.json operations */
 ElmJson* elm_json_read(const char *filepath) {
-    FILE *file = fopen(filepath, "rb");
-    if (!file) {
+    char *data = file_read_contents_bounded(filepath, MAX_ELM_JSON_FILE_BYTES, NULL);
+    if (!data) {
         // In verbose mode, show both the path and the resolved absolute path
-        char *abs_path = realpath(filepath, NULL);
-        if (abs_path) {
-            log_debug("Could not open '%s' (resolved: %s)", filepath, abs_path);
-            free(abs_path);
+        char abs_path[MAX_PATH_LENGTH];
+        if (realpath(filepath, abs_path)) {
+            log_debug("Could not read '%s' (resolved: %s)", filepath, abs_path);
         } else {
             // realpath failed, show cwd for context
             char cwd[MAX_TEMP_PATH_LENGTH];
             if (getcwd(cwd, sizeof(cwd))) {
-                log_debug("Could not open '%s' (cwd: %s)", filepath, cwd);
+                log_debug("Could not read '%s' (cwd: %s)", filepath, cwd);
             } else {
-                log_debug("Could not open '%s'", filepath);
+                log_debug("Could not read '%s'", filepath);
             }
         }
         return NULL;
     }
-    
-    // Get file size
-    fseek(file, 0, SEEK_END);
-    long length = ftell(file);
-    rewind(file);
-    
-    // Read file content
-    char *data = arena_malloc(length + 1);
-    if (!data) {
-        fclose(file);
-        return NULL;
-    }
-    
-    size_t read_size = fread(data, 1, length, file);
-    data[read_size] = '\0';
-    fclose(file);
-    
+
     // Parse JSON
     cJSON *json = cJSON_Parse(data);
     arena_free(data);
@@ -228,6 +222,15 @@ ElmJson* elm_json_read(const char *filepath) {
     elm_json->package_version = NULL;
     elm_json->package_dependencies = NULL;
     elm_json->package_test_dependencies = NULL;
+
+    if (!elm_json->dependencies_direct ||
+        !elm_json->dependencies_indirect ||
+        !elm_json->dependencies_test_direct ||
+        !elm_json->dependencies_test_indirect) {
+        cJSON_Delete(json);
+        elm_json_free(elm_json);
+        return NULL;
+    }
     
     if (elm_json->type == ELM_PROJECT_APPLICATION) {
         // Parse dependencies
@@ -236,15 +239,37 @@ ElmJson* elm_json_read(const char *filepath) {
             // Parse direct dependencies
             cJSON *direct = cJSON_GetObjectItem(deps, "direct");
             if (direct && cJSON_IsObject(direct)) {
+                size_t entries = 0;
                 cJSON *package = NULL;
                 cJSON_ArrayForEach(package, direct) {
+                    if (++entries > MAX_ELM_JSON_DEPENDENCY_ENTRIES) {
+                        log_error("Too many dependencies in %s (direct)", filepath);
+                        cJSON_Delete(json);
+                        elm_json_free(elm_json);
+                        return NULL;
+                    }
                     if (cJSON_IsString(package)) {
                         // Parse "author/name"
                         const char *full_name = package->string;
+                        if (!package->valuestring ||
+                            strlen(package->valuestring) >= MAX_ELM_JSON_VERSION_VALUE_LENGTH) {
+                            log_error("Invalid dependency version string in %s", filepath);
+                            cJSON_Delete(json);
+                            elm_json_free(elm_json);
+                            return NULL;
+                        }
                         char *author = NULL;
                         char *name = NULL;
                         if (parse_package_name(full_name, &author, &name)) {
-                            package_map_add(elm_json->dependencies_direct, author, name, package->valuestring);
+                            if (!package_map_add(elm_json->dependencies_direct, author, name, package->valuestring)) {
+                                arena_free(author);
+                                arena_free(name);
+                                cJSON_Delete(json);
+                                elm_json_free(elm_json);
+                                return NULL;
+                            }
+                            arena_free(author);
+                            arena_free(name);
                         }
                     }
                 }
@@ -253,14 +278,36 @@ ElmJson* elm_json_read(const char *filepath) {
             // Parse indirect dependencies
             cJSON *indirect = cJSON_GetObjectItem(deps, "indirect");
             if (indirect && cJSON_IsObject(indirect)) {
+                size_t entries = 0;
                 cJSON *package = NULL;
                 cJSON_ArrayForEach(package, indirect) {
+                    if (++entries > MAX_ELM_JSON_DEPENDENCY_ENTRIES) {
+                        log_error("Too many dependencies in %s (indirect)", filepath);
+                        cJSON_Delete(json);
+                        elm_json_free(elm_json);
+                        return NULL;
+                    }
                     if (cJSON_IsString(package)) {
                         const char *full_name = package->string;
+                        if (!package->valuestring ||
+                            strlen(package->valuestring) >= MAX_ELM_JSON_VERSION_VALUE_LENGTH) {
+                            log_error("Invalid dependency version string in %s", filepath);
+                            cJSON_Delete(json);
+                            elm_json_free(elm_json);
+                            return NULL;
+                        }
                         char *author = NULL;
                         char *name = NULL;
                         if (parse_package_name(full_name, &author, &name)) {
-                            package_map_add(elm_json->dependencies_indirect, author, name, package->valuestring);
+                            if (!package_map_add(elm_json->dependencies_indirect, author, name, package->valuestring)) {
+                                arena_free(author);
+                                arena_free(name);
+                                cJSON_Delete(json);
+                                elm_json_free(elm_json);
+                                return NULL;
+                            }
+                            arena_free(author);
+                            arena_free(name);
                         }
                     }
                 }
@@ -273,14 +320,36 @@ ElmJson* elm_json_read(const char *filepath) {
             // Parse test direct dependencies
             cJSON *test_direct = cJSON_GetObjectItem(test_deps, "direct");
             if (test_direct && cJSON_IsObject(test_direct)) {
+                size_t entries = 0;
                 cJSON *package = NULL;
                 cJSON_ArrayForEach(package, test_direct) {
+                    if (++entries > MAX_ELM_JSON_DEPENDENCY_ENTRIES) {
+                        log_error("Too many test-dependencies in %s (direct)", filepath);
+                        cJSON_Delete(json);
+                        elm_json_free(elm_json);
+                        return NULL;
+                    }
                     if (cJSON_IsString(package)) {
                         const char *full_name = package->string;
+                        if (!package->valuestring ||
+                            strlen(package->valuestring) >= MAX_ELM_JSON_VERSION_VALUE_LENGTH) {
+                            log_error("Invalid dependency version string in %s", filepath);
+                            cJSON_Delete(json);
+                            elm_json_free(elm_json);
+                            return NULL;
+                        }
                         char *author = NULL;
                         char *name = NULL;
                         if (parse_package_name(full_name, &author, &name)) {
-                            package_map_add(elm_json->dependencies_test_direct, author, name, package->valuestring);
+                            if (!package_map_add(elm_json->dependencies_test_direct, author, name, package->valuestring)) {
+                                arena_free(author);
+                                arena_free(name);
+                                cJSON_Delete(json);
+                                elm_json_free(elm_json);
+                                return NULL;
+                            }
+                            arena_free(author);
+                            arena_free(name);
                         }
                     }
                 }
@@ -289,14 +358,36 @@ ElmJson* elm_json_read(const char *filepath) {
             // Parse test indirect dependencies
             cJSON *test_indirect = cJSON_GetObjectItem(test_deps, "indirect");
             if (test_indirect && cJSON_IsObject(test_indirect)) {
+                size_t entries = 0;
                 cJSON *package = NULL;
                 cJSON_ArrayForEach(package, test_indirect) {
+                    if (++entries > MAX_ELM_JSON_DEPENDENCY_ENTRIES) {
+                        log_error("Too many test-dependencies in %s (indirect)", filepath);
+                        cJSON_Delete(json);
+                        elm_json_free(elm_json);
+                        return NULL;
+                    }
                     if (cJSON_IsString(package)) {
                         const char *full_name = package->string;
+                        if (!package->valuestring ||
+                            strlen(package->valuestring) >= MAX_ELM_JSON_VERSION_VALUE_LENGTH) {
+                            log_error("Invalid dependency version string in %s", filepath);
+                            cJSON_Delete(json);
+                            elm_json_free(elm_json);
+                            return NULL;
+                        }
                         char *author = NULL;
                         char *name = NULL;
                         if (parse_package_name(full_name, &author, &name)) {
-                            package_map_add(elm_json->dependencies_test_indirect, author, name, package->valuestring);
+                            if (!package_map_add(elm_json->dependencies_test_indirect, author, name, package->valuestring)) {
+                                arena_free(author);
+                                arena_free(name);
+                                cJSON_Delete(json);
+                                elm_json_free(elm_json);
+                                return NULL;
+                            }
+                            arena_free(author);
+                            arena_free(name);
                         }
                     }
                 }
@@ -317,18 +408,46 @@ ElmJson* elm_json_read(const char *filepath) {
         // Initialize package dependencies
         elm_json->package_dependencies = package_map_create();
         elm_json->package_test_dependencies = package_map_create();
+
+        if (!elm_json->package_dependencies || !elm_json->package_test_dependencies) {
+            cJSON_Delete(json);
+            elm_json_free(elm_json);
+            return NULL;
+        }
         
         // Parse dependencies (for packages, these are constraint ranges)
         cJSON *deps = cJSON_GetObjectItem(json, "dependencies");
         if (deps && cJSON_IsObject(deps)) {
+            size_t entries = 0;
             cJSON *package = NULL;
             cJSON_ArrayForEach(package, deps) {
+                if (++entries > MAX_ELM_JSON_DEPENDENCY_ENTRIES) {
+                    log_error("Too many dependencies in %s", filepath);
+                    cJSON_Delete(json);
+                    elm_json_free(elm_json);
+                    return NULL;
+                }
                 if (cJSON_IsString(package)) {
                     const char *full_name = package->string;
+                    if (!package->valuestring ||
+                        strlen(package->valuestring) >= MAX_ELM_JSON_VERSION_VALUE_LENGTH) {
+                        log_error("Invalid dependency constraint string in %s", filepath);
+                        cJSON_Delete(json);
+                        elm_json_free(elm_json);
+                        return NULL;
+                    }
                     char *author = NULL;
                     char *name = NULL;
                     if (parse_package_name(full_name, &author, &name)) {
-                        package_map_add(elm_json->package_dependencies, author, name, package->valuestring);
+                        if (!package_map_add(elm_json->package_dependencies, author, name, package->valuestring)) {
+                            arena_free(author);
+                            arena_free(name);
+                            cJSON_Delete(json);
+                            elm_json_free(elm_json);
+                            return NULL;
+                        }
+                        arena_free(author);
+                        arena_free(name);
                     }
                 }
             }
@@ -337,14 +456,36 @@ ElmJson* elm_json_read(const char *filepath) {
         // Parse test-dependencies
         cJSON *test_deps = cJSON_GetObjectItem(json, "test-dependencies");
         if (test_deps && cJSON_IsObject(test_deps)) {
+            size_t entries = 0;
             cJSON *package = NULL;
             cJSON_ArrayForEach(package, test_deps) {
+                if (++entries > MAX_ELM_JSON_DEPENDENCY_ENTRIES) {
+                    log_error("Too many test-dependencies in %s", filepath);
+                    cJSON_Delete(json);
+                    elm_json_free(elm_json);
+                    return NULL;
+                }
                 if (cJSON_IsString(package)) {
                     const char *full_name = package->string;
+                    if (!package->valuestring ||
+                        strlen(package->valuestring) >= MAX_ELM_JSON_VERSION_VALUE_LENGTH) {
+                        log_error("Invalid dependency constraint string in %s", filepath);
+                        cJSON_Delete(json);
+                        elm_json_free(elm_json);
+                        return NULL;
+                    }
                     char *author = NULL;
                     char *name = NULL;
                     if (parse_package_name(full_name, &author, &name)) {
-                        package_map_add(elm_json->package_test_dependencies, author, name, package->valuestring);
+                        if (!package_map_add(elm_json->package_test_dependencies, author, name, package->valuestring)) {
+                            arena_free(author);
+                            arena_free(name);
+                            cJSON_Delete(json);
+                            elm_json_free(elm_json);
+                            return NULL;
+                        }
+                        arena_free(author);
+                        arena_free(name);
                     }
                 }
             }

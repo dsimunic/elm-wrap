@@ -5,6 +5,7 @@
 #include "elm_project.h"
 #include "fileutil.h"
 #include "alloc.h"
+#include "constants.h"
 #include "vendor/cJSON.h"
 #include "dyn_array.h"
 #include <stdio.h>
@@ -14,7 +15,7 @@
 #include <dirent.h>
 
 char **elm_parse_exposed_modules(const char *elm_json_path, int *count) {
-    char *content = file_read_contents(elm_json_path);
+    char *content = file_read_contents_bounded(elm_json_path, MAX_ELM_JSON_FILE_BYTES, NULL);
     if (!content) return NULL;
 
     cJSON *root = cJSON_Parse(content);
@@ -26,6 +27,11 @@ char **elm_parse_exposed_modules(const char *elm_json_path, int *count) {
     int modules_capacity = 16;
     int modules_count = 0;
     char **modules = arena_malloc(modules_capacity * sizeof(char*));
+    if (!modules) {
+        cJSON_Delete(root);
+        arena_free(content);
+        return NULL;
+    }
 
     cJSON *exposed = cJSON_GetObjectItem(root, "exposed-modules");
     if (!exposed) {
@@ -67,7 +73,7 @@ char **elm_parse_exposed_modules(const char *elm_json_path, int *count) {
 }
 
 char **elm_parse_source_directories(const char *elm_json_path, int *count) {
-    char *content = file_read_contents(elm_json_path);
+    char *content = file_read_contents_bounded(elm_json_path, MAX_ELM_JSON_FILE_BYTES, NULL);
     if (!content) return NULL;
 
     cJSON *root = cJSON_Parse(content);
@@ -79,6 +85,11 @@ char **elm_parse_source_directories(const char *elm_json_path, int *count) {
     int dirs_capacity = 4;
     int dirs_count = 0;
     char **dirs = arena_malloc(dirs_capacity * sizeof(char*));
+    if (!dirs) {
+        cJSON_Delete(root);
+        arena_free(content);
+        return NULL;
+    }
 
     cJSON *source_dirs = cJSON_GetObjectItem(root, "source-directories");
     if (source_dirs && cJSON_IsArray(source_dirs)) {
@@ -103,6 +114,9 @@ char *elm_module_name_to_path(const char *module_name, const char *src_dir) {
 
     /* Allocate enough space: src_dir + "/" + module_name (with / instead of .) + ".elm" + null */
     char *path = arena_malloc(src_len + 1 + len + 5);
+    if (!path) {
+        return NULL;
+    }
     strcpy(path, src_dir);
     strcat(path, "/");
 

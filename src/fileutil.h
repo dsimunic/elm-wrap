@@ -2,6 +2,7 @@
 #define FILEUTIL_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 /* Extract a ZIP file to a destination directory
  * Returns true on success, false on failure
@@ -61,6 +62,17 @@ char *find_elm_json_upwards(const char *start_path);
  * The returned string is null-terminated
  */
 char *file_read_contents(const char *filepath);
+
+/* Read entire file contents into an arena-allocated buffer, enforcing an
+ * upper bound on file size.
+ *
+ * max_bytes: Maximum allowed file size in bytes.
+ * out_size: Optional output for the number of bytes read (excluding NUL).
+ *
+ * Returns NULL on failure (missing file, too large, read error, allocation failure).
+ * The returned string is null-terminated.
+ */
+char *file_read_contents_bounded(const char *filepath, size_t max_bytes, size_t *out_size);
 
 /* Strip trailing slashes from a path
  * Returns an arena-allocated copy with trailing slashes removed

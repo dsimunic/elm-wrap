@@ -49,6 +49,7 @@ typedef struct PgDependencyProvider {
 typedef enum {
     PG_SOLVER_OK = 0,
     PG_SOLVER_NO_SOLUTION,
+    PG_SOLVER_BUDGET_EXCEEDED,
     PG_SOLVER_INTERNAL_ERROR
 } PgSolverStatus;
 
@@ -118,7 +119,7 @@ typedef const char *(*PgPackageNameResolver)(void *ctx, PgPackageId pkg);
 
 /*
  * Generate a human-readable error message explaining why solving failed.
- * Should only be called after pg_solver_solve returns PG_SOLVER_NO_SOLUTION.
+ * Intended for PG_SOLVER_NO_SOLUTION and PG_SOLVER_BUDGET_EXCEEDED.
  *
  * solver: The solver that failed to find a solution
  * name_resolver: Callback to convert package IDs to names

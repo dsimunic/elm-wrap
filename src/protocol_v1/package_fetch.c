@@ -4,6 +4,7 @@
 #include "../cache.h"
 #include "../alloc.h"
 #include "../constants.h"
+#include "../fileutil.h"
 #include "../vendor/cJSON.h"
 #include "../vendor/sha1.h"
 #include "../log.h"
@@ -397,40 +398,34 @@ bool fetch_package_metadata(InstallEnv *env, const char *author,
 
         /* Validate elm.json immediately after downloading */
         if (strcmp(filename, "elm.json") == 0) {
-            FILE *test_file = fopen(file_path, "r");
-            if (test_file) {
-                fseek(test_file, 0, SEEK_END);
-                long file_size = ftell(test_file);
-                fseek(test_file, 0, SEEK_SET);
-
-                if (file_size > 0) {
-                    char *test_data = arena_malloc(file_size + 1);
-                    if (test_data) {
-                        size_t bytes_read = fread(test_data, 1, file_size, test_file);
-                        test_data[bytes_read] = '\0';
-
-                        cJSON *test_json = cJSON_Parse(test_data);
-                        if (!test_json) {
-                            log_error("Invalid JSON in downloaded elm.json for %s/%s %s",
-                                    author, name, version);
-                            const char *error_ptr = cJSON_GetErrorPtr();
-                            if (error_ptr) {
-                                log_error("JSON parse error before: %s", error_ptr);
-                            }
-                            arena_free(test_data);
-                            fclose(test_file);
-                            remove(file_path);  /* Delete the corrupted file */
-                            arena_free(url);
-                            arena_free(file_path);
-                            arena_free(pkg_dir);
-                            return false;
-                        }
-                        cJSON_Delete(test_json);
-                        arena_free(test_data);
-                    }
-                }
-                fclose(test_file);
+            char *test_data = file_read_contents_bounded(file_path, MAX_ELM_JSON_FILE_BYTES, NULL);
+            if (!test_data) {
+                log_error("Downloaded elm.json is unreadable or too large for %s/%s %s",
+                          author, name, version);
+                remove(file_path);
+                arena_free(url);
+                arena_free(file_path);
+                arena_free(pkg_dir);
+                return false;
             }
+
+            cJSON *test_json = cJSON_Parse(test_data);
+            if (!test_json) {
+                log_error("Invalid JSON in downloaded elm.json for %s/%s %s",
+                        author, name, version);
+                const char *error_ptr = cJSON_GetErrorPtr();
+                if (error_ptr) {
+                    log_error("JSON parse error before: %s", error_ptr);
+                }
+                arena_free(test_data);
+                remove(file_path);  /* Delete the corrupted file */
+                arena_free(url);
+                arena_free(file_path);
+                arena_free(pkg_dir);
+                return false;
+            }
+            cJSON_Delete(test_json);
+            arena_free(test_data);
         }
 
         arena_free(url);

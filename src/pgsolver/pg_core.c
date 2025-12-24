@@ -119,10 +119,50 @@ struct PgSolver {
     int stats_decisions;
     int stats_propagations;
     int stats_conflicts;
+
+    /* DoS protection: set when a solve budget is exceeded. */
+    bool budget_exceeded;
+    const char *budget_reason;
 };
 
-#define PG_DECISION_VERSION_BUFFER 128
-#define PG_DEPENDENCY_BUFFER 128
+static PgSolverStatus pg_solver_budget_check(PgSolver *solver) {
+    if (!solver) {
+        return PG_SOLVER_INTERNAL_ERROR;
+    }
+
+    if (solver->stats_decisions >= PG_MAX_DECISIONS) {
+        solver->budget_exceeded = true;
+        solver->budget_reason = "too many decisions";
+        return PG_SOLVER_BUDGET_EXCEEDED;
+    }
+    if (solver->stats_propagations >= PG_MAX_PROPAGATIONS) {
+        solver->budget_exceeded = true;
+        solver->budget_reason = "too many propagations";
+        return PG_SOLVER_BUDGET_EXCEEDED;
+    }
+    if (solver->stats_conflicts >= PG_MAX_CONFLICTS) {
+        solver->budget_exceeded = true;
+        solver->budget_reason = "too many conflicts";
+        return PG_SOLVER_BUDGET_EXCEEDED;
+    }
+    if (solver->pkg_state_capacity > PG_MAX_PACKAGES) {
+        solver->budget_exceeded = true;
+        solver->budget_reason = "too many packages";
+        return PG_SOLVER_BUDGET_EXCEEDED;
+    }
+    if (solver->trail.count > PG_MAX_TRAIL_ASSIGNMENTS) {
+        solver->budget_exceeded = true;
+        solver->budget_reason = "too many assignments";
+        return PG_SOLVER_BUDGET_EXCEEDED;
+    }
+    if (solver->incompatibility_count > PG_MAX_INCOMPATIBILITIES) {
+        solver->budget_exceeded = true;
+        solver->budget_reason = "too many incompatibilities";
+        return PG_SOLVER_BUDGET_EXCEEDED;
+    }
+
+    return PG_SOLVER_OK;
+}
 
 static bool pg_solver_ensure_pkg_state(PgSolver *solver, PgPackageId pkg);
 static bool pg_solver_enqueue_changed(PgSolver *solver, PgPackageId pkg);
@@ -2018,6 +2058,11 @@ PgSolverStatus pg_solver_solve(PgSolver *solver) {
     solver->current_decision_level = 1;
 
     while (true) {
+        PgSolverStatus budget_status = pg_solver_budget_check(solver);
+        if (budget_status != PG_SOLVER_OK) {
+            return budget_status;
+        }
+
         PgIncompatibility *conflict = NULL;
         PgSolverStatus status = pg_unit_propagate(solver, &conflict);
         if (status != PG_SOLVER_OK) {
@@ -2822,6 +2867,31 @@ bool pg_solver_explain_failure(
 ) {
     if (!solver || !name_resolver || !out_buffer || buffer_size == 0) {
         return false;
+    }
+
+    if (solver->budget_exceeded) {
+        PgSolverStats stats;
+        pg_solver_get_stats(solver, &stats);
+        snprintf(
+            out_buffer,
+            buffer_size,
+            "Dependency solving stopped: exceeded safety budget (%s).\n\n"
+            "Budgets:\n"
+            "  Decisions:    %d/%d\n"
+            "  Propagations: %d/%d\n"
+            "  Conflicts:    %d/%d\n"
+            "  Packages:     ~%d/%d\n"
+            "  Assignments:  ~%zu/%d\n"
+            "  Clauses:      ~%zu/%d\n",
+            solver->budget_reason ? solver->budget_reason : "budget exceeded",
+            stats.decisions, PG_MAX_DECISIONS,
+            stats.propagations, PG_MAX_PROPAGATIONS,
+            stats.conflicts, PG_MAX_CONFLICTS,
+            solver->pkg_state_capacity, PG_MAX_PACKAGES,
+            solver->trail.count, PG_MAX_TRAIL_ASSIGNMENTS,
+            solver->incompatibility_count, PG_MAX_INCOMPATIBILITIES
+        );
+        return true;
     }
 
     if (!solver->root_incompatibility) {
