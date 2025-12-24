@@ -499,12 +499,21 @@ char *expand_function_type_aliases(const char *type_str, TypeAliasMap *type_alia
 
                 size_t buf_size = prefix_len + strlen(expanded) + 10;
                 char *result = arena_malloc(buf_size);
+                if (!result) {
+                    arena_free(expanded);
+                    for (int i = 0; i < type_args_count; i++) {
+                        arena_free(type_args[i]);
+                    }
+                    arena_free(type_args);
+                    return arena_strdup(type_str);
+                }
 
                 /* Copy the prefix (everything before the return type) */
                 memcpy(result, type_str, prefix_len);
 
                 /* Copy the expanded type */
-                strcpy(result + prefix_len, expanded);
+                size_t expanded_len = strlen(expanded);
+                memcpy(result + prefix_len, expanded, expanded_len + 1);
 
                 arena_free(expanded);
 

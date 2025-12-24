@@ -1,8 +1,10 @@
 #include "embedded_archive.h"
 #include "alloc.h"
+#include "constants.h"
 
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 
 /* Static state for the embedded archive */
 static struct {
@@ -26,7 +28,8 @@ static mz_uint64 find_zip_start(FILE *f, mz_uint64 file_size) {
     mz_uint64 eocd_pos = 0;
 
     /* Scan backwards to find EOCD signature (PK\x05\x06) */
-    for (mz_uint64 pos = file_size - 22; pos >= search_start; pos--) {
+    for (mz_uint64 pos = file_size - 22;; pos--) {
+        if (pos > (mz_uint64)LONG_MAX) break;
         if (fseek(f, (long)pos, SEEK_SET) != 0) break;
         if (fread(buf, 1, 4, f) != 4) break;
 
@@ -34,6 +37,8 @@ static mz_uint64 find_zip_start(FILE *f, mz_uint64 file_size) {
             eocd_pos = pos;
             break;
         }
+
+        if (pos == search_start) break;
     }
 
     if (eocd_pos == 0) {
@@ -48,7 +53,12 @@ static mz_uint64 find_zip_start(FILE *f, mz_uint64 file_size) {
     mz_uint32 cdir_offset = buf[16] | (buf[17] << 8) | (buf[18] << 16) | (buf[19] << 24);
     mz_uint32 cdir_size = buf[12] | (buf[13] << 8) | (buf[14] << 16) | (buf[15] << 24);
 
-    mz_uint64 zip_start = eocd_pos - cdir_offset - cdir_size;
+    mz_uint64 cdir_total = (mz_uint64)cdir_offset + (mz_uint64)cdir_size;
+    if (cdir_total > eocd_pos) {
+        return 0;
+    }
+
+    mz_uint64 zip_start = eocd_pos - cdir_total;
 
     /* Sanity check: at zip_start there should be a local file header */
     if (fseek(f, (long)zip_start, SEEK_SET) != 0) return 0;
@@ -87,7 +97,12 @@ bool embedded_archive_init(const char *exe_path) {
         fclose(f);
         return false;
     }
-    mz_uint64 file_size = (mz_uint64)ftell(f);
+    long file_size_long = ftell(f);
+    if (file_size_long < 0) {
+        fclose(f);
+        return false;
+    }
+    mz_uint64 file_size = (mz_uint64)file_size_long;
 
     mz_uint64 zip_start = find_zip_start(f, file_size);
     fclose(f);
@@ -155,6 +170,10 @@ bool embedded_archive_extract(const char *name, void **data, size_t *size) {
 
     mz_zip_archive_file_stat stat;
     if (!mz_zip_reader_file_stat(&g_archive.zip, (mz_uint)index, &stat)) {
+        return false;
+    }
+
+    if (stat.m_uncomp_size > (mz_uint64)MAX_EMBEDDED_ARCHIVE_EXTRACT_BYTES) {
         return false;
     }
 

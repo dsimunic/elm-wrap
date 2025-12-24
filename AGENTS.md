@@ -8,6 +8,7 @@ We refer to the project as elm-wrap and the main binary as `wrap`. In documentat
 
 Before writing or modifying C code, you **MUST** also read:
 
+- `doc/writing-secure-code.md` — Secure coding rules (edicts) for humans and coding LLMs
 - `doc/shared_code_functionality.md` — Shared modules and functions to use when implementing commands
 - `doc/global_context.md` — Global context all commands operate in.
 

@@ -362,7 +362,7 @@ static bool register_local_dev_v2_text_registry(InstallEnv *env, const char *aut
         return false;
     }
 
-    char *existing_content = file_read_contents(reg_path);
+    char *existing_content = file_read_contents_bounded(reg_path, MAX_V2_REGISTRY_TEXT_FILE_BYTES, NULL);
     bool entry_exists = false;
 
     if (existing_content) {
@@ -421,9 +421,8 @@ static bool register_local_dev_v2_text_registry(InstallEnv *env, const char *aut
         return false;
     }
 
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    if (fsize == 0) {
+    struct stat fst;
+    if (fstat(fileno(f), &fst) == 0 && fst.st_size == 0) {
         const char *compiler_name = global_context_compiler_name();
         const char *compiler_version = (ctx && ctx->compiler_version) ? ctx->compiler_version : "0.19.1";
         fprintf(f, "format 2\n");

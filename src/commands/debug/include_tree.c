@@ -4,6 +4,7 @@
 #include "../../log.h"
 #include "../../fileutil.h"
 #include "../../dyn_array.h"
+#include "../../constants.h"
 #include "../../vendor/cJSON.h"
 #include "../../ast/skeleton.h"
 
@@ -88,24 +89,7 @@ int cmd_debug_include_tree(int argc, char *argv[]) {
  * Read entire file content into allocated buffer
  */
 static char *read_file_content(const char *filepath) {
-    FILE *f = fopen(filepath, "r");
-    if (!f) return NULL;
-
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    char *content = arena_malloc(fsize + 1);
-    if (!content) {
-        fclose(f);
-        return NULL;
-    }
-
-    size_t read_size = fread(content, 1, fsize, f);
-    content[read_size] = '\0';
-    fclose(f);
-
-    return content;
+    return file_read_contents_bounded(filepath, MAX_ELM_JSON_FILE_BYTES, NULL);
 }
 
 /**
@@ -113,11 +97,11 @@ static char *read_file_content(const char *filepath) {
  */
 static char *find_src_dir_for_file(const char *file_path) {
     /* Get absolute path */
-    char *abs_path = realpath(file_path, NULL);
-    if (!abs_path) return NULL;
+    char abs_path[MAX_PATH_LENGTH];
+    if (!realpath(file_path, abs_path)) return NULL;
 
     char *dir = arena_strdup(abs_path);
-    free(abs_path);
+    if (!dir) return NULL;
 
     /* Walk up directories looking for elm.json */
     while (1) {
@@ -133,8 +117,14 @@ static char *find_src_dir_for_file(const char *file_path) {
 
         if (file_exists(elm_json_path)) {
             /* Found elm.json, return src path */
-            char *src_dir = arena_malloc(strlen(dir) + 5);
-            sprintf(src_dir, "%s/src", dir);
+            size_t dir_len = strlen(dir);
+            size_t cap = dir_len + 4 + 1; /* "/src" + NUL */
+            char *src_dir = arena_malloc(cap);
+            if (!src_dir) return NULL;
+            int n = snprintf(src_dir, cap, "%s/src", dir);
+            if (n < 0 || (size_t)n >= cap) {
+                return NULL;
+            }
             return src_dir;
         }
     }
@@ -159,8 +149,8 @@ static int print_file_include_tree(const char *file_path) {
     }
 
     /* Get absolute path */
-    char *abs_path = realpath(file_path, NULL);
-    if (!abs_path) {
+    char abs_path[MAX_PATH_LENGTH];
+    if (!realpath(file_path, abs_path)) {
         log_error("Could not resolve path: %s", file_path);
         return 1;
     }
@@ -191,7 +181,6 @@ static int print_file_include_tree(const char *file_path) {
     collect_imports_recursive(abs_path, src_dir, &visited, &visited_count, &visited_capacity, "");
 
     printf("\n");
-    free(abs_path);
     return 0;
 }
 
@@ -344,8 +333,8 @@ static int print_package_include_tree(const char *dir_path) {
                 char **visited = arena_malloc(visited_capacity * sizeof(char*));
 
                 /* Get absolute path */
-                char *abs_path = realpath(module_path, NULL);
-                if (abs_path) {
+                char abs_path[MAX_PATH_LENGTH];
+                if (realpath(module_path, abs_path)) {
                     printf("%s (%s)\n", module_name, abs_path);
 
                     /* Add to included files */
@@ -364,7 +353,6 @@ static int print_package_include_tree(const char *dir_path) {
                         }
                     }
 
-                    free(abs_path);
                     printf("\n");
                 }
             } else {
@@ -416,13 +404,12 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
                                        char ***visited, int *visited_count, int *visited_capacity,
                                        const char *prefix) {
     /* Get absolute path for consistent comparison */
-    char *abs_path = realpath(file_path, NULL);
-    if (!abs_path) return;
+    char abs_path[MAX_PATH_LENGTH];
+    if (!realpath(file_path, abs_path)) return;
 
     /* Check if already visited (cycle detection) */
     for (int i = 0; i < *visited_count; i++) {
         if (strcmp((*visited)[i], abs_path) == 0) {
-            free(abs_path);
             return; /* Already processed */
         }
     }
@@ -430,7 +417,6 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
     /* Add to visited */
     char *current_file_abs = arena_strdup(abs_path);
     DYNARRAY_PUSH(*visited, *visited_count, *visited_capacity, current_file_abs, char*);
-    free(abs_path);
 
     /* Parse the Elm file using skeleton parser (tree-sitter based) */
     SkeletonModule *mod = skeleton_parse(file_path);
@@ -454,11 +440,10 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
         char *module_path = module_name_to_path(module_name, src_dir);
         
         if (module_path && file_exists(module_path)) {
-            char *mod_abs_path = realpath(module_path, NULL);
-            if (mod_abs_path) {
+            char mod_abs_path[MAX_PATH_LENGTH];
+            if (realpath(module_path, mod_abs_path)) {
                 /* Skip self-references (shouldn't happen but be safe) */
                 if (strcmp(mod_abs_path, current_file_abs) == 0) {
-                    free(mod_abs_path);
                     continue;
                 }
                 
@@ -468,7 +453,6 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
                 local_import_names[local_imports_count] = arena_strdup(module_name);
                 local_import_paths[local_imports_count] = arena_strdup(mod_abs_path);
                 local_imports_count++;
-                free(mod_abs_path);
             }
         } else {
             /* External import (from a package dependency) */
@@ -509,10 +493,15 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
             printf("%s\n", module_name);
             
             /* Build new prefix for children */
-            int prefix_len = strlen(prefix);
-            char *child_prefix = arena_malloc(prefix_len + 7); /* +6 for "│   " or "    ", +1 for null */
-            strcpy(child_prefix, prefix);
-            strcat(child_prefix, is_last ? TREE_SPACE : TREE_VERT);
+            size_t prefix_len = strlen(prefix);
+            const char *suffix = is_last ? TREE_SPACE : TREE_VERT;
+            size_t suffix_len = strlen(suffix);
+            char *child_prefix = arena_malloc(prefix_len + suffix_len + 1);
+            if (!child_prefix) {
+                continue;
+            }
+            memcpy(child_prefix, prefix, prefix_len);
+            memcpy(child_prefix + prefix_len, suffix, suffix_len + 1);
             
             /* Recurse */
             collect_imports_recursive(mod_abs_path, src_dir, visited, 
@@ -537,28 +526,24 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
  * Convert module name (e.g., "Html.Events") to file path
  */
 static char *module_name_to_path(const char *module_name, const char *src_dir) {
-    int len = strlen(module_name);
-    int src_len = strlen(src_dir);
+    if (!module_name || !src_dir) return NULL;
 
-    /* Allocate enough space: src_dir + "/" + module_name (with / instead of .) + ".elm" + null */
-    char *path = arena_malloc(src_len + 1 + len + 5);
+    size_t module_len = strlen(module_name);
+    size_t src_len = strlen(src_dir);
+    size_t required = src_len + 1 + module_len + 4 + 1;
+    if (required > MAX_PATH_LENGTH) return NULL;
 
-    strcpy(path, src_dir);
-    strcat(path, "/");
+    char *path = arena_malloc(required);
+    if (!path) return NULL;
 
-    /* Convert dots to slashes */
-    int offset = src_len + 1;
-    for (int i = 0; i < len; i++) {
-        if (module_name[i] == '.') {
-            path[offset++] = '/';
-        } else {
-            path[offset++] = module_name[i];
-        }
+    memcpy(path, src_dir, src_len);
+    path[src_len] = '/';
+
+    char *dest = path + src_len + 1;
+    for (size_t i = 0; i < module_len; i++) {
+        *dest++ = (module_name[i] == '.') ? '/' : module_name[i];
     }
-    path[offset] = '\0';
-
-    strcat(path, ".elm");
-
+    memcpy(dest, ".elm", 5);
     return path;
 }
 
@@ -590,12 +575,9 @@ static void collect_all_elm_files(const char *dir_path, char ***files, int *coun
             /* Check if .elm file */
             const char *ext = strrchr(entry->d_name, '.');
             if (ext && strcmp(ext, ".elm") == 0) {
-                /* Get absolute path */
-                char *abs_path = realpath(full_path, NULL);
-                if (abs_path) {
-                    char *dup = arena_strdup(abs_path);
-                    DYNARRAY_PUSH(*files, *count, *capacity, dup, char*);
-                    free(abs_path); /* realpath uses malloc */
+                char abs_path[MAX_PATH_LENGTH];
+                if (realpath(full_path, abs_path)) {
+                    DYNARRAY_PUSH(*files, *count, *capacity, arena_strdup(abs_path), char*);
                 }
             }
         }

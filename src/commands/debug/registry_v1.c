@@ -494,7 +494,7 @@ static int cmd_registry_v1_apply_since(const char *json_path) {
         return 1;
     }
 
-    char *json_str = file_read_contents(json_path);
+    char *json_str = file_read_contents_bounded(json_path, MAX_V1_SINCE_JSON_FILE_BYTES, NULL);
     if (!json_str) {
         fprintf(stderr, "Error: Failed to read JSON file: %s\n", json_path);
         return 1;

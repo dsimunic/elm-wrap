@@ -3,6 +3,7 @@
 #include "registry.h"
 #include "alloc.h"
 #include "constants.h"
+#include "fileutil.h"
 #include "exit_codes.h"
 #include "terminal_colors.h"
 #include "log.h"
@@ -28,25 +29,10 @@ typedef struct {
  * Returns the number of duplicates found (0 if none).
  */
 static int check_duplicate_exposed_modules(const char *elm_json_path) {
-    FILE *f = fopen(elm_json_path, "r");
-    if (!f) {
-        return 0;
-    }
-
-    /* Read entire file */
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    char *content = arena_malloc(fsize + 1);
+    char *content = file_read_contents_bounded(elm_json_path, MAX_ELM_JSON_FILE_BYTES, NULL);
     if (!content) {
-        fclose(f);
         return 0;
     }
-
-    size_t read_size = fread(content, 1, fsize, f);
-    content[read_size] = 0;
-    fclose(f);
 
     /* Find "exposed-modules" key */
     char *exposed = strstr(content, "\"exposed-modules\"");

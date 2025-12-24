@@ -7,6 +7,7 @@
 
 #include "import_tree.h"
 #include "alloc.h"
+#include "constants.h"
 #include "fileutil.h"
 #include "dyn_array.h"
 #include "vendor/cJSON.h"
@@ -39,47 +40,30 @@ static void print_tree_recursive(const char *file_path, const char *src_dir,
  * Read entire file content into allocated buffer
  */
 static char *read_file_content(const char *filepath) {
-    FILE *f = fopen(filepath, "r");
-    if (!f) return NULL;
-
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    char *content = arena_malloc(fsize + 1);
-    if (!content) {
-        fclose(f);
-        return NULL;
-    }
-
-    size_t read_size = fread(content, 1, fsize, f);
-    content[read_size] = '\0';
-    fclose(f);
-
-    return content;
+    return file_read_contents_bounded(filepath, MAX_ELM_JSON_FILE_BYTES, NULL);
 }
 
 /**
  * Convert module name (e.g., "Html.Events") to file path
  */
 static char *module_name_to_path(const char *module_name, const char *src_dir) {
-    int len = strlen(module_name);
-    int src_len = strlen(src_dir);
+    if (!module_name || !src_dir) return NULL;
 
-    char *path = arena_malloc(src_len + 1 + len + 5);
-    strcpy(path, src_dir);
-    strcat(path, "/");
+    size_t module_len = strlen(module_name);
+    size_t src_len = strlen(src_dir);
+    size_t required = src_len + 1 + module_len + 4 + 1;
+
+    char *path = arena_malloc(required);
+    if (!path) return NULL;
+
+    memcpy(path, src_dir, src_len);
+    path[src_len] = '/';
 
     char *dest = path + src_len + 1;
-    for (int i = 0; i < len; i++) {
-        if (module_name[i] == '.') {
-            *dest++ = '/';
-        } else {
-            *dest++ = module_name[i];
-        }
+    for (size_t i = 0; i < module_len; i++) {
+        *dest++ = (module_name[i] == '.') ? '/' : module_name[i];
     }
-    *dest = '\0';
-    strcat(path, ".elm");
+    memcpy(dest, ".elm", 5);
 
     return path;
 }
@@ -210,10 +194,9 @@ static void collect_all_elm_files(const char *dir_path, char ***files, int *coun
             } else if (S_ISREG(st.st_mode)) {
                 const char *ext = strrchr(entry->d_name, '.');
                 if (ext && strcmp(ext, ".elm") == 0) {
-                    char *abs_path = realpath(full_path, NULL);
-                    if (abs_path) {
+                    char abs_path[MAX_PATH_LENGTH];
+                    if (realpath(full_path, abs_path)) {
                         DYNARRAY_PUSH(*files, *count, *capacity, arena_strdup(abs_path), char*);
-                        free(abs_path);
                     }
                 }
             }
@@ -230,13 +213,12 @@ static void collect_all_elm_files(const char *dir_path, char ***files, int *coun
  */
 static void collect_reachable_files(const char *file_path, const char *src_dir,
                                      char ***visited, int *visited_count, int *visited_capacity) {
-    char *abs_path = realpath(file_path, NULL);
-    if (!abs_path) return;
+    char abs_path[MAX_PATH_LENGTH];
+    if (!realpath(file_path, abs_path)) return;
 
     /* Check if already visited */
     for (int i = 0; i < *visited_count; i++) {
         if (strcmp((*visited)[i], abs_path) == 0) {
-            free(abs_path);
             return;
         }
     }
@@ -244,7 +226,6 @@ static void collect_reachable_files(const char *file_path, const char *src_dir,
     /* Add to visited */
     char *path_copy = arena_strdup(abs_path);
     DYNARRAY_PUSH(*visited, *visited_count, *visited_capacity, path_copy, char*);
-    free(abs_path);
 
     /* Parse the Elm file */
     SkeletonModule *mod = skeleton_parse(file_path);
@@ -270,13 +251,12 @@ static void collect_reachable_files(const char *file_path, const char *src_dir,
 static void print_tree_recursive(const char *file_path, const char *src_dir,
                                   char ***visited, int *visited_count, int *visited_capacity,
                                   const char *prefix, bool show_external) {
-    char *abs_path = realpath(file_path, NULL);
-    if (!abs_path) return;
+    char abs_path[MAX_PATH_LENGTH];
+    if (!realpath(file_path, abs_path)) return;
 
     /* Check if already visited */
     for (int i = 0; i < *visited_count; i++) {
         if (strcmp((*visited)[i], abs_path) == 0) {
-            free(abs_path);
             return;
         }
     }
@@ -284,7 +264,6 @@ static void print_tree_recursive(const char *file_path, const char *src_dir,
     /* Add to visited */
     char *current_file_abs = arena_strdup(abs_path);
     DYNARRAY_PUSH(*visited, *visited_count, *visited_capacity, current_file_abs, char*);
-    free(abs_path);
 
     /* Parse the Elm file */
     SkeletonModule *mod = skeleton_parse(file_path);
@@ -307,10 +286,9 @@ static void print_tree_recursive(const char *file_path, const char *src_dir,
         char *module_path = module_name_to_path(module_name, src_dir);
         
         if (module_path && file_exists(module_path)) {
-            char *mod_abs_path = realpath(module_path, NULL);
-            if (mod_abs_path) {
+            char mod_abs_path[MAX_PATH_LENGTH];
+            if (realpath(module_path, mod_abs_path)) {
                 if (strcmp(mod_abs_path, current_file_abs) == 0) {
-                    free(mod_abs_path);
                     continue;
                 }
                 
@@ -319,7 +297,6 @@ static void print_tree_recursive(const char *file_path, const char *src_dir,
                 local_imports_count--;
                 DYNARRAY_PUSH(local_import_paths, local_imports_count, local_imports_capacity,
                              arena_strdup(mod_abs_path), char*);
-                free(mod_abs_path);
             }
         } else if (show_external) {
             DYNARRAY_PUSH(external_import_names, external_imports_count, external_imports_capacity,
@@ -356,9 +333,14 @@ static void print_tree_recursive(const char *file_path, const char *src_dir,
             printf("%s\n", module_name);
             
             int prefix_len = strlen(prefix);
-            char *child_prefix = arena_malloc(prefix_len + 5);
-            strcpy(child_prefix, prefix);
-            strcat(child_prefix, is_last ? TREE_SPACE : TREE_VERT);
+            const char *suffix = is_last ? TREE_SPACE : TREE_VERT;
+            size_t suffix_len = strlen(suffix);
+            char *child_prefix = arena_malloc((size_t)prefix_len + suffix_len + 1);
+            if (!child_prefix) {
+                continue;
+            }
+            memcpy(child_prefix, prefix, (size_t)prefix_len);
+            memcpy(child_prefix + prefix_len, suffix, suffix_len + 1);
             
             print_tree_recursive(mod_abs_path, src_dir, visited, 
                                 visited_count, visited_capacity, child_prefix, show_external);
@@ -504,13 +486,12 @@ void import_tree_print(ImportTreeAnalysis *analysis, bool show_external) {
                 int visited_count = 0;
                 char **visited = arena_malloc(visited_capacity * sizeof(char*));
 
-                char *abs_path = realpath(module_path, NULL);
-                if (abs_path) {
+                char abs_path[MAX_PATH_LENGTH];
+                if (realpath(module_path, abs_path)) {
                     printf("%s (%s)\n", module_name, abs_path);
-                    
-                    print_tree_recursive(abs_path, analysis->src_dir, &visited, 
+
+                    print_tree_recursive(abs_path, analysis->src_dir, &visited,
                                         &visited_count, &visited_capacity, "", show_external);
-                    free(abs_path);
                     printf("\n");
                 }
             } else {

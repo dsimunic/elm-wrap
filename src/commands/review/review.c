@@ -130,24 +130,7 @@ static void print_package_usage(void) {
  * Read file contents into arena-allocated string
  */
 static char *read_file_content(const char *filepath) {
-    FILE *f = fopen(filepath, "r");
-    if (!f) return NULL;
-
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    char *content = arena_malloc(fsize + 1);
-    if (!content) {
-        fclose(f);
-        return NULL;
-    }
-
-    size_t read_size = fread(content, 1, fsize, f);
-    content[read_size] = '\0';
-    fclose(f);
-
-    return content;
+    return file_read_contents_bounded(filepath, MAX_ELM_JSON_FILE_BYTES, NULL);
 }
 
 /**
@@ -849,24 +832,24 @@ static char **pkg_parse_exposed_modules(const char *elm_json_path, int *count) {
  * Convert module name (e.g., "Html.Events") to file path
  */
 static char *pkg_module_name_to_path(const char *module_name, const char *src_dir) {
-    int len = strlen(module_name);
-    int src_len = strlen(src_dir);
+    if (!module_name || !src_dir) return NULL;
 
-    char *path = arena_malloc(src_len + 1 + len + 5);
-    strcpy(path, src_dir);
-    strcat(path, "/");
+    size_t module_len = strlen(module_name);
+    size_t src_len = strlen(src_dir);
+    size_t required = src_len + 1 + module_len + 4 + 1;
+    if (required > MAX_PATH_LENGTH) return NULL;
+
+    char *path = arena_malloc(required);
+    if (!path) return NULL;
+
+    memcpy(path, src_dir, src_len);
+    path[src_len] = '/';
 
     char *dest = path + src_len + 1;
-    for (int i = 0; i < len; i++) {
-        if (module_name[i] == '.') {
-            *dest++ = '/';
-        } else {
-            *dest++ = module_name[i];
-        }
+    for (size_t i = 0; i < module_len; i++) {
+        *dest++ = (module_name[i] == '.') ? '/' : module_name[i];
     }
-    *dest = '\0';
-    strcat(path, ".elm");
-
+    memcpy(dest, ".elm", 5);
     return path;
 }
 
@@ -894,10 +877,9 @@ static void pkg_collect_all_elm_files(const char *dir_path, char ***files, int *
             } else if (S_ISREG(st.st_mode)) {
                 const char *ext = strrchr(entry->d_name, '.');
                 if (ext && strcmp(ext, ".elm") == 0) {
-                    char *abs_path = realpath(full_path, NULL);
-                    if (abs_path) {
+                    char abs_path[MAX_PATH_LENGTH];
+                    if (realpath(full_path, abs_path)) {
                         DYNARRAY_PUSH(*files, *count, *capacity, arena_strdup(abs_path), char*);
-                        free(abs_path);
                     }
                 }
             }
@@ -930,10 +912,9 @@ static void pkg_collect_all_files(const char *dir_path, char ***files, int *coun
             if (S_ISDIR(st.st_mode)) {
                 pkg_collect_all_files(full_path, files, count, capacity);
             } else if (S_ISREG(st.st_mode)) {
-                char *abs_path = realpath(full_path, NULL);
-                if (abs_path) {
+                char abs_path[MAX_PATH_LENGTH];
+                if (realpath(full_path, abs_path)) {
                     DYNARRAY_PUSH(*files, *count, *capacity, arena_strdup(abs_path), char*);
-                    free(abs_path);
                 }
             }
         }
@@ -1207,9 +1188,16 @@ int cmd_review_package(int argc, char *argv[]) {
     snprintf(readme_path, sizeof(readme_path), "%s/README.md", clean_path);
     
     /* Get absolute paths for allowed root files */
-    char *abs_license = realpath(license_path, NULL);
-    char *abs_readme = realpath(readme_path, NULL);
-    char *abs_elm_json = realpath(elm_json_path, NULL);
+    char *abs_license = NULL;
+    char *abs_readme = NULL;
+    char *abs_elm_json = NULL;
+
+    {
+        char resolved[MAX_PATH_LENGTH];
+        if (realpath(license_path, resolved)) abs_license = arena_strdup(resolved);
+        if (realpath(readme_path, resolved)) abs_readme = arena_strdup(resolved);
+        if (realpath(elm_json_path, resolved)) abs_elm_json = arena_strdup(resolved);
+    }
 
     if (!quiet_mode) {
         printf("Reviewing package: %s\n", clean_path);
@@ -1227,9 +1215,9 @@ int cmd_review_package(int argc, char *argv[]) {
         if (!quiet_mode) {
             fprintf(stderr, "Error: Failed to initialize rulr engine: %s\n", err.message);
         }
-        if (abs_license) free(abs_license);
-        if (abs_readme) free(abs_readme);
-        if (abs_elm_json) free(abs_elm_json);
+        if (abs_license) arena_free(abs_license);
+        if (abs_readme) arena_free(abs_readme);
+        if (abs_elm_json) arena_free(abs_elm_json);
         return 1;
     }
 
@@ -1349,9 +1337,9 @@ int cmd_review_package(int argc, char *argv[]) {
                 rulr_deinit(&rulr);
                 if (elm_json) elm_json_free(elm_json);
                 if (cache) cache_config_free(cache);
-                if (abs_license) free(abs_license);
-                if (abs_readme) free(abs_readme);
-                if (abs_elm_json) free(abs_elm_json);
+                if (abs_license) arena_free(abs_license);
+                if (abs_readme) arena_free(abs_readme);
+                if (abs_elm_json) arena_free(abs_elm_json);
                 return EXIT_NO_UPGRADES_AVAILABLE;
             }
             if (skip_error_detail) {
@@ -1390,9 +1378,9 @@ int cmd_review_package(int argc, char *argv[]) {
     if (cache) {
         cache_config_free(cache);
     }
-    if (abs_license) free(abs_license);
-    if (abs_readme) free(abs_readme);
-    if (abs_elm_json) free(abs_elm_json);
+    if (abs_license) arena_free(abs_license);
+    if (abs_readme) arena_free(abs_readme);
+    if (abs_elm_json) arena_free(abs_elm_json);
 
     if (!quiet_mode) {
         printf("Total errors: %d\n", total_errors);

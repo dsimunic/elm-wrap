@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 
 #include "alloc.h"
+#include "constants.h"
+#include "fileutil.h"
 #include "builtin_rules.h"
 #include "frontend/ast.h"
 #include "frontend/ast_serialize.h"
@@ -18,39 +20,15 @@ static RulrError read_entire_file(const char *path, LoadedFile *out) {
     if (!path || !out) {
         return rulr_error("Invalid file input");
     }
-    FILE *f = fopen(path, "rb");
-    if (!f) {
-        return rulr_error("Failed to open file");
+    size_t read_len = 0;
+    char *buffer = file_read_contents_bounded(path, MAX_RULR_TEXT_FILE_BYTES, &read_len);
+    if (!buffer || read_len == 0) {
+        arena_free(buffer);
+        return rulr_error("Failed to read file");
     }
-    if (fseek(f, 0, SEEK_END) != 0) {
-        fclose(f);
-        return rulr_error("Failed to seek file");
-    }
-    long size = ftell(f);
-    if (size < 0) {
-        fclose(f);
-        return rulr_error("Failed to tell file size");
-    }
-    if (fseek(f, 0, SEEK_SET) != 0) {
-        fclose(f);
-        return rulr_error("Failed to rewind file");
-    }
-    char *buffer = (char *)arena_malloc((size_t)size + 1);
-    if (!buffer) {
-        fclose(f);
-        return rulr_error("Out of memory reading file");
-    }
-    size_t read_len = fread(buffer, 1, (size_t)size, f);
-    fclose(f);
-    buffer[read_len] = '\0';
     out->data = buffer;
     out->len = read_len;
     return rulr_ok();
-}
-
-static int file_exists(const char *path) {
-    struct stat st;
-    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
 }
 
 static int has_extension(const char *path, const char *ext) {

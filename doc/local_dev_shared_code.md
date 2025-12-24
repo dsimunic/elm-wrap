@@ -218,7 +218,7 @@ This module depends on:
 - `install_local_dev.h` - For `get_local_dev_tracking_dir()`
 - `alloc.h` - For arena allocation functions
 - `constants.h` - For `MAX_PATH_LENGTH`, `INITIAL_SMALL_CAPACITY`
-- `fileutil.h` - For `file_read_contents()`
+- `fileutil.h` - For `file_read_contents_bounded()`
 
 ## Files
 

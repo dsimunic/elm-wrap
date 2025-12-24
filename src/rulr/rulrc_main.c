@@ -23,6 +23,8 @@
 #include <libgen.h>
 
 #include "alloc.h"
+#include "constants.h"
+#include "fileutil.h"
 #include "frontend/ast.h"
 #include "frontend/ast_serialize.h"
 #include "ir/ir_builder.h"
@@ -154,26 +156,13 @@ static char *read_stdin(void) {
  */
 static int compile_file(const char *input_path) {
     /* Read source file */
-    FILE *f = fopen(input_path, "rb");
-    if (!f) {
-        fprintf(stderr, "Error: Cannot open file: %s\n", input_path);
+    size_t read_size = 0;
+    char *source = file_read_contents_bounded(input_path, MAX_RULR_TEXT_FILE_BYTES, &read_size);
+    if (!source || read_size == 0) {
+        arena_free(source);
+        fprintf(stderr, "Error: Failed to read: %s\n", input_path);
         return 1;
     }
-    
-    fseek(f, 0, SEEK_END);
-    long file_size = ftell(f);
-    rewind(f);
-    
-    char *source = (char *)arena_malloc((size_t)file_size + 1);
-    if (!source) {
-        fclose(f);
-        fprintf(stderr, "Error: Out of memory reading: %s\n", input_path);
-        return 1;
-    }
-    
-    size_t read_size = fread(source, 1, (size_t)file_size, f);
-    fclose(f);
-    source[read_size] = '\0';
     
     /* Construct output path */
     char output_path[PATH_MAX];
@@ -359,32 +348,21 @@ int main(int argc, char *argv[]) {
             /* Compile from file */
             if (output_path) {
                 /* Read file and compile to specified output */
-                FILE *f = fopen(input_path, "rb");
-                if (!f) {
-                    fprintf(stderr, "Error: Cannot open file: %s\n", input_path);
+                size_t read_size = 0;
+                char *source = file_read_contents_bounded(input_path, MAX_RULR_TEXT_FILE_BYTES, &read_size);
+                if (!source || read_size == 0) {
+                    arena_free(source);
+                    fprintf(stderr, "Error: Failed to read: %s\n", input_path);
                     alloc_shutdown();
                     return 1;
                 }
-                fseek(f, 0, SEEK_END);
-                long file_size = ftell(f);
-                rewind(f);
-                char *source = (char *)arena_malloc((size_t)file_size + 1);
-                if (!source) {
-                    fclose(f);
-                    fprintf(stderr, "Error: Out of memory\n");
-                    alloc_shutdown();
-                    return 1;
-                }
-                size_t read_size = fread(source, 1, (size_t)file_size, f);
-                fclose(f);
-                source[read_size] = '\0';
                 
                 result = compile_source(source, input_path, output_path);
                 if (result == 0 && verbose) {
                     struct stat output_stat;
                     stat(output_path, &output_stat);
                     printf("Compiled: %s -> %s (%ld -> %ld bytes)\n",
-                           input_path, output_path, file_size, (long)output_stat.st_size);
+                           input_path, output_path, (long)read_size, (long)output_stat.st_size);
                 } else if (result == 0) {
                     printf("Compiled: %s -> %s\n", input_path, output_path);
                 }

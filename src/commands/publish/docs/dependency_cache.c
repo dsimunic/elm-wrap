@@ -4,6 +4,7 @@
 #include "../../../constants.h"
 #include "../../../elm_json.h"
 #include "../../../cache.h"
+#include "../../../fileutil.h"
 #include "../../../vendor/cJSON.h"
 #include "../../../registry.h"
 #include <stdio.h>
@@ -15,30 +16,6 @@
 
 /* External tree-sitter language function */
 extern TSLanguage *tree_sitter_elm(void);
-
-/* Helper to read file contents */
-static char *read_file_contents(const char *filepath) {
-    FILE *file = fopen(filepath, "r");
-    if (!file) {
-        return NULL;
-    }
-
-    fseek(file, 0, SEEK_END);
-    long file_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    char *content = arena_malloc(file_size + 1);
-    if (!content) {
-        fclose(file);
-        return NULL;
-    }
-
-    size_t read_size = fread(content, 1, file_size, file);
-    content[read_size] = '\0';
-    fclose(file);
-
-    return content;
-}
 
 /* Helper to get node text */
 static char *get_node_text(TSNode node, const char *source_code) {
@@ -226,7 +203,7 @@ static char *find_module_in_dependencies(struct DependencyCache *cache, const ch
 /* Parse a docs.json file to extract exported types from a package module */
 static CachedModuleExports *parse_module_exports_from_docs_json(const char *docs_json_path, const char *module_name) {
     /* Read docs.json content */
-    char *json_content = read_file_contents(docs_json_path);
+    char *json_content = file_read_contents_bounded(docs_json_path, MAX_DOCS_JSON_FILE_BYTES, NULL);
     if (!json_content) {
         CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));
         exports->module_name = arena_strdup(module_name);
@@ -354,7 +331,7 @@ static CachedModuleExports *parse_module_exports_from_docs_json(const char *docs
 /* Parse a module file to extract its exported types */
 static CachedModuleExports *parse_module_exports(const char *module_path, const char *module_name) {
     /* Read file content */
-    char *source_code = read_file_contents(module_path);
+    char *source_code = file_read_contents_bounded(module_path, MAX_ELM_SOURCE_FILE_BYTES, NULL);
     if (!source_code) {
         /* Create a failed parse entry */
         CachedModuleExports *exports = arena_malloc(sizeof(CachedModuleExports));

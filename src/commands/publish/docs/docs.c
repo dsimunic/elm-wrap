@@ -4,6 +4,8 @@
 #include "dependency_cache.h"
 #include "path_util.h"
 #include "../../../alloc.h"
+#include "../../../constants.h"
+#include "../../../fileutil.h"
 #include "../../../global_context.h"
 #include "../../../cache.h"
 #include <stdio.h>
@@ -71,29 +73,8 @@ static void exposed_modules_free(ExposedModules *em) {
 
 /* Parse elm.json to extract exposed-modules */
 static bool parse_elm_json(const char *elm_json_path, ExposedModules *em) {
-    FILE *f = fopen(elm_json_path, "r");
-    if (!f) {
-        return false;
-    }
-
-    /* Read entire file */
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    char *content = arena_malloc(fsize + 1);
-    if (!content) {
-        fclose(f);
-        return false;
-    }
-
-    size_t bytes_read = fread(content, 1, fsize, f);
-    fclose(f);
-    if (bytes_read != (size_t)fsize) {
-        arena_free(content);
-        return false;
-    }
-    content[fsize] = 0;
+    char *content = file_read_contents_bounded(elm_json_path, MAX_ELM_JSON_FILE_BYTES, NULL);
+    if (!content) return false;
 
     /* Find "exposed-modules" key */
     char *exposed = strstr(content, "\"exposed-modules\"");
@@ -202,6 +183,9 @@ static bool validate_module_path(const char *filepath, const char *module_name, 
     /* e.g., "Eth.Sentry.Event" -> "Eth/Sentry/Event.elm" */
     size_t module_len = strlen(module_name);
     char *expected_rel_path = arena_malloc(module_len + 5); /* +5 for ".elm\0" */
+    if (!expected_rel_path) {
+        return false;
+    }
 
     /* Copy module name and replace dots with slashes */
     const char *src = module_name;
@@ -215,7 +199,7 @@ static bool validate_module_path(const char *filepath, const char *module_name, 
         src++;
         dst++;
     }
-    strcpy(dst, ".elm");
+    memcpy(dst, ".elm", 5);
 
     /* Extract relative path from filepath */
     /* filepath is like ".../src/Eth/Sentry/Event.elm" */

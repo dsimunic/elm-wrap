@@ -7,6 +7,8 @@
 #include "runtime/runtime.h"
 #include "common/dyn_array.h"
 #include "alloc.h"
+#include "constants.h"
+#include "fileutil.h"
 
 struct Engine {
     InternSymbolFn intern;
@@ -190,28 +192,12 @@ int engine_insert_fact(Engine *e, int pred_id, int arity, const Value *values) {
 }
 
 static EngineError load_file_contents(const char *path, char **out_buffer) {
-    FILE *f = fopen(path, "rb");
-    if (!f) {
-        return engine_err("Failed to open rule file");
+    size_t read_size = 0;
+    char *buf = file_read_contents_bounded(path, MAX_RULR_TEXT_FILE_BYTES, &read_size);
+    if (!buf || read_size == 0) {
+        arena_free(buf);
+        return engine_err("Failed to read rule file");
     }
-    if (fseek(f, 0, SEEK_END) != 0) {
-        fclose(f);
-        return engine_err("Failed to seek rule file");
-    }
-    long size = ftell(f);
-    if (size < 0) {
-        fclose(f);
-        return engine_err("Failed to stat rule file");
-    }
-    rewind(f);
-    char *buf = (char *)arena_malloc((size_t)size + 1);
-    if (!buf) {
-        fclose(f);
-        return engine_err("Out of memory");
-    }
-    size_t read = fread(buf, 1, (size_t)size, f);
-    fclose(f);
-    buf[read] = '\0';
     *out_buffer = buf;
     return engine_ok();
 }

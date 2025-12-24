@@ -1,6 +1,8 @@
 #include "frontend/ast_serialize.h"
 #include "vendor/miniz.h"
 #include "alloc.h"
+#include "constants.h"
+#include "fileutil.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -587,38 +589,14 @@ AstSerializeError ast_serialize_to_file(const AstProgram *prog, const char *path
 }
 
 AstSerializeError ast_deserialize_from_file(const char *path, AstProgram *prog) {
-    FILE *f = fopen(path, "rb");
-    if (!f) {
-        return ast_err("Failed to open input file");
-    }
-    
-    if (fseek(f, 0, SEEK_END) != 0) {
-        fclose(f);
-        return ast_err("Failed to seek in file");
-    }
-    
-    long file_size = ftell(f);
-    if (file_size < 0) {
-        fclose(f);
-        return ast_err("Failed to get file size");
-    }
-    
-    rewind(f);
-    
-    unsigned char *data = (unsigned char *)arena_malloc((size_t)file_size);
-    if (!data) {
-        fclose(f);
-        return ast_err("Out of memory reading file");
-    }
-    
-    size_t read_size = fread(data, 1, (size_t)file_size, f);
-    fclose(f);
-    
-    if (read_size != (size_t)file_size) {
+    size_t read_size = 0;
+    char *data = file_read_contents_bounded(path, MAX_RULR_COMPILED_FILE_BYTES, &read_size);
+    if (!data || read_size == 0) {
+        arena_free(data);
         return ast_err("Failed to read file");
     }
-    
-    return ast_deserialize(data, read_size, prog);
+
+    return ast_deserialize((const unsigned char *)data, read_size, prog);
 }
 
 /* ============================================================================

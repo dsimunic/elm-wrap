@@ -47,7 +47,7 @@ static void trim_trailing_ws_in_place(char *s) {
 
 static char *registry_etag_read_from_disk(const char *etag_path) {
     if (!etag_path) return NULL;
-    char *contents = file_read_contents(etag_path);
+    char *contents = file_read_contents_bounded(etag_path, MAX_LARGE_BUFFER_LENGTH, NULL);
     if (!contents) return NULL;
     trim_trailing_ws_in_place(contents);
     if (contents[0] == '\0') {
@@ -102,7 +102,7 @@ char *install_env_registry_since_count_file_path(const char *registry_dat_path) 
 static bool registry_since_count_read_from_disk(const char *since_path, size_t *out_since_count) {
     if (!since_path || !out_since_count) return false;
 
-    char *contents = file_read_contents(since_path);
+    char *contents = file_read_contents_bounded(since_path, MAX_TEMP_BUFFER_LENGTH, NULL);
     if (!contents) return false;
 
     trim_trailing_ws_in_place(contents);

@@ -698,26 +698,12 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
         }
     }
     
-    // Read the existing file to preserve all fields
-    FILE *file = fopen(filepath, "r");
-    if (!file) {
-        log_error("Could not open %s for reading", filepath);
-        return false;
-    }
-    
-    fseek(file, 0, SEEK_END);
-    long file_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    
-    char *file_content = arena_malloc(file_size + 1);
+    // Read the existing file to preserve all fields (bounded)
+    char *file_content = file_read_contents_bounded(filepath, MAX_ELM_JSON_FILE_BYTES, NULL);
     if (!file_content) {
-        fclose(file);
+        log_error("Could not read %s (missing, too large, or unreadable)", filepath);
         return false;
     }
-    
-    size_t bytes_read = fread(file_content, 1, file_size, file);
-    file_content[bytes_read] = '\0';
-    fclose(file);
     
     // Parse the existing JSON
     cJSON *json = cJSON_Parse(file_content);

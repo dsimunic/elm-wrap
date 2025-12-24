@@ -270,8 +270,7 @@ int cmd_repository_new(int argc, char *argv[]) {
                     log_error("Out of memory");
                     return 1;
                 }
-                strcpy(effective_root, home);
-                strcat(effective_root, root_path + 1);
+                snprintf(effective_root, len, "%s%s", home, root_path + 1);
             } else {
                 effective_root = arena_strdup(root_path);
             }
@@ -394,8 +393,7 @@ int cmd_repository_list(int argc, char *argv[]) {
                     log_error("Out of memory");
                     return 1;
                 }
-                strcpy(effective_root, home);
-                strcat(effective_root, root_path + 1);
+                snprintf(effective_root, len, "%s%s", home, root_path + 1);
             } else {
                 effective_root = arena_strdup(root_path);
             }

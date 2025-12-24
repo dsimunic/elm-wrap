@@ -32,9 +32,9 @@ static char *expand_tilde(const char *path) {
         if (!result) {
             return NULL;
         }
-        
-        strcpy(result, home);
-        strcat(result, path + 1); /* Skip the ~ */
+
+        /* result_len includes NUL and skips the '~' via path+1 */
+        snprintf(result, result_len, "%s%s", home, path + 1);
         return result;
     }
     

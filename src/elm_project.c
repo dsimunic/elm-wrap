@@ -109,28 +109,28 @@ char **elm_parse_source_directories(const char *elm_json_path, int *count) {
 }
 
 char *elm_module_name_to_path(const char *module_name, const char *src_dir) {
-    int len = strlen(module_name);
-    int src_len = strlen(src_dir);
+    if (!module_name || !src_dir) return NULL;
 
-    /* Allocate enough space: src_dir + "/" + module_name (with / instead of .) + ".elm" + null */
-    char *path = arena_malloc(src_len + 1 + len + 5);
-    if (!path) {
+    size_t module_len = strlen(module_name);
+    size_t src_len = strlen(src_dir);
+
+    /* src_dir + "/" + module_name (with / instead of .) + ".elm" + NUL */
+    size_t required = src_len + 1 + module_len + 4 + 1;
+    if (required > MAX_PATH_LENGTH) {
         return NULL;
     }
-    strcpy(path, src_dir);
-    strcat(path, "/");
 
-    /* Convert dots to slashes */
+    char *path = arena_malloc(required);
+    if (!path) return NULL;
+
+    memcpy(path, src_dir, src_len);
+    path[src_len] = '/';
+
     char *dest = path + src_len + 1;
-    for (int i = 0; i < len; i++) {
-        if (module_name[i] == '.') {
-            *dest++ = '/';
-        } else {
-            *dest++ = module_name[i];
-        }
+    for (size_t i = 0; i < module_len; i++) {
+        *dest++ = (module_name[i] == '.') ? '/' : module_name[i];
     }
-    *dest = '\0';
-    strcat(path, ".elm");
+    memcpy(dest, ".elm", 5);
 
     return path;
 }
@@ -156,10 +156,9 @@ void elm_collect_elm_files(const char *dir_path, char ***files, int *count, int 
             } else if (S_ISREG(st.st_mode)) {
                 const char *ext = strrchr(entry->d_name, '.');
                 if (ext && strcmp(ext, ".elm") == 0) {
-                    char *abs_path = realpath(full_path, NULL);
-                    if (abs_path) {
+                    char abs_path[MAX_PATH_LENGTH];
+                    if (realpath(full_path, abs_path)) {
                         DYNARRAY_PUSH(*files, *count, *capacity, arena_strdup(abs_path), char*);
-                        free(abs_path);
                     }
                 }
             }
@@ -189,10 +188,9 @@ void elm_collect_all_files(const char *dir_path, char ***files, int *count, int 
             if (S_ISDIR(st.st_mode)) {
                 elm_collect_all_files(full_path, files, count, capacity);
             } else if (S_ISREG(st.st_mode)) {
-                char *abs_path = realpath(full_path, NULL);
-                if (abs_path) {
+                char abs_path[MAX_PATH_LENGTH];
+                if (realpath(full_path, abs_path)) {
                     DYNARRAY_PUSH(*files, *count, *capacity, arena_strdup(abs_path), char*);
-                    free(abs_path);
                 }
             }
         }

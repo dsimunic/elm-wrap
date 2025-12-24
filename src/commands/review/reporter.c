@@ -199,14 +199,13 @@ static void tree_print_node(TreeNode *node, const char *prefix, int is_last, int
     
     /* Build prefix for children - need space for prefix + 4 chars for the branch + null terminator */
     size_t prefix_len = strlen(prefix);
-    char *child_prefix = arena_malloc(prefix_len + 8); /* Extra space for safety */
+    const char *suffix = (node->name ? (is_last ? "    " : "│   ") : "");
+    size_t suffix_len = strlen(suffix);
+    char *child_prefix = arena_malloc(prefix_len + suffix_len + 1);
     if (!child_prefix) return;
-    
-    strcpy(child_prefix, prefix);
-    if (node->name) {
-        /* Only add continuation if we printed a node name */
-        strcat(child_prefix, is_last ? "    " : "│   ");
-    }
+
+    memcpy(child_prefix, prefix, prefix_len);
+    memcpy(child_prefix + prefix_len, suffix, suffix_len + 1);
     
     for (int i = 0; i < node->children_count; i++) {
         int child_is_last = (i == node->children_count - 1);

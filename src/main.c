@@ -225,11 +225,10 @@ int main(int argc, char *argv[]) {
 #ifdef __APPLE__
         uint32_t size = sizeof(exe_path);
         if (_NSGetExecutablePath(exe_path, &size) == 0) {
-            char *resolved = realpath(exe_path, NULL);
-            if (resolved) {
+            char resolved[PATH_MAX];
+            if (realpath(exe_path, resolved)) {
                 strncpy(exe_path, resolved, sizeof(exe_path) - 1);
                 exe_path[sizeof(exe_path) - 1] = '\0';
-                free(resolved);
                 got_exe_path = true;
             }
         }
@@ -242,11 +241,10 @@ int main(int argc, char *argv[]) {
 #endif
 
         if (!got_exe_path) {
-            char *resolved = realpath(argv[0], NULL);
-            if (resolved) {
+            char resolved[PATH_MAX];
+            if (realpath(argv[0], resolved)) {
                 strncpy(exe_path, resolved, sizeof(exe_path) - 1);
                 exe_path[sizeof(exe_path) - 1] = '\0';
-                free(resolved);
                 got_exe_path = true;
             }
         }

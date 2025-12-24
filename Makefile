@@ -754,8 +754,8 @@ $(RULRC_OBJ): $(RULRC_SRC) | $(BUILDDIR)
 	@mkdir -p $(dir $@)
 	$(CC) $(RULR_CFLAGS) -c $< -o $@
 
-$(RULRC): $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o | $(TOOLSDIR)
-	$(CC) $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o -o $@
+$(RULRC): $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o $(BUILDDIR)/fileutil.o | $(TOOLSDIR)
+	$(CC) $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o $(BUILDDIR)/fileutil.o -o $@
 
 # Link final binary
 $(TARGET): $(OBJECTS) $(RULR_LIB) | $(BINDIR)
@@ -794,12 +794,12 @@ $(PACKAGE_SUGGESTIONS_TEST): $(BUILDDIR)/package_suggestions_test.o $(BUILDDIR)/
 
 indexmaker: $(INDEXMAKER)
 
-$(INDEXMAKER): $(BUILDDIR)/indexmaker.o $(BUILDDIR)/registry.o $(BUILDDIR)/v2_registry.o $(BUILDDIR)/package_common.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/cJSON.o $(BUILDDIR)/miniz.o | $(TOOLSDIR)
+$(INDEXMAKER): $(BUILDDIR)/indexmaker.o $(BUILDDIR)/registry.o $(BUILDDIR)/v2_registry.o $(BUILDDIR)/package_common.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/cJSON.o $(BUILDDIR)/miniz.o $(BUILDDIR)/fileutil.o | $(TOOLSDIR)
 	$(CC) $(CFLAGS) $^ -o $@
 
 mkpkg: $(MKPKG)
 
-$(MKPKG): $(BUILDDIR)/mkpkg.o $(BUILDDIR)/v2_registry.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/cache.o $(BUILDDIR)/elm_compiler.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/cJSON.o $(BUILDDIR)/miniz.o | $(TOOLSDIR)
+$(MKPKG): $(BUILDDIR)/mkpkg.o $(BUILDDIR)/v2_registry.o $(BUILDDIR)/elm_json.o $(BUILDDIR)/cache.o $(BUILDDIR)/elm_compiler.o $(BUILDDIR)/alloc.o $(BUILDDIR)/log.o $(BUILDDIR)/cJSON.o $(BUILDDIR)/miniz.o $(BUILDDIR)/fileutil.o | $(TOOLSDIR)
 	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
 
 help-report-html-gen: $(HELP_REPORT_HTML_GEN)

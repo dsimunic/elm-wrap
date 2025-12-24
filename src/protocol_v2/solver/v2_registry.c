@@ -7,6 +7,8 @@
 
 #include "v2_registry.h"
 #include "../../alloc.h"
+#include "../../constants.h"
+#include "../../fileutil.h"
 #include "../../log.h"
 #include "../../vendor/miniz.h"
 #include "../../dyn_array.h"
@@ -495,40 +497,17 @@ V2Registry *v2_registry_load_from_text(const char *text_path) {
         log_error("v2_registry_load_from_text: NULL path");
         return NULL;
     }
-    
-    FILE *f = fopen(text_path, "rb");
-    if (!f) {
-        log_error("v2_registry_load_from_text: failed to open %s", text_path);
+
+    size_t read_size = 0;
+    char *data = file_read_contents_bounded(text_path, MAX_V2_REGISTRY_TEXT_FILE_BYTES, &read_size);
+    if (!data || read_size == 0) {
+        log_error("v2_registry_load_from_text: failed to read %s", text_path);
+        arena_free(data);
         return NULL;
     }
-    
-    /* Get file size */
-    fseek(f, 0, SEEK_END);
-    long file_size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    
-    if (file_size <= 0) {
-        log_error("v2_registry_load_from_text: empty or invalid file %s", text_path);
-        fclose(f);
-        return NULL;
-    }
-    
-    /* Read entire file */
-    char *data = arena_malloc((size_t)file_size + 1);
-    if (!data) {
-        log_error("v2_registry_load_from_text: out of memory");
-        fclose(f);
-        return NULL;
-    }
-    
-    size_t read_size = fread(data, 1, (size_t)file_size, f);
-    fclose(f);
-    
-    data[read_size] = '\0';
-    
+
     V2Registry *registry = v2_registry_parse(data, read_size);
     arena_free(data);
-    
     return registry;
 }
 

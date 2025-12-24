@@ -9,6 +9,7 @@
 #include "package_publish.h"
 #include "../../review/reporter.h"
 #include "../../../alloc.h"
+#include "../../../constants.h"
 #include "../../../global_context.h"
 #include "../../../elm_json.h"
 #include "../../../fileutil.h"
@@ -53,7 +54,7 @@ static void print_usage(void) {
  * ========================================================================== */
 
 static char **parse_exposed_modules(const char *elm_json_path, int *count) {
-    char *content = file_read_contents(elm_json_path);
+    char *content = file_read_contents_bounded(elm_json_path, MAX_ELM_JSON_FILE_BYTES, NULL);
     if (!content) return NULL;
 
     cJSON *root = cJSON_Parse(content);
@@ -62,7 +63,7 @@ static char **parse_exposed_modules(const char *elm_json_path, int *count) {
         return NULL;
     }
 
-    int modules_capacity = 16;
+    int modules_capacity = INITIAL_MODULE_CAPACITY;
     int modules_count = 0;
     char **modules = arena_malloc(modules_capacity * sizeof(char*));
 
@@ -104,24 +105,24 @@ static char **parse_exposed_modules(const char *elm_json_path, int *count) {
 }
 
 static char *module_name_to_path(const char *module_name, const char *src_dir) {
-    int len = strlen(module_name);
-    int src_len = strlen(src_dir);
+    if (!module_name || !src_dir) return NULL;
 
-    char *path = arena_malloc(src_len + 1 + len + 5);
-    strcpy(path, src_dir);
-    strcat(path, "/");
+    size_t module_len = strlen(module_name);
+    size_t src_len = strlen(src_dir);
+    size_t required = src_len + 1 + module_len + 4 + 1;
+    if (required > MAX_PATH_LENGTH) return NULL;
+
+    char *path = arena_malloc(required);
+    if (!path) return NULL;
+
+    memcpy(path, src_dir, src_len);
+    path[src_len] = '/';
 
     char *dest = path + src_len + 1;
-    for (int i = 0; i < len; i++) {
-        if (module_name[i] == '.') {
-            *dest++ = '/';
-        } else {
-            *dest++ = module_name[i];
-        }
+    for (size_t i = 0; i < module_len; i++) {
+        *dest++ = (module_name[i] == '.') ? '/' : module_name[i];
     }
-    *dest = '\0';
-    strcat(path, ".elm");
-
+    memcpy(dest, ".elm", 5);
     return path;
 }
 
@@ -146,10 +147,9 @@ static void collect_all_elm_files(const char *dir_path, char ***files, int *coun
             } else if (S_ISREG(st.st_mode)) {
                 const char *ext = strrchr(entry->d_name, '.');
                 if (ext && strcmp(ext, ".elm") == 0) {
-                    char *abs_path = realpath(full_path, NULL);
-                    if (abs_path) {
+                    char abs_path[MAX_PATH_LENGTH];
+                    if (realpath(full_path, abs_path)) {
                         DYNARRAY_PUSH(*files, *count, *capacity, arena_strdup(abs_path), char*);
-                        free(abs_path);
                     }
                 }
             }
@@ -179,10 +179,9 @@ static void collect_all_files(const char *dir_path, char ***files, int *count, i
             if (S_ISDIR(st.st_mode)) {
                 collect_all_files(full_path, files, count, capacity);
             } else if (S_ISREG(st.st_mode)) {
-                char *abs_path = realpath(full_path, NULL);
-                if (abs_path) {
+                char abs_path[MAX_PATH_LENGTH];
+                if (realpath(full_path, abs_path)) {
                     DYNARRAY_PUSH(*files, *count, *capacity, arena_strdup(abs_path), char*);
-                    free(abs_path);
                 }
             }
         }
@@ -285,18 +284,25 @@ int cmd_package_publish(int argc, char *argv[]) {
     snprintf(license_path, sizeof(license_path), "%s/LICENSE", clean_path);
     snprintf(readme_path, sizeof(readme_path), "%s/README.md", clean_path);
     
-    char *abs_license = realpath(license_path, NULL);
-    char *abs_readme = realpath(readme_path, NULL);
-    char *abs_elm_json = realpath(elm_json_path, NULL);
+    char *abs_license = NULL;
+    char *abs_readme = NULL;
+    char *abs_elm_json = NULL;
+
+    {
+        char resolved[MAX_PATH_LENGTH];
+        if (realpath(license_path, resolved)) abs_license = arena_strdup(resolved);
+        if (realpath(readme_path, resolved)) abs_readme = arena_strdup(resolved);
+        if (realpath(elm_json_path, resolved)) abs_elm_json = arena_strdup(resolved);
+    }
 
     /* Initialize rulr engine */
     Rulr rulr;
     RulrError err = rulr_init(&rulr);
     if (err.is_error) {
         fprintf(stderr, "Error: Failed to initialize rulr engine: %s\n", err.message);
-        if (abs_license) free(abs_license);
-        if (abs_readme) free(abs_readme);
-        if (abs_elm_json) free(abs_elm_json);
+        if (abs_license) arena_free(abs_license);
+        if (abs_readme) arena_free(abs_readme);
+        if (abs_elm_json) arena_free(abs_elm_json);
         return 1;
     }
 
@@ -352,9 +358,9 @@ int cmd_package_publish(int argc, char *argv[]) {
         if (err.is_error) {
             fprintf(stderr, "Error: Failed to load rule file '%s': %s\n", rule_paths[i], err.message);
             rulr_deinit(&rulr);
-            if (abs_license) free(abs_license);
-            if (abs_readme) free(abs_readme);
-            if (abs_elm_json) free(abs_elm_json);
+            if (abs_license) arena_free(abs_license);
+            if (abs_readme) arena_free(abs_readme);
+            if (abs_elm_json) arena_free(abs_elm_json);
             return 1;
         }
     }
@@ -364,9 +370,9 @@ int cmd_package_publish(int argc, char *argv[]) {
     if (err.is_error) {
         fprintf(stderr, "Error: Rule evaluation failed: %s\n", err.message);
         rulr_deinit(&rulr);
-        if (abs_license) free(abs_license);
-        if (abs_readme) free(abs_readme);
-        if (abs_elm_json) free(abs_elm_json);
+        if (abs_license) arena_free(abs_license);
+        if (abs_readme) arena_free(abs_readme);
+        if (abs_elm_json) arena_free(abs_elm_json);
         return 1;
     }
 
@@ -376,9 +382,9 @@ int cmd_package_publish(int argc, char *argv[]) {
     if (publish_view.pred_id < 0 || publish_view.num_tuples == 0) {
         printf("No files to publish.\n");
         rulr_deinit(&rulr);
-        if (abs_license) free(abs_license);
-        if (abs_readme) free(abs_readme);
-        if (abs_elm_json) free(abs_elm_json);
+        if (abs_license) arena_free(abs_license);
+        if (abs_readme) arena_free(abs_readme);
+        if (abs_elm_json) arena_free(abs_elm_json);
         return 0;
     }
 
@@ -406,9 +412,9 @@ int cmd_package_publish(int argc, char *argv[]) {
 
     /* Cleanup */
     rulr_deinit(&rulr);
-    if (abs_license) free(abs_license);
-    if (abs_readme) free(abs_readme);
-    if (abs_elm_json) free(abs_elm_json);
+    if (abs_license) arena_free(abs_license);
+    if (abs_readme) arena_free(abs_readme);
+    if (abs_elm_json) arena_free(abs_elm_json);
 
     return 0;
 }

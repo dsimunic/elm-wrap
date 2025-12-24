@@ -165,21 +165,27 @@ if (!file_exists("elm.json")) {
 }
 ```
 
-#### `char *file_read_contents(const char *filepath)`
+#### `char *file_read_contents_bounded(const char *filepath, size_t max_bytes, size_t *out_size)`
 
-Reads entire file contents into an arena-allocated buffer.
+Reads entire file contents into an arena-allocated buffer, enforcing an upper bound on file size.
 
-**Returns:** Null-terminated string, or NULL on failure.
+**Returns:** Null-terminated string, or NULL on failure (missing file, too large, read error, allocation failure).
 
 **Example:**
 ```c
-char *content = file_read_contents("elm.json");
+char *content = file_read_contents_bounded("elm.json", MAX_ELM_JSON_FILE_BYTES, NULL);
 if (!content) {
-    log_error("Failed to read file");
+    log_error("Failed to read file (missing/too-large/read error)");
     return 1;
 }
 cJSON *json = cJSON_Parse(content);
 ```
+
+#### `char *file_read_contents(const char *filepath)`
+
+Legacy convenience wrapper.
+
+Prefer `file_read_contents_bounded()` so callers can pick an appropriate limit for the file type.
 
 #### `char *strip_trailing_slash(const char *path)`
 

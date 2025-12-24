@@ -4,6 +4,8 @@
 
 #include "util.h"
 #include "../alloc.h"
+#include "../constants.h"
+#include "../fileutil.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -15,28 +17,19 @@ extern const TSLanguage *tree_sitter_elm(void);
  * ========================================================================== */
 
 char *ast_read_file_normalized(const char *filepath) {
-    FILE *file = fopen(filepath, "r");
-    if (!file) {
-        fprintf(stderr, "Error: Could not open file %s\n", filepath);
-        return NULL;
-    }
-
-    fseek(file, 0, SEEK_END);
-    long file_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    char *content = arena_malloc(file_size + 1);
+    size_t read_size = 0;
+    char *content = file_read_contents_bounded(filepath, MAX_ELM_SOURCE_FILE_BYTES, &read_size);
     if (!content) {
-        fclose(file);
+        fprintf(stderr, "Error: Could not read file %s\n", filepath);
         return NULL;
     }
-
-    size_t read_size = fread(content, 1, file_size, file);
-    content[read_size] = '\0';
-    fclose(file);
 
     /* Normalize line endings: convert \r\n and \r to \n */
     char *normalized = arena_malloc(read_size + 1);
+    if (!normalized) {
+        arena_free(content);
+        return NULL;
+    }
     size_t write_pos = 0;
     for (size_t i = 0; i < read_size; i++) {
         if (content[i] == '\r') {

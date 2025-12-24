@@ -94,6 +94,32 @@
 /* Maximum size for an elm.json file we will read/parse. */
 #define MAX_ELM_JSON_FILE_BYTES (1 * BYTES_PER_MB)
 
+/* Maximum size for an Elm source (.elm) file we will read/parse. */
+#define MAX_ELM_SOURCE_FILE_BYTES (4 * BYTES_PER_MB)
+
+/* Maximum size for a docs.json file we will read/parse. */
+#define MAX_DOCS_JSON_FILE_BYTES (8 * BYTES_PER_MB)
+
+/* Maximum size for a V1 /since JSON file we will read/parse (debug tooling). */
+#define MAX_V1_SINCE_JSON_FILE_BYTES (32 * BYTES_PER_MB)
+
+/* Maximum size for a V2 registry text file we will read/parse. */
+#define MAX_V2_REGISTRY_TEXT_FILE_BYTES (64 * BYTES_PER_MB)
+
+/* Maximum size for a single embedded archive entry we will extract into memory. */
+#define MAX_EMBEDDED_ARCHIVE_EXTRACT_BYTES (64 * BYTES_PER_MB)
+
+/* Legacy helper bound: file_read_contents() should never read unbounded data. */
+#define MAX_FILE_READ_CONTENTS_BYTES (64 * BYTES_PER_MB)
+
+/*
+ * Rulr file-size hardening
+ *
+ * These bounds protect against pathological (or corrupted) rule inputs.
+ */
+#define MAX_RULR_TEXT_FILE_BYTES (8 * BYTES_PER_MB)
+#define MAX_RULR_COMPILED_FILE_BYTES (32 * BYTES_PER_MB)
+
 /* Maximum number of dependency entries we will accept from an elm.json. */
 #define MAX_ELM_JSON_DEPENDENCY_ENTRIES 4096
 

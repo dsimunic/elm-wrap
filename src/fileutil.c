@@ -655,49 +655,7 @@ char *file_read_contents_bounded(const char *filepath, size_t max_bytes, size_t 
 }
 
 char *file_read_contents(const char *filepath) {
-    if (!filepath) {
-        return NULL;
-    }
-
-    FILE *f = fopen(filepath, "rb");
-    if (!f) {
-        return NULL;
-    }
-
-    if (fseek(f, 0, SEEK_END) != 0) {
-        fclose(f);
-        return NULL;
-    }
-    long fsize_long = ftell(f);
-    if (fsize_long < 0) {
-        fclose(f);
-        return NULL;
-    }
-    if (fseek(f, 0, SEEK_SET) != 0) {
-        fclose(f);
-        return NULL;
-    }
-
-    size_t fsize = (size_t)fsize_long;
-    char *content = arena_malloc(fsize + 1);
-    if (!content) {
-        fclose(f);
-        return NULL;
-    }
-
-    size_t read_size = 0;
-    if (fsize > 0) {
-        read_size = fread(content, 1, fsize, f);
-        if (read_size != fsize && ferror(f)) {
-            fclose(f);
-            arena_free(content);
-            return NULL;
-        }
-    }
-    content[read_size] = '\0';
-    fclose(f);
-
-    return content;
+    return file_read_contents_bounded(filepath, MAX_FILE_READ_CONTENTS_BYTES, NULL);
 }
 
 char *strip_trailing_slash(const char *path) {

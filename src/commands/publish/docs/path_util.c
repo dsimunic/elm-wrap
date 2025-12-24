@@ -9,7 +9,8 @@
 char *module_name_to_file_path(const char *module_name) {
     size_t len = strlen(module_name);
     char *path = arena_malloc(len + 5);  /* +4 for ".elm" + 1 for null */
-    strcpy(path, module_name);
+    if (!path) return NULL;
+    memcpy(path, module_name, len + 1);
 
     /* Replace dots with slashes */
     for (char *p = path; *p; p++) {
@@ -18,6 +19,6 @@ char *module_name_to_file_path(const char *module_name) {
         }
     }
 
-    strcat(path, ".elm");
+    memcpy(path + len, ".elm", 5);
     return path;
 }

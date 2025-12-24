@@ -142,7 +142,7 @@ LocalDevPackage *local_dev_get_tracked_packages(const char *elm_json_path, int *
                     if (!tracking_file) continue;
                     snprintf(tracking_file, tracking_file_len, "%s/%s", version_path, tracking_entry->d_name);
 
-                    char *content = file_read_contents(tracking_file);
+                    char *content = file_read_contents_bounded(tracking_file, MAX_PATH_LENGTH, NULL);
                     arena_free(tracking_file);
                     if (!content) continue;
 
@@ -249,7 +249,7 @@ char **local_dev_get_tracking_apps(const char *author, const char *name,
         if (!tracking_file) continue;
         snprintf(tracking_file, file_len, "%s/%s", version_dir, entry->d_name);
 
-        char *content = file_read_contents(tracking_file);
+        char *content = file_read_contents_bounded(tracking_file, MAX_PATH_LENGTH, NULL);
         arena_free(tracking_file);
         if (!content) continue;
 

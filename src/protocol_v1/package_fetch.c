@@ -236,8 +236,10 @@ char* compute_file_sha1_hex(const char *filepath) {
     char *hex = arena_malloc(SHA1_BLOCK_SIZE * 2 + 1);
     if (!hex) return NULL;
 
+    static const char hexdigits[] = "0123456789abcdef";
     for (int i = 0; i < SHA1_BLOCK_SIZE; i++) {
-        sprintf(hex + i * 2, "%02x", hash[i]);
+        hex[i * 2] = hexdigits[(hash[i] >> 4) & 0x0F];
+        hex[i * 2 + 1] = hexdigits[hash[i] & 0x0F];
     }
     hex[SHA1_BLOCK_SIZE * 2] = '\0';
 
@@ -511,28 +513,14 @@ char* fetch_package_complete(InstallEnv *env, const char *author,
         return NULL;
     }
 
-    FILE *endpoint_file = fopen(endpoint_path, "r");
-    if (!endpoint_file) {
-        log_error("Cannot open endpoint.json: %s", endpoint_path);
+    char *endpoint_data = file_read_contents_bounded(endpoint_path, MAX_LARGE_BUFFER_LENGTH, NULL);
+    if (!endpoint_data) {
+        log_error("Cannot read endpoint.json (missing, too large, or unreadable): %s", endpoint_path);
         arena_free(endpoint_path);
         return NULL;
     }
 
     arena_free(endpoint_path);
-
-    fseek(endpoint_file, 0, SEEK_END);
-    long file_size = ftell(endpoint_file);
-    fseek(endpoint_file, 0, SEEK_SET);
-
-    char *endpoint_data = arena_malloc(file_size + 1);
-    if (!endpoint_data) {
-        fclose(endpoint_file);
-        return NULL;
-    }
-
-    size_t read_size = fread(endpoint_data, 1, file_size, endpoint_file);
-    endpoint_data[read_size] = '\0';
-    fclose(endpoint_file);
 
     PackageEndpoint *endpoint = package_endpoint_parse(endpoint_data);
     arena_free(endpoint_data);
