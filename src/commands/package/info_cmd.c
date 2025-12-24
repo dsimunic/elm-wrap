@@ -120,7 +120,7 @@ static void print_info_usage(const char *invocation) {
     printf("  %s %s elm/core@1.0.0   # Show info for elm/core 1.0.0\n", global_context_program_name(), command_label);
     printf("\n");
     printf("Note: Package name format (author/package) takes priority over paths.\n");
-    printf("      Use './package/author' to treat as a path instead.\n");
+    printf("      If not found in the registry, it will be retried as a path.\n");
     printf("\n");
     printf("Options:\n");
     printf("  -d, --deps-only                   # Only print dependencies\n");
@@ -259,6 +259,36 @@ static bool is_package_name_format(const char *str) {
     return slash_count == 1;
 }
 
+static bool try_resolve_elm_json_path_from_arg(const char *arg, char **out_elm_json_path, bool report_errors) {
+    if (!arg || !out_elm_json_path) {
+        return false;
+    }
+
+    struct stat st;
+    char path_buf[PATH_MAX];
+
+    if (stat(arg, &st) == 0 && S_ISDIR(st.st_mode)) {
+        snprintf(path_buf, sizeof(path_buf), "%s/elm.json", arg);
+    } else if (stat(arg, &st) == 0 && S_ISREG(st.st_mode)) {
+        snprintf(path_buf, sizeof(path_buf), "%s", arg);
+    } else {
+        if (report_errors) {
+            fprintf(stderr, "Error: Path does not exist: %s\n", arg);
+        }
+        return false;
+    }
+
+    if (stat(path_buf, &st) != 0 || !S_ISREG(st.st_mode)) {
+        if (report_errors) {
+            fprintf(stderr, "Error: elm.json not found at: %s\n", path_buf);
+        }
+        return false;
+    }
+
+    *out_elm_json_path = arena_strdup(path_buf);
+    return *out_elm_json_path != NULL;
+}
+
 
 
 static void print_package_suggestions_block(
@@ -342,9 +372,13 @@ static void print_application_tracking_info(const char *elm_json_path) {
     }
 }
 
-static int show_package_info_from_registry(const char *package_name, const char *version_arg, InstallEnv *env) {
+static int show_package_info_from_registry(const char *package_name, const char *version_arg, InstallEnv *env, bool *out_not_found) {
     char *author = NULL;
     char *name = NULL;
+
+    if (out_not_found) {
+        *out_not_found = false;
+    }
 
     if (!parse_package_name(package_name, &author, &name)) {
         return 1;
@@ -353,10 +387,12 @@ static int show_package_info_from_registry(const char *package_name, const char 
     if (global_context_is_v2() && env->v2_registry) {
         V2PackageEntry *entry = v2_registry_find(env->v2_registry, author, name);
         if (!entry) {
-            int result = report_package_not_found_with_suggestions(env, author, name);
+            if (out_not_found) {
+                *out_not_found = true;
+            }
             arena_free(author);
             arena_free(name);
-            return result;
+            return 1;
         }
 
         if (entry->version_count == 0) {
@@ -477,10 +513,12 @@ static int show_package_info_from_registry(const char *package_name, const char 
 
     RegistryEntry *registry_entry = registry_find(env->registry, author, name);
     if (!registry_entry) {
-        int result = report_package_not_found_with_suggestions(env, author, name);
+        if (out_not_found) {
+            *out_not_found = true;
+        }
         arena_free(author);
         arena_free(name);
-        return result;
+        return 1;
     }
 
     if (registry_entry->version_count == 0) {
@@ -588,6 +626,7 @@ static int show_package_info_from_registry(const char *package_name, const char 
 
 int cmd_info(int argc, char *argv[], const char *invocation) {
     const char *arg = NULL;
+    const char *raw_arg = NULL;
     const char *version_arg = NULL;
     bool deps_only = false;
     char package_name_buf[MAX_PACKAGE_NAME_LENGTH];
@@ -606,6 +645,7 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
         } else {
             if (!arg) {
                 arg = argv[i];
+                raw_arg = argv[i];
             } else if (!version_arg) {
                 version_arg = argv[i];
             } else {
@@ -661,24 +701,11 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
                 print_info_usage(invocation);
                 return 1;
             }
-            struct stat st;
-            char path_buf[PATH_MAX];
-
-            if (stat(arg, &st) == 0 && S_ISDIR(st.st_mode)) {
-                snprintf(path_buf, sizeof(path_buf), "%s/elm.json", arg);
-            } else if (stat(arg, &st) == 0 && S_ISREG(st.st_mode)) {
-                snprintf(path_buf, sizeof(path_buf), "%s", arg);
-            } else {
-                fprintf(stderr, "Error: Path does not exist: %s\n", arg);
+            char *resolved = NULL;
+            if (!try_resolve_elm_json_path_from_arg(arg, &resolved, true)) {
                 return 1;
             }
-
-            if (stat(path_buf, &st) != 0 || !S_ISREG(st.st_mode)) {
-                fprintf(stderr, "Error: elm.json not found at: %s\n", path_buf);
-                return 1;
-            }
-
-            elm_json_path = arena_strdup(path_buf);
+            elm_json_path = resolved;
         }
     } else {
         elm_json_path = ELM_JSON_PATH;
@@ -701,9 +728,42 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
             return 1;
         }
 
-        int result = show_package_info_from_registry(arg, version_arg, env);
-        install_env_free(env);
-        return result;
+        bool not_found = false;
+        int result = show_package_info_from_registry(arg, version_arg, env, &not_found);
+        if (result == 0) {
+            install_env_free(env);
+            return 0;
+        }
+
+        if (not_found) {
+            /*
+             * If a valid author/name isn't in the registry, try treating it as a path.
+             * This matches the behavior users get when they suffix the argument with '/'.
+             * If that also fails, keep the original "package not found" error.
+             */
+            char *resolved = NULL;
+            const char *path_arg = raw_arg ? raw_arg : arg;
+            if (try_resolve_elm_json_path_from_arg(path_arg, &resolved, false)) {
+                elm_json_path = resolved;
+                is_package_lookup = false;
+                install_env_free(env);
+            } else {
+                char *author = NULL;
+                char *name = NULL;
+                if (parse_package_name(arg, &author, &name)) {
+                    report_package_not_found_with_suggestions(env, author, name);
+                    arena_free(author);
+                    arena_free(name);
+                } else {
+                    fprintf(stderr, "Error: Package '%s' not found in registry\n", arg);
+                }
+                install_env_free(env);
+                return 1;
+            }
+        } else {
+            install_env_free(env);
+            return result;
+        }
     }
 
     if (deps_only) {
