@@ -14,7 +14,7 @@
 #include "../../src/constants.h"
 #include "../../src/registry.h"
 #include "../../src/protocol_v2/solver/v2_registry.h"
-#include "../../src/log.h"
+#include "../../src/shared/log.h"
 #include "../../src/exit_codes.h"
 #include "../../src/commands/package/package_common.h"
 #include <stdio.h>

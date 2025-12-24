@@ -1,6 +1,6 @@
 #include "../../src/alloc.h"
 #include "../../src/constants.h"
-#include "../../src/log.h"
+#include "../../src/shared/log.h"
 #include "../../src/exit_codes.h"
 #include "../../src/protocol_v2/solver/v2_registry.h"
 #include "../../src/elm_json.h"

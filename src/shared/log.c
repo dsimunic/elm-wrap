@@ -1,4 +1,4 @@
-#include "shared/log.h"
+#include "log.h"
 
 /* Global log level - defaults to ERROR only */
 LogLevel g_log_level = LOG_LEVEL_ERROR;
