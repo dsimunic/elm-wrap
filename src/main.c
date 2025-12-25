@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include "buildinfo.h"
 #include "install.h"
+#include "commands/package/extract_cmd.h"
 #include "commands/wrappers/make.h"
 #include "commands/wrappers/init.h"
 #include "commands/wrappers/repl.h"
@@ -120,6 +121,7 @@ void print_package_usage(const char *prog) {
     printf("\nSubcommands:\n");
     printf("  install PACKAGE                Add a dependency to current elm.json\n");
     printf("  init PACKAGE                   Initialize a package\n");
+    printf("  extract PACKAGE TARGET PATH    Extract source into a new local-dev package\n");
     printf("  upgrade PACKAGE                Upgrade packages to latest versions\n");
     printf("  uninstall PACKAGE              Remove a package from elm.json (alias: remove)\n");
     printf("  info    [ PATH                 Display package information and upgrades\n");
@@ -159,6 +161,10 @@ int cmd_package(int argc, char *argv[], const char *prog) {
 
     if (strcmp(subcmd, "init") == 0) {
         return cmd_package_init(argc - 1, argv + 1);
+    }
+
+    if (strcmp(subcmd, "extract") == 0) {
+        return cmd_extract(argc - 1, argv + 1);
     }
 
     if (strcmp(subcmd, "cache") == 0) {

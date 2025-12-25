@@ -581,3 +581,151 @@ int cmd_package_init(int argc, char *argv[]) {
 
     return result;
 }
+
+int package_init_at_path(const char *target_dir, const char *package_spec,
+                         bool register_local_dev, bool auto_yes) {
+    /* Parse package specification */
+    char *author = NULL;
+    char *name = NULL;
+    Version requested_version = (Version){0};
+    bool has_version = false;
+
+    if (strchr(package_spec, '@')) {
+        const char *at = strchr(package_spec, '@');
+        if (at == package_spec || at[1] == '\0') {
+            log_error("Invalid package specification '%s'", package_spec);
+            return 1;
+        }
+
+        size_t pkg_part_len = (size_t)(at - package_spec);
+        char *pkg_part = arena_malloc(pkg_part_len + 1);
+        if (!pkg_part) {
+            log_error("Out of memory while parsing package name");
+            return 1;
+        }
+        strncpy(pkg_part, package_spec, pkg_part_len);
+        pkg_part[pkg_part_len] = '\0';
+
+        if (!parse_package_name_silent(pkg_part, &author, &name)) {
+            log_error("Invalid package name: %s", pkg_part);
+            arena_free(pkg_part);
+            return 1;
+        }
+        arena_free(pkg_part);
+
+        if (!version_parse_safe(at + 1, &requested_version)) {
+            log_error("Invalid version '%s' (expected X.Y.Z)", at + 1);
+            arena_free(author);
+            arena_free(name);
+            return 1;
+        }
+        has_version = true;
+    } else {
+        if (!parse_package_name_silent(package_spec, &author, &name)) {
+            log_error("Invalid package name: %s", package_spec);
+            return 1;
+        }
+    }
+
+    char package_name_buf[MAX_PACKAGE_NAME_LENGTH];
+    int package_name_len = snprintf(package_name_buf, sizeof(package_name_buf), "%s/%s", author, name);
+    arena_free(author);
+    arena_free(name);
+    if (package_name_len < 0 || package_name_len >= (int)sizeof(package_name_buf)) {
+        log_error("Package name too long");
+        return 1;
+    }
+
+    char *requested_version_str = NULL;
+    if (has_version) {
+        requested_version_str = version_to_string(&requested_version);
+        if (!requested_version_str) {
+            log_error("Out of memory while preparing version");
+            return 1;
+        }
+    }
+
+    /* Save current directory */
+    char original_cwd[MAX_PATH_LENGTH];
+    if (!getcwd(original_cwd, sizeof(original_cwd))) {
+        log_error("Failed to get current directory");
+        if (requested_version_str) arena_free(requested_version_str);
+        return 1;
+    }
+
+    /* Change to target directory */
+    if (chdir(target_dir) != 0) {
+        log_error("Failed to change to directory: %s", target_dir);
+        if (requested_version_str) arena_free(requested_version_str);
+        return 1;
+    }
+
+    /* Check if elm.json already exists in target */
+    if (file_exists("elm.json")) {
+        log_error("This folder already contains an elm.json.");
+        chdir(original_cwd);
+        if (requested_version_str) arena_free(requested_version_str);
+        return 1;
+    }
+
+    if (!embedded_archive_available()) {
+        log_error("Embedded templates are not available in this build.");
+        chdir(original_cwd);
+        if (requested_version_str) arena_free(requested_version_str);
+        return 1;
+    }
+
+    /* Extract templates */
+    if (!extract_templates(package_name_buf, requested_version_str)) {
+        chdir(original_cwd);
+        if (requested_version_str) arena_free(requested_version_str);
+        return 1;
+    }
+    if (requested_version_str) arena_free(requested_version_str);
+
+    /* Read actual version from newly created elm.json */
+    char *pkg_author = NULL;
+    char *pkg_name = NULL;
+    char *pkg_version = NULL;
+    if (!read_package_info_from_elm_json("elm.json", &pkg_author, &pkg_name, &pkg_version)) {
+        log_error("Failed to read package info from newly created elm.json");
+        chdir(original_cwd);
+        return 1;
+    }
+
+    int result = 0;
+
+    if (register_local_dev) {
+        InstallEnv *env = install_env_create();
+        if (!env) {
+            log_error("Failed to create install environment");
+            arena_free(pkg_author);
+            arena_free(pkg_name);
+            arena_free(pkg_version);
+            chdir(original_cwd);
+            return 1;
+        }
+
+        if (!install_env_init(env)) {
+            log_error("Failed to initialize install environment");
+            install_env_free(env);
+            arena_free(pkg_author);
+            arena_free(pkg_name);
+            arena_free(pkg_version);
+            chdir(original_cwd);
+            return 1;
+        }
+
+        result = register_local_dev_package(".", package_name_buf, env, auto_yes, true);
+        install_env_free(env);
+    }
+
+    arena_free(pkg_author);
+    arena_free(pkg_name);
+    arena_free(pkg_version);
+
+    /* Return to original directory */
+    chdir(original_cwd);
+
+    return result;
+}

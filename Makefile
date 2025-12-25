@@ -218,6 +218,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/install_local_dev.o \
           $(BUILDDIR)/local_dev_tracking.o \
           $(BUILDDIR)/init_cmd.o \
+          $(BUILDDIR)/extract_cmd.o \
           $(BUILDDIR)/cache_cmd.o \
           $(BUILDDIR)/remove_cmd.o \
           $(BUILDDIR)/info_cmd.o \
@@ -566,6 +567,9 @@ $(BUILDDIR)/local_dev_tracking.o: $(SRCDIR)/local_dev/local_dev_tracking.c $(SRC
 
 $(BUILDDIR)/init_cmd.o: $(SRCDIR)/commands/package/init_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install_env.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/embedded_archive.h $(SRCDIR)/fileutil.h $(SRCDIR)/vendor/cJSON.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/extract_cmd.o: $(SRCDIR)/commands/package/extract_cmd.c $(SRCDIR)/commands/package/extract_cmd.h $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install.h $(SRCDIR)/install_env.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/shared/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/elm_json.h $(SRCDIR)/elm_project.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/vendor/cJSON.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -Isrc/vendor/tree-sitter -c $< -o $@
 
 $(BUILDDIR)/cache_cmd.o: $(SRCDIR)/commands/package/cache_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/http_client.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/commands/cache/check/cache_check.h $(SRCDIR)/commands/cache/full_scan/cache_full_scan.h $(SRCDIR)/commands/cache/download_missing/cache_download_missing.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
