@@ -19,7 +19,7 @@
 #include "../../protocol_v2/solver/v2_registry.h"
 #include "../../registry.h"
 #include "../../cache.h"
-#include "../../rulr/rulr.h"
+#include "rulr.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"
 #include <stdio.h>

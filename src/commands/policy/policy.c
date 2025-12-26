@@ -11,8 +11,8 @@
 #include "../../fileutil.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/builtin_rules.h"
-#include "../../rulr/frontend/ast.h"
-#include "../../rulr/frontend/ast_serialize.h"
+#include "frontend/ast.h"
+#include "../../rulr/frontend/ast_deserialize.h"
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>

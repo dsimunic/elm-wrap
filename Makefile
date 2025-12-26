@@ -75,31 +75,36 @@ BINDIR = bin
 LIBDIR = lib
 TOOLSDIR = $(BINDIR)/tools
 
-# Rulr (Mini Datalog) library
+# Rulr (Mini Datalog) library - external vendored library
 RULR_SRCDIR = $(SRCDIR)/rulr
+RULR_INCLUDE = -Iexternal/include/rulr
 RULR_LIB = $(LIBDIR)/librulr.a
-RULR_SOURCES = $(RULR_SRCDIR)/rulr.c \
-               $(RULR_SRCDIR)/rulr_dl.c \
-               $(RULR_SRCDIR)/builtin_rules.c \
-               $(RULR_SRCDIR)/host_helpers.c \
-               $(RULR_SRCDIR)/frontend/lexer.c \
-               $(RULR_SRCDIR)/frontend/parser.c \
-               $(RULR_SRCDIR)/frontend/ast_serialize.c \
-               $(RULR_SRCDIR)/ir/ir_builder.c \
-               $(RULR_SRCDIR)/runtime/runtime.c \
-               $(RULR_SRCDIR)/engine/engine.c
-RULR_OBJECTS = $(patsubst $(SRCDIR)/rulr/%.c,$(BUILDDIR)/rulr/%.o,$(RULR_SOURCES))
-RULR_DRIVER = $(BINDIR)/rulr-demo
-RULR_DRIVER_SRC = $(RULR_SRCDIR)/driver_main.c
-RULR_DRIVER_OBJ = $(BUILDDIR)/rulr/driver_main.o
-RULR_CFLAGS = $(CFLAGS) -Isrc -Isrc/rulr
+RULR_VENDOR_LIB = external/lib/librulr.a
+# Local sources that provide elm-wrap specific functionality:
+#   - rulr_dl.c: file loading with compression support
+#   - frontend/ast_deserialize.c: .dlc decompression wrapper (calls librulr.a)
+#   - builtin_rules.c: embedded rules extraction
+#   - host_helpers.c: fact insertion helpers
+RULR_LOCAL_SOURCES = $(RULR_SRCDIR)/rulr_dl.c \
+                     $(RULR_SRCDIR)/frontend/ast_deserialize.c \
+                     $(RULR_SRCDIR)/builtin_rules.c \
+                     $(RULR_SRCDIR)/host_helpers.c
+RULR_LOCAL_OBJECTS = $(BUILDDIR)/rulr/rulr_dl.o \
+                     $(BUILDDIR)/rulr/frontend/ast_deserialize.o \
+                     $(BUILDDIR)/rulr/builtin_rules.o \
+                     $(BUILDDIR)/rulr/host_helpers.o
+RULR_CFLAGS = $(CFLAGS) -Isrc -Isrc/rulr $(RULR_INCLUDE)
 
-# Built-in rules
-BUILTIN_RULES_DIR = rulr/rules
+# Built-in rules (pre-compiled with system rulrc)
+BUILTIN_RULES_SRC = rulr/rules/src
+BUILTIN_RULES_COMPILED = rulr/rules/compiled
 BUILTIN_RULES_ZIP = $(BUILDDIR)/builtin_rules.zip
-BUILTIN_RULES_DLC = $(BUILDDIR)/builtin_rules
 EMBEDDED_ARCHIVE_DIR = $(BUILDDIR)/embedded_archive
 TEMPLATES_DIR = templates
+
+# Rule source and compiled files
+RULE_SOURCES := $(wildcard $(BUILTIN_RULES_SRC)/*.dl)
+RULE_COMPILED := $(patsubst $(BUILTIN_RULES_SRC)/%.dl,$(BUILTIN_RULES_COMPILED)/%.dlc,$(RULE_SOURCES))
 
 # Rulr compiler (rulrc)
 RULRC = $(TOOLSDIR)/rulrc
@@ -362,24 +367,25 @@ rebuild-install:
 
 rulrc: $(RULRC)
 
-# Compile all .dl files in rulr/rules to .dlc format
-compile-builtin-rules: $(RULRC)
-	@echo "Compiling built-in rules..."
-	@mkdir -p $(BUILTIN_RULES_DLC)
-	@for f in $(BUILTIN_RULES_DIR)/*.dl; do \
-		if [ -f "$$f" ]; then \
-			base=$$(basename "$$f" .dl); \
-			$(RULRC) compile "$$f" -o $(BUILTIN_RULES_DLC)/"$$base".dlc; \
-		fi; \
-	done
+# Compile rules using system rulrc (only when source changes)
+$(BUILTIN_RULES_COMPILED)/%.dlc: $(BUILTIN_RULES_SRC)/%.dl
+	@mkdir -p $(BUILTIN_RULES_COMPILED)
+	@echo "Compiling rule: $<"
+	@rulrc compile $< -o $@
 
-# Create zip file from compiled rules and append to binary
-append-builtin-rules: $(TARGET) compile-builtin-rules
+# Compile all rules (for manual recompilation)
+compile-rules: $(RULE_COMPILED)
+	@echo "All rules compiled."
+
+.PHONY: compile-rules
+
+# Create zip file from pre-compiled rules and append to binary
+append-builtin-rules: $(TARGET)
 	@echo "Creating built-in rules archive..."
 	@rm -f $(BUILTIN_RULES_ZIP)
 	@rm -rf $(EMBEDDED_ARCHIVE_DIR)
 	@mkdir -p $(EMBEDDED_ARCHIVE_DIR)
-	@cp $(BUILTIN_RULES_DLC)/*.dlc $(EMBEDDED_ARCHIVE_DIR) 2>/dev/null || true
+	@cp $(BUILTIN_RULES_COMPILED)/*.dlc $(EMBEDDED_ARCHIVE_DIR) 2>/dev/null || true
 	@if [ -d $(TEMPLATES_DIR) ]; then \
 		rsync -a $(TEMPLATES_DIR) $(EMBEDDED_ARCHIVE_DIR)/; \
 	fi
@@ -562,19 +568,19 @@ $(BUILDDIR)/path_util.o: $(SRCDIR)/commands/publish/docs/path_util.c $(SRCDIR)/c
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 # Build package_publish command object
-$(BUILDDIR)/package_publish.o: $(SRCDIR)/commands/publish/package/package_publish.c $(SRCDIR)/commands/publish/package/package_publish.h $(SRCDIR)/alloc.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/dyn_array.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/rulr/rulr.h $(SRCDIR)/rulr/rulr_dl.h | $(BUILDDIR)
+$(BUILDDIR)/package_publish.o: $(SRCDIR)/commands/publish/package/package_publish.c $(SRCDIR)/commands/publish/package/package_publish.h $(SRCDIR)/alloc.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/dyn_array.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/rulr/rulr_dl.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
-	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -I$(SRCDIR)/rulr -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -I$(SRCDIR)/rulr $(RULR_INCLUDE) -c $< -o $@
 
 # Build review command object
-$(BUILDDIR)/review.o: $(SRCDIR)/commands/review/review.c $(SRCDIR)/commands/review/review.h $(SRCDIR)/commands/review/reporter.h $(SRCDIR)/alloc.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/rulr/rulr.h | $(BUILDDIR)
+$(BUILDDIR)/review.o: $(SRCDIR)/commands/review/review.c $(SRCDIR)/commands/review/review.h $(SRCDIR)/commands/review/reporter.h $(SRCDIR)/alloc.h $(SRCDIR)/elm_json.h $(SRCDIR)/ast/skeleton.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
-	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -I$(SRCDIR)/rulr -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -I$(SRCDIR)/rulr $(RULR_INCLUDE) -c $< -o $@
 
 # Build reporter object for review command
-$(BUILDDIR)/reporter.o: $(SRCDIR)/commands/review/reporter.c $(SRCDIR)/commands/review/reporter.h $(SRCDIR)/alloc.h $(SRCDIR)/rulr/rulr.h $(SRCDIR)/rulr/runtime/runtime.h | $(BUILDDIR)
+$(BUILDDIR)/reporter.o: $(SRCDIR)/commands/review/reporter.c $(SRCDIR)/commands/review/reporter.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
-	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr $(RULR_INCLUDE) -c $< -o $@
 
 # Build debug command object
 $(BUILDDIR)/debug.o: $(SRCDIR)/commands/debug/debug.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h | $(BUILDDIR)
@@ -588,16 +594,16 @@ $(BUILDDIR)/application.o: $(SRCDIR)/commands/application/application.c $(SRCDIR
 
 $(BUILDDIR)/app_init.o: $(SRCDIR)/commands/application/init.c $(SRCDIR)/commands/application/application.h $(SRCDIR)/install_env.h $(SRCDIR)/global_context.h $(SRCDIR)/elm_compiler.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/embedded_archive.h $(SRCDIR)/fileutil.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/commands/review/reporter.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
-	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr $(RULR_INCLUDE) -c $< -o $@
 
 $(BUILDDIR)/app_info.o: $(SRCDIR)/commands/application/info.c $(SRCDIR)/commands/application/application.h $(SRCDIR)/install.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 # Build policy command object
-$(BUILDDIR)/policy.o: $(SRCDIR)/commands/policy/policy.c $(SRCDIR)/commands/policy/policy.h $(SRCDIR)/alloc.h $(SRCDIR)/rulr/rulr_dl.h $(SRCDIR)/rulr/frontend/ast.h $(SRCDIR)/rulr/frontend/ast_serialize.h | $(BUILDDIR)
+$(BUILDDIR)/policy.o: $(SRCDIR)/commands/policy/policy.c $(SRCDIR)/commands/policy/policy.h $(SRCDIR)/alloc.h $(SRCDIR)/rulr/rulr_dl.h $(SRCDIR)/rulr/frontend/ast_deserialize.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
-	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr $(RULR_INCLUDE) -c $< -o $@
 
 # Build include_tree command object
 $(BUILDDIR)/include_tree.o: $(SRCDIR)/commands/debug/include_tree.c $(SRCDIR)/commands/debug/debug.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/dyn_array.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/import_tree.h | $(BUILDDIR)
@@ -650,9 +656,9 @@ $(BUILDDIR)/ts_elm_scanner.o: $(SRCDIR)/vendor/tree-sitter-elm/scanner.c | $(BUI
 	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build package command objects
-$(BUILDDIR)/package_common.o: $(SRCDIR)/commands/package/package_common.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/alloc.h $(SRCDIR)/cache.h $(SRCDIR)/fileutil.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/shared/log.h $(SRCDIR)/rulr/rulr.h $(SRCDIR)/rulr/rulr_dl.h $(SRCDIR)/rulr/host_helpers.h | $(BUILDDIR)
+$(BUILDDIR)/package_common.o: $(SRCDIR)/commands/package/package_common.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/alloc.h $(SRCDIR)/cache.h $(SRCDIR)/fileutil.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/shared/log.h $(SRCDIR)/rulr/rulr_dl.h $(SRCDIR)/rulr/host_helpers.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
-	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr $(RULR_INCLUDE) -c $< -o $@
 
 $(BUILDDIR)/package_suggestions.o: $(SRCDIR)/package_suggestions.c $(SRCDIR)/package_suggestions.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
@@ -874,7 +880,7 @@ $(BUILDDIR)/global_context.o: $(SRCDIR)/global_context.c $(SRCDIR)/global_contex
 # Build repository object
 $(BUILDDIR)/repository.o: $(SRCDIR)/commands/repository/repository.c $(SRCDIR)/commands/repository/repository.h $(SRCDIR)/env_defaults.h $(SRCDIR)/elm_compiler.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
-	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr $(RULR_INCLUDE) -c $< -o $@
 
 # Build sha1 object
 $(BUILDDIR)/sha1.o: $(SRCDIR)/vendor/sha1.c $(SRCDIR)/vendor/sha1.h | $(BUILDDIR)
@@ -897,10 +903,10 @@ $(BUILDDIR)/rulr/%.o: $(SRCDIR)/rulr/%.c | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(RULR_CFLAGS) -c $< -o $@
 
-# Build librulr archive
-$(RULR_LIB): $(RULR_OBJECTS) | $(LIBDIR)
-	$(AR_MSG) $@
-	$(Q)$(AR) rcs $@ $(RULR_OBJECTS)
+# Copy vendored librulr archive
+$(RULR_LIB): $(RULR_VENDOR_LIB) | $(LIBDIR)
+	@echo "  CP      $@"
+	$(Q)cp $(RULR_VENDOR_LIB) $@
 
 # Build rulr demo driver (optional helper for development)
 $(RULR_DRIVER): $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o | $(BINDIR)
@@ -917,10 +923,10 @@ $(RULRC): $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o $(BUI
 	$(LINK_MSG) $@
 	$(Q)$(CC) $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o $(BUILDDIR)/fileutil.o -o $@
 
-# Link final binary
-$(TARGET): $(OBJECTS) $(RULR_LIB) | $(BINDIR)
+# Link final binary (includes local rulr objects + vendored librulr.a)
+$(TARGET): $(OBJECTS) $(RULR_LOCAL_OBJECTS) $(RULR_LIB) | $(BINDIR)
 	$(LINK_MSG) $@
-	$(Q)$(CC) $(OBJECTS) $(RULR_LIB) $(LDFLAGS) -o $@
+	$(Q)$(CC) $(OBJECTS) $(RULR_LOCAL_OBJECTS) $(RULR_LIB) $(LDFLAGS) -o $@
 
 # Create directories
 $(BUILDDIR):

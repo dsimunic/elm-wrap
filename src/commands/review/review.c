@@ -24,12 +24,12 @@
 #include "../../dyn_array.h"
 #include "../../cache.h"
 #include "../../vendor/cJSON.h"
-#include "../../rulr/rulr.h"
+#include "rulr.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"
-#include "../../rulr/engine/engine.h"
-#include "../../rulr/runtime/runtime.h"
-#include "../../rulr/common/types.h"
+#include "engine/engine.h"
+#include "runtime/runtime.h"
+#include "common/types.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>

@@ -14,8 +14,8 @@
 #ifndef REVIEW_REPORTER_H
 #define REVIEW_REPORTER_H
 
-#include "../../rulr/rulr.h"
-#include "../../rulr/runtime/runtime.h"
+#include "rulr.h"
+#include "runtime/runtime.h"
 
 /* ============================================================================
  * Configuration

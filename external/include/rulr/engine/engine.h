@@ -10,6 +10,22 @@ extern "C" {
 
 typedef struct Engine Engine;
 
+/**
+ * External callback interface for the engine.
+ * Allows host code to inject logic at the end of each iteration.
+ */
+typedef struct {
+    /**
+     * Called at the end of each semi-naive evaluation iteration.
+     * @param engine The engine instance
+     * @param stratum Current stratum being evaluated
+     * @param user_data User-provided context
+     * @param out_changed Set to non-zero if external changes occurred
+     */
+    void (*on_iteration_end)(Engine *engine, int stratum, void *user_data, int *out_changed);
+    void *user_data;
+} EngineExternal;
+
 typedef int (*InternSymbolFn)(void *user, const char *s);
 typedef const char *(*LookupSymbolFn)(void *user, int sym_id);
 
@@ -20,6 +36,12 @@ typedef struct {
 
 Engine *engine_create(void);
 void    engine_destroy(Engine *e);
+
+/**
+ * Register an external callback interface.
+ * The external's callbacks will be invoked during evaluation.
+ */
+void engine_register_external(Engine *e, EngineExternal *external);
 
 void engine_set_symbol_table(
     Engine          *e,

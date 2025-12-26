@@ -8,10 +8,10 @@
 #include "../../solver.h"
 #include "../../protocol_v2/solver/v2_registry.h"
 #include "../../shared/log.h"
-#include "../../rulr/rulr.h"
+#include "rulr.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"
-#include "../../rulr/runtime/runtime.h"
+#include "runtime/runtime.h"
 #include "../../dyn_array.h"
 #include <ctype.h>
 #include <stdio.h>

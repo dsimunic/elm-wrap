@@ -9,7 +9,7 @@
 #include "fileutil.h"
 #include "builtin_rules.h"
 #include "frontend/ast.h"
-#include "frontend/ast_serialize.h"
+#include "frontend/ast_deserialize.h"
 
 typedef struct {
     char  *data;
