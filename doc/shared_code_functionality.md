@@ -12,6 +12,7 @@ The codebase provides several shared modules organized by functionality:
 | Elm Project | `elm_project.h` | Elm project file parsing and traversal |
 | File Utilities | `fileutil.h` | General file system operations |
 | Local Dev Tracking | `local_dev/local_dev_tracking.h` | Query local development tracking relationships |
+| Package List | `shared/package_list.h` | Consistent package list printing and sorting |
 | Rulr Host Helpers | `rulr/host_helpers.h` | Inserting facts into Rulr engine |
 
 ---
@@ -434,6 +435,86 @@ This module depends on:
 ### Related Documentation
 
 - [Installing a package for local development](package_install_local_dev.md) - User-facing workflow
+
+---
+
+## shared/package_list.h — Package List Printing and Sorting
+
+**Include:** `#include "shared/package_list.h"`
+
+This module provides consistent formatting and sorting for package lists across all commands. All packages are sorted by author/name alphabetically.
+
+### When to Use
+
+- Simple package lists without version change arrows (use print functions)
+- Any place needing sorted package names (use comparison functions)
+
+For complex formatting (upgrade arrows, color coding, constraint display), you may need custom printing, but use the comparison functions for sorting.
+
+### Types
+
+#### `PackageListEntry`
+
+```c
+typedef struct {
+    const char *author;       /* Package author (e.g., "elm") */
+    const char *name;         /* Package name (e.g., "core") */
+    const char *version;      /* Version string or NULL */
+    const char *annotation;   /* Optional annotation (e.g., " (indirect)") */
+} PackageListEntry;
+```
+
+### Functions
+
+#### `int package_list_compare(const void *a, const void *b)`
+
+Comparison function for sorting PackageListEntry arrays. Sorts by author first, then by name.
+
+**Example:**
+```c
+qsort(entries, count, sizeof(PackageListEntry), package_list_compare);
+```
+
+#### `int package_name_compare(const void *a, const void *b)`
+
+Comparison function for sorting strings in "author/name" format.
+
+**Example:**
+```c
+qsort(names, count, sizeof(char*), package_name_compare);
+```
+
+#### `void package_list_print_sorted(entries, count, max_width, indent)`
+
+Print a sorted package list with aligned versions. Creates a sorted copy internally.
+
+**Parameters:**
+- `entries` - Array of PackageListEntry
+- `count` - Number of entries
+- `max_width` - Maximum name width for alignment (0 = auto-calculate)
+- `indent` - Number of leading spaces
+
+**Example:**
+```c
+PackageListEntry entries[3] = {
+    { "elm", "core", "1.0.5", NULL },
+    { "avh4", "elm-color", "1.0.0", NULL },
+    { "elm", "html", "1.0.0", " (indirect)" }
+};
+package_list_print_sorted(entries, 3, 0, 2);
+/* Output:
+     avh4/elm-color  1.0.0
+     elm/core        1.0.5
+     elm/html        1.0.0 (indirect)
+*/
+```
+
+### Files
+
+| File | Description |
+|------|-------------|
+| `src/shared/package_list.h` | Public API header |
+| `src/shared/package_list.c` | Implementation |
 
 ---
 
