@@ -430,6 +430,6 @@ Available fields:
 
 **No commits**: NEVER commit to Git yourself.
 
-**Building the project**: `make clean all install-user`
+**Building the project**: `make rebuild`
 
 **NEVER DELETE ANYTHING**: Absolutely NEVER EVER run `rm` command or delete anything with git file removal commands.
