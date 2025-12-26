@@ -15,6 +15,7 @@
 #include "../../fileutil.h"
 #include "../../alloc.h"
 #include "../../shared/log.h"
+#include "../../shared/package_list.h"
 #include "../../constants.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -255,13 +256,13 @@ int cmd_build_check(int argc, char *argv[]) {
 
     /* Check for problems first */
     if (plan->problem_count > 0) {
-        printf("  PROBLEMS DETECTED:\n");
+        printf("PROBLEMS DETECTED:\n\n");
         for (int i = 0; i < plan->problem_count; i++) {
             if (plan->problems[i].module_name) {
-                printf("    - %s: %s\n", plan->problems[i].module_name,
+                printf("  - %s: %s\n", plan->problems[i].module_name,
                        plan->problems[i].message);
             } else {
-                printf("    - %s\n", plan->problems[i].message);
+                printf("  - %s\n", plan->problems[i].message);
             }
         }
         printf("\n");
@@ -269,7 +270,7 @@ int cmd_build_check(int argc, char *argv[]) {
 
     /* Package summary */
     if (plan->packages_with_artifacts > 0) {
-        printf("  Include cached data for %d already built package%s.\n",
+        printf("Include cached data for %d already built package%s.\n",
                plan->packages_with_artifacts,
                plan->packages_with_artifacts == 1 ? "" : "s");
     }
@@ -278,23 +279,55 @@ int cmd_build_check(int argc, char *argv[]) {
     int packages_to_rebuild = plan->packages_stale + plan->packages_missing;
     if (packages_to_rebuild > 0) {
         printf("\n");
-        printf("  Rebuild %d package%s that %s out of date:\n",
+        printf("Rebuild %d package%s that %s out of date:\n",
                packages_to_rebuild,
                packages_to_rebuild == 1 ? "" : "s",
                packages_to_rebuild == 1 ? "is" : "are");
 
-        for (int i = 0; i < plan->package_count; i++) {
-            BuildPackage *pkg = &plan->packages[i];
-            if (pkg->artifact_status == ARTIFACT_STALE ||
-                pkg->artifact_status == ARTIFACT_MISSING) {
-                /* Check if this is a local-dev package */
-                bool is_local_dev = false;
-                if (pkg->version && strstr(pkg->version, "local-dev")) {
-                    is_local_dev = true;
+        /* Build a list of packages to print */
+        PackageListEntry *rebuild_entries = arena_malloc(
+            (size_t)packages_to_rebuild * sizeof(PackageListEntry));
+        int rebuild_count = 0;
+
+        if (rebuild_entries) {
+            for (int i = 0; i < plan->package_count; i++) {
+                BuildPackage *pkg = &plan->packages[i];
+                if (pkg->artifact_status == ARTIFACT_STALE ||
+                    pkg->artifact_status == ARTIFACT_MISSING) {
+                    /* Parse "author/name" format */
+                    const char *slash = strchr(pkg->name, '/');
+                    if (slash) {
+                        size_t author_len = (size_t)(slash - pkg->name);
+                        char *author = arena_malloc(author_len + 1);
+                        if (author) {
+                            memcpy(author, pkg->name, author_len);
+                            author[author_len] = '\0';
+
+                            rebuild_entries[rebuild_count].author = author;
+                            rebuild_entries[rebuild_count].name = slash + 1;
+                            rebuild_entries[rebuild_count].version = pkg->version;
+
+                            /* Check if this is a local-dev package */
+                            if (pkg->version && strstr(pkg->version, "local-dev")) {
+                                rebuild_entries[rebuild_count].annotation = " (local-dev)";
+                            } else {
+                                rebuild_entries[rebuild_count].annotation = NULL;
+                            }
+                            rebuild_count++;
+                        }
+                    }
                 }
-                printf("      %s%s\n", pkg->name,
-                       is_local_dev ? " (local-dev)" : "");
             }
+
+            /* Print sorted package list */
+            printf("\n");
+            package_list_print_sorted(rebuild_entries, rebuild_count, 0, 2);
+
+            /* Free author strings */
+            for (int i = 0; i < rebuild_count; i++) {
+                arena_free((void *)rebuild_entries[i].author);
+            }
+            arena_free(rebuild_entries);
         }
     }
 
@@ -305,7 +338,7 @@ int cmd_build_check(int argc, char *argv[]) {
         compute_src_dir_stats(plan, &stats, &stats_count);
 
         printf("\n");
-        printf("  Build %d module%s from the source path%s:\n",
+        printf("Build %d module%s from the source path%s:\n\n",
                plan->module_count,
                plan->module_count == 1 ? "" : "s",
                stats_count == 1 ? "" : "s");
@@ -319,7 +352,7 @@ int cmd_build_check(int argc, char *argv[]) {
 
         for (int i = 0; i < stats_count; i++) {
             if (stats[i].module_count > 0) {
-                printf("     %-*s: %3d module%s\n",
+                printf("  %-*s: %3d module%s\n",
                        max_len + 1, stats[i].src_dir,
                        stats[i].module_count,
                        stats[i].module_count == 1 ? "" : "s");

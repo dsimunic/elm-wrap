@@ -91,6 +91,7 @@ TARGET_FILE = wrap
 SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/alloc.c \
           $(SRCDIR)/shared/log.c \
+          $(SRCDIR)/shared/package_list.c \
           $(SRCDIR)/features.c \
           $(SRCDIR)/embedded_archive.c \
           $(SRCDIR)/commands/wrappers/init.c \
@@ -185,6 +186,7 @@ BUILDINFO_SRC = $(BUILDDIR)/buildinfo.c
 OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/alloc.o \
           $(BUILDDIR)/log.o \
+          $(BUILDDIR)/package_list.o \
           $(BUILDDIR)/features.o \
           $(BUILDDIR)/embedded_archive.o \
           $(BUILDDIR)/init.o \
@@ -380,6 +382,10 @@ $(BUILDDIR)/alloc.o: $(SRCDIR)/alloc.c $(SRCDIR)/alloc.h $(SRCDIR)/larena.h | $(
 
 # Build log object
 $(BUILDDIR)/log.o: $(SRCDIR)/shared/log.c $(SRCDIR)/shared/log.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build package_list object
+$(BUILDDIR)/package_list.o: $(SRCDIR)/shared/package_list.c $(SRCDIR)/shared/package_list.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build features object
