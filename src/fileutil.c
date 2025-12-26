@@ -197,6 +197,7 @@ bool extract_zip_selective(const char *zip_path, const char *dest_dir) {
 
 char *find_elm_json_upwards(const char *start_path) {
     char cwd[MAX_PATH_LENGTH];
+    char resolved[MAX_PATH_LENGTH];
     const char *initial = start_path;
 
     if (!initial) {
@@ -206,10 +207,44 @@ char *find_elm_json_upwards(const char *start_path) {
         initial = cwd;
     }
 
-    char *path = arena_strdup(initial);
-    if (!path) {
+    /*
+     * Convert to absolute path first.
+     * This is crucial for relative paths like "src/Main.elm" - without this,
+     * when we strip to "src" and try to go up, there's no '/' to find.
+     */
+    char *abs_path = NULL;
+    if (initial[0] != '/') {
+        /* Relative path - make it absolute */
+        if (!getcwd(cwd, sizeof(cwd))) {
+            return NULL;
+        }
+        /* Check if the path exists as-is first */
+        struct stat st;
+        if (stat(initial, &st) == 0) {
+            /* Path exists, use realpath to resolve it */
+            if (realpath(initial, resolved)) {
+                abs_path = arena_strdup(resolved);
+            } else {
+                /* realpath failed, construct manually */
+                char combined[MAX_PATH_LENGTH];
+                snprintf(combined, sizeof(combined), "%s/%s", cwd, initial);
+                abs_path = arena_strdup(combined);
+            }
+        } else {
+            /* Path doesn't exist, construct manually */
+            char combined[MAX_PATH_LENGTH];
+            snprintf(combined, sizeof(combined), "%s/%s", cwd, initial);
+            abs_path = arena_strdup(combined);
+        }
+    } else {
+        abs_path = arena_strdup(initial);
+    }
+
+    if (!abs_path) {
         return NULL;
     }
+
+    char *path = abs_path;
 
     /* If start_path is a file, start from its parent directory */
     struct stat st;
@@ -223,7 +258,7 @@ char *find_elm_json_upwards(const char *start_path) {
                 *slash = '\0';
             }
         } else {
-            /* Relative filename with no slash */
+            /* Relative filename with no slash - shouldn't happen now with abs path */
             arena_free(path);
             path = arena_strdup(".");
             if (!path) {

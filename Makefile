@@ -104,6 +104,8 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/wrappers/diff.c \
           $(SRCDIR)/commands/wrappers/publish.c \
           $(SRCDIR)/commands/wrappers/live.c \
+          $(SRCDIR)/commands/wrappers/build.c \
+          $(SRCDIR)/build/build_driver.c \
           $(SRCDIR)/config.c \
           $(SRCDIR)/commands/publish/docs/docs.c \
           $(SRCDIR)/commands/publish/docs/elm_docs.c \
@@ -196,6 +198,8 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/diff.o \
           $(BUILDDIR)/publish.o \
           $(BUILDDIR)/live.o \
+          $(BUILDDIR)/build_cmd.o \
+          $(BUILDDIR)/build_driver.o \
           $(BUILDDIR)/config.o \
           $(BUILDDIR)/docs.o \
           $(BUILDDIR)/elm_docs.o \
@@ -367,7 +371,7 @@ $(BUILDDIR)/buildinfo.o: $(BUILDINFO_SRC)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build main object
-$(BUILDDIR)/main.o: $(SRCDIR)/main.c $(SRCDIR)/buildinfo.h $(SRCDIR)/install.h $(SRCDIR)/commands/wrappers/make.h $(SRCDIR)/commands/wrappers/init.h $(SRCDIR)/commands/wrappers/repl.h $(SRCDIR)/commands/wrappers/reactor.h $(SRCDIR)/commands/wrappers/bump.h $(SRCDIR)/commands/wrappers/diff.h $(SRCDIR)/commands/wrappers/publish.h $(SRCDIR)/commands/wrappers/live.h $(SRCDIR)/commands/info/info.h $(SRCDIR)/config.h | $(BUILDDIR)
+$(BUILDDIR)/main.o: $(SRCDIR)/main.c $(SRCDIR)/buildinfo.h $(SRCDIR)/install.h $(SRCDIR)/commands/wrappers/make.h $(SRCDIR)/commands/wrappers/init.h $(SRCDIR)/commands/wrappers/repl.h $(SRCDIR)/commands/wrappers/reactor.h $(SRCDIR)/commands/wrappers/bump.h $(SRCDIR)/commands/wrappers/diff.h $(SRCDIR)/commands/wrappers/publish.h $(SRCDIR)/commands/wrappers/live.h $(SRCDIR)/commands/wrappers/build.h $(SRCDIR)/commands/info/info.h $(SRCDIR)/config.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build alloc object
@@ -429,6 +433,14 @@ $(BUILDDIR)/publish.o: $(SRCDIR)/commands/wrappers/publish.c $(SRCDIR)/commands/
 # Build live object
 $(BUILDDIR)/live.o: $(SRCDIR)/commands/wrappers/live.c $(SRCDIR)/commands/wrappers/live.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h $(SRCDIR)/global_context.h | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build build command object
+$(BUILDDIR)/build_cmd.o: $(SRCDIR)/commands/wrappers/build.c $(SRCDIR)/commands/wrappers/build.h $(SRCDIR)/build/build_driver.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/fileutil.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/global_context.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build build_driver object
+$(BUILDDIR)/build_driver.o: $(SRCDIR)/build/build_driver.c $(SRCDIR)/build/build_driver.h $(SRCDIR)/build/build_types.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/cache.h $(SRCDIR)/fileutil.h $(SRCDIR)/elm_project.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/vendor/cJSON.h | $(BUILDDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build config object
 $(BUILDDIR)/config.o: $(SRCDIR)/config.c $(SRCDIR)/config.h $(SRCDIR)/cache.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)

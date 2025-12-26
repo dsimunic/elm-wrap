@@ -20,6 +20,7 @@
 #include "commands/wrappers/diff.h"
 #include "commands/wrappers/publish.h"
 #include "commands/wrappers/live.h"
+#include "commands/wrappers/build.h"
 #include "config.h"
 #include "commands/debug/debug.h"
 #include "commands/policy/policy.h"
@@ -324,6 +325,10 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "make") == 0) {
             return cmd_make(argc - 1, argv + 1);
+        }
+
+        if (strcmp(argv[1], "build") == 0) {
+            return cmd_build(argc - 1, argv + 1);
         }
 
         if (strcmp(argv[1], "repl") == 0) {
