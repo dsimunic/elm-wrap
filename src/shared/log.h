@@ -100,11 +100,4 @@ static inline bool log_is_progress(void) {
     return g_log_level >= LOG_LEVEL_PROGRESS;
 }
 
-/*
- * Suppress GCC warn_unused_result for cleanup code where we intentionally
- * ignore the return value (e.g., chdir back to original directory on error).
- * Note: (void)expr doesn't work with GCC's warn_unused_result attribute.
- */
-#define IGNORE_RESULT(expr) do { if ((expr) != 0) { /* intentionally ignored */ } } while (0)
-
 #endif /* LOG_H */

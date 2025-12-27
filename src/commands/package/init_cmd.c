@@ -15,6 +15,9 @@
 #include <errno.h>
 #include <unistd.h>
 
+/* Suppress GCC warn_unused_result for cleanup chdir calls */
+#define IGNORE_RESULT(expr) do { if ((expr) != 0) { /* intentionally ignored */ } } while (0)
+
 #define TEMPLATE_PREFIX "templates/package/init"
 
 static void print_package_init_usage(void) {
