@@ -38,6 +38,37 @@ Please include:
 | 0.6.x         | :white_check_mark: |
 | < 0.6         | :x:                |
 
+## Verifying Releases
+
+All release binaries are signed using [Sigstore](https://sigstore.dev) and recorded in the public [Rekor](https://docs.sigstore.dev/logging/overview/) transparency log. This provides tamper-evident provenance: you can verify that a binary was built by our GitHub Actions workflow and hasn't been modified.
+
+### Using GitHub CLI
+
+```bash
+# Download the binary and verify its attestation
+gh attestation verify elm-wrap-macos-arm64 --owner dsimunic
+```
+
+### Using Cosign
+
+```bash
+# Verify with cosign (requires the binary's SHA256)
+cosign verify-blob-attestation \
+  --new-bundle-format \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+  --certificate-identity-regexp="^https://github.com/dsimunic/elm-wrap/" \
+  elm-wrap-macos-arm64
+```
+
+### Verifying Checksums
+
+Each release includes a `SHA256SUMS` file and individual `.sha256` files:
+
+```bash
+# Verify checksum
+sha256sum -c elm-wrap-macos-arm64.sha256
+```
+
 ## Security Practices
 
 This project follows secure coding practices documented in [`doc/writing-secure-code.md`](doc/writing-secure-code.md). Key practices include:
