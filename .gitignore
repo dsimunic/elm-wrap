@@ -2,6 +2,8 @@ build/
 bin/
 *.o
 *.a
+# Track vendored librulr.a (needed for dist builds, rulrc not always available)
+!external/lib/librulr.a
 *.so
 *.dylib
 elm-stuff/
@@ -18,6 +20,8 @@ CLAUDE.md
 .github/copilot-instructions.md
 rulr/doc/
 *.dlc
+# Track compiled built-in rules (rulrc not available in CI/dist builds)
+!rulr/rules/compiled/*.dlc
 www/full_index/
 test/scripts/dep_sync.actual
 test/manual-test/

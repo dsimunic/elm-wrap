@@ -118,7 +118,7 @@ To add a new built-in rule:
 
 2. Rebuild:
    ```bash
-   make clean all install-user
+   make rebuild
    ```
 
 3. Verify it's included:

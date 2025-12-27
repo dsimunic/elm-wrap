@@ -42,7 +42,7 @@ Builds `.deb` packages for multiple distributions and architectures using Docker
    - Installs build dependencies
    - Clones the repo from the mounted local directory (no network traffic)
    - Checks out the exact commit
-   - Builds with `make clean all`
+   - Builds with `make rebuild`
    - Detects shared library dependencies using `dpkg-shlibdeps`
    - Packages the binary into a `.deb` file
 3. Skips targets where the `.deb` already exists in `dist/`

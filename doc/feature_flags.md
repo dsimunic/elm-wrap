@@ -98,7 +98,7 @@ make FEATURE_CODE=1 FEATURE_PUBLISH=1 FEATURE_REVIEW=1 FEATURE_POLICY=1 FEATURE_
 
 **Release build (features hidden by default):**
 ```bash
-make clean all  # Uses ?= defaults (0 = hidden)
+make rebuild  # Uses ?= defaults (0 = hidden)
 ```
 
 **Runtime override:**

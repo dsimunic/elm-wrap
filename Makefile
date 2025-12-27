@@ -1019,6 +1019,7 @@ dist:
 	if [ -d tools ]; then cp -r tools $$DIST_DIR/; fi; \
 	if [ -d rulr ]; then cp -r rulr $$DIST_DIR/; fi; \
 	if [ -d templates ]; then cp -r templates $$DIST_DIR/; fi; \
+	if [ -d external ]; then cp -r external $$DIST_DIR/; fi; \
 	if [ -f AGENTS.md ]; then cp AGENTS.md $$DIST_DIR/; fi; \
 	if [ -f LICENSE ]; then cp LICENSE $$DIST_DIR/; fi; \
 	if [ -f ENV_DEFAULTS ]; then cp ENV_DEFAULTS $$DIST_DIR/; fi; \

@@ -27,7 +27,7 @@ jobs:
       uses: actions/checkout@v4
     
     - name: Build project
-      run: make clean all
+      run: make rebuild
     
     - name: Run tests
       run: make check
@@ -56,5 +56,4 @@ jobs:
             libssl-dev libldap2-dev libbrotli-dev librtmp-dev libssh-dev \
             libpsl-dev libkrb5-dev libzstd-dev zlib1g-dev rsync 
       - name: Build on Linux
-        run: make clean all
-
+        run: make rebuild

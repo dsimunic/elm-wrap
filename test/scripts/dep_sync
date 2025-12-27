@@ -666,7 +666,7 @@ main() {
     # Check prerequisites
     if [ ! -x "$WRAP_BIN" ]; then
         log_error "wrap binary not found at $WRAP_BIN"
-        log "Please build the project first: make clean all install-user"
+        log "Please build the project first: make rebuild"
         exit 1
     fi
     

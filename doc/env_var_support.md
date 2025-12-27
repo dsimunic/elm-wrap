@@ -333,7 +333,7 @@ MY_APP_DATA_DIR=/tmp/test MY_APP_DEBUG=1 ./myapp
 
 # Test with modified ENV_DEFAULTS file
 echo "MY_APP_API_URL=https://staging.example.com" >> ENV_DEFAULTS
-make clean all
+make rebuild
 ./myapp
 ```
 

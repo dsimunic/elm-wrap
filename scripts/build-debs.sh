@@ -6,7 +6,7 @@ set -euo pipefail
 # Environment overrides:
 #   VERSION (default: 0.5.0)
 #   DOCKER_CMD (default: docker)
-#   SKIP_BUILD (if set to 1, will not run `make clean all` / `make dist`)
+#   SKIP_BUILD (if set to 1, will not run `make rebuild` / `make dist`)
 #   SUITE (if set, only build for this suite, e.g. "bookworm")
 #   ARCH (if set, only build for this arch, e.g. "amd64")
 
