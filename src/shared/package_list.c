@@ -6,6 +6,7 @@
 #include "../alloc.h"
 #include "../constants.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 int package_list_compare(const void *a, const void *b) {
