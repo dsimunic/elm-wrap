@@ -663,21 +663,21 @@ int package_init_at_path(const char *target_dir, const char *package_spec,
     /* Check if elm.json already exists in target */
     if (file_exists("elm.json")) {
         log_error("This folder already contains an elm.json.");
-        chdir(original_cwd);
+        IGNORE_RESULT(chdir(original_cwd));
         if (requested_version_str) arena_free(requested_version_str);
         return 1;
     }
 
     if (!embedded_archive_available()) {
         log_error("Embedded templates are not available in this build.");
-        chdir(original_cwd);
+        IGNORE_RESULT(chdir(original_cwd));
         if (requested_version_str) arena_free(requested_version_str);
         return 1;
     }
 
     /* Extract templates */
     if (!extract_templates(package_name_buf, requested_version_str)) {
-        chdir(original_cwd);
+        IGNORE_RESULT(chdir(original_cwd));
         if (requested_version_str) arena_free(requested_version_str);
         return 1;
     }
@@ -689,7 +689,7 @@ int package_init_at_path(const char *target_dir, const char *package_spec,
     char *pkg_version = NULL;
     if (!read_package_info_from_elm_json("elm.json", &pkg_author, &pkg_name, &pkg_version)) {
         log_error("Failed to read package info from newly created elm.json");
-        chdir(original_cwd);
+        IGNORE_RESULT(chdir(original_cwd));
         return 1;
     }
 
@@ -702,7 +702,7 @@ int package_init_at_path(const char *target_dir, const char *package_spec,
             arena_free(pkg_author);
             arena_free(pkg_name);
             arena_free(pkg_version);
-            chdir(original_cwd);
+            IGNORE_RESULT(chdir(original_cwd));
             return 1;
         }
 
@@ -712,7 +712,7 @@ int package_init_at_path(const char *target_dir, const char *package_spec,
             arena_free(pkg_author);
             arena_free(pkg_name);
             arena_free(pkg_version);
-            chdir(original_cwd);
+            IGNORE_RESULT(chdir(original_cwd));
             return 1;
         }
 
@@ -725,7 +725,7 @@ int package_init_at_path(const char *target_dir, const char *package_spec,
     arena_free(pkg_version);
 
     /* Return to original directory */
-    chdir(original_cwd);
+    IGNORE_RESULT(chdir(original_cwd));
 
     return result;
 }

@@ -33,7 +33,9 @@ if ! docker info &>/dev/null; then
 fi
 
 MODE="${1:-full}"
-IMAGE="debian:bookworm"
+# Use ubuntu:24.04 to match CI (ubuntu-latest)
+# Ubuntu's GCC is stricter about warn_unused_result than Debian
+IMAGE="ubuntu:24.04"
 PLATFORM="linux/amd64"
 
 info "Testing Linux build (GCC) in Docker..."
