@@ -20,8 +20,30 @@ CFLAGS += -DFEATURE_REVIEW_DEFAULT=$(FEATURE_REVIEW) -DFEATURE_POLICY_DEFAULT=$(
 CFLAGS += -DFEATURE_CACHE_DEFAULT=$(FEATURE_CACHE)
 CFLAGS += -DFEATURE_DEBUG_DEFAULT=$(FEATURE_DEBUG)
 
-# Detect operating system
+# Detect operating system and architecture
 UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+
+# Determine OS-ARCH tuple for library selection
+ifeq ($(UNAME_S),Darwin)
+    HOST_OS := darwin
+    ifeq ($(UNAME_M),arm64)
+        HOST_ARCH := arm64
+    else
+        HOST_ARCH := x86_64
+    endif
+else ifeq ($(UNAME_S),Linux)
+    HOST_OS := linux
+    ifeq ($(UNAME_M),aarch64)
+        HOST_ARCH := arm64
+    else
+        HOST_ARCH := x86_64
+    endif
+else
+    HOST_OS := unknown
+    HOST_ARCH := $(UNAME_M)
+endif
+LIB_PLATFORM := $(HOST_OS)-$(HOST_ARCH)
 
 # Set LDFLAGS based on OS
 ifeq ($(UNAME_S),Linux)
@@ -79,7 +101,7 @@ TOOLSDIR = $(BINDIR)/tools
 RULR_SRCDIR = $(SRCDIR)/rulr
 RULR_INCLUDE = -Iexternal/include/rulr
 RULR_LIB = $(LIBDIR)/librulr.a
-RULR_VENDOR_LIB = external/lib/librulr.a
+RULR_VENDOR_LIB = external/lib/$(LIB_PLATFORM)/librulr.a
 # Local sources that provide elm-wrap specific functionality:
 #   - rulr_dl.c: file loading with compression support
 #   - frontend/ast_deserialize.c: .dlc decompression wrapper (calls librulr.a)

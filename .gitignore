@@ -2,8 +2,12 @@
 bin/
 *.o
 *.a
-# Track vendored librulr.a (needed for dist builds, rulrc not always available)
-!external/lib/librulr.a
+# Track vendored librulr.a per-architecture (needed for dist builds)
+# Libraries are built without LTO for portability across compiler versions
+!external/lib/darwin-arm64/librulr.a
+!external/lib/darwin-x86_64/librulr.a
+!external/lib/linux-x86_64/librulr.a
+!external/lib/linux-arm64/librulr.a
 *.so
 *.dylib
 elm-stuff/
