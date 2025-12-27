@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   release:
@@ -65,7 +67,17 @@ jobs:
       run: |
         cp bin/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
         chmod +x ${{ matrix.asset_name }}
-    
+
+    - name: Generate checksum
+      run: shasum -a 256 ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
+
+    - name: Upload binary artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.asset_name }}
+        path: ${{ matrix.asset_name }}
+        retention-days: 1
+
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
       env:
@@ -75,3 +87,44 @@ jobs:
         asset_path: ./${{ matrix.asset_name }}
         asset_name: ${{ matrix.asset_name }}
         asset_content_type: application/octet-stream
+
+    - name: Upload Checksum
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release.outputs.upload_url }}
+        asset_path: ./${{ matrix.asset_name }}.sha256
+        asset_name: ${{ matrix.asset_name }}.sha256
+        asset_content_type: text/plain
+
+  attestation:
+    name: Attest Build Provenance
+    needs: [release, build]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+        merge-multiple: true
+
+    - name: Generate combined checksums
+      run: |
+        cd artifacts
+        sha256sum * > SHA256SUMS
+
+    - name: Upload SHA256SUMS
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release.outputs.upload_url }}
+        asset_path: ./artifacts/SHA256SUMS
+        asset_name: SHA256SUMS
+        asset_content_type: text/plain
+
+    - name: Attest build provenance
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-path: 'artifacts/*'

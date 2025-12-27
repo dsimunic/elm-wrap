@@ -5,6 +5,8 @@ on:
     tags:
       - 'v*'
 
+permissions: {}
+
 jobs:
   trigger-tap-update:
     runs-on: ubuntu-latest
