@@ -4,12 +4,21 @@ set -euo pipefail
 # Test .deb packages by installing them in clean containers and running `wrap version`
 # Usage: ./scripts/test-debs.sh
 # Environment overrides:
-#   VERSION (default: 0.5.0)
+#   VERSION (required: set via environment OR provide a top-level `VERSION` file; no default)
 #   DOCKER_CMD (default: docker)
 #   SUITE (if set, only test for this suite, e.g. "bookworm")
 #   ARCH (if set, only test for this arch, e.g. "amd64")
 
-VERSION=${VERSION:-0.5.0}
+# Require VERSION: prefer environment override; otherwise read from top-level `VERSION` file; fail if neither exists
+if [ -z "${VERSION:-}" ]; then
+  if [ -f VERSION ]; then
+    VERSION=$(<VERSION)
+  else
+    echo "ERROR: VERSION not set and no top-level 'VERSION' file found" >&2
+    echo "Set the VERSION environment variable or create a top-level 'VERSION' file containing the desired version." >&2
+    exit 1
+  fi
+fi
 DOCKER_CMD=${DOCKER_CMD:-docker}
 FILTER_SUITE=${SUITE:-}
 FILTER_ARCH=${ARCH:-}

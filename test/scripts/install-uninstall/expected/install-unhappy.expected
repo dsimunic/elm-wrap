@@ -19,8 +19,7 @@ Maybe you want one of these instead?
 === END ERR-01 ===
 
 === BEGIN ERR-02: Install package with non-existent version ===
-Error: Version 9.9.9 not found for package wrap/package-3v-no-deps
-
+[ERROR] Version 9.9.9 not found for package wrap/package-3v-no-deps
 Available versions:
   3.0.0
   2.0.0
@@ -42,8 +41,7 @@ I didn't install anything yet, as I can only install all specified packages or n
 === END ERR-03 ===
 
 === BEGIN ERR-04: Install multiple packages with one having wrong version ===
-Error: Version 9.9.9 not found for package wrap/package-3v-no-deps
-
+[ERROR] Version 9.9.9 not found for package wrap/package-3v-no-deps
 Available versions:
   3.0.0
   2.0.0

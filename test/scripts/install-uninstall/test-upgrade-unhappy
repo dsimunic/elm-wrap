@@ -58,9 +58,11 @@ test_err_02_upgrade_not_in_dependencies() {
     
     # Install one package
     cd "$app_dir"
+    echo "--- setup: installing a different package (so upgrade can fail) ---"
     run_wrap install wrap/package-single-no-deps
     
     # Try to upgrade a different package (should fail)
+    echo "--- setup: upgrade of a different package should fail ---"
     if run_wrap package upgrade wrap/package-3v-no-deps 2>/dev/null; then
         echo "ERROR: Expected command to fail"
         exit 1

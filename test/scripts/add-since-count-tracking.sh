@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016
 set -euo pipefail
 
 # Add since-count tracking to all test functions in the test scripts
@@ -37,31 +38,8 @@ add_since_tracking() {
 for script in "$SCRIPTS_DIR"/test-*; do
     # Skip if not executable or not a regular file
     [[ -f "$script" && -x "$script" ]] || continue
-        print "    local end_since=$(get_v1_since_count)"
-        print "    local delta=$((end_since - start_since))"
-        print "    echo \"Registry since-count: $start_since -> $end_since (delta: $delta)\""
-        print
-        has_begin = 0
-        in_function = 0
-        function_name = ""
-    }
-    
-    # Detect function end (closing brace at start of line)
-    in_function && /^}/ {
-        in_function = 0
-        function_name = ""
-        has_begin = 0
-    }
-    
-    # Print all other lines as-is
-    {
-        print
-    }
-    ' "$file" > "$temp_file"
-    
-    mv "$temp_file" "$file"
-    echo "  ✓ Updated $file"
-}
+    add_since_tracking "$script"
+done
 
 # Process all test scripts
 for script in test/scripts/install-uninstall/test-*; do

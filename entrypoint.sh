@@ -33,7 +33,7 @@ if ! getent passwd "${uid}" >/dev/null 2>&1; then
   useradd -m -u "${uid}" -g "${group_name}" -s /bin/bash "${DEFAULT_USER}" 2>/dev/null || \
   useradd -m -u "${uid}" -g "${gid}" -s /bin/bash "user${uid}"
 fi
-user_name="$(getent passwd "${uid}" | cut -d: -f1)"
+_user_name="$(getent passwd "${uid}" | cut -d: -f1)"  # intentionally unused (SC2034)
 home_dir="$(getent passwd "${uid}" | cut -d: -f6)"
 
 # 4) Ensure writable HOME and /work

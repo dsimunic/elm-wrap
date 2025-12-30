@@ -4,7 +4,7 @@ Desired behavior:
 
     $ wrap install elm-explorations/test
     I found it in your elm.json file, but in the "test-dependencies" field.
-    Should I move it into "dependencies" for more general use? [Y/n]: n
+    Should I move it into "dependencies" for more general use? [Y/n] n
     Okay, I did not change anything!
 
 If the user specifies y, move into 'dependencies' as suggested.
@@ -18,7 +18,7 @@ Desired behavior:
 
     $ wrap install elm/random
     I found it in your elm.json file, but in the "test-dependencies" field.
-    Should I move it into "dependencies" for more general use? [Y/n]: n
+    Should I move it into "dependencies" for more general use? [Y/n] n
     Okay, I did not change anything!
 
 If the user specifies y, move into 'dependencies' as suggested.

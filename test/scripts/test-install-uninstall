@@ -357,11 +357,32 @@ cleanup_test_environment() {
 # Helper Functions (exported to subscripts)
 # =============================================================================
 
+# If a test suite (or a user) reuses the same TEST_ROOT, suite scripts may
+# request the same directory names (e.g. "$TEST_ROOT/app01"). To keep suites
+# independent and order-insensitive, always allocate a fresh directory path.
+unique_test_dir() {
+    local requested="$1"
+
+    if [[ ! -e "$requested" ]]; then
+        echo "$requested"
+        return 0
+    fi
+
+    local n=1
+    while [[ -e "${requested}-$n" ]]; do
+        n=$((n + 1))
+    done
+    echo "${requested}-$n"
+}
+
 # Create an application project
 # Usage: create_app <directory> <name>
 create_app() {
-    local dir="$1"
+    local requested_dir="$1"
     local name="$2"
+
+    local dir
+    dir=$(unique_test_dir "$requested_dir")
     
     mkdir -p "$dir"
     cd "$dir"
@@ -375,8 +396,11 @@ create_app() {
 # Create a package project
 # Usage: create_package <directory> <author/name>
 create_package() {
-    local dir="$1"
+    local requested_dir="$1"
     local name="$2"
+
+    local dir
+    dir=$(unique_test_dir "$requested_dir")
     
     mkdir -p "$dir"
     cd "$dir"
@@ -517,6 +541,7 @@ get_v1_since_count() {
 }
 
 # Export functions and variables for subscripts
+export -f unique_test_dir
 export -f create_app create_package get_deps normalize_output run_wrap
 export -f assert_direct_dep assert_indirect_dep assert_no_dep
 export -f assert_deps_unchanged snapshot_deps get_v1_since_count
@@ -564,9 +589,12 @@ run_test_suite() {
     local actual_file="$ACTUAL_DIR/$suite.actual"
     local expected_file="$EXPECTED_DIR/$suite.expected"
     
-    # Run the test script
+    # Run the test script.
+    # Always execute from within TEST_ROOT so accidental relative-path writes
+    # (e.g. an unexpected `wrap install` before a test `cd`s into its app dir)
+    # can't leak files into the repository root.
     local exit_code=0
-    if ! "$script" > "$actual_file" 2>&1; then
+    if ! (cd "$TEST_ROOT" && "$script") > "$actual_file" 2>&1; then
         exit_code=$?
     fi
     

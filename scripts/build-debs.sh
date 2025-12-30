@@ -4,13 +4,22 @@ set -euo pipefail
 # Build .deb packages for multiple suites and architectures using Docker
 # Usage: ./scripts/build-debs.sh
 # Environment overrides:
-#   VERSION (default: 0.5.0)
+#   VERSION (required: set via environment OR provide a top-level `VERSION` file; no default)
 #   DOCKER_CMD (default: docker)
 #   SKIP_BUILD (if set to 1, will not run `make rebuild` / `make dist`)
 #   SUITE (if set, only build for this suite, e.g. "bookworm")
 #   ARCH (if set, only build for this arch, e.g. "amd64")
 
-VERSION=${VERSION:-0.5.0}
+# Require VERSION: prefer environment override; otherwise read from top-level `VERSION` file; fail if neither exists
+if [ -z "${VERSION:-}" ]; then
+  if [ -f VERSION ]; then
+    VERSION=$(<VERSION)
+  else
+    echo "ERROR: VERSION not set and no top-level 'VERSION' file found" >&2
+    echo "Set the VERSION environment variable or create a top-level 'VERSION' file containing the desired version." >&2
+    exit 1
+  fi
+fi
 DOCKER_CMD=${DOCKER_CMD:-docker}
 SKIP_BUILD=${SKIP_BUILD:-0}
 FILTER_SUITE=${SUITE:-}

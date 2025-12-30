@@ -25,6 +25,7 @@ Usage:
   wrap package cache [OPTIONS] PACKAGE[@VERSION] [PACKAGE[@VERSION]...]
   wrap package cache check PACKAGE [OPTIONS]
   wrap package cache full-scan [OPTIONS]
+  wrap package cache missing [OPTIONS]
 
 Download packages into the cache so installs can run offline.
 
@@ -36,6 +37,7 @@ Examples:
   wrap package cache check elm/html              # Check cache status for elm/html
   wrap package cache check elm/html --fix-broken # Re-download broken versions
   wrap package cache full-scan                   # Scan all packages in cache
+  wrap package cache missing                     # Download all missing deps from elm.json
   wrap package cache --from-file ./pkg elm/html  # Download from local directory
   wrap package cache --from-url URL elm/html     # Download from URL to cache
   wrap package cache --major elm/html            # Download highest major version

@@ -16,8 +16,8 @@ Builds `.deb` packages for multiple distributions and architectures using Docker
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VERSION` | `0.5.0` | Package version |
-| `DOCKER_CMD` | `docker` | Docker command (e.g., `podman`) |
+| `VERSION` | required: either set via environment or present in top-level `VERSION` file — no default | Package version |
+| `DOCKER_CMD` | `docker` | Docker command |
 | `SKIP_BUILD` | `0` | Set to `1` to skip compilation (use existing binary) |
 | `SUITE` | (all) | Build only this suite (e.g., `bookworm`, `trixie`) |
 | `ARCH` | (all) | Build only this arch (e.g., `amd64`, `arm64`) |
