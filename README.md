@@ -106,9 +106,9 @@ Most important characteristic of the extended `package install` are `--from-url`
 into the `ELM_HOME` package tree straight from GitHub or from a local package directory (maybe you are developing a package and want to test without 
 having to push to the canonical public repository, or an author of a package you depend on deleted the version tag or renamed the GitHub repository).
 
-Of note is also the ability to install new major versions of dependencies, something that the built-in `elm install` cannot do.
+Of note is also the ability to upgrade to new major versions of dependencies, something that the built-in `elm install` cannot do.
 
-    $ wrap package install --major elm/http
+    $ wrap package upgrade --major elm/http
     Here is my plan:
     
     Change:
@@ -116,36 +116,6 @@ Of note is also the ability to install new major versions of dependencies, somet
         elm/http    1.0.0 => 2.0.0
 
     Would you like me to update your elm.json accordingly? [Y/n] 
-
-Synopsis:
-
-    Usage: wrap install PACKAGE[@VERSION] [PACKAGE[@VERSION]...]
-    
-    Install packages for your Elm project.
-    
-    Examples:
-      wrap install elm/html                     # Add elm/html to your project
-      wrap install elm/html@1.0.0               # Add elm/html at specific version
-      wrap install elm/html elm/json elm/url    # Add multiple packages at once
-      wrap install elm/html@1.0.0 elm/json      # Mix versioned and latest
-      wrap install --test elm/json              # Add elm/json as a test dependency
-      wrap install --major elm/html             # Upgrade elm/html to next major version
-      wrap install --from-file ./pkg.zip elm/html  # Install from local file
-      wrap install --from-url URL elm/html         # Install from URL
-    
-    Options:
-      --test                             # Install as test dependency
-      --upgrade-all                      # Allow upgrading production deps (with --test)
-      --major PACKAGE                    # Allow major version upgrade for package (single package only)
-      --from-file PATH PACKAGE           # Install from local file/directory (single package only)
-      --from-url URL PACKAGE             # Install from URL (single package only)
-      --local-dev [--from-path PATH] [PACKAGE]
-                                         # Install package for local development
-      -v, --verbose                      # Show progress reports (registry, connectivity)
-      -q, --quiet                        # Suppress progress reports
-      -y, --yes                          # Automatically confirm changes
-      --help                             # Show this help
-
 
 **`uninstall`** removes a package from `elm.json`, together with any indirect dependencies that would become orphaned.
 
@@ -253,7 +223,7 @@ populate the cache.
 
 ## Status
 
-`wrap` is functional and production grade for package authoring as of `v0.5.0`.
+`wrap` is functional and production grade for package authoring as of `v0.5.1`.
 
 The code builds on macOS and Linux.
 
@@ -271,12 +241,8 @@ Note the binary command is called `wrap`.
 You can confirm you have the latest version with:
 
 ```bash
-wrap version
-
-Version: 0.5.0@detached-63f56413-2025-12-18T18:21:15Z
-  Base version: 0.5.0
-  Commit: 63f564137e8e2975fdaa11736dc70aabde468bb5
-
+wrap -V
+0.5.1
 ```
 
 Later updates:
@@ -314,9 +280,9 @@ sudo apt install -y --no-install-recommends \
   libssl-dev libldap2-dev libbrotli-dev librtmp-dev libssh-dev \
   libpsl-dev libkrb5-dev libzstd-dev zlib1g-dev rsync
 
-curl -sL https://github.com/dsimunic/elm-wrap/archive/refs/tags/v0.5.0.tar.gz | tar -zxv
+curl -sL https://github.com/dsimunic/elm-wrap/archive/refs/tags/v0.5.1.tar.gz | tar -zxv
 
-SRC=elm-wrap-0.5.0
+SRC=elm-wrap-0.5.1
 make -C $SRC clean all
 make -C $SRC install-user   # if your ~/.local/bin is in the path
 sudo make -C $SRC install   # otherwise 
@@ -331,9 +297,9 @@ sudo apt install -y --no-install-recommends \
   make build-essential libcurl4-openssl-dev libnghttp2-dev \
   libunistring-dev libgpg-error-dev rsync 
 
-curl -sL https://github.com/dsimunic/elm-wrap/archive/refs/tags/v0.5.0.tar.gz | tar -zxv
+curl -sL https://github.com/dsimunic/elm-wrap/archive/refs/tags/v0.5.1.tar.gz | tar -zxv
 
-SRC=elm-wrap-0.5.0
+SRC=elm-wrap-0.5.1
 make -C $SRC clean all
 make -C $SRC install-user   # if your ~/.local/bin is in the path
 sudo make -C $SRC install   # otherwise 

@@ -49,8 +49,8 @@ static void print_repository_usage(void) {
     printf("Manage local package repositories.\n");
     printf("\n");
     printf("Subcommands:\n");
-    printf("  init [ROOT_PATH]      Create a new repository directory\n");
-    printf("  list [ROOT_PATH]      List repositories at path\n");
+    // printf("  init [ROOT_PATH]      Create a new repository directory\n");
+    // printf("  list [ROOT_PATH]      List repositories at path\n");
     printf("  local-dev             Manage local development tracking\n");
     printf("\n");
     printf("Options:\n");

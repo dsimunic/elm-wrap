@@ -338,7 +338,7 @@ static bool show_init_plan_and_confirm(const char *template_name, const char *te
     printf("  \n");
 
     if (!auto_yes) {
-        printf("\nWould you like me to proceed? [Y/n]: ");
+        printf("\nWould you like me to proceed? [Y/n] ");
         fflush(stdout);
 
         char response[10];

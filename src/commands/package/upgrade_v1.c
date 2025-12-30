@@ -25,6 +25,125 @@
 
 /* Removed local parse_version - now using version_parse_safe from package_common.h */
 
+typedef struct {
+    bool in_deps_direct;
+    bool in_deps_indirect;
+    bool in_deps_test_direct;
+    bool in_deps_test_indirect;
+    bool in_pkg_deps;
+    bool in_pkg_test_deps;
+    int count;
+} PackagePresence;
+
+static PackagePresence detect_package_presence(const ElmJson *elm_json, const char *author, const char *name) {
+    PackagePresence p;
+    memset(&p, 0, sizeof(p));
+
+    if (!elm_json || !author || !name) {
+        return p;
+    }
+
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        p.in_deps_direct = (elm_json->dependencies_direct && package_map_find(elm_json->dependencies_direct, author, name));
+        p.in_deps_indirect = (elm_json->dependencies_indirect && package_map_find(elm_json->dependencies_indirect, author, name));
+        p.in_deps_test_direct = (elm_json->dependencies_test_direct && package_map_find(elm_json->dependencies_test_direct, author, name));
+        p.in_deps_test_indirect = (elm_json->dependencies_test_indirect && package_map_find(elm_json->dependencies_test_indirect, author, name));
+    } else {
+        p.in_pkg_deps = (elm_json->package_dependencies && package_map_find(elm_json->package_dependencies, author, name));
+        p.in_pkg_test_deps = (elm_json->package_test_dependencies && package_map_find(elm_json->package_test_dependencies, author, name));
+    }
+
+    p.count = (p.in_deps_direct ? 1 : 0) + (p.in_deps_indirect ? 1 : 0) +
+              (p.in_deps_test_direct ? 1 : 0) + (p.in_deps_test_indirect ? 1 : 0) +
+              (p.in_pkg_deps ? 1 : 0) + (p.in_pkg_test_deps ? 1 : 0);
+    return p;
+}
+
+static bool set_pkg_version_in_map(ElmJson *elm_json, PackageMap *map, const char *author, const char *name, const char *new_version) {
+    if (!elm_json || !map || !author || !name || !new_version) {
+        return false;
+    }
+
+    Package *pkg = package_map_find(map, author, name);
+    if (!pkg) {
+        return false;
+    }
+
+    const char *version_to_write = new_version;
+    char *constraint = NULL;
+    if (elm_json->type == ELM_PROJECT_PACKAGE) {
+        constraint = version_to_constraint(new_version);
+        if (constraint) {
+            version_to_write = constraint;
+        }
+    }
+
+    arena_free(pkg->version);
+    pkg->version = arena_strdup(version_to_write);
+
+    if (constraint) {
+        arena_free(constraint);
+    }
+
+    return pkg->version != NULL;
+}
+
+static bool apply_change_preserving_location(
+    ElmJson *elm_json,
+    const char *author,
+    const char *name,
+    const char *new_version,
+    bool default_is_test,
+    bool default_is_direct
+) {
+    if (!elm_json || !author || !name || !new_version) {
+        return false;
+    }
+
+    PackagePresence presence = detect_package_presence(elm_json, author, name);
+
+    if (presence.count > 1) {
+        /* Malformed elm.json: update all occurrences to keep it consistent. */
+        bool ok = true;
+        if (presence.in_deps_direct) ok = ok && set_pkg_version_in_map(elm_json, elm_json->dependencies_direct, author, name, new_version);
+        if (presence.in_deps_indirect) ok = ok && set_pkg_version_in_map(elm_json, elm_json->dependencies_indirect, author, name, new_version);
+        if (presence.in_deps_test_direct) ok = ok && set_pkg_version_in_map(elm_json, elm_json->dependencies_test_direct, author, name, new_version);
+        if (presence.in_deps_test_indirect) ok = ok && set_pkg_version_in_map(elm_json, elm_json->dependencies_test_indirect, author, name, new_version);
+        if (presence.in_pkg_deps) ok = ok && set_pkg_version_in_map(elm_json, elm_json->package_dependencies, author, name, new_version);
+        if (presence.in_pkg_test_deps) ok = ok && set_pkg_version_in_map(elm_json, elm_json->package_test_dependencies, author, name, new_version);
+        return ok;
+    }
+
+    if (presence.count == 1) {
+        /* Preserve where it currently lives. */
+        bool is_test = false;
+        bool is_direct = true;
+
+        if (elm_json->type == ELM_PROJECT_APPLICATION) {
+            PackageMap *map = find_package_map(elm_json, author, name);
+            if (!map) {
+                return false;
+            }
+
+            is_test = (map == elm_json->dependencies_test_direct || map == elm_json->dependencies_test_indirect);
+            is_direct = (map == elm_json->dependencies_direct || map == elm_json->dependencies_test_direct);
+        } else {
+            PackageMap *map = find_package_map(elm_json, author, name);
+            if (!map) {
+                return false;
+            }
+            is_test = (map == elm_json->package_test_dependencies);
+            is_direct = true;
+        }
+
+        return add_or_update_package_in_elm_json(elm_json, author, name, new_version, is_test, is_direct, false);
+    }
+
+    /* Not currently present: add it in the default location. */
+    return add_or_update_package_in_elm_json(elm_json, author, name, new_version, default_is_test, default_is_direct,
+                                             elm_json->type == ELM_PROJECT_APPLICATION);
+}
+
 int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv *env,
                               bool major_upgrade, bool major_ignore_test, bool auto_yes) {
     char *author = NULL;
@@ -381,11 +500,20 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
         return 1;
     }
 
+    bool is_package_project = (elm_json->type == ELM_PROJECT_PACKAGE);
+
     int add_count = 0;
     int change_count = 0;
 
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
+        bool is_requested_package = (strcmp(change->author, author) == 0 && strcmp(change->name, name) == 0);
+
+        /* For package projects, only upgrade the requested direct dependency in elm.json. */
+        if (is_package_project && !is_requested_package) {
+            continue;
+        }
+
         if (!change->old_version) {
             add_count++;
         } else {
@@ -393,14 +521,19 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
         }
     }
 
-    PackageChange *adds = arena_malloc(sizeof(PackageChange) * (size_t)add_count);
-    PackageChange *changes = arena_malloc(sizeof(PackageChange) * (size_t)change_count);
+    PackageChange *adds = arena_malloc(sizeof(PackageChange) * (size_t)(add_count > 0 ? add_count : 1));
+    PackageChange *changes = arena_malloc(sizeof(PackageChange) * (size_t)(change_count > 0 ? change_count : 1));
 
     int add_idx = 0;
     int change_idx = 0;
 
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
+        bool is_requested_package = (strcmp(change->author, author) == 0 && strcmp(change->name, name) == 0);
+        if (is_package_project && !is_requested_package) {
+            continue;
+        }
+
         if (!change->old_version) {
             adds[add_idx++] = *change;
         } else {
@@ -432,7 +565,18 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
             PackageChange *change = &adds[i];
             char pkg_name[MAX_PACKAGE_NAME_LENGTH];
             snprintf(pkg_name, sizeof(pkg_name), "%s/%s", change->author, change->name);
-            printf("    %-*s    %s\n", max_width, pkg_name, change->new_version);
+            const char *new_display = change->new_version;
+            char *new_constraint = NULL;
+            if (is_package_project && change->new_version) {
+                new_constraint = version_to_constraint(change->new_version);
+                if (new_constraint) {
+                    new_display = new_constraint;
+                }
+            }
+            printf("    %-*s    %s\n", max_width, pkg_name, new_display ? new_display : "(none)");
+            if (new_constraint) {
+                arena_free(new_constraint);
+            }
         }
         printf("  \n");
     }
@@ -443,8 +587,32 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
             PackageChange *change = &changes[i];
             char pkg_name[MAX_PACKAGE_NAME_LENGTH];
             snprintf(pkg_name, sizeof(pkg_name), "%s/%s", change->author, change->name);
+            const char *old_display = change->old_version;
+            const char *new_display = change->new_version;
+            char *old_constraint = NULL;
+            char *new_constraint = NULL;
+
+            if (is_package_project) {
+                if (change->old_version) {
+                    old_constraint = version_to_constraint(change->old_version);
+                    if (old_constraint) {
+                        old_display = old_constraint;
+                    }
+                }
+                if (change->new_version) {
+                    new_constraint = version_to_constraint(change->new_version);
+                    if (new_constraint) {
+                        new_display = new_constraint;
+                    }
+                }
+            }
+
             printf("    %-*s    %s => %s\n", max_width, pkg_name,
-                   change->old_version, change->new_version);
+                   old_display ? old_display : "(none)",
+                   new_display ? new_display : "(none)");
+
+            if (old_constraint) arena_free(old_constraint);
+            if (new_constraint) arena_free(new_constraint);
         }
     }
 
@@ -452,7 +620,7 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
     arena_free(changes);
 
     if (!auto_yes) {
-        printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
+        printf("\nWould you like me to update your elm.json accordingly? [Y/n] ");
         fflush(stdout);
 
         char response[INITIAL_SMALL_CAPACITY];
@@ -477,64 +645,27 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
 
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
-        PackageMap *target_map = NULL;
+        bool is_requested_package = (strcmp(change->author, author) == 0 && strcmp(change->name, name) == 0);
 
-        if (elm_json->type == ELM_PROJECT_APPLICATION) {
-            if (change->old_version) {
-                Package *pkg = package_map_find(elm_json->dependencies_direct, change->author, change->name);
-                if (pkg) {
-                    arena_free(pkg->version);
-                    pkg->version = arena_strdup(change->new_version);
-                    continue;
-                }
+        if (is_package_project && !is_requested_package) {
+            continue;
+        }
 
-                pkg = package_map_find(elm_json->dependencies_indirect, change->author, change->name);
-                if (pkg) {
-                    arena_free(pkg->version);
-                    pkg->version = arena_strdup(change->new_version);
-                    continue;
-                }
+        bool default_is_direct = is_requested_package;
+        bool default_is_test = is_test;
 
-                pkg = package_map_find(elm_json->dependencies_test_direct, change->author, change->name);
-                if (pkg) {
-                    arena_free(pkg->version);
-                    pkg->version = arena_strdup(change->new_version);
-                    continue;
-                }
-
-                pkg = package_map_find(elm_json->dependencies_test_indirect, change->author, change->name);
-                if (pkg) {
-                    arena_free(pkg->version);
-                    pkg->version = arena_strdup(change->new_version);
-                    continue;
-                }
-            } else {
-                if (strcmp(change->author, author) == 0 && strcmp(change->name, name) == 0) {
-                    target_map = is_test ? elm_json->dependencies_test_direct : elm_json->dependencies_direct;
-                } else {
-                    target_map = is_test ? elm_json->dependencies_test_indirect : elm_json->dependencies_indirect;
-                }
-                package_map_add(target_map, change->author, change->name, change->new_version);
-            }
-        } else {
-            if (change->old_version) {
-                Package *pkg = package_map_find(elm_json->package_dependencies, change->author, change->name);
-                if (pkg) {
-                    arena_free(pkg->version);
-                    pkg->version = arena_strdup(change->new_version);
-                    continue;
-                }
-
-                pkg = package_map_find(elm_json->package_test_dependencies, change->author, change->name);
-                if (pkg) {
-                    arena_free(pkg->version);
-                    pkg->version = arena_strdup(change->new_version);
-                    continue;
-                }
-            } else {
-                target_map = is_test ? elm_json->package_test_dependencies : elm_json->package_dependencies;
-                package_map_add(target_map, change->author, change->name, change->new_version);
-            }
+        if (!apply_change_preserving_location(elm_json,
+                                              change->author,
+                                              change->name,
+                                              change->new_version,
+                                              default_is_test,
+                                              default_is_direct)) {
+            log_error("Failed to update elm.json for %s/%s", change->author, change->name);
+            install_plan_free(out_plan);
+            arena_free((char*)latest_version);
+            arena_free(author);
+            arena_free(name);
+            return 1;
         }
     }
 
@@ -606,9 +737,35 @@ int upgrade_all_packages_v1(ElmJson *elm_json, InstallEnv *env,
 
     qsort(out_plan->changes, (size_t)out_plan->count, sizeof(PackageChange), compare_package_changes);
 
+    bool is_package_project = (elm_json->type == ELM_PROJECT_PACKAGE);
+
+    int display_count = 0;
+    for (int i = 0; i < out_plan->count; i++) {
+        PackageChange *change = &out_plan->changes[i];
+
+        if (is_package_project) {
+            /* For package projects, only upgrade dependencies explicitly listed in elm.json. */
+            if (!find_package_map(elm_json, change->author, change->name)) {
+                continue;
+            }
+        }
+        display_count++;
+    }
+
+    if (display_count == 0) {
+        printf("No upgrades available. All packages are at their latest %s version.\n",
+               major_upgrade ? "major" : "minor");
+        install_plan_free(out_plan);
+        return 0;
+    }
+
     int max_width = 0;
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
+        if (is_package_project && !find_package_map(elm_json, change->author, change->name)) {
+            continue;
+        }
+
         int pkg_len = (int)strlen(change->author) + 1 + (int)strlen(change->name);
         if (pkg_len > max_width) max_width = pkg_len;
     }
@@ -619,15 +776,43 @@ int upgrade_all_packages_v1(ElmJson *elm_json, InstallEnv *env,
 
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
+        if (is_package_project && !find_package_map(elm_json, change->author, change->name)) {
+            continue;
+        }
+
         char pkg_name[MAX_PACKAGE_NAME_LENGTH];
         snprintf(pkg_name, sizeof(pkg_name), "%s/%s", change->author, change->name);
+        const char *old_display = change->old_version;
+        const char *new_display = change->new_version;
+        char *old_constraint = NULL;
+        char *new_constraint = NULL;
+
+        if (is_package_project) {
+            if (change->old_version) {
+                old_constraint = version_to_constraint(change->old_version);
+                if (old_constraint) {
+                    old_display = old_constraint;
+                }
+            }
+            if (change->new_version) {
+                new_constraint = version_to_constraint(change->new_version);
+                if (new_constraint) {
+                    new_display = new_constraint;
+                }
+            }
+        }
+
         printf("    %-*s    %s => %s\n", max_width, pkg_name,
-               change->old_version, change->new_version);
+               old_display ? old_display : "(none)",
+               new_display ? new_display : "(none)");
+
+        if (old_constraint) arena_free(old_constraint);
+        if (new_constraint) arena_free(new_constraint);
     }
     printf("  \n");
 
     if (!auto_yes) {
-        printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
+        printf("\nWould you like me to update your elm.json accordingly? [Y/n] ");
         fflush(stdout);
 
         char response[INITIAL_SMALL_CAPACITY];
@@ -647,52 +832,20 @@ int upgrade_all_packages_v1(ElmJson *elm_json, InstallEnv *env,
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
 
-        if (elm_json->type == ELM_PROJECT_APPLICATION) {
-            Package *pkg = package_map_find(elm_json->dependencies_direct, change->author, change->name);
-            if (pkg) {
-                arena_free(pkg->version);
-                pkg->version = arena_strdup(change->new_version);
-                continue;
-            }
-
-            pkg = package_map_find(elm_json->dependencies_indirect, change->author, change->name);
-            if (pkg) {
-                arena_free(pkg->version);
-                pkg->version = arena_strdup(change->new_version);
-                continue;
-            }
-
-            pkg = package_map_find(elm_json->dependencies_test_direct, change->author, change->name);
-            if (pkg) {
-                arena_free(pkg->version);
-                pkg->version = arena_strdup(change->new_version);
-                continue;
-            }
-
-            pkg = package_map_find(elm_json->dependencies_test_indirect, change->author, change->name);
-            if (pkg) {
-                arena_free(pkg->version);
-                pkg->version = arena_strdup(change->new_version);
-                continue;
-            }
-        } else {
-            Package *pkg = package_map_find(elm_json->package_dependencies, change->author, change->name);
-            if (pkg) {
-                arena_free(pkg->version);
-                pkg->version = arena_strdup(change->new_version);
-                continue;
-            }
-
-            pkg = package_map_find(elm_json->package_test_dependencies, change->author, change->name);
-            if (pkg) {
-                arena_free(pkg->version);
-                pkg->version = arena_strdup(change->new_version);
-                continue;
-            }
+        if (is_package_project && !find_package_map(elm_json, change->author, change->name)) {
+            continue;
         }
 
-        log_error("Package %s/%s not found in elm.json (this should not happen)",
-                  change->author, change->name);
+        if (!apply_change_preserving_location(elm_json,
+                                              change->author,
+                                              change->name,
+                                              change->new_version,
+                                              false,
+                                              true)) {
+            log_error("Failed to update elm.json for %s/%s", change->author, change->name);
+            install_plan_free(out_plan);
+            return 1;
+        }
     }
 
     printf("Saving elm.json...\n");
@@ -702,7 +855,7 @@ int upgrade_all_packages_v1(ElmJson *elm_json, InstallEnv *env,
         return 1;
     }
 
-    printf("Successfully upgraded %d package(s)!\n", out_plan->count);
+    printf("Successfully upgraded %d package(s)!\n", display_count);
 
     install_plan_free(out_plan);
     return 0;

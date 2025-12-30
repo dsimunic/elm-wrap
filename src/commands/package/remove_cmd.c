@@ -367,7 +367,7 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
     printf("  \n");
 
     if (!auto_yes) {
-        printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
+        printf("\nWould you like me to update your elm.json accordingly? [Y/n] ");
         fflush(stdout);
         
         char response[10];

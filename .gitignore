@@ -31,5 +31,8 @@ test/scripts/dep_sync.actual
 test/manual-test/
 test/scripts/install-uninstall/actual/
 
+# Local build artifacts / debugging outputs
+test/pwa-build-order.json
+
 dist/
 foreign/Elm-Compiler/

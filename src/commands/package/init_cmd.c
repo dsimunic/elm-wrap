@@ -23,7 +23,7 @@
 static void print_package_init_usage(void) {
     printf("Usage: %s package init [OPTIONS] PACKAGE[@VERSION]\n", global_context_program_name());
     printf("\n");
-    printf("Initialize a new Elm package from embedded templates.\n");
+    printf("Initialize a new Elm package.\n");
     printf("\nOptions:\n");
     printf("  --no-local-dev  Skip registering the package in the local-dev registry\n");
     printf("  -y, --yes       Skip confirmation prompt\n");
@@ -384,7 +384,7 @@ static bool show_init_plan_and_confirm(const char *package_name, const char *res
     }
 
     if (!auto_yes) {
-        printf("\nWould you like me to proceed? [Y/n]: ");
+        printf("\nWould you like me to proceed? [Y/n] ");
         fflush(stdout);
 
         char response[MAX_TEMP_BUFFER_LENGTH];

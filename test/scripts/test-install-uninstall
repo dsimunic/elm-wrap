@@ -532,6 +532,8 @@ export ELM_HOME="$TEST_ELM_HOME"
 export WRAP_HOME="$TEST_WRAP_HOME"
 # Enable cache command for testing
 export WRAP_FEATURE_CACHE=1
+# Enable debug command for testing (some test helpers call `wrap debug ...`)
+export WRAP_FEATURE_DEBUG=1
 # Skip registry updates but allow online operations (used by cache tests).
 # This prevents the /since endpoint check that would download 16k+ versions
 # while still allowing package downloads from the test registry.

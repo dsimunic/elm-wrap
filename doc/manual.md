@@ -108,10 +108,6 @@ There are a few flags that let you beyond the usual `install` command that might
 - `--test`: Install the package as a test dependency. This adds the package under the `test-dependencies` section of your `elm.json`
   instead of the regular `dependencies` section.
 
-- `--major`: Allow upgrading a package to its latest major version. Normally, `wrap install` (like `elm install`) only checks and 
-    proposes upgrades to the latest minor version of your dependencies. Use this flag to check what packages have major version 
-    updates and install. As usual, it will present you with the plan before implementing any changes.
-
 - `--from-file PATH`: Install a package from a local ZIP file rather than the registry. Useful for testing unpublished packages
   during development or working with private packages without using a local repository:
   

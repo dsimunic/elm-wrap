@@ -203,14 +203,12 @@ static void print_install_usage(void) {
     log_progress("  %s install elm/html elm/json elm/url    # Add multiple packages at once", global_context_program_name());
     log_progress("  %s install elm/html@1.0.0 elm/json      # Mix versioned and latest", global_context_program_name());
     log_progress("  %s install --test elm/json              # Add elm/json as a test dependency", global_context_program_name());
-    log_progress("  %s install --major elm/html             # Upgrade elm/html to next major version", global_context_program_name());
     log_progress("  %s install --from-file ./pkg.zip elm/html  # Install from local file", global_context_program_name());
     log_progress("  %s install --from-url URL elm/html         # Install from URL", global_context_program_name());
     log_progress("");
     log_progress("Options:");
     log_progress("  --test                             # Install as test dependency");
     log_progress("  --upgrade-all                      # Allow upgrading production deps (with --test)");
-    log_progress("  --major PACKAGE                    # Allow major version upgrade for package (single package only)");
     log_progress("  --from-file PATH PACKAGE           # Install from local file/directory (single package only)");
     log_progress("  --from-url URL PACKAGE             # Install from URL (single package only)");
     log_progress("  --local-dev [--from-path PATH] [PACKAGE]");
@@ -367,7 +365,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
                     log_debug("Done");
                 }
             } else {
-                log_progress("It is already installed!");
+                printf("It is already installed!\n");
             }
 
             return 0;
@@ -573,7 +571,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
     log_set_level(old_level);
 
     if (!auto_yes) {
-        printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
+        printf("\nWould you like me to update your elm.json accordingly? [Y/n] ");
         fflush(stdout);
         
         char response[10];
@@ -643,7 +641,7 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
         }
     }
 
-    log_progress("Saving elm.json...");
+    printf("Saving elm.json...\n");
     if (!elm_json_write(elm_json, elm_json_path)) {
         log_error("Failed to write elm.json");
         install_plan_free(out_plan);
@@ -995,7 +993,7 @@ static int install_multiple_packages(
     arena_free(changes);
 
     if (!auto_yes) {
-        printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
+        printf("\nWould you like me to update your elm.json accordingly? [Y/n] ");
         fflush(stdout);
 
         char response[10];
@@ -1068,7 +1066,7 @@ static int install_multiple_packages(
         }
     }
 
-    log_progress("Saving elm.json...");
+    printf("Saving elm.json...\n");
     if (!elm_json_write(elm_json, elm_json_path)) {
         log_error("Failed to write elm.json");
         if (out_plan) install_plan_free(out_plan);
@@ -1108,7 +1106,6 @@ int cmd_install(int argc, char *argv[]) {
     bool cmd_quiet = false;
     bool pin_flag = false;
     bool local_dev = false;
-    const char *major_package_name = NULL;
     const char *from_file_path = NULL;
     const char *from_url = NULL;
     const char *from_path = NULL;
@@ -1210,16 +1207,6 @@ int cmd_install(int argc, char *argv[]) {
                 print_install_usage();
                 return 1;
             }
-        } else if (strcmp(argv[i], "--major") == 0) {
-            major_upgrade = true;
-            if (i + 1 < argc && argv[i + 1][0] != '-') {
-                i++;
-                major_package_name = argv[i];
-            } else {
-                log_error("--major requires a package name");
-                print_install_usage();
-                return 1;
-            }
         } else if (strcmp(argv[i], "--local-dev") == 0) {
             local_dev = true;
         } else if (strcmp(argv[i], "--from-path") == 0) {
@@ -1283,50 +1270,6 @@ int cmd_install(int argc, char *argv[]) {
         }
     }
 
-    /* Handle --major: requires single package */
-    if (major_upgrade) {
-        if (!major_package_name) {
-            log_error("--major requires a package name");
-            print_install_usage();
-            return 1;
-        }
-        if (specs_count > 0) {
-            log_error("--major can only be used with a single package");
-            return 1;
-        }
-        /* Parse major package spec */
-        char *author = NULL;
-        char *name = NULL;
-        Version ver = {0};
-        bool has_version = false;
-
-        if (strchr(major_package_name, '@')) {
-            if (!parse_package_with_version(major_package_name, &author, &name, &ver)) {
-                log_error("Invalid package specification '%s'", major_package_name);
-                print_install_usage();
-                return 1;
-            }
-            has_version = true;
-            /* Warn when both --major and explicit version are specified */
-            log_warn("--major flag is ignored when an explicit version is specified");
-            log_progress("Installing %s/%s at version %u.%u.%u",
-                    author, name, ver.major, ver.minor, ver.patch);
-        } else {
-            if (!parse_package_name(major_package_name, &author, &name)) {
-                print_install_usage();
-                return 1;
-            }
-        }
-
-        DYNARRAY_PUSH(specs, specs_count, specs_capacity,
-            ((PackageInstallSpec){
-                .author = author,
-                .name = name,
-                .version = ver,
-                .has_version = has_version
-            }),
-            PackageInstallSpec);
-    }
 
     /* Validate flag combinations for single-package-only options */
     if (from_file_path || from_url) {
@@ -1543,7 +1486,7 @@ int cmd_install(int argc, char *argv[]) {
                        actual_author, actual_name, author, name);
 
                 if (!auto_yes) {
-                    printf("Continue with installation? [Y/n]: ");
+                    printf("Continue with installation? [Y/n] ");
                     fflush(stdout);
 
                     char response[10];
@@ -1595,7 +1538,7 @@ int cmd_install(int argc, char *argv[]) {
         printf("  \n");
 
         if (!auto_yes) {
-            printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
+            printf("\nWould you like me to update your elm.json accordingly? [Y/n] ");
             fflush(stdout);
 
             char response[10];
@@ -1649,7 +1592,7 @@ int cmd_install(int argc, char *argv[]) {
             return 1;
         }
 
-        log_progress("Saving elm.json...");
+        printf("Saving elm.json...\n");
         if (!elm_json_write(elm_json, project_elm_json_path)) {
             log_error("Failed to write elm.json");
             if (version) arena_free(version);

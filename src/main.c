@@ -122,7 +122,7 @@ void print_package_usage(const char *prog) {
     printf("\nSubcommands:\n");
     printf("  install PACKAGE                Add a dependency to current elm.json\n");
     printf("  init PACKAGE                   Initialize a package\n");
-    printf("  extract PACKAGE TARGET PATH    Extract source into a new local-dev package\n");
+    // printf("  extract PACKAGE TARGET PATH    Extract source into a new local-dev package\n");
     printf("  upgrade PACKAGE                Upgrade packages to latest versions\n");
     printf("  uninstall PACKAGE              Remove a package from elm.json (alias: remove)\n");
     printf("  info    [ PATH                 Display package information and upgrades\n");

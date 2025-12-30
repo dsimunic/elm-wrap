@@ -954,7 +954,7 @@ int register_local_dev_package(const char *source_path, const char *package_name
     }
 
     if (!auto_yes) {
-        printf("\nWould you like me to proceed? [Y/n]: ");
+        printf("\nWould you like me to proceed? [Y/n] ");
         fflush(stdout);
 
         char response[10];
@@ -1278,7 +1278,7 @@ int install_local_dev(const char *source_path, const char *package_name,
     printf("  \n");
 
     if (!auto_yes) {
-        printf("\nWould you like me to proceed? [Y/n]: ");
+        printf("\nWould you like me to proceed? [Y/n] ");
         fflush(stdout);
 
         char response[10];

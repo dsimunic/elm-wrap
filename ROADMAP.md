@@ -4,6 +4,7 @@
 - Init from templates
 - Develop packages locally (local-dev)
 - Install from git/zip/path
+- Public web site `elm-wrap.dev`
 
 ## 0.6.0 Publishing support
 - Pre-publish checks
@@ -31,8 +32,7 @@
 - Authentication and user management
 
 ## 1.0.0 Wide release
-- Marketing and outreach
-- Public web site `elm-wrap.dev`
+- CI caching actions
 
 ## 1.1.0 Machine support
 - Emit machine-friendly reports/feedback

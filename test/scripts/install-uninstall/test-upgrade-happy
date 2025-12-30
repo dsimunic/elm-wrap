@@ -8,6 +8,46 @@
 set -euo pipefail
 
 # =============================================================================
+# Local Helpers
+# =============================================================================
+
+assert_pkg_dep_constraint() {
+    local pkg="$1"
+    local expected="$2"
+    local dir="${3:-.}"
+
+    if grep -Fq "\"$pkg\": \"$expected\"" "$dir/elm.json"; then
+        return 0
+    fi
+
+    echo "ERROR: Expected elm.json to contain constraint: $pkg => $expected" >&2
+    echo "elm.json contents:" >&2
+    sed -n '1,200p' "$dir/elm.json" >&2
+    return 1
+}
+
+assert_upgrade_plan_shows_constraint_change() {
+    local pkg="$1"
+    local old_constraint="$2"
+    local new_constraint="$3"
+    local out="$4"
+
+    # Match regardless of column alignment spacing.
+    local re
+    re="${pkg}[[:space:]]+${old_constraint}[[:space:]]+=>[[:space:]]+${new_constraint}"
+
+    if echo "$out" | grep -Eq "$re"; then
+        return 0
+    fi
+
+    echo "ERROR: Expected upgrade plan to show constraint change" >&2
+    echo "Wanted regex: $re" >&2
+    echo "Actual output:" >&2
+    echo "$out" >&2
+    return 1
+}
+
+# =============================================================================
 # Test Cases
 # =============================================================================
 
@@ -256,11 +296,23 @@ test_pkg_01_upgrade_single_to_minor() {
     # Install older version
     cd "$pkg_dir"
     run_wrap package install wrap/package-3m-no-deps@1.0.0
+
+    # Verify initial constraint (package projects should use constraints)
+    assert_pkg_dep_constraint "wrap/package-3m-no-deps" "1.0.0 <= v < 2.0.0" "$pkg_dir"
     
     # Upgrade
-    run_wrap package upgrade wrap/package-3m-no-deps
+    local upgrade_out
+    upgrade_out=$(run_wrap package upgrade wrap/package-3m-no-deps)
     
-    # Verify constraint updated
+    # Verify plan shows constraint-to-constraint change
+    assert_upgrade_plan_shows_constraint_change \
+        "wrap/package-3m-no-deps" \
+        "1\\.0\\.0 <= v < 2\\.0\\.0" \
+        "1\\.2\\.0 <= v < 2\\.0\\.0" \
+        "$upgrade_out"
+
+    # Verify constraint updated in elm.json
+    assert_pkg_dep_constraint "wrap/package-3m-no-deps" "1.2.0 <= v < 2.0.0" "$pkg_dir"
     
     since_after=$(get_v1_since_count)
     delta=$((since_after - since_before))
@@ -283,11 +335,25 @@ test_pkg_02_upgrade_all_to_minor() {
     # Install older versions
     cd "$pkg_dir"
     run_wrap package install wrap/package-3m-no-deps@1.0.0 wrap/package-3v-no-deps@1.0.0
+
+    assert_pkg_dep_constraint "wrap/package-3m-no-deps" "1.0.0 <= v < 2.0.0" "$pkg_dir"
+    assert_pkg_dep_constraint "wrap/package-3v-no-deps" "1.0.0 <= v < 2.0.0" "$pkg_dir"
     
     # Upgrade all
-    run_wrap package upgrade
+    local upgrade_out
+    upgrade_out=$(run_wrap package upgrade)
     
+    # Verify plan shows constraint-to-constraint change for the package with minor releases
+    assert_upgrade_plan_shows_constraint_change \
+        "wrap/package-3m-no-deps" \
+        "1\\.0\\.0 <= v < 2\\.0\\.0" \
+        "1\\.2\\.0 <= v < 2\\.0\\.0" \
+        "$upgrade_out"
+
     # Verify constraints updated
+    assert_pkg_dep_constraint "wrap/package-3m-no-deps" "1.2.0 <= v < 2.0.0" "$pkg_dir"
+    # package-3v has no newer minor within major 1
+    assert_pkg_dep_constraint "wrap/package-3v-no-deps" "1.0.0 <= v < 2.0.0" "$pkg_dir"
     
     since_after=$(get_v1_since_count)
     delta=$((since_after - since_before))
@@ -310,11 +376,22 @@ test_pkg_03_upgrade_to_major() {
     # Install older version
     cd "$pkg_dir"
     run_wrap package install wrap/package-3v-no-deps@1.0.0
+
+    assert_pkg_dep_constraint "wrap/package-3v-no-deps" "1.0.0 <= v < 2.0.0" "$pkg_dir"
     
     # Upgrade with --major
-    run_wrap package upgrade --major wrap/package-3v-no-deps
+    local upgrade_out
+    upgrade_out=$(run_wrap package upgrade --major wrap/package-3v-no-deps)
     
+    # Verify plan shows constraint-to-constraint change
+    assert_upgrade_plan_shows_constraint_change \
+        "wrap/package-3v-no-deps" \
+        "1\\.0\\.0 <= v < 2\\.0\\.0" \
+        "3\\.0\\.0 <= v < 4\\.0\\.0" \
+        "$upgrade_out"
+
     # Verify constraint updated to major version
+    assert_pkg_dep_constraint "wrap/package-3v-no-deps" "3.0.0 <= v < 4.0.0" "$pkg_dir"
     
     since_after=$(get_v1_since_count)
     delta=$((since_after - since_before))

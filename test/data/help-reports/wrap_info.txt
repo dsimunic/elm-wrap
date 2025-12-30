@@ -21,7 +21,7 @@ Examples:
   wrap info elm/core@1.0.0   # Show info for elm/core 1.0.0
 
 Note: Package name format (author/package) takes priority over paths.
-      Use './package/author' to treat as a path instead.
+      If not found in the registry, it will be retried as a path.
 
 Options:
   -d, --deps-only                   # Only print dependencies

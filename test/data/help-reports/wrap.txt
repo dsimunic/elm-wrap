@@ -14,7 +14,6 @@ Commands:
   application SUBCOMMAND    Application management commands
   package SUBCOMMAND        Package management commands
   repository SUBCOMMAND     Repository management commands
-  debug SUBCOMMAND          Diagnostic tools for development
 
 Options:
   -v, --verbose      Show detailed logging output

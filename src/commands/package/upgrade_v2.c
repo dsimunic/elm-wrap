@@ -33,6 +33,30 @@ static char *v2_version_to_string(V2PackageVersion *v) {
     return version_format(v->major, v->minor, v->patch);
 }
 
+static const char *format_version_for_plan(const char *version, bool is_package_project, char **out_alloc) {
+    if (out_alloc) {
+        *out_alloc = NULL;
+    }
+
+    if (!version) {
+        return "(none)";
+    }
+
+    if (!is_package_project) {
+        return version;
+    }
+
+    char *constraint = version_to_constraint(version);
+    if (constraint) {
+        if (out_alloc) {
+            *out_alloc = constraint;
+        }
+        return constraint;
+    }
+
+    return version;
+}
+
 int upgrade_single_package_v2(const char *package, ElmJson *elm_json, InstallEnv *env,
                               bool major_upgrade, bool major_ignore_test, bool auto_yes) {
     char *author = NULL;
@@ -423,8 +447,8 @@ int upgrade_single_package_v2(const char *package, ElmJson *elm_json, InstallEnv
         }
     }
 
-    PackageChange *adds = arena_malloc(sizeof(PackageChange) * (size_t)add_count);
-    PackageChange *changes = arena_malloc(sizeof(PackageChange) * (size_t)change_count);
+    PackageChange *adds = arena_malloc(sizeof(PackageChange) * (size_t)(add_count > 0 ? add_count : 1));
+    PackageChange *changes = arena_malloc(sizeof(PackageChange) * (size_t)(change_count > 0 ? change_count : 1));
 
     int add_idx = 0;
     int change_idx = 0;
@@ -456,13 +480,18 @@ int upgrade_single_package_v2(const char *package, ElmJson *elm_json, InstallEnv
     printf("Here is my plan:\n");
     printf("  \n");
 
+    bool is_package_project = (elm_json->type == ELM_PROJECT_PACKAGE);
+
     if (add_count > 0) {
         printf("  Add:\n");
         for (int i = 0; i < add_count; i++) {
             PackageChange *change = &adds[i];
             char pkg_name[MAX_PACKAGE_NAME_LENGTH];
             snprintf(pkg_name, sizeof(pkg_name), "%s/%s", change->author, change->name);
-            printf("    %-*s    %s\n", max_width, pkg_name, change->new_version);
+            char *new_alloc = NULL;
+            const char *new_display = format_version_for_plan(change->new_version, is_package_project, &new_alloc);
+            printf("    %-*s    %s\n", max_width, pkg_name, new_display);
+            if (new_alloc) arena_free(new_alloc);
         }
         printf("  \n");
     }
@@ -473,8 +502,13 @@ int upgrade_single_package_v2(const char *package, ElmJson *elm_json, InstallEnv
             PackageChange *change = &changes[i];
             char pkg_name[MAX_PACKAGE_NAME_LENGTH];
             snprintf(pkg_name, sizeof(pkg_name), "%s/%s", change->author, change->name);
-            printf("    %-*s    %s => %s\n", max_width, pkg_name,
-                   change->old_version, change->new_version);
+            char *old_alloc = NULL;
+            char *new_alloc = NULL;
+            const char *old_display = format_version_for_plan(change->old_version, is_package_project, &old_alloc);
+            const char *new_display = format_version_for_plan(change->new_version, is_package_project, &new_alloc);
+            printf("    %-*s    %s => %s\n", max_width, pkg_name, old_display, new_display);
+            if (old_alloc) arena_free(old_alloc);
+            if (new_alloc) arena_free(new_alloc);
         }
     }
 
@@ -482,7 +516,7 @@ int upgrade_single_package_v2(const char *package, ElmJson *elm_json, InstallEnv
     arena_free(changes);
 
     if (!auto_yes) {
-        printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
+        printf("\nWould you like me to update your elm.json accordingly? [Y/n] ");
         fflush(stdout);
 
         char response[INITIAL_SMALL_CAPACITY];
@@ -636,6 +670,8 @@ int upgrade_all_packages_v2(ElmJson *elm_json, InstallEnv *env,
 
     qsort(out_plan->changes, (size_t)out_plan->count, sizeof(PackageChange), compare_package_changes);
 
+    bool is_package_project = (elm_json->type == ELM_PROJECT_PACKAGE);
+
     int max_width = 0;
     for (int i = 0; i < out_plan->count; i++) {
         PackageChange *change = &out_plan->changes[i];
@@ -651,13 +687,18 @@ int upgrade_all_packages_v2(ElmJson *elm_json, InstallEnv *env,
         PackageChange *change = &out_plan->changes[i];
         char pkg_name[MAX_PACKAGE_NAME_LENGTH];
         snprintf(pkg_name, sizeof(pkg_name), "%s/%s", change->author, change->name);
-        printf("    %-*s    %s => %s\n", max_width, pkg_name,
-               change->old_version, change->new_version);
+        char *old_alloc = NULL;
+        char *new_alloc = NULL;
+        const char *old_display = format_version_for_plan(change->old_version, is_package_project, &old_alloc);
+        const char *new_display = format_version_for_plan(change->new_version, is_package_project, &new_alloc);
+        printf("    %-*s    %s => %s\n", max_width, pkg_name, old_display, new_display);
+        if (old_alloc) arena_free(old_alloc);
+        if (new_alloc) arena_free(new_alloc);
     }
     printf("  \n");
 
     if (!auto_yes) {
-        printf("\nWould you like me to update your elm.json accordingly? [Y/n]: ");
+        printf("\nWould you like me to update your elm.json accordingly? [Y/n] ");
         fflush(stdout);
 
         char response[INITIAL_SMALL_CAPACITY];

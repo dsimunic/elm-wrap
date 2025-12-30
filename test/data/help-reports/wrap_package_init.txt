@@ -1,6 +1,6 @@
 Usage: wrap package init [OPTIONS] PACKAGE[@VERSION]
 
-Initialize a new Elm package from embedded templates.
+Initialize a new Elm package.
 
 Options:
   --no-local-dev  Skip registering the package in the local-dev registry
