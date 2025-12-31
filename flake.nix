@@ -33,6 +33,7 @@
 
             nativeBuildInputs = with pkgs; [
               hostname
+              rsync
             ];
             buildInputs = with pkgs; [
               curl
