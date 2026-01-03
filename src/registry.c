@@ -705,65 +705,34 @@ void registry_print(const Registry *registry) {
     log_set_level(old_level);
 }
 
-/* Merge local-dev registry into main registry */
-bool registry_merge_local_dev(Registry *registry, const char *local_dev_path) {
-    if (!registry || !local_dev_path) {
+/* Merge local-dev and other aux registries into main registry */
+bool registry_merge_dat(Registry *registry, const char *dat_path) {
+    if (!registry || !dat_path) {
         return false;
     }
-    
-    /* Try to load local-dev registry */
-    Registry *local_dev = registry_load_from_dat(local_dev_path, NULL);
-    if (!local_dev) {
+
+    Registry *other = registry_load_from_dat(dat_path, NULL);
+    if (!other) {
         /* File doesn't exist or couldn't be read - that's fine */
         return true;
     }
-    
-    /* Merge each entry */
-    for (size_t i = 0; i < local_dev->entry_count; i++) {
-        RegistryEntry *local_entry = &local_dev->entries[i];
-        
-        /* Find or create entry in main registry */
-        RegistryEntry *main_entry = registry_find(registry, local_entry->author, local_entry->name);
-        
-        if (!main_entry) {
-            /* Add new entry */
-            if (!registry_add_entry(registry, local_entry->author, local_entry->name)) {
-                registry_free(local_dev);
+
+    for (size_t i = 0; i < other->entry_count; i++) {
+        RegistryEntry *other_entry = &other->entries[i];
+        for (size_t j = 0; j < other_entry->version_count; j++) {
+            Version *v = &other_entry->versions[j];
+            if (!registry_add_version_ex(registry, other_entry->author, other_entry->name, *v, false, NULL)) {
+                registry_free(other);
                 return false;
-            }
-            main_entry = registry_find(registry, local_entry->author, local_entry->name);
-        }
-        
-        if (!main_entry) {
-            registry_free(local_dev);
-            return false;
-        }
-        
-        /* Add versions that don't exist */
-        for (size_t j = 0; j < local_entry->version_count; j++) {
-            Version *v = &local_entry->versions[j];
-            
-            /* Check if version exists */
-            bool exists = false;
-            for (size_t k = 0; k < main_entry->version_count; k++) {
-                if (main_entry->versions[k].major == v->major &&
-                    main_entry->versions[k].minor == v->minor &&
-                    main_entry->versions[k].patch == v->patch) {
-                    exists = true;
-                    break;
-                }
-            }
-            
-            if (!exists) {
-                if (!registry_add_version_ex(registry, local_entry->author, local_entry->name, *v, false, NULL)) {
-                    registry_free(local_dev);
-                    return false;
-                }
             }
         }
     }
-    
+
     registry_sort_entries(registry);
-    registry_free(local_dev);
+    registry_free(other);
     return true;
+}
+
+bool registry_merge_local_dev(Registry *registry, const char *local_dev_path) {
+    return registry_merge_dat(registry, local_dev_path);
 }

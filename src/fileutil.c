@@ -637,6 +637,56 @@ bool file_exists(const char *path) {
     return stat(path, &st) == 0 && S_ISREG(st.st_mode);
 }
 
+bool file_write_bytes_atomic(const char *dest_path, const void *data, size_t len) {
+    if (!dest_path || dest_path[0] == '\0' || (!data && len != 0)) {
+        return false;
+    }
+
+    size_t tmp_len = strlen(dest_path) + strlen(".tmp") + 1;
+    char *tmp_path = arena_malloc(tmp_len);
+    if (!tmp_path) {
+        return false;
+    }
+    snprintf(tmp_path, tmp_len, "%s.tmp", dest_path);
+
+    FILE *f = fopen(tmp_path, "wb");
+    if (!f) {
+        log_debug("Failed to open %s for writing: %s", tmp_path, strerror(errno));
+        arena_free(tmp_path);
+        return false;
+    }
+
+    bool ok = true;
+    if (len > 0) {
+        if (fwrite(data, 1, len, f) != len) {
+            ok = false;
+        }
+    }
+
+    if (ok) {
+        fflush(f);
+        fsync(fileno(f));
+    }
+
+    fclose(f);
+
+    if (!ok) {
+        unlink(tmp_path);
+        arena_free(tmp_path);
+        return false;
+    }
+
+    if (rename(tmp_path, dest_path) != 0) {
+        log_debug("Failed to rename %s to %s: %s", tmp_path, dest_path, strerror(errno));
+        unlink(tmp_path);
+        arena_free(tmp_path);
+        return false;
+    }
+
+    arena_free(tmp_path);
+    return true;
+}
+
 char *file_read_contents_bounded(const char *filepath, size_t max_bytes, size_t *out_size) {
     if (!filepath || max_bytes == 0) {
         return NULL;

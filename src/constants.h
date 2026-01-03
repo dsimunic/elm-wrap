@@ -152,4 +152,10 @@
 #define LOCAL_DEV_TRACKING_DIR "_local-dev"  /* Directory under WRAP_HOME for dependency tracking */
 #define REGISTRY_LOCAL_DEV_DAT "registry-local-dev.dat"  /* Text registry file for local-dev packages */
 
+/*
+ * Lamdera tracking constants
+ */
+#define LAMDERA_TRACKING_DIR "_lamdera"  /* Directory under WRAP_HOME for Lamdera-specific data */
+#define LAMDERA_REGISTRY_DAT "registry.dat"  /* Lamdera registry file name under LAMDERA_TRACKING_DIR */
+
 #endif /* CONSTANTS_H */

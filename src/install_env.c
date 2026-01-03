@@ -6,6 +6,7 @@
 #include "vendor/sha1.h"
 #include "shared/log.h"
 #include "fileutil.h"
+#include "embedded_archive.h"
 #include "global_context.h"
 #include "registry.h"
 #include "protocol_v1/package_fetch.h"
@@ -87,6 +88,74 @@ static bool registry_etag_write_to_disk(const char *etag_path, const char *etag)
     }
 
     return true;
+}
+
+static void install_env_merge_lamdera_registry_if_needed(InstallEnv *env) {
+    if (!env || !env->registry) return;
+    if (!global_context_is_lamdera()) return;
+
+    char *wrap_home = env_get_wrap_home();
+    if (!wrap_home) {
+        log_progress("Warning: Failed to resolve WRAP_HOME while merging Lamdera registry");
+        return;
+    }
+
+    size_t lamdera_dir_len = strlen(wrap_home) + strlen("/") + strlen(LAMDERA_TRACKING_DIR) + 1;
+    char *lamdera_dir = arena_malloc(lamdera_dir_len);
+    if (!lamdera_dir) {
+        arena_free(wrap_home);
+        return;
+    }
+    snprintf(lamdera_dir, lamdera_dir_len, "%s/%s", wrap_home, LAMDERA_TRACKING_DIR);
+
+    size_t lamdera_registry_len = strlen(lamdera_dir) + strlen("/") + strlen(LAMDERA_REGISTRY_DAT) + 1;
+    char *lamdera_registry_path = arena_malloc(lamdera_registry_len);
+    if (!lamdera_registry_path) {
+        arena_free(lamdera_dir);
+        arena_free(wrap_home);
+        return;
+    }
+    snprintf(lamdera_registry_path, lamdera_registry_len, "%s/%s", lamdera_dir, LAMDERA_REGISTRY_DAT);
+
+    if (!file_exists(lamdera_registry_path)) {
+        if (!ensure_directory_recursive(lamdera_dir)) {
+            log_progress("Warning: Failed to create Lamdera registry directory: %s", lamdera_dir);
+        } else {
+            void *data = NULL;
+            size_t size = 0;
+            if (!embedded_archive_extract("templates/compilers/lamdera/registry.dat", &data, &size)) {
+                log_progress("Warning: Failed to extract embedded Lamdera registry.dat");
+            } else {
+                if (!file_write_bytes_atomic(lamdera_registry_path, data, size)) {
+                    log_progress("Warning: Failed to write Lamdera registry.dat to %s", lamdera_registry_path);
+                }
+                arena_free(data);
+            }
+        }
+    }
+
+    V2Registry *lamdera_registry = v2_registry_load_from_text(lamdera_registry_path);
+    if (!lamdera_registry) {
+        log_progress("Warning: Failed to parse Lamdera registry (format 2): %s", lamdera_registry_path);
+    } else {
+        for (size_t i = 0; i < lamdera_registry->entry_count; i++) {
+            V2PackageEntry *entry = &lamdera_registry->entries[i];
+            for (size_t j = 0; j < entry->version_count; j++) {
+                V2PackageVersion *v2v = &entry->versions[j];
+                Version v1v = { v2v->major, v2v->minor, v2v->patch };
+                if (!registry_add_version_ex(env->registry, entry->author, entry->name, v1v, false, NULL)) {
+                    log_progress("Warning: Failed to merge Lamdera package %s/%s %u.%u.%u", entry->author,
+                                 entry->name, v2v->major, v2v->minor, v2v->patch);
+                }
+            }
+        }
+        registry_sort_entries(env->registry);
+        v2_registry_free(lamdera_registry);
+    }
+
+    arena_free(lamdera_registry_path);
+    arena_free(lamdera_dir);
+    arena_free(wrap_home);
 }
 
 char *install_env_registry_since_count_file_path(const char *registry_dat_path) {
@@ -425,6 +494,8 @@ bool install_env_ensure_v1_registry(InstallEnv *env) {
             arena_free(reg_dir);
         }
 
+        install_env_merge_lamdera_registry_if_needed(env);
+
         /* Repair inflated/incorrect header since_count using the persisted canonical sidecar (Option B). */
         char *since_path = install_env_registry_since_count_file_path(env->cache->registry_path);
         if (since_path && file_exists(since_path)) {
@@ -496,6 +567,9 @@ bool install_env_ensure_v1_registry(InstallEnv *env) {
             fprintf(stderr, "Warning: Failed to update registry (using cached data)\n");
         }
     }
+
+    /* Ensure Lamdera registry exists and is merged even after network fetch/update */
+    install_env_merge_lamdera_registry_if_needed(env);
 
     return true;
 }

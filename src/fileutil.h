@@ -49,6 +49,12 @@ bool copy_directory_selective(const char *src_path, const char *dest_path);
  */
 bool file_exists(const char *path);
 
+/* Write bytes to a file atomically.
+ * Writes to a temporary file in the same directory and renames into place.
+ * Returns true on success, false on failure.
+ */
+bool file_write_bytes_atomic(const char *dest_path, const void *data, size_t len);
+
 /* Find elm.json by walking up parent directories.
  *
  * If start_path is NULL, starts from the current working directory.

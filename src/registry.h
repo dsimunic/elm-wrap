@@ -56,6 +56,8 @@ bool registry_remove_version_ex(Registry *registry, const char *author, const ch
 bool registry_resolve_constraint(Registry *registry, const char *author, const char *name,
                                  const char *constraint, Version *out_version);
 
+/* Merge a V2 aux registry into main V1 registry */
+bool registry_merge_dat(Registry *registry, const char *dat_path);
 /* Merge local-dev registry into main registry */
 bool registry_merge_local_dev(Registry *registry, const char *local_dev_path);
 
