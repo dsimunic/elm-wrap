@@ -114,8 +114,22 @@ rm dist/elm-wrap_0.5.0_bookworm_*.deb
 VERSION=0.6.0 ./scripts/build-debs.sh
 ```
 
+### Import into local repo
+
+`rept/rept import --repo deb.wrap.pm --config-path rept/etc/rept elm-wrap/dist/`
+
+The signing public key should be `584A2ABC280E831041C2CE5D6785302328CB0FD5`
+
+### Deploy
+
+`rclone sync /opt/apt/deb.wrap.pm/ deb-wrap-pm:deb-wrap-pm --progress --transfers=16 --checkers=64 --create-empty-src-dirs`
+
 ## Requirements
 
 - Docker (or OrbStack on macOS)
 - Multi-architecture support (for arm64 builds on amd64 host, or vice versa)
 - Git repository with the source code
+
+## Signing public key for the repo
+
+584A2ABC280E831041C2CE5D6785302328CB0FD5
