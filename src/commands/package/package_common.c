@@ -589,6 +589,114 @@ bool parse_package_with_version(const char *spec, char **out_author, char **out_
     return true;
 }
 
+bool parse_package_install_spec(const char *spec, PackageInstallSpec *out) {
+    if (!spec || !out) {
+        return false;
+    }
+
+    out->author = NULL;
+    out->name = NULL;
+    out->has_version = false;
+    out->version = (Version){0};
+
+    Version v = {0};
+    char *author = NULL;
+    char *name = NULL;
+
+    if (parse_package_with_version(spec, &author, &name, &v)) {
+        out->author = author;
+        out->name = name;
+        out->version = v;
+        out->has_version = true;
+        return true;
+    }
+
+    if (parse_package_name(spec, &author, &name)) {
+        out->author = author;
+        out->name = name;
+        out->has_version = false;
+        return true;
+    }
+
+    return false;
+}
+
+char *package_format_name(const char *author, const char *name) {
+    if (!author || !name) {
+        return NULL;
+    }
+
+    size_t author_len = strlen(author);
+    size_t name_len = strlen(name);
+    size_t total_len = author_len + 1 + name_len;
+
+    /* MAX_PACKAGE_NAME_LENGTH includes the terminating NUL in our buffers. */
+    if (total_len == 0 || total_len >= MAX_PACKAGE_NAME_LENGTH) {
+        return NULL;
+    }
+
+    char *out = arena_malloc(total_len + 1);
+    if (!out) {
+        return NULL;
+    }
+
+    if (snprintf(out, total_len + 1, "%s/%s", author, name) < 0) {
+        arena_free(out);
+        return NULL;
+    }
+
+    return out;
+}
+
+char *package_name_from_spec(const PackageInstallSpec *spec) {
+    if (!spec) {
+        return NULL;
+    }
+    return package_format_name(spec->author, spec->name);
+}
+
+char *package_name_with_version_from_spec(const PackageInstallSpec *spec) {
+    if (!spec) {
+        return NULL;
+    }
+
+    char *base = package_format_name(spec->author, spec->name);
+    if (!base) {
+        return NULL;
+    }
+
+    if (!spec->has_version) {
+        return base;
+    }
+
+    char *version_str = version_to_string(&spec->version);
+    if (!version_str) {
+        arena_free(base);
+        return NULL;
+    }
+
+    size_t base_len = strlen(base);
+    size_t ver_len = strlen(version_str);
+    size_t total_len = base_len + 1 + ver_len;
+    char *out = arena_malloc(total_len + 1);
+    if (!out) {
+        arena_free(base);
+        arena_free(version_str);
+        return NULL;
+    }
+
+    if (snprintf(out, total_len + 1, "%s@%s", base, version_str) < 0) {
+        arena_free(out);
+        arena_free(base);
+        arena_free(version_str);
+        return NULL;
+    }
+
+    arena_free(base);
+    arena_free(version_str);
+    return out;
+}
+
 /* ========================================================================
  * Constraint utilities
  * ======================================================================== */

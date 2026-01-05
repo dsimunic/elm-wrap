@@ -467,43 +467,47 @@ int cmd_extract(int argc, char *argv[]) {
     const char *target_path = argv[2];
 
     /* Phase B: Validate application project */
-    ElmJson *app_json = elm_json_read("elm.json");
+    const char *project_hint_path = argv[3];
+    char *app_elm_json_path = find_elm_json_upwards(project_hint_path);
+    const char *app_elm_json_to_use = app_elm_json_path ? app_elm_json_path : "elm.json";
+
+    ElmJson *app_json = elm_json_read(app_elm_json_to_use);
     if (!app_json) {
         log_error("Could not read elm.json");
         log_error("Have you run 'elm init' or 'wrap init'?");
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
     if (app_json->type != ELM_PROJECT_APPLICATION) {
         log_error("This command must be run in an Elm application project (elm.json type=\"application\").");
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
     /* Phase C: Parse package specification */
-    char *author = NULL;
-    char *name = NULL;
-    Version version = {0};
-    bool has_version = false;
-
-    if (!parse_package_with_version(package_spec, &author, &name, &version)) {
-        if (!parse_package_name(package_spec, &author, &name)) {
-            log_error("Invalid package specification: %s", package_spec);
-            log_error("Expected format: author/name or author/name@version");
-            elm_json_free(app_json);
-            return 1;
-        }
-    } else {
-        has_version = true;
+    PackageInstallSpec pkg_spec = {0};
+    if (!parse_package_install_spec(package_spec, &pkg_spec)) {
+        log_error("Invalid package specification: %s", package_spec);
+        log_error("Expected format: author/name or author/name@version");
+        elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
+        return 1;
     }
 
-    char package_name[MAX_PACKAGE_NAME_LENGTH];
-    int pkg_len = snprintf(package_name, sizeof(package_name), "%s/%s", author, name);
-    if (pkg_len < 0 || pkg_len >= (int)sizeof(package_name)) {
-        log_error("Package name too long");
+    char *author = pkg_spec.author;
+    char *name = pkg_spec.name;
+    Version version = pkg_spec.version;
+    bool has_version = pkg_spec.has_version;
+
+    char *package_name = package_name_from_spec(&pkg_spec);
+    if (!package_name) {
+        log_error("Failed to format package name");
         arena_free(author);
         arena_free(name);
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
@@ -520,6 +524,7 @@ int cmd_extract(int argc, char *argv[]) {
         log_error("Target path already exists: %s", target_path);
         if (version_str) arena_free(version_str);
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
@@ -535,6 +540,7 @@ int cmd_extract(int argc, char *argv[]) {
             log_error("Path does not exist: %s", src_path);
             if (version_str) arena_free(version_str);
             elm_json_free(app_json);
+            if (app_elm_json_path) arena_free(app_elm_json_path);
             return 1;
         }
 
@@ -543,6 +549,7 @@ int cmd_extract(int argc, char *argv[]) {
             log_error("PATH must be an .elm file or a directory: %s", src_path);
             if (version_str) arena_free(version_str);
             elm_json_free(app_json);
+            if (app_elm_json_path) arena_free(app_elm_json_path);
             return 1;
         }
     }
@@ -562,6 +569,7 @@ int cmd_extract(int argc, char *argv[]) {
                 log_error("Failed to resolve path: %s", src_path);
                 if (version_str) arena_free(version_str);
                 elm_json_free(app_json);
+                if (app_elm_json_path) arena_free(app_elm_json_path);
                 return 1;
             }
 
@@ -577,6 +585,7 @@ int cmd_extract(int argc, char *argv[]) {
                 log_error("Failed to resolve path: %s", src_path);
                 if (version_str) arena_free(version_str);
                 elm_json_free(app_json);
+                if (app_elm_json_path) arena_free(app_elm_json_path);
                 return 1;
             }
 
@@ -602,16 +611,18 @@ int cmd_extract(int argc, char *argv[]) {
         log_error("No .elm files found in specified paths");
         if (version_str) arena_free(version_str);
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
     /* Phase F: Out-of-selection import validation */
     int srcdir_count = 0;
-    char **srcdirs_abs = get_app_source_dirs_abs("elm.json", &srcdir_count);
+    char **srcdirs_abs = get_app_source_dirs_abs(app_elm_json_to_use, &srcdir_count);
     if (!srcdirs_abs) {
         log_error("Failed to parse source directories from elm.json");
         if (version_str) arena_free(version_str);
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
@@ -629,6 +640,7 @@ int cmd_extract(int argc, char *argv[]) {
             log_error("Failed to parse Elm module: %s", file_path);
             if (version_str) arena_free(version_str);
             elm_json_free(app_json);
+            if (app_elm_json_path) arena_free(app_elm_json_path);
             return 1;
         }
 
@@ -663,6 +675,7 @@ int cmd_extract(int argc, char *argv[]) {
 
         if (version_str) arena_free(version_str);
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
@@ -671,6 +684,7 @@ int cmd_extract(int argc, char *argv[]) {
         log_error("Failed to create directory: %s", target_path);
         if (version_str) arena_free(version_str);
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
@@ -680,6 +694,7 @@ int cmd_extract(int argc, char *argv[]) {
         log_error("Failed to initialize package at %s", target_path);
         if (version_str) arena_free(version_str);
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
@@ -690,6 +705,7 @@ int cmd_extract(int argc, char *argv[]) {
         log_error("Target path too long");
         if (version_str) arena_free(version_str);
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
@@ -705,6 +721,7 @@ int cmd_extract(int argc, char *argv[]) {
             log_error("Destination path too long");
             if (version_str) arena_free(version_str);
             elm_json_free(app_json);
+            if (app_elm_json_path) arena_free(app_elm_json_path);
             return 1;
         }
 
@@ -712,6 +729,7 @@ int cmd_extract(int argc, char *argv[]) {
             log_error("Failed to move %s -> %s", src_file, dest_file);
             if (version_str) arena_free(version_str);
             elm_json_free(app_json);
+            if (app_elm_json_path) arena_free(app_elm_json_path);
             return 1;
         }
     }
@@ -824,6 +842,7 @@ int cmd_extract(int argc, char *argv[]) {
         log_error("Failed to resolve absolute path for %s", target_path);
         if (version_str) arena_free(version_str);
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
@@ -833,6 +852,7 @@ int cmd_extract(int argc, char *argv[]) {
         arena_free(target_abs);
         if (version_str) arena_free(version_str);
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
@@ -842,10 +862,11 @@ int cmd_extract(int argc, char *argv[]) {
         arena_free(target_abs);
         if (version_str) arena_free(version_str);
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
-    int install_result = install_local_dev(target_abs, package_name, "elm.json",
+    int install_result = install_local_dev(target_abs, package_name, app_elm_json_to_use,
                                           env, false, true);
     install_env_free(env);
     arena_free(target_abs);
@@ -854,16 +875,21 @@ int cmd_extract(int argc, char *argv[]) {
         log_error("Package was created and files moved, but failed to add as dependency.");
         log_error("You can manually add it with: %s package install %s",
                  global_context_program_name(), package_name);
+        arena_free(package_name);
         if (version_str) arena_free(version_str);
         elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
     }
 
     printf("Successfully extracted %d file(s) to %s and added as local-dev dependency.\n",
            selected.count, target_path);
 
+    arena_free(package_name);
+
     if (version_str) arena_free(version_str);
     elm_json_free(app_json);
+    if (app_elm_json_path) arena_free(app_elm_json_path);
 
     return 0;
 }

@@ -105,6 +105,24 @@ typedef struct {
     bool has_version;       /* true if user specified a version */
 } PackageInstallSpec;
 
+/* Parse "author/name" or "author/name@version" into a PackageInstallSpec.
+ * Returns true on success.
+ * On success, out->author/out->name are arena-allocated (caller frees).
+ * If out->has_version is true, out->version is valid.
+ */
+bool parse_package_install_spec(const char *spec, PackageInstallSpec *out);
+
+/* Format "author/name" from components.
+ * Returns arena-allocated string on success, NULL on failure.
+ */
+char *package_format_name(const char *author, const char *name);
+
+/* Convenience wrappers for PackageInstallSpec.
+ * These return arena-allocated strings on success, NULL on failure.
+ */
+char *package_name_from_spec(const PackageInstallSpec *spec);
+char *package_name_with_version_from_spec(const PackageInstallSpec *spec);
+
 /* Parse "author/name@version" into components.
  * Returns true on success.
  * out_author, out_name: arena-allocated strings (caller frees)
