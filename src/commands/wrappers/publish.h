@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-/* Publish command entry point (deprecated - redirects to package publish) */
+/* Publish command entry point (deprecated - redirects to package prepublish) */
 int cmd_publish(int argc, char *argv[]);
 
 #endif /* WRAPPER_PUBLISH_H */

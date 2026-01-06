@@ -108,16 +108,6 @@ WRAP_FEATURE_CACHE=1 wrap code cache elm/core
 
 ## Inventory of Existing Feature Flags
 
-### `publish` Feature Flag
-- **Purpose**: Hides publishing-related commands
-- **Commands Hidden**:
-  - `wrap publish` (deprecated wrapper)
-  - `wrap package publish`
-- **Commands Always Visible**: `wrap package docs`
-- **Environment Variable**: `WRAP_FEATURE_PUBLISH`
-- **Default**: Hidden (0)
-- **Implementation**: Command routing in `main.c` and sub-command routing in `cmd_package()`
-
 ### `review` Feature Flag
 - **Purpose**: Hides the `wrap review` command group for running review rules
 - **Commands Hidden**: `wrap review SUBCOMMAND`

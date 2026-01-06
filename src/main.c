@@ -128,10 +128,8 @@ void print_package_usage(const char *prog) {
     printf("  info    [ PATH                 Display package information and upgrades\n");
     printf("          | PACKAGE [VERSION]\n");
     printf("          ]\n");
-    if (feature_publish_enabled()) {
-        printf("  publish PATH                   Show files that would be published from a package\n");
-        printf("  docs    PATH                   Generate documentation JSON for a package\n");
-    }
+    printf("  prepublish PATH                Show files that would be published from a package\n");
+    printf("  docs    PATH                   Generate documentation JSON for a package\n");
     if (feature_cache_enabled()) {
         printf("  cache   PACKAGE                Download package to ELM_HOME without adding it to elm.json\n");
     }
@@ -195,21 +193,11 @@ int cmd_package(int argc, char *argv[], const char *prog) {
         return cmd_info(argc - 1, argv + 1, "package info");
     }
 
-    if (strcmp(subcmd, "publish") == 0) {
-        if (!feature_publish_enabled()) {
-            log_error("Subcommand 'publish' is not available in this build.");
-            return 1;
-        }
-        // Pass remaining args to package publish command
-        return cmd_package_publish(argc - 1, argv + 1);
+    if (strcmp(subcmd, "prepublish") == 0) {
+        return cmd_package_prepublish(argc - 1, argv + 1);
     }
 
     if (strcmp(subcmd, "docs") == 0) {
-        if (!feature_publish_enabled()) {
-            log_error("Subcommand 'docs' is not available in this build.");
-            return 1;
-        }
-        // Pass remaining args to docs command
         return cmd_publish_docs(argc - 1, argv + 1);
     }
 
@@ -372,10 +360,6 @@ int main(int argc, char *argv[]) {
         }
 
         if (strcmp(argv[1], "publish") == 0) {
-            if (!feature_publish_enabled()) {
-                log_error("Command 'publish' is not available in this build.");
-                return 1;
-            }
             return cmd_publish(argc - 1, argv + 1);
         }
 

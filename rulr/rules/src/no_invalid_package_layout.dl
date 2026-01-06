@@ -8,6 +8,7 @@
 .pred has_license_file().
 .pred has_elm_json_file().
 .pred has_readme_file().
+.pred has_docs_json_file().
 .pred has_src_folder().
 .pred has_elm_source_file().
 .pred has_exposed_module().
@@ -26,6 +27,9 @@ has_elm_json_file() :-
 
 has_readme_file() :-
     package_file_info(_, "README.md", _).
+
+has_docs_json_file() :-
+    package_file_info(_, "docs.json", _).
 
 % Check for src/ folder (any file starting with "src/")
 has_src_folder() :-
@@ -57,6 +61,9 @@ error("Missing elm.json file") :-
 
 error("Missing README.md file") :-
     not has_readme_file().
+
+error("Missing docs.json file") :-
+    not has_docs_json_file().
 
 error("Missing src/ folder") :-
     not has_src_folder().

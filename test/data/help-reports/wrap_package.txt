@@ -8,6 +8,8 @@ Subcommands:
   info    [ PATH                 Display package information and upgrades
           | PACKAGE [VERSION]
           ]
+  prepublish PATH                Show files that would be published from a package
+  docs    PATH                   Generate documentation JSON for a package
   cache   PACKAGE                Download package to ELM_HOME without adding it to elm.json
 
 Options:

@@ -12,6 +12,15 @@
 .pred file_import(file: symbol, module: symbol).
 .pred allowed_root_file(file: symbol).
 
+% Directories that the host should avoid descending into when collecting
+% package_file_info. These are built-in defaults.
+.pred dont_descend_into(name: symbol).
+
+dont_descend_into(".git").
+dont_descend_into("elm-stuff").
+dont_descend_into("node_modules").
+dont_descend_into(".node_modules").
+
 % Derived predicates for reachability analysis
 .pred reachable_module(module: symbol).
 .pred reachable_file(file: symbol).

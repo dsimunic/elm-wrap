@@ -6,10 +6,6 @@
  * Compile-time defaults are set via Makefile CFLAGS.
  * Provide fallback values if not defined.
  */
-#ifndef FEATURE_PUBLISH_DEFAULT
-#define FEATURE_PUBLISH_DEFAULT 0
-#endif
-
 #ifndef FEATURE_REVIEW_DEFAULT
 #define FEATURE_REVIEW_DEFAULT 0
 #endif
@@ -42,14 +38,6 @@ static int check_env_flag(const char *env_var) {
         return 0; /* Disabled */
     }
     return -1; /* Invalid value, use default */
-}
-
-bool feature_publish_enabled(void) {
-    int env_value = check_env_flag("WRAP_FEATURE_PUBLISH");
-    if (env_value >= 0) {
-        return env_value == 1;
-    }
-    return FEATURE_PUBLISH_DEFAULT != 0;
 }
 
 bool feature_review_enabled(void) {

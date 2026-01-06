@@ -25,6 +25,7 @@ typedef struct {
     const char *base_path;     /* Base path to strip from file paths (optional) */
     int         use_tree;      /* If true, display as tree; if false, flat list */
     int         use_color;     /* If true, use ANSI colors (NYI) */
+    int         show_base;     /* If true, print base path as header */
     int         max_depth;     /* Max tree depth to show (-1 = unlimited) */
 } ReporterConfig;
 

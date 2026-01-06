@@ -2,7 +2,7 @@
  * publish.c - Deprecated publish wrapper command
  *
  * This command previously wrapped 'elm publish' but has been replaced by
- * 'package publish' which uses the new publishing flow with rulr rules.
+ * 'package prepublish' which uses the new publishing flow with rulr rules.
  */
 
 #include "publish.h"
@@ -15,6 +15,6 @@ int cmd_publish(int argc, char *argv[]) {
     (void)argv;  // Unused
 
     log_error("%s uses a new publishing flow.", global_context_program_name());
-    log_error("Please use %s package publish", global_context_program_name());
+    log_error("Please use %s package prepublish", global_context_program_name());
     return 100;
 }

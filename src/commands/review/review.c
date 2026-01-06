@@ -24,6 +24,8 @@
 #include "../../dyn_array.h"
 #include "../../cache.h"
 #include "../../vendor/cJSON.h"
+#include "../../messages.h"
+#include "../../shared/log.h"
 #include "rulr.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"
@@ -42,84 +44,84 @@
  * ========================================================================== */
 
 static void print_review_usage(void) {
-    printf("Usage: %s review SUBCOMMAND [OPTIONS]\n", global_context_program_name());
-    printf("\n");
-    printf("Run rulr rules against Elm source files for code review.\n");
-    printf("\n");
-    printf("Subcommands:\n");
-    printf("  file FILE          Analyze an Elm source file with rulr rules\n");
-    printf("  package PATH       Analyze an Elm package directory with rulr rules\n");
-    printf("\n");
-    printf("Options:\n");
-    printf("  -q, --quiet        Quiet mode: no output, exit 100 on first error, 0 if OK\n");
-    printf("  -h, --help         Show this help message\n");
+    user_message("Usage: %s review SUBCOMMAND [OPTIONS]\n", global_context_program_name());
+    user_message("\n");
+    user_message("Run rulr rules against Elm source files for code review.\n");
+    user_message("\n");
+    user_message("Subcommands:\n");
+    user_message("  file FILE          Analyze an Elm source file with rulr rules\n");
+    user_message("  package PATH       Analyze an Elm package directory with rulr rules\n");
+    user_message("\n");
+    user_message("Options:\n");
+    user_message("  -q, --quiet        Quiet mode: no output, exit 100 on first error, 0 if OK\n");
+    user_message("  -h, --help         Show this help message\n");
 }
 
 static void print_file_usage(void) {
-    printf("Usage: %s review file FILE [OPTIONS]\n", global_context_program_name());
-    printf("\n");
-    printf("Analyze an Elm source file using rulr rules.\n");
-    printf("\n");
-    printf("Arguments:\n");
-    printf("  FILE               Path to Elm source file (.elm)\n");
-    printf("\n");
-    printf("Options:\n");
-    printf("  --config PATH      Path to elm.json (default: auto-detect in parent dirs)\n");
-    printf("  --rule NAME        Rule name or path (without extension) - can be repeated\n");
-    printf("                     Tries .dlc (compiled) first, falls back to .dl (source)\n");
-    printf("  -q, --quiet        Quiet mode: no output, exit 100 on first error, 0 if OK\n");
-    printf("  -h, --help         Show this help message\n");
-    printf("\n");
-    printf("Examples:\n");
-    printf("  %s review file src/Main.elm --rule rules/no-debug\n", global_context_program_name());
-    printf("  %s review file src/Main.elm --config elm.json --rule a --rule b\n", global_context_program_name());
-    printf("\n");
-    printf("Host-generated facts available in rules:\n");
-    printf("  module(name)                   - Module name\n");
-    printf("  import(module)                 - Imported modules\n");
-    printf("  import_alias(module, alias)    - Import aliases\n");
-    printf("  import_exposing(module, name)  - Exposed imports\n");
-    printf("  type_annotation(name, type)    - Type annotations\n");
-    printf("  sig_uses_type(func, type)      - Function signature uses a type\n");
-    printf("  type_alias(name)               - Type alias declarations\n");
-    printf("  union_type(name)               - Union type declarations\n");
-    printf("  constructor(type, name)        - Union type constructors\n");
-    printf("  exported_value(name)           - Exported values/functions\n");
-    printf("  exported_type(name)            - Exported types\n");
-    printf("  file_path(path)                - Source file path\n");
-    printf("  project_type(type)             - Project type (application/package)\n");
-    printf("  elm_version(version)           - Elm version from elm.json\n");
-    printf("  dependency(author, package, version) - Direct dependencies\n");
-    printf("  package_module(author, package, module) - Modules exposed by a dependency\n");
+    user_message("Usage: %s review file FILE [OPTIONS]\n", global_context_program_name());
+    user_message("\n");
+    user_message("Analyze an Elm source file using rulr rules.\n");
+    user_message("\n");
+    user_message("Arguments:\n");
+    user_message("  FILE               Path to Elm source file (.elm)\n");
+    user_message("\n");
+    user_message("Options:\n");
+    user_message("  --config PATH      Path to elm.json (default: auto-detect in parent dirs)\n");
+    user_message("  --rule NAME        Rule name or path (without extension) - can be repeated\n");
+    user_message("                     Tries .dlc (compiled) first, falls back to .dl (source)\n");
+    user_message("  -q, --quiet        Quiet mode: no output, exit 100 on first error, 0 if OK\n");
+    user_message("  -h, --help         Show this help message\n");
+    user_message("\n");
+    user_message("Examples:\n");
+    user_message("  %s review file src/Main.elm --rule rules/no-debug\n", global_context_program_name());
+    user_message("  %s review file src/Main.elm --config elm.json --rule a --rule b\n", global_context_program_name());
+    user_message("\n");
+    user_message("Host-generated facts available in rules:\n");
+    user_message("  module(name)                   - Module name\n");
+    user_message("  import(module)                 - Imported modules\n");
+    user_message("  import_alias(module, alias)    - Import aliases\n");
+    user_message("  import_exposing(module, name)  - Exposed imports\n");
+    user_message("  type_annotation(name, type)    - Type annotations\n");
+    user_message("  sig_uses_type(func, type)      - Function signature uses a type\n");
+    user_message("  type_alias(name)               - Type alias declarations\n");
+    user_message("  union_type(name)               - Union type declarations\n");
+    user_message("  constructor(type, name)        - Union type constructors\n");
+    user_message("  exported_value(name)           - Exported values/functions\n");
+    user_message("  exported_type(name)            - Exported types\n");
+    user_message("  file_path(path)                - Source file path\n");
+    user_message("  project_type(type)             - Project type (application/package)\n");
+    user_message("  elm_version(version)           - Elm version from elm.json\n");
+    user_message("  dependency(author, package, version) - Direct dependencies\n");
+    user_message("  package_module(author, package, module) - Modules exposed by a dependency\n");
 }
 
 static void print_package_usage(void) {
-    printf("Usage: %s review package PATH [OPTIONS]\n", global_context_program_name());
-    printf("\n");
-    printf("Analyze an Elm package directory using rulr rules.\n");
-    printf("\n");
-    printf("Arguments:\n");
-    printf("  PATH               Path to package directory (must contain elm.json, src/)\n");
-    printf("\n");
-    printf("Options:\n");
-    printf("  --rule NAME        Rule name or path (without extension) - can be repeated\n");
-    printf("                     Tries .dlc (compiled) first, falls back to .dl (source)\n");
-    printf("  -q, --quiet        Quiet mode: no output, exit 100 on first error, 0 if OK\n");
-    printf("  -h, --help         Show this help message\n");
-    printf("\n");
-    printf("Examples:\n");
-    printf("  %s review package /path/to/package --rule rules/no_redundant_files\n", global_context_program_name());
-    printf("\n");
-    printf("Host-generated facts available in rules:\n");
-    printf("  exposed_module(module)         - Modules from exposed-modules in elm.json\n");
-    printf("  file_module(file, module)      - Mapping from file path to module name\n");
-    printf("  file_import(file, module)      - Import statements in a file\n");
-    printf("  source_file(file)              - All .elm files in src/ directory\n");
-    printf("  package_file(file)             - All files (absolute path)\n");
-    printf("  package_file_rel(path)         - All files (relative to package root)\n");
-    printf("  package_file_name(name)        - All filenames (just the name)\n");
-    printf("  package_file_info(abs, rel, name) - Combined file info\n");
-    printf("  allowed_root_file(file)        - LICENSE, README.md, elm.json\n");
+    user_message("Usage: %s review package PATH [OPTIONS]\n", global_context_program_name());
+    user_message("\n");
+    user_message("Analyze an Elm package directory using rulr rules.\n");
+    user_message("\n");
+    user_message("Arguments:\n");
+    user_message("  PATH               Path to package directory (must contain elm.json, src/)\n");
+    user_message("\n");
+    user_message("Options:\n");
+    user_message("  --rule NAME        Rule name or path (without extension) - can be repeated\n");
+    user_message("                     Tries .dlc (compiled) first, falls back to .dl (source)\n");
+    user_message("  -q, --quiet        Quiet mode: no output, exit 100 on first error, 0 if OK\n");
+    user_message("  -h, --help         Show this help message\n");
+    user_message("\n");
+    user_message("Examples:\n");
+    user_message("  %s review package /path/to/package --rule rules/no_redundant_files\n", global_context_program_name());
+    user_message("\n");
+    user_message("Host-generated facts available in rules:\n");
+    user_message("  exposed_module(module)         - Modules from exposed-modules in elm.json\n");
+    user_message("  file_module(file, module)      - Mapping from file path to module name\n");
+    user_message("  file_import(file, module)      - Import statements in a file\n");
+    user_message("  source_file(file)              - All .elm files in src/ directory\n");
+    user_message("  package_file(file)             - All files (absolute path)\n");
+    user_message("  package_file_rel(path)         - All files (relative to package root)\n");
+    user_message("  package_file_name(name)        - All filenames (just the name)\n");
+    user_message("  package_file_info(abs, rel, name) - Combined file info\n");
+    user_message("  allowed_root_file(file)        - LICENSE, README.md, elm.json\n");
 }
 
 /* ============================================================================
@@ -473,20 +475,20 @@ static void print_value(const Rulr *r, const Value *v) {
     case VAL_SYM: {
         const char *name = rulr_lookup_symbol(r, v->u.sym);
         if (name) {
-            printf("%s", name);
+            user_message("%s", name);
         } else {
-            printf("#%d", v->u.sym);
+            user_message("#%d", v->u.sym);
         }
         break;
     }
     case VAL_RANGE:
-        printf("range(%ld)", v->u.i);
+        user_message("range(%ld)", v->u.i);
         break;
     case VAL_INT:
-        printf("%ld", v->u.i);
+        user_message("%ld", v->u.i);
         break;
     default:
-        printf("?");
+        user_message("?");
         break;
     }
 }
@@ -495,14 +497,14 @@ static void print_relation(const char *pred_name, const Rulr *r, EngineRelationV
     const Tuple *tuples = (const Tuple *)view.tuples;
     for (int i = 0; i < view.num_tuples; ++i) {
         const Tuple *t = &tuples[i];
-        printf("  %s(", pred_name);
+        user_message("  %s(", pred_name);
         for (int a = 0; a < t->arity; ++a) {
             print_value(r, &t->fields[a]);
             if (a + 1 < t->arity) {
-                printf(", ");
+                user_message(", ");
             }
         }
-        printf(")\n");
+        user_message(")\n");
     }
 }
 
@@ -565,7 +567,7 @@ int cmd_review_file(int argc, char *argv[]) {
 
     rule_files = arena_malloc(rule_files_capacity * sizeof(char*));
     if (!rule_files) {
-        fprintf(stderr, "Error: Out of memory\n");
+        log_error("Out of memory\n");
         return 1;
     }
 
@@ -578,20 +580,20 @@ int cmd_review_file(int argc, char *argv[]) {
             quiet_mode = 1;
         } else if (strcmp(argv[i], "--config") == 0) {
             if (i + 1 >= argc) {
-                fprintf(stderr, "Error: --config requires a path argument\n");
+                log_error("--config requires a path argument\n");
                 return 1;
             }
             config_path = argv[++i];
         } else if (strcmp(argv[i], "--rule") == 0) {
             if (i + 1 >= argc) {
-                fprintf(stderr, "Error: --rule requires a path argument\n");
+                log_error("--rule requires a path argument\n");
                 return 1;
             }
             if (rule_files_count >= rule_files_capacity) {
                 rule_files_capacity *= 2;
                 rule_files = arena_realloc(rule_files, rule_files_capacity * sizeof(char*));
                 if (!rule_files) {
-                    fprintf(stderr, "Error: Out of memory\n");
+                    log_error("Out of memory\n");
                     return 1;
                 }
             }
@@ -600,24 +602,24 @@ int cmd_review_file(int argc, char *argv[]) {
             if (!elm_file) {
                 elm_file = argv[i];
             } else {
-                fprintf(stderr, "Error: Unexpected argument '%s'\n", argv[i]);
+                log_error("Unexpected argument '%s'\n", argv[i]);
                 return 1;
             }
         } else {
-            fprintf(stderr, "Error: Unknown option '%s'\n", argv[i]);
+            log_error("Unknown option '%s'\n", argv[i]);
             return 1;
         }
     }
 
     /* Validate arguments */
     if (!elm_file) {
-        fprintf(stderr, "Error: No Elm file specified\n");
+        log_error("No Elm file specified\n");
         print_file_usage();
         return 1;
     }
 
     if (rule_files_count == 0) {
-        fprintf(stderr, "Error: At least one --rule file is required\n");
+        log_error("At least one --rule file is required\n");
         print_file_usage();
         return 1;
     }
@@ -625,7 +627,7 @@ int cmd_review_file(int argc, char *argv[]) {
     /* Parse the Elm file */
     SkeletonModule *mod = skeleton_parse(elm_file);
     if (!mod) {
-        fprintf(stderr, "Error: Failed to parse Elm file '%s'\n", elm_file);
+        log_error("Failed to parse Elm file '%s'\n", elm_file);
         return 1;
     }
 
@@ -635,7 +637,7 @@ int cmd_review_file(int argc, char *argv[]) {
         elm_json = elm_json_read(config_path);
         if (!elm_json) {
             if (!quiet_mode) {
-                fprintf(stderr, "Warning: Failed to read elm.json at '%s'\n", config_path);
+                log_warn("Failed to read elm.json at '%s'\n", config_path);
             }
         }
     } else {
@@ -644,7 +646,7 @@ int cmd_review_file(int argc, char *argv[]) {
         if (detected_path) {
             elm_json = elm_json_read(detected_path);
             if (elm_json && !quiet_mode) {
-                printf("Using elm.json: %s\n", detected_path);
+                user_message("Using elm.json: %s\n", detected_path);
             }
             arena_free(detected_path);
         }
@@ -657,11 +659,11 @@ int cmd_review_file(int argc, char *argv[]) {
     }
 
     if (!quiet_mode) {
-        printf("Reviewing: %s\n", elm_file);
+        user_message("Reviewing: %s\n", elm_file);
         if (mod->module_name) {
-            printf("Module: %s\n", mod->module_name);
+            user_message("Module: %s\n", mod->module_name);
         }
-        printf("\n");
+        user_message("\n");
     }
 
     /* Run each rule file */
@@ -670,7 +672,7 @@ int cmd_review_file(int argc, char *argv[]) {
         const char *rule_path = rule_files[r];
 
         if (!quiet_mode) {
-            printf("=== Rule file: %s ===\n", rule_path);
+            user_message("=== Rule file: %s ===\n", rule_path);
         }
 
         /* Initialize rulr engine */
@@ -678,7 +680,7 @@ int cmd_review_file(int argc, char *argv[]) {
         RulrError err = rulr_init(&rulr);
         if (err.is_error) {
             if (!quiet_mode) {
-                fprintf(stderr, "Error: Failed to initialize rulr engine: %s\n", err.message);
+                log_error("Failed to initialize rulr engine: %s\n", err.message);
             }
             continue;
         }
@@ -687,7 +689,7 @@ int cmd_review_file(int argc, char *argv[]) {
         err = rulr_load_rule_file(&rulr, rule_path);
         if (err.is_error) {
             if (!quiet_mode) {
-                fprintf(stderr, "Error: Failed to load rule file: %s\n", err.message);
+                log_error("Failed to load rule file: %s\n", err.message);
             }
             rulr_deinit(&rulr);
             continue;
@@ -709,7 +711,7 @@ int cmd_review_file(int argc, char *argv[]) {
         err = rulr_evaluate(&rulr);
         if (err.is_error) {
             if (!quiet_mode) {
-                fprintf(stderr, "Error: Rule evaluation failed: %s\n", err.message);
+                log_error("Rule evaluation failed: %s\n", err.message);
             }
             rulr_deinit(&rulr);
             continue;
@@ -727,28 +729,28 @@ int cmd_review_file(int argc, char *argv[]) {
                 if (cache) cache_config_free(cache);
                 return 100;
             }
-            printf("Found %d error(s):\n", error_view.num_tuples);
+            user_message("Found %d error(s):\n", error_view.num_tuples);
             print_relation("error", &rulr, error_view);
         } else if (!quiet_mode) {
-            printf("No errors found.\n");
+            user_message("No errors found.\n");
         }
 
         /* Also check for 'warning' relation */
         EngineRelationView warning_view = rulr_get_relation(&rulr, "warning");
         if (!quiet_mode && warning_view.pred_id >= 0 && warning_view.num_tuples > 0) {
-            printf("Found %d warning(s):\n", warning_view.num_tuples);
+            user_message("Found %d warning(s):\n", warning_view.num_tuples);
             print_relation("warning", &rulr, warning_view);
         }
 
         /* Check for 'info' relation */
         EngineRelationView info_view = rulr_get_relation(&rulr, "info");
         if (!quiet_mode && info_view.pred_id >= 0 && info_view.num_tuples > 0) {
-            printf("Found %d info message(s):\n", info_view.num_tuples);
+            user_message("Found %d info message(s):\n", info_view.num_tuples);
             print_relation("info", &rulr, info_view);
         }
 
         if (!quiet_mode) {
-            printf("\n");
+            user_message("\n");
         }
         rulr_deinit(&rulr);
     }
@@ -763,7 +765,7 @@ int cmd_review_file(int argc, char *argv[]) {
     }
 
     if (!quiet_mode) {
-        printf("Total errors: %d\n", total_errors);
+        user_message("Total errors: %d\n", total_errors);
     }
     return total_errors > 0 ? 1 : 0;
 }
@@ -1087,7 +1089,7 @@ int cmd_review_package(int argc, char *argv[]) {
 
     rule_files = arena_malloc(rule_files_capacity * sizeof(char*));
     if (!rule_files) {
-        fprintf(stderr, "Error: Out of memory\n");
+        log_error("Out of memory\n");
         return 1;
     }
 
@@ -1100,7 +1102,7 @@ int cmd_review_package(int argc, char *argv[]) {
             quiet_mode = 1;
         } else if (strcmp(argv[i], "--rule") == 0) {
             if (i + 1 >= argc) {
-                fprintf(stderr, "Error: --rule requires a path argument\n");
+                log_error("--rule requires a path argument\n");
                 return 1;
             }
             DYNARRAY_PUSH(rule_files, rule_files_count, rule_files_capacity, argv[++i], char*);
@@ -1108,24 +1110,24 @@ int cmd_review_package(int argc, char *argv[]) {
             if (!pkg_path) {
                 pkg_path = argv[i];
             } else {
-                fprintf(stderr, "Error: Unexpected argument '%s'\n", argv[i]);
+                log_error("Unexpected argument '%s'\n", argv[i]);
                 return 1;
             }
         } else {
-            fprintf(stderr, "Error: Unknown option '%s'\n", argv[i]);
+            log_error("Unknown option '%s'\n", argv[i]);
             return 1;
         }
     }
 
     /* Validate arguments */
     if (!pkg_path) {
-        fprintf(stderr, "Error: No package path specified\n");
+        log_error("No package path specified\n");
         print_package_usage();
         return 1;
     }
 
     if (rule_files_count == 0) {
-        fprintf(stderr, "Error: At least one --rule file is required\n");
+        log_error("At least one --rule file is required\n");
         print_package_usage();
         return 1;
     }
@@ -1138,7 +1140,7 @@ int cmd_review_package(int argc, char *argv[]) {
     snprintf(elm_json_path, sizeof(elm_json_path), "%s/elm.json", clean_path);
     if (!file_exists(elm_json_path)) {
         if (!quiet_mode) {
-            fprintf(stderr, "Error: elm.json not found at '%s'\n", elm_json_path);
+            log_error("elm.json not found at '%s'\n", elm_json_path);
         }
         return 1;
     }
@@ -1152,7 +1154,7 @@ int cmd_review_package(int argc, char *argv[]) {
     char **exposed_modules = pkg_parse_exposed_modules(elm_json_path, &exposed_count);
     if (!exposed_modules) {
         if (!quiet_mode) {
-            fprintf(stderr, "Error: Failed to parse elm.json\n");
+            log_error("Failed to parse elm.json\n");
         }
         return 1;
     }
@@ -1160,7 +1162,7 @@ int cmd_review_package(int argc, char *argv[]) {
     /* Parse full elm.json for dependency facts */
     ElmJson *elm_json = elm_json_read(elm_json_path);
     if (!elm_json && !quiet_mode) {
-        fprintf(stderr, "Warning: Failed to parse elm.json for dependencies\n");
+        log_warn("Failed to parse elm.json for dependencies\n");
     }
 
     /* Initialize cache for package module fact extraction */
@@ -1200,12 +1202,12 @@ int cmd_review_package(int argc, char *argv[]) {
     }
 
     if (!quiet_mode) {
-        printf("Reviewing package: %s\n", clean_path);
-        printf("Exposed modules: %d\n", exposed_count);
-        printf("Source files: %d\n", all_elm_files_count);
-        printf("Total package files: %d\n", all_pkg_files_count);
-        printf("Rule files: %d\n", rule_files_count);
-        printf("\n");
+        user_message("Reviewing package: %s\n", clean_path);
+        user_message("Exposed modules: %d\n", exposed_count);
+        user_message("Source files: %d\n", all_elm_files_count);
+        user_message("Total package files: %d\n", all_pkg_files_count);
+        user_message("Rule files: %d\n", rule_files_count);
+        user_message("\n");
     }
 
     /* Initialize rulr engine ONCE */
@@ -1213,7 +1215,7 @@ int cmd_review_package(int argc, char *argv[]) {
     RulrError err = rulr_init(&rulr);
     if (err.is_error) {
         if (!quiet_mode) {
-            fprintf(stderr, "Error: Failed to initialize rulr engine: %s\n", err.message);
+            log_error("Failed to initialize rulr engine: %s\n", err.message);
         }
         if (abs_license) arena_free(abs_license);
         if (abs_readme) arena_free(abs_readme);
@@ -1299,14 +1301,14 @@ int cmd_review_package(int argc, char *argv[]) {
         const char *rule_path = rule_files[r];
 
         if (!quiet_mode) {
-            printf("=== Rule file: %s ===\n", rule_path);
+            user_message("=== Rule file: %s ===\n", rule_path);
         }
 
         /* Load the rule file (tries compiled .dlc first, then source .dl) */
         err = rulr_load_rule_file(&rulr, rule_path);
         if (err.is_error) {
             if (!quiet_mode) {
-                fprintf(stderr, "Error: Failed to load rule file: %s\n", err.message);
+                log_error("Failed to load rule file: %s\n", err.message);
             }
             continue;
         }
@@ -1315,7 +1317,7 @@ int cmd_review_package(int argc, char *argv[]) {
         err = rulr_evaluate(&rulr);
         if (err.is_error) {
             if (!quiet_mode) {
-                fprintf(stderr, "Error: Rule evaluation failed: %s\n", err.message);
+                log_error("Rule evaluation failed: %s\n", err.message);
             }
             continue;
         }
@@ -1343,30 +1345,30 @@ int cmd_review_package(int argc, char *argv[]) {
                 return EXIT_NO_UPGRADES_AVAILABLE;
             }
             if (skip_error_detail) {
-                printf("Found %d error(s) (see redundant files below)\n", error_view.num_tuples);
+                user_message("Found %d error(s) (see redundant files below)\n", error_view.num_tuples);
             } else {
-                printf("Found %d error(s):\n", error_view.num_tuples);
+                user_message("Found %d error(s):\n", error_view.num_tuples);
                 reporter_print_errors(&rulr, error_view, clean_path);
             }
         } else if (!quiet_mode) {
-            printf("No errors found.\n");
+            user_message("No errors found.\n");
         }
 
         /* Also check for 'warning' relation */
         EngineRelationView warning_view = rulr_get_relation(&rulr, "warning");
         if (!quiet_mode && warning_view.pred_id >= 0 && warning_view.num_tuples > 0) {
-            printf("Found %d warning(s):\n", warning_view.num_tuples);
+            user_message("Found %d warning(s):\n", warning_view.num_tuples);
             print_relation("warning", &rulr, warning_view);
         }
 
         /* Print redundant_file relation (already obtained above) */
         if (!quiet_mode && redundant_view.pred_id >= 0 && redundant_view.num_tuples > 0) {
-            printf("\n⚠️  Redundant files (%d):\n", redundant_view.num_tuples);
+            user_message("\n⚠️  Redundant files (%d):\n", redundant_view.num_tuples);
             reporter_print_redundant_files(&rulr, redundant_view, clean_path);
         }
 
         if (!quiet_mode) {
-            printf("\n");
+            user_message("\n");
         }
     }
 
@@ -1383,7 +1385,7 @@ int cmd_review_package(int argc, char *argv[]) {
     if (abs_elm_json) arena_free(abs_elm_json);
 
     if (!quiet_mode) {
-        printf("Total errors: %d\n", total_errors);
+        user_message("Total errors: %d\n", total_errors);
     }
     return total_errors > 0 ? 1 : 0;
 }
@@ -1413,7 +1415,7 @@ int cmd_review(int argc, char *argv[]) {
         return cmd_review_package(argc - 1, argv + 1);
     }
 
-    fprintf(stderr, "Error: Unknown review subcommand '%s'\n", subcmd);
-    fprintf(stderr, "Run '%s review --help' for usage information.\n", global_context_program_name());
+    log_error("Unknown review subcommand '%s'\n", subcmd);
+    user_message("Run '%s review --help' for usage information.\n", global_context_program_name());
     return 1;
 }

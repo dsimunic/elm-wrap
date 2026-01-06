@@ -7,6 +7,7 @@
 
 .pred package_file_info(abs: symbol, rel: symbol, name: symbol).
 .pred publish_file(abs: symbol, rel: symbol).
+.pred extra_file(abs: symbol, rel: symbol).
 
 % All core package files should be published
 % core_package_file is derived by core_package_files.dl, not declared here
@@ -25,3 +26,8 @@ publish_file(Abs, Rel) :-
 publish_file(Abs, Rel) :-
     package_file_info(Abs, Rel, _),
     Rel = "README.md".
+
+% Extra files: present in the directory, but not part of the publish set
+extra_file(Abs, Rel) :-
+    package_file_info(Abs, Rel, _),
+    not publish_file(Abs, Rel).

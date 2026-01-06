@@ -3,6 +3,7 @@
 #include "../../cache.h"
 #include "../package/package_common.h"
 #include "../../global_context.h"
+#include "../../messages.h"
 #include "../../shared/log.h"
 #include "../../fileutil.h"
 #include "../../dyn_array.h"
@@ -320,20 +321,20 @@ static bool build_external_module_owner_map_from_elm_json(const char *elm_json_p
 }
 
 static void print_include_tree_usage(void) {
-    printf("Usage: %s debug include-tree PATH\n", global_context_program_name());
-    printf("\n");
-    printf("Show import dependency tree for an Elm file or package at PATH.\n");
-    printf("\n");
-    printf("Arguments:\n");
-    printf("  PATH       Path to an Elm file (.elm)\n");
-    printf("             or a path to a package directory with elm.json\n");
-    printf("\n");
-    printf("For packages:\n");
-    printf("  - Shows import tree for each exposed module\n");
-    printf("  - Lists redundant files not imported by any exposed module\n");
-    printf("\n");
-    printf("Options:\n");
-    printf("  -h, --help        Show this help message\n");
+    user_message("Usage: %s debug include-tree PATH\n", global_context_program_name());
+    user_message("\n");
+    user_message("Show import dependency tree for an Elm file or package at PATH.\n");
+    user_message("\n");
+    user_message("Arguments:\n");
+    user_message("  PATH       Path to an Elm file (.elm)\n");
+    user_message("             or a path to a package directory with elm.json\n");
+    user_message("\n");
+    user_message("For packages:\n");
+    user_message("  - Shows import tree for each exposed module\n");
+    user_message("  - Lists redundant files not imported by any exposed module\n");
+    user_message("\n");
+    user_message("Options:\n");
+    user_message("  -h, --help        Show this help message\n");
 }
 
 int cmd_debug_include_tree(int argc, char *argv[]) {
@@ -470,16 +471,16 @@ static int print_file_include_tree(const char *file_path) {
         have_external_map = build_external_module_owner_map_from_elm_json(elm_json_path, &external_map);
     }
     if (!src_dir) {
-        printf("\n⚠️  Could not find elm.json in parent directories\n");
-        printf("   Imports from external packages will not be resolved.\n");
+        user_message("\n⚠️  Could not find elm.json in parent directories\n");
+        user_message("   Imports from external packages will not be resolved.\n");
         /* Use file's directory as fallback */
         src_dir = arena_strdup(abs_path);
         char *last_slash = strrchr(src_dir, '/');
         if (last_slash) *last_slash = '\0';
     }
 
-    printf("\n📄 Import tree for: %s\n", abs_path);
-    printf("   Source directory: %s\n\n", src_dir);
+    user_message("\n📄 Import tree for: %s\n", abs_path);
+    user_message("   Source directory: %s\n\n", src_dir);
 
     /* Track visited files to avoid cycles */
     int visited_capacity = 64;
@@ -487,14 +488,14 @@ static int print_file_include_tree(const char *file_path) {
     char **visited = arena_malloc(visited_capacity * sizeof(char*));
 
     /* Print the root file */
-    printf("%s\n", abs_path);
+    user_message("%s\n", abs_path);
 
     /* Recursively print imports */
     collect_imports_recursive(abs_path, src_dir,
                               have_external_map ? &external_map : NULL,
                               &visited, &visited_count, &visited_capacity, "");
 
-    printf("\n");
+    user_message("\n");
     return 0;
 }
 
@@ -624,8 +625,8 @@ static int print_package_include_tree(const char *dir_path) {
         snprintf(src_dir, sizeof(src_dir), "%s/src", clean_dir_path);
     }
 
-    printf("\n📦 Import tree for package: %s\n", clean_dir_path);
-    printf("   Source directory: %s\n\n", src_dir);
+    user_message("\n📦 Import tree for package: %s\n", clean_dir_path);
+    user_message("   Source directory: %s\n\n", src_dir);
 
     ExternalModuleOwnerMap external_map = {0};
     bool have_external_map = build_external_module_owner_map_from_elm_json(elm_json_path, &external_map);
@@ -637,7 +638,7 @@ static int print_package_include_tree(const char *dir_path) {
 
     /* Process exposed modules */
     if (exposed_count > 0) {
-        printf("📚 Exposed Modules (%d):\n\n", exposed_count);
+        user_message("📚 Exposed Modules (%d):\n\n", exposed_count);
 
         for (int i = 0; i < exposed_count; i++) {
             const char *module_name = exposed_modules[i];
@@ -652,7 +653,7 @@ static int print_package_include_tree(const char *dir_path) {
                 /* Get absolute path */
                 char abs_path[MAX_PATH_LENGTH];
                 if (realpath(module_path, abs_path)) {
-                    printf("%s (%s)\n", module_name, abs_path);
+                    user_message("%s (%s)\n", module_name, abs_path);
 
                     /* Add to included files */
                     DYNARRAY_PUSH(included_files, included_count, included_capacity,
@@ -672,15 +673,15 @@ static int print_package_include_tree(const char *dir_path) {
                         }
                     }
 
-                    printf("\n");
+                    user_message("\n");
                 }
             } else {
-                printf("%s (❌ NOT FOUND: %s)\n\n", module_name, 
+                user_message("%s (❌ NOT FOUND: %s)\n\n", module_name, 
                        module_path ? module_path : "unknown");
             }
         }
     } else {
-        printf("⚠️  No exposed modules found in elm.json\n\n");
+        user_message("⚠️  No exposed modules found in elm.json\n\n");
     }
 
     /* Collect all .elm files in src directory */
@@ -691,27 +692,27 @@ static int print_package_include_tree(const char *dir_path) {
     collect_all_elm_files(src_dir, &all_files, &all_files_count, &all_files_capacity);
 
     /* Find redundant files (not included by any exposed module) */
-    printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-    printf("🔍 Scanning for redundant files...\n\n");
+    user_message("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+    user_message("🔍 Scanning for redundant files...\n\n");
 
     int redundant_count = 0;
     for (int i = 0; i < all_files_count; i++) {
         if (!is_file_in_list(all_files[i], included_files, included_count)) {
             if (redundant_count == 0) {
-                printf("⚠️  Redundant files (not imported by any exposed module):\n\n");
+                user_message("⚠️  Redundant files (not imported by any exposed module):\n\n");
             }
-            printf("   • %s\n", all_files[i]);
+            user_message("   • %s\n", all_files[i]);
             redundant_count++;
         }
     }
 
     if (redundant_count == 0) {
-        printf("✅ No redundant files found. All files are included.\n");
+        user_message("✅ No redundant files found. All files are included.\n");
     } else {
-        printf("\n   Total: %d redundant file(s)\n", redundant_count);
+        user_message("\n   Total: %d redundant file(s)\n", redundant_count);
     }
 
-    printf("\n");
+    user_message("\n");
     return 0;
 }
 
@@ -805,12 +806,12 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
         current_index++;
         
         /* Print current prefix + branch character */
-        printf("%s%s", prefix, is_last ? TREE_LAST : TREE_BRANCH);
+        user_message("%s%s", prefix, is_last ? TREE_LAST : TREE_BRANCH);
 
         if (already_visited) {
-            printf("%s (↩ already shown)\n", module_name);
+            user_message("%s (↩ already shown)\n", module_name);
         } else {
-            printf("%s\n", module_name);
+            user_message("%s\n", module_name);
             
             /* Build new prefix for children */
             size_t prefix_len = strlen(prefix);
@@ -837,12 +838,12 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
         current_index++;
         
         /* Print current prefix + branch character */
-        printf("%s%s", prefix, is_last ? TREE_LAST : TREE_BRANCH);
+        user_message("%s%s", prefix, is_last ? TREE_LAST : TREE_BRANCH);
         const char *owner = external_map ? external_module_owner_map_find(external_map, module_name) : NULL;
         if (owner) {
-            printf("%s (📦 %s)\n", module_name, owner);
+            user_message("%s (📦 %s)\n", module_name, owner);
         } else {
-            printf("%s (📦 external)\n", module_name);
+            user_message("%s (📦 external)\n", module_name);
         }
     }
 }

@@ -128,11 +128,6 @@ TEMPLATES_DIR = templates
 RULE_SOURCES := $(wildcard $(BUILTIN_RULES_SRC)/*.dl)
 RULE_COMPILED := $(patsubst $(BUILTIN_RULES_SRC)/%.dl,$(BUILTIN_RULES_COMPILED)/%.dlc,$(RULE_SOURCES))
 
-# Rulr compiler (rulrc)
-RULRC = $(TOOLSDIR)/rulrc
-RULRC_SRC = $(RULR_SRCDIR)/rulrc_main.c
-RULRC_OBJ = $(BUILDDIR)/rulr/rulrc_main.o
-
 # Files
 TARGET_FILE = wrap
 SOURCES = $(SRCDIR)/main.c \
@@ -368,7 +363,7 @@ BINDIR_INSTALL = $(PREFIX)/bin
 USER_PREFIX = $(HOME)/.local
 USER_BINDIR = $(USER_PREFIX)/bin
 
-.PHONY: all rebuild rebuild-install clean pg_core_test pg_file_test indexmaker mkpkg help-report-html-gen test check dist distcheck install uninstall uninstall-user rulrc compile-builtin-rules
+.PHONY: all rebuild rebuild-install clean pg_core_test pg_file_test indexmaker mkpkg help-report-html-gen test check dist distcheck install uninstall uninstall-user compile-builtin-rules
 
 .DEFAULT_GOAL := all
 
@@ -386,8 +381,6 @@ rebuild-install:
 	@$(MAKE) clean
 	@$(MAKE) all
 	@$(MAKE) install
-
-rulrc: $(RULRC)
 
 # Compile rules using system rulrc (only when source changes)
 $(BUILTIN_RULES_COMPILED)/%.dlc: $(BUILTIN_RULES_SRC)/%.dl
@@ -934,16 +927,6 @@ $(RULR_LIB): $(RULR_VENDOR_LIB) | $(LIBDIR)
 $(RULR_DRIVER): $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o | $(BINDIR)
 	$(LINK_MSG) $@
 	$(Q)$(CC) $(RULR_DRIVER_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o -o $@
-
-# Build rulrc compiler
-$(RULRC_OBJ): $(RULRC_SRC) | $(BUILDDIR)
-	@mkdir -p $(dir $@)
-	$(COMPILE_MSG) $@
-	$(Q)$(CC) $(RULR_CFLAGS) -c $< -o $@
-
-$(RULRC): $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o $(BUILDDIR)/fileutil.o | $(TOOLSDIR)
-	$(LINK_MSG) $@
-	$(Q)$(CC) $(RULRC_OBJ) $(RULR_LIB) $(BUILDDIR)/alloc.o $(BUILDDIR)/miniz.o $(BUILDDIR)/fileutil.o -o $@
 
 # Link final binary (includes local rulr objects + vendored librulr.a)
 $(TARGET): $(OBJECTS) $(RULR_LOCAL_OBJECTS) $(RULR_LIB) | $(BINDIR)

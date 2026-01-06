@@ -6,9 +6,11 @@
 #include "frontend/ast.h"
 
 typedef struct {
-    char **names;
-    int    count;
-    int    capacity;
+    void  *intern_table;  /* Internal symbol interning table */
+    int    capacity1;     /* Primary capacity */
+    int    count;         /* Number of symbols */
+    char **names;         /* Symbol names array */
+    int    capacity2;     /* Secondary capacity */
 } RulrSymTable;
 
 typedef struct {

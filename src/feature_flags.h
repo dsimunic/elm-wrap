@@ -6,17 +6,13 @@
 /*
  * Feature flags for hiding development commands from regular users.
  *
- * Compile-time defaults are set via Makefile (FEATURE_CODE, FEATURE_PUBLISH,
- * FEATURE_REVIEW, FEATURE_POLICY, FEATURE_CACHE, FEATURE_DEBUG). Runtime environment variables can override:
- *   - WRAP_FEATURE_PUBLISH: "1" to enable, "0" to disable
+ * Compile-time defaults are set via Makefile (FEATURE_CODE, FEATURE_REVIEW,
+ * FEATURE_POLICY, FEATURE_CACHE, FEATURE_DEBUG). Runtime environment variables can override:
  *   - WRAP_FEATURE_REVIEW: "1" to enable, "0" to disable
  *   - WRAP_FEATURE_POLICY: "1" to enable, "0" to disable
  *   - WRAP_FEATURE_CACHE: "1" to enable, "0" to disable
  *   - WRAP_FEATURE_DEBUG: "1" to enable, "0" to disable
  */
-
-/* Check if the 'publish' command (deprecated wrapper and package publish) is enabled */
-bool feature_publish_enabled(void);
 
 /* Check if the 'review' command group is enabled */
 bool feature_review_enabled(void);

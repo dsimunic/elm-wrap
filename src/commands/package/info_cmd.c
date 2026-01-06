@@ -14,6 +14,7 @@
 #include "../../global_context.h"
 #include "../../alloc.h"
 #include "../../constants.h"
+#include "../../messages.h"
 #include "../../shared/log.h"
 #include "../../fileutil.h"
 #include "../../terminal_colors.h"
@@ -97,34 +98,34 @@ static char *get_project_dir(const char *elm_json_path) {
 static void print_info_usage(const char *invocation) {
     const char *command_label = invocation ? invocation : "package info";
 
-    printf("Usage: %s %s [PATH | PACKAGE [VERSION]]\n", global_context_program_name(), command_label);
-    printf("\n");
-    printf("Display package management information.\n");
-    printf("\n");
-    printf("Shows:\n");
-    printf("  - Current ELM_HOME directory\n");
-    printf("  - Registry cache statistics\n");
-    printf("  - Package registry connectivity\n");
-    printf("  - Installed packages (if run in a project directory)\n");
-    printf("  - Available updates (if run in a project directory)\n");
-    printf("\n");
-    printf("Version resolution (for package lookup):\n");
-    printf("  - If package is in elm.json: uses that version\n");
-    printf("  - If not in elm.json and no VERSION specified: uses latest from registry\n");
-    printf("  - If VERSION specified: uses that specific version\n");
-    printf("\n");
-    printf("Examples:\n");
-    printf("  %s %s                  # Show general package info\n", global_context_program_name(), command_label);
-    printf("  %s %s ./path/to/dir    # Show info for elm.json at path\n", global_context_program_name(), command_label);
-    printf("  %s %s elm/core         # Show info for elm/core package\n", global_context_program_name(), command_label);
-    printf("  %s %s elm/core@1.0.0   # Show info for elm/core 1.0.0\n", global_context_program_name(), command_label);
-    printf("\n");
-    printf("Note: Package name format (author/package) takes priority over paths.\n");
-    printf("      If not found in the registry, it will be retried as a path.\n");
-    printf("\n");
-    printf("Options:\n");
-    printf("  -d, --deps-only                   # Only print dependencies\n");
-    printf("  --help                            # Show this help\n");
+    user_message("Usage: %s %s [PATH | PACKAGE [VERSION]]\n", global_context_program_name(), command_label);
+    user_message("\n");
+    user_message("Display package management information.\n");
+    user_message("\n");
+    user_message("Shows:\n");
+    user_message("  - Current ELM_HOME directory\n");
+    user_message("  - Registry cache statistics\n");
+    user_message("  - Package registry connectivity\n");
+    user_message("  - Installed packages (if run in a project directory)\n");
+    user_message("  - Available updates (if run in a project directory)\n");
+    user_message("\n");
+    user_message("Version resolution (for package lookup):\n");
+    user_message("  - If package is in elm.json: uses that version\n");
+    user_message("  - If not in elm.json and no VERSION specified: uses latest from registry\n");
+    user_message("  - If VERSION specified: uses that specific version\n");
+    user_message("\n");
+    user_message("Examples:\n");
+    user_message("  %s %s                  # Show general package info\n", global_context_program_name(), command_label);
+    user_message("  %s %s ./path/to/dir    # Show info for elm.json at path\n", global_context_program_name(), command_label);
+    user_message("  %s %s elm/core         # Show info for elm/core package\n", global_context_program_name(), command_label);
+    user_message("  %s %s elm/core@1.0.0   # Show info for elm/core 1.0.0\n", global_context_program_name(), command_label);
+    user_message("\n");
+    user_message("Note: Package name format (author/package) takes priority over paths.\n");
+    user_message("      If not found in the registry, it will be retried as a path.\n");
+    user_message("\n");
+    user_message("Options:\n");
+    user_message("  -d, --deps-only                   # Only print dependencies\n");
+    user_message("  --help                            # Show this help\n");
 }
 
 static void update_max_name_len_from_package_map(const PackageMap *map, size_t *max_name_len) {
@@ -190,20 +191,20 @@ static void print_dependency_entries(const PackageMap *map, size_t max_name_len,
         Package *pkg = &map->packages[i];
         char full_name[MAX_PACKAGE_NAME_LENGTH];
         snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
-        printf("  %-*s  %s%s\n", (int)max_name_len, full_name, pkg->version, annotation ? annotation : "");
+        user_message("  %-*s  %s%s\n", (int)max_name_len, full_name, pkg->version, annotation ? annotation : "");
     }
 }
 
 static void print_dependencies_section(const ElmJson *elm_json, size_t max_name_len) {
     int total_packages = get_total_dependency_count(elm_json);
 
-    printf("\nDependencies:\n\n");
+    user_message("\nDependencies:\n\n");
     if (elm_json->type == ELM_PROJECT_APPLICATION) {
         print_dependency_entries(elm_json->dependencies_direct, max_name_len, NULL);
 
         if (elm_json->dependencies_direct && elm_json->dependencies_indirect &&
             elm_json->dependencies_direct->count > 0 && elm_json->dependencies_indirect->count > 0) {
-            printf("\n");
+            user_message("\n");
         }
 
         print_dependency_entries(elm_json->dependencies_indirect, max_name_len, " (indirect)");
@@ -213,14 +214,14 @@ static void print_dependencies_section(const ElmJson *elm_json, size_t max_name_
         bool any_test = (elm_json->dependencies_test_direct && elm_json->dependencies_test_direct->count > 0) ||
                         (elm_json->dependencies_test_indirect && elm_json->dependencies_test_indirect->count > 0);
         if (any_prod && any_test) {
-            printf("\n");
+            user_message("\n");
         }
 
         print_dependency_entries(elm_json->dependencies_test_direct, max_name_len, " (test)");
 
         if (elm_json->dependencies_test_direct && elm_json->dependencies_test_indirect &&
             elm_json->dependencies_test_direct->count > 0 && elm_json->dependencies_test_indirect->count > 0) {
-            printf("\n");
+            user_message("\n");
         }
 
         print_dependency_entries(elm_json->dependencies_test_indirect, max_name_len, " (test, indirect)");
@@ -229,15 +230,15 @@ static void print_dependencies_section(const ElmJson *elm_json, size_t max_name_
 
         if (elm_json->package_dependencies && elm_json->package_test_dependencies &&
             elm_json->package_dependencies->count > 0 && elm_json->package_test_dependencies->count > 0) {
-            printf("\n");
+            user_message("\n");
         }
 
         print_dependency_entries(elm_json->package_test_dependencies, max_name_len, " (test)");
     }
 
     /* Print total dependencies aligned with version column */
-    printf("\n%-*s  %d\n", (int)(max_name_len + 2), "  Total:", total_packages);
-    printf("\n");
+    user_message("\n%-*s  %d\n", (int)(max_name_len + 2), "  Total:", total_packages);
+    user_message("\n");
 }
 
 static bool is_package_name_format(const char *str) {
@@ -273,14 +274,14 @@ static bool try_resolve_elm_json_path_from_arg(const char *arg, char **out_elm_j
         snprintf(path_buf, sizeof(path_buf), "%s", arg);
     } else {
         if (report_errors) {
-            fprintf(stderr, "Error: Path does not exist: %s\n", arg);
+            log_error("Path does not exist: %s\n", arg);
         }
         return false;
     }
 
     if (stat(path_buf, &st) != 0 || !S_ISREG(st.st_mode)) {
         if (report_errors) {
-            fprintf(stderr, "Error: elm.json not found at: %s\n", path_buf);
+            log_error("elm.json not found at: %s\n", path_buf);
         }
         return false;
     }
@@ -301,16 +302,16 @@ static void print_package_suggestions_block(
         return;
     }
 
-    fprintf(stderr, "\n%s-- UNKNOWN PACKAGE -------------------------------------------------------------%s\n\n",
+    user_message("\n%s-- UNKNOWN PACKAGE -------------------------------------------------------------%s\n\n",
             ANSI_DULL_CYAN, ANSI_RESET);
-    fprintf(stderr, "I could not find '%s/%s' in the package registry, but I found\n", author, name);
-    fprintf(stderr, "these packages with similar names:\n\n");
+    user_message("I could not find '%s/%s' in the package registry, but I found\n", author, name);
+    user_message("these packages with similar names:\n\n");
 
     for (size_t i = 0; i < count && i < MAX_PACKAGE_SUGGESTIONS; i++) {
-        fprintf(stderr, "    %s/%s\n", suggestions[i].author, suggestions[i].name);
+        user_message("    %s/%s\n", suggestions[i].author, suggestions[i].name);
     }
 
-    fprintf(stderr, "\nMaybe you want one of these instead?\n\n");
+    user_message("\nMaybe you want one of these instead?\n\n");
 }
 
 static int report_package_not_found_with_suggestions(InstallEnv *env, const char *author, const char *name) {
@@ -325,7 +326,7 @@ static int report_package_not_found_with_suggestions(InstallEnv *env, const char
         return 1;
     }
 
-    fprintf(stderr, "Error: Package '%s/%s' not found in registry\n", author, name);
+    log_error("Package '%s/%s' not found in registry\n", author, name);
     return 1;
 }
 
@@ -339,7 +340,7 @@ static void print_package_tracking_info(const char *author, const char *name, co
     char **app_paths = local_dev_get_tracking_apps(author, name, version, &app_count);
 
     if (app_count > 0 && app_paths) {
-        printf("\nLocal development tracked by:\n\n");
+        user_message("\nLocal development tracked by:\n\n");
         for (int i = 0; i < app_count; i++) {
             /* Get directory path (remove /elm.json if present) */
             char *path_copy = arena_strdup(app_paths[i]);
@@ -347,7 +348,7 @@ static void print_package_tracking_info(const char *author, const char *name, co
             if (elm_json_pos) {
                 *elm_json_pos = '\0';
             }
-            printf("  %s\n", path_copy);
+            user_message("  %s\n", path_copy);
             arena_free(path_copy);
             arena_free(app_paths[i]);
         }
@@ -363,12 +364,12 @@ static void print_application_tracking_info(const char *elm_json_path) {
     LocalDevPackage *packages = local_dev_get_tracked_packages(elm_json_path, &pkg_count);
 
     if (pkg_count > 0 && packages) {
-        printf("\nTracking local dev packages:\n\n");
+        user_message("\nTracking local dev packages:\n\n");
         for (int i = 0; i < pkg_count; i++) {
-            printf("  %s/%s %s\n", packages[i].author, packages[i].name, packages[i].version);
+            user_message("  %s/%s %s\n", packages[i].author, packages[i].name, packages[i].version);
         }
         local_dev_packages_free(packages, pkg_count);
-        printf("\n");
+        user_message("\n");
     }
 }
 
@@ -396,7 +397,7 @@ static int show_package_info_from_registry(const char *package_name, const char 
         }
 
         if (entry->version_count == 0) {
-            fprintf(stderr, "Error: Package '%s/%s' has no versions\n", author, name);
+            log_error("Package '%s/%s' has no versions\n", author, name);
             arena_free(author);
             arena_free(name);
             return 1;
@@ -422,15 +423,15 @@ static int show_package_info_from_registry(const char *package_name, const char 
             }
 
             if (!version_found) {
-                fprintf(stderr, "Error: Version %s not found for package %s/%s\n", version_arg, author, name);
-                printf("\nAvailable versions:\n");
+                log_error("Version %s not found for package %s/%s\n", version_arg, author, name);
+                user_message("\nAvailable versions:\n");
                 for (size_t i = 0; i < entry->version_count; i++) {
                     V2PackageVersion *v = &entry->versions[i];
                     if (v->status == V2_STATUS_VALID) {
-                        printf("  %u.%u.%u\n", v->major, v->minor, v->patch);
+                        user_message("  %u.%u.%u\n", v->major, v->minor, v->patch);
                     }
                 }
-                printf("\n");
+                user_message("\n");
                 arena_free(author);
                 arena_free(name);
                 return 1;
@@ -463,7 +464,7 @@ static int show_package_info_from_registry(const char *package_name, const char 
         }
 
         if (!version_found || !version_to_use) {
-            fprintf(stderr, "Error: Could not determine version for %s/%s\n", author, name);
+            log_error("Could not determine version for %s/%s\n", author, name);
             arena_free(author);
             arena_free(name);
             return 1;
@@ -481,17 +482,17 @@ static int show_package_info_from_registry(const char *package_name, const char 
             }
         }
 
-        printf("\nPackage: %s/%s\n", author, name);
+        user_message("\nPackage: %s/%s\n", author, name);
         if (is_local_dev) {
-            printf("Version: %s (local development)\n", version_to_use);
+            user_message("Version: %s (local development)\n", version_to_use);
         } else {
-            printf("Version: %s\n", version_to_use);
+            user_message("Version: %s\n", version_to_use);
         }
         if (latest_buf && strcmp(version_to_use, latest_buf) != 0) {
-            printf("Latest version: %s\n", latest_buf);
+            user_message("Latest version: %s\n", latest_buf);
         }
-        printf("Total versions: %zu\n", entry->version_count);
-        printf("\n");
+        user_message("Total versions: %zu\n", entry->version_count);
+        user_message("\n");
 
         int result = v2_show_package_dependencies(author, name, version_to_use, env->v2_registry);
 
@@ -522,7 +523,7 @@ static int show_package_info_from_registry(const char *package_name, const char 
     }
 
     if (registry_entry->version_count == 0) {
-        fprintf(stderr, "Error: Package '%s/%s' has no versions\n", author, name);
+        log_error("Package '%s/%s' has no versions\n", author, name);
         arena_free(author);
         arena_free(name);
         return 1;
@@ -547,16 +548,16 @@ static int show_package_info_from_registry(const char *package_name, const char 
         }
 
         if (!version_found) {
-            fprintf(stderr, "Error: Version %s not found for package %s/%s\n", version_arg, author, name);
-            printf("\nAvailable versions:\n");
+            log_error("Version %s not found for package %s/%s\n", version_arg, author, name);
+            user_message("\nAvailable versions:\n");
             for (size_t i = 0; i < registry_entry->version_count; i++) {
                 char *v_str = version_to_string(&registry_entry->versions[i]);
                 if (v_str) {
-                    printf("  %s\n", v_str);
+                    user_message("  %s\n", v_str);
                     arena_free(v_str);
                 }
             }
-            printf("\n");
+            user_message("\n");
             arena_free(author);
             arena_free(name);
             return 1;
@@ -583,7 +584,7 @@ static int show_package_info_from_registry(const char *package_name, const char 
     }
 
     if (!version_found || !version_to_use) {
-        fprintf(stderr, "Error: Could not determine version for %s/%s\n", author, name);
+        log_error("Could not determine version for %s/%s\n", author, name);
         arena_free(author);
         arena_free(name);
         return 1;
@@ -594,17 +595,17 @@ static int show_package_info_from_registry(const char *package_name, const char 
 
     char *latest_version = version_to_string(&registry_entry->versions[0]);
 
-    printf("\nPackage: %s/%s\n", author, name);
+    user_message("\nPackage: %s/%s\n", author, name);
     if (is_local_dev) {
-        printf("Version: %s (local development)\n", version_to_use);
+        user_message("Version: %s (local development)\n", version_to_use);
     } else {
-        printf("Version: %s\n", version_to_use);
+        user_message("Version: %s\n", version_to_use);
     }
     if (latest_version && strcmp(version_to_use, latest_version) != 0) {
-        printf("Latest version: %s\n", latest_version);
+        user_message("Latest version: %s\n", latest_version);
     }
-    printf("Total versions: %zu\n", registry_entry->version_count);
-    printf("\n");
+    user_message("Total versions: %zu\n", registry_entry->version_count);
+    user_message("\n");
 
     int result = v1_show_package_dependencies(author, name, version_to_use, env);
 
@@ -639,7 +640,7 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
         } else if (strcmp(argv[i], "--deps-only") == 0 || strcmp(argv[i], "-d") == 0) {
             deps_only = true;
         } else if (argv[i][0] == '-') {
-            fprintf(stderr, "Error: Unknown option: %s\n", argv[i]);
+            log_error("Unknown option: %s\n", argv[i]);
             print_info_usage(invocation);
             return 1;
         } else {
@@ -649,7 +650,7 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
             } else if (!version_arg) {
                 version_arg = argv[i];
             } else {
-                fprintf(stderr, "Error: Too many arguments\n");
+                log_error("Too many arguments\n");
                 print_info_usage(invocation);
                 return 1;
             }
@@ -665,14 +666,14 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
             const char *at_pos = strchr(arg, '@');
             if (at_pos) {
                 if (version_arg) {
-                    fprintf(stderr, "Error: Version specified twice (use either PACKAGE@VERSION or PACKAGE VERSION)\n");
+                    log_error("Version specified twice (use either PACKAGE@VERSION or PACKAGE VERSION)\n");
                     print_info_usage(invocation);
                     return 1;
                 }
 
                 size_t name_len = (size_t)(at_pos - arg);
                 if (name_len == 0 || name_len >= sizeof(package_name_buf)) {
-                    fprintf(stderr, "Error: Invalid package specification '%s'\n", arg);
+                    log_error("Invalid package specification '%s'\n", arg);
                     print_info_usage(invocation);
                     return 1;
                 }
@@ -682,7 +683,7 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
 
                 Version parsed_version = (Version){0};
                 if (!version_parse_safe(at_pos + 1, &parsed_version)) {
-                    fprintf(stderr, "Error: Invalid version '%s' (expected X.Y.Z)\n", at_pos + 1);
+                    log_error("Invalid version '%s' (expected X.Y.Z)\n", at_pos + 1);
                     return 1;
                 }
 
@@ -691,13 +692,13 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
             } else if (version_arg) {
                 Version parsed_version = (Version){0};
                 if (!version_parse_safe(version_arg, &parsed_version)) {
-                    fprintf(stderr, "Error: Invalid version '%s' (expected X.Y.Z)\n", version_arg);
+                    log_error("Invalid version '%s' (expected X.Y.Z)\n", version_arg);
                     return 1;
                 }
             }
         } else {
             if (version_arg) {
-                fprintf(stderr, "Error: Version argument is only valid with package name (author/package)\n");
+                log_error("Version argument is only valid with package name (author/package)\n");
                 print_info_usage(invocation);
                 return 1;
             }
@@ -713,7 +714,7 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
 
     if (is_package_lookup) {
         if (deps_only) {
-            fprintf(stderr, "Error: --deps-only is only supported with PATH (not PACKAGE [VERSION])\n");
+            log_error("--deps-only is only supported with PATH (not PACKAGE [VERSION])\n");
             return 1;
         }
         InstallEnv *env = install_env_create();
@@ -755,7 +756,7 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
                     arena_free(author);
                     arena_free(name);
                 } else {
-                    fprintf(stderr, "Error: Package '%s' not found in registry\n", arg);
+                    log_error("Package '%s' not found in registry\n", arg);
                 }
                 install_env_free(env);
                 return 1;
@@ -769,7 +770,7 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
     if (deps_only) {
         ElmJson *elm_json = elm_json_read(elm_json_path);
         if (!elm_json) {
-            fprintf(stderr, "Error: Failed to read elm.json at: %s\n", elm_json_path);
+            log_error("Failed to read elm.json at: %s\n", elm_json_path);
             return 1;
         }
 
@@ -816,32 +817,32 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
         char *project_dir = get_project_dir(elm_json_path);
         char *project_name = get_last_path_segment(project_dir);
 
-        printf("\n%s\n", project_name);
-        printf("-------------------\n");
-        printf("\n");
+        user_message("\n%s\n", project_name);
+        user_message("-------------------\n");
+        user_message("\n");
 
         if (elm_json->type == ELM_PROJECT_APPLICATION) {
-            printf("Type: Application\n");
-            printf("Path: %s\n", project_dir);
+            user_message("Type: Application\n");
+            user_message("Path: %s\n", project_dir);
         } else {
-            printf("Type: Package\n");
-            printf("Path: %s\n", project_dir);
+            user_message("Type: Package\n");
+            user_message("Path: %s\n", project_dir);
 
             /* Show package metadata */
             if (elm_json->package_name) {
-                printf("Name: %s\n", elm_json->package_name);
+                user_message("Name: %s\n", elm_json->package_name);
             }
             if (elm_json->package_version) {
-                printf("Version: %s\n", elm_json->package_version);
+                user_message("Version: %s\n", elm_json->package_version);
             }
 
             /* Show exposed modules */
             int exposed_count = 0;
             char **exposed_modules = elm_parse_exposed_modules(elm_json_path, &exposed_count);
             if (exposed_count > 0 && exposed_modules) {
-                printf("\nExposed modules:\n");
+                user_message("\nExposed modules:\n");
                 for (int i = 0; i < exposed_count; i++) {
-                    printf("  %s\n", exposed_modules[i]);
+                    user_message("  %s\n", exposed_modules[i]);
                     arena_free(exposed_modules[i]);
                 }
                 arena_free(exposed_modules);
@@ -871,7 +872,7 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
             check_all_upgrades(elm_json_path, env->registry, max_name_len);
         }
 
-        printf("\n");
+        user_message("\n");
 
 
         /* Show local development tracking information */
@@ -893,45 +894,45 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
             }
         }
 
-        printf("\n");
+        user_message("\n");
     } else {
-        printf("\n");
-        printf("Package Management Information\n");
-        printf("===============================\n");
+        user_message("\n");
+        user_message("Package Management Information\n");
+        user_message("===============================\n");
     }
 
-    printf("\nELM_HOME: %s\n", env->cache->elm_home);
+    user_message("\nELM_HOME: %s\n", env->cache->elm_home);
 
     if (global_context_is_v2() && v2_registry) {
-        printf("\nV2 Registry:\n");
-        printf("  Location: %s/index.dat\n", global_context_get()->repository_path);
-        printf("  Packages: %zu\n", v2_registry->entry_count);
+        user_message("\nV2 Registry:\n");
+        user_message("  Location: %s/index.dat\n", global_context_get()->repository_path);
+        user_message("  Packages: %zu\n", v2_registry->entry_count);
         size_t total_versions = 0;
         for (size_t i = 0; i < v2_registry->entry_count; i++) {
             total_versions += v2_registry->entries[i].version_count;
         }
-        printf("  Versions: %zu\n", total_versions);
-        printf("  Status: Local (V2 protocol)\n");
+        user_message("  Versions: %zu\n", total_versions);
+        user_message("  Status: Local (V2 protocol)\n");
     } else {
-        printf("\nRegistry Cache:\n");
-        printf("  Location: %s\n", env->cache->registry_path);
-        printf("  Packages: %zu\n", env->registry->entry_count);
-        printf("  Versions: %zu\n", registry_versions_in_map_count(env->registry));
-        printf("  Since count: %zu\n", env->registry->since_count);
+        user_message("\nRegistry Cache:\n");
+        user_message("  Location: %s\n", env->cache->registry_path);
+        user_message("  Packages: %zu\n", env->registry->entry_count);
+        user_message("  Versions: %zu\n", registry_versions_in_map_count(env->registry));
+        user_message("  Since count: %zu\n", env->registry->since_count);
 
-        printf("\nRegistry URL: %s\n", env->registry_url);
+        user_message("\nRegistry URL: %s\n", env->registry_url);
         if (env->offline) {
             if (env->offline_forced) {
-                printf("  Status: Offline (forced via WRAP_OFFLINE_MODE=1)\n");
+                user_message("  Status: Offline (forced via WRAP_OFFLINE_MODE=1)\n");
             } else {
-                printf("  Status: Offline (using cached data)\n");
+                user_message("  Status: Offline (using cached data)\n");
             }
         } else {
-            printf("  Status: Connected\n");
+            user_message("  Status: Connected\n");
         }
     }
 
-    printf("\n");
+    user_message("\n");
 
     if (elm_json) {
         elm_json_free(elm_json);

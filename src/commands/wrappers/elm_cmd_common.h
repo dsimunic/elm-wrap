@@ -36,4 +36,49 @@ char **build_elm_environment(void);
  */
 int download_all_packages(ElmJson *elm_json, InstallEnv *env);
 
+/**
+ * Run a "silent" package build using `elm make --json`, capturing compiler stdout,
+ * verifying success via exit code, and always deleting `elm-stuff` afterwards.
+ *
+ * This is used by commands like `wrap package prepublish` and `wrap package extract`
+ * to quickly confirm a package compiles.
+ *
+ * - `project_dir_abs` must be an absolute path to the package directory.
+ * - `elm_json_path_abs` must be an absolute path to that package's elm.json.
+ * - `exposed_modules` is typically the exposed-modules list.
+ *
+ * Returns true if the compiler exits successfully for all modules compiled.
+ * On failure, `*out_compiler_stdout` (if provided) contains the last compiler
+ * JSON output captured.
+ */
+bool elm_cmd_run_silent_package_build(
+	const char *project_dir_abs,
+	const char *elm_json_path_abs,
+	char **exposed_modules,
+	int exposed_count,
+	char **out_compiler_stdout
+);
+
+/*
+ * Given the Elm compiler JSON report (from `elm make --report=json`), return the
+ * number of unique file paths present in `errors[].path`.
+ * Returns 0 if parsing fails or no paths are present.
+ */
+int elm_cmd_count_compiler_error_files(const char *compiler_json);
+
+/*
+ * Parse the Elm compiler JSON report (from `elm make --report=json`) and return
+ * a unique list of file paths from `errors[].path`.
+ *
+ * The returned array and strings are arena-allocated.
+ * Returns the number of paths (0 on parse failure or none).
+ */
+int elm_cmd_get_compiler_error_paths(const char *compiler_json, char ***out_paths);
+
+/*
+ * Make an absolute path relative to `base_abs` (if it is under that directory).
+ * Returns an arena-allocated string.
+ */
+char *elm_cmd_path_relative_to_base(const char *abs_path, const char *base_abs);
+
 #endif /* ELM_CMD_COMMON_H */

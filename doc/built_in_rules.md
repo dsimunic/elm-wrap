@@ -31,7 +31,7 @@ wrap policy view ./my_rules/no_unused_dependencies
 | Rule | Description |
 |------|-------------|
 | `core_package_files` | Identifies core files required in an Elm package |
-| `no_invalid_package_layout` | Validates package directory structure |
+| `no_invalid_package_layout` | Validates package directory structure (checks for required LICENSE, README.md, docs.json, elm.json, src/ folder, exposed modules) |
 | `no_missing_type_expose` | Checks that types used in exposed APIs are also exposed |
 | `no_redundant_elm_files` | Detects Elm files not reachable from exposed modules |
 | `no_redundant_files` | Detects files that shouldn't be in a published package |

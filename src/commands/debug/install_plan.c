@@ -2,6 +2,7 @@
 #include "../../alloc.h"
 #include "../../constants.h"
 #include "../../dyn_array.h"
+#include "../../messages.h"
 #include "../../shared/log.h"
 #include "../../solver.h"
 #include "../../install_env.h"
@@ -21,24 +22,24 @@
 #include <unistd.h>
 
 static void print_install_plan_usage(void) {
-    printf("Usage: %s debug install-plan PACKAGE [PACKAGE ...] [OPTIONS]\n", global_context_program_name());
-    printf("\n");
-    printf("Show what packages would be installed for one or more packages (dry-run).\n");
-    printf("This exercises the dependency solver without actually installing anything.\n");
-    printf("\n");
-    printf("Arguments:\n");
-    printf("  PACKAGE           Package name in author/name format (e.g., elm/html)\n");
-    printf("                     Multiple packages can be specified.\n");
-    printf("\n");
-    printf("Options:\n");
-    printf("  --test             Show plan for test dependencies\n");
-    printf("  --major            Allow major version upgrades (single package only)\n");
-    printf("  --local-dev        Debug local development package installation\n");
-    printf("  --from-path PATH   Path to local package (requires --local-dev)\n");
-    printf("  -v, --verbose      Show detailed logging output (default)\n");
-    printf("  -vv                Show extra verbose (trace) logging output\n");
-    printf("  -q, --quiet        Suppress statistics output\n");
-    printf("  -h, --help         Show this help message\n");
+    user_message("Usage: %s debug install-plan PACKAGE [PACKAGE ...] [OPTIONS]\n", global_context_program_name());
+    user_message("\n");
+    user_message("Show what packages would be installed for one or more packages (dry-run).\n");
+    user_message("This exercises the dependency solver without actually installing anything.\n");
+    user_message("\n");
+    user_message("Arguments:\n");
+    user_message("  PACKAGE           Package name in author/name format (e.g., elm/html)\n");
+    user_message("                     Multiple packages can be specified.\n");
+    user_message("\n");
+    user_message("Options:\n");
+    user_message("  --test             Show plan for test dependencies\n");
+    user_message("  --major            Allow major version upgrades (single package only)\n");
+    user_message("  --local-dev        Debug local development package installation\n");
+    user_message("  --from-path PATH   Path to local package (requires --local-dev)\n");
+    user_message("  -v, --verbose      Show detailed logging output (default)\n");
+    user_message("  -vv                Show extra verbose (trace) logging output\n");
+    user_message("  -q, --quiet        Suppress statistics output\n");
+    user_message("  -h, --help         Show this help message\n");
 }
 
 /* Report obvious conflicts between the target package and current pinned deps (V2 only) */
@@ -67,7 +68,7 @@ static void report_conflicts_v2(const InstallEnv *env, ElmJson *elm_json, const 
     /* Helper to look up current pinned version */
     Package *(*find_pkg)(PackageMap *, const char *, const char *) = package_map_find;
 
-    printf("\nDetected conflicts for %s/%s (latest valid version %d.%d.%d):\n",
+    user_message("\nDetected conflicts for %s/%s (latest valid version %d.%d.%d):\n",
            author, name, version->major, version->minor, version->patch);
 
     int reported = 0;
@@ -96,13 +97,13 @@ static void report_conflicts_v2(const InstallEnv *env, ElmJson *elm_json, const 
             if (version_parse_constraint(dep->constraint, &constraint)) {
                 PgVersion cur_v;
                 if (pg_version_parse(cur->version, &cur_v) && !pg_range_contains(constraint, cur_v)) {
-                    printf("  - %s/%s requires %s but project pins %s\n",
+                    user_message("  - %s/%s requires %s but project pins %s\n",
                            dep_author, dep_name, dep->constraint, cur->version);
                     reported++;
                 }
             } else {
                 /* Fallback: show raw constraint text */
-                printf("  - %s/%s requires %s but project pins %s\n",
+                user_message("  - %s/%s requires %s but project pins %s\n",
                        dep_author, dep_name, dep->constraint, cur->version);
                 reported++;
             }
@@ -112,9 +113,9 @@ static void report_conflicts_v2(const InstallEnv *env, ElmJson *elm_json, const 
     }
 
     if (reported == 0) {
-        printf("  (no pinned dependencies found to compare; constraints are incompatible with available versions)\n");
+        user_message("  (no pinned dependencies found to compare; constraints are incompatible with available versions)\n");
     }
-    printf("\n");
+    user_message("\n");
 }
 
 int cmd_debug_install_plan(int argc, char *argv[]) {
@@ -155,7 +156,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
                 i++;
                 from_path = argv[i];
             } else {
-                fprintf(stderr, "Error: --from-path requires a path argument\n");
+                log_error("--from-path requires a path argument\n");
                 print_install_plan_usage();
                 return 1;
             }
@@ -169,7 +170,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
             /* Collect package names into array */
             DYNARRAY_PUSH(packages, package_count, package_capacity, argv[i], const char*);
         } else {
-            fprintf(stderr, "Error: Unknown option '%s'\n", argv[i]);
+            log_error("Unknown option '%s'\n", argv[i]);
             print_install_plan_usage();
             return 1;
         }
@@ -177,14 +178,14 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
 
     // Validate options
     if (from_path && !local_dev) {
-        fprintf(stderr, "Error: --from-path requires --local-dev flag\n");
+        log_error("--from-path requires --local-dev flag\n");
         print_install_plan_usage();
         return 1;
     }
 
     /* --major only works with single package */
     if (major_upgrade && package_count > 1) {
-        fprintf(stderr, "Error: --major can only be used with a single package\n");
+        log_error("--major can only be used with a single package\n");
         return 1;
     }
 
@@ -203,32 +204,32 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         snprintf(source_elm_json, sizeof(source_elm_json), "%s/elm.json", source_path);
         
         if (!file_exists(source_elm_json)) {
-            fprintf(stderr, "Error: No elm.json found in source directory: %s\n", source_path);
+            log_error("No elm.json found in source directory: %s\n", source_path);
             return 1;
         }
         
         // Read package info from local elm.json
         ElmJson *pkg_json = elm_json_read(source_elm_json);
         if (!pkg_json) {
-            fprintf(stderr, "Error: Failed to read %s\n", source_elm_json);
+            log_error("Failed to read %s\n", source_elm_json);
             return 1;
         }
         
         if (pkg_json->type != ELM_PROJECT_PACKAGE) {
-            fprintf(stderr, "Error: %s is not a package project. Please add --from-path PATH to see the install plan for a local-dev package.\n", source_elm_json);
+            log_error("%s is not a package project. Please add --from-path PATH to see the install plan for a local-dev package.\n", source_elm_json);
             elm_json_free(pkg_json);
             return 1;
         }
         
         if (!pkg_json->package_name) {
-            fprintf(stderr, "Error: No package name in %s\n", source_elm_json);
+            log_error("No package name in %s\n", source_elm_json);
             elm_json_free(pkg_json);
             return 1;
         }
         
         // Parse package name from elm.json
         if (!parse_package_name(pkg_json->package_name, &author, &name)) {
-            fprintf(stderr, "Error: Invalid package name in elm.json: %s\n", pkg_json->package_name);
+            log_error("Invalid package name in elm.json: %s\n", pkg_json->package_name);
             elm_json_free(pkg_json);
             return 1;
         }
@@ -238,50 +239,50 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
             char full_name[MAX_PACKAGE_NAME_LENGTH];
             snprintf(full_name, sizeof(full_name), "%s/%s", author, name);
             if (strcmp(packages[0], full_name) != 0) {
-                fprintf(stderr, "Error: Package name mismatch: specified %s but elm.json has %s\n", 
+                log_error("Package name mismatch: specified %s but elm.json has %s\n", 
                         packages[0], full_name);
                 elm_json_free(pkg_json);
                 return 1;
             }
         }
         
-        printf("\n=== Local Development Package Debug ===\n");
-        printf("Source path: %s\n", source_path);
-        printf("Package: %s/%s\n", author, name);
-        printf("Version in elm.json: %s\n", pkg_json->package_version ? pkg_json->package_version : "unknown");
-        printf("\nDependencies from local elm.json:\n");
+        user_message("\n=== Local Development Package Debug ===\n");
+        user_message("Source path: %s\n", source_path);
+        user_message("Package: %s/%s\n", author, name);
+        user_message("Version in elm.json: %s\n", pkg_json->package_version ? pkg_json->package_version : "unknown");
+        user_message("\nDependencies from local elm.json:\n");
         
         if (pkg_json->package_dependencies && pkg_json->package_dependencies->count > 0) {
             for (int i = 0; i < pkg_json->package_dependencies->count; i++) {
                 Package *dep = &pkg_json->package_dependencies->packages[i];
-                printf("  %s/%s: %s\n", dep->author, dep->name, dep->version ? dep->version : "any");
+                user_message("  %s/%s: %s\n", dep->author, dep->name, dep->version ? dep->version : "any");
             }
         } else {
-            printf("  (none)\n");
+            user_message("  (none)\n");
         }
-        printf("\n");
+        user_message("\n");
         
         // Find app's elm.json
         char *elm_json_path = find_elm_json_upwards(NULL);
         if (!elm_json_path) {
-            fprintf(stderr, "Error: Could not find elm.json in current directory or parent directories\n");
+            log_error("Could not find elm.json in current directory or parent directories\n");
             elm_json_free(pkg_json);
             return 1;
         }
         
         ElmJson *app_json = elm_json_read(elm_json_path);
         if (!app_json) {
-            fprintf(stderr, "Error: Failed to load elm.json from %s\n", elm_json_path);
+            log_error("Failed to load elm.json from %s\n", elm_json_path);
             elm_json_free(pkg_json);
             arena_free(elm_json_path);
             return 1;
         }
         
-        printf("Target app: %s\n\n", elm_json_path);
+        user_message("Target app: %s\n\n", elm_json_path);
 
         InstallEnv *install_env = install_env_create();
         if (!install_env) {
-            fprintf(stderr, "Error: Failed to create install environment\n");
+            log_error("Failed to create install environment\n");
             elm_json_free(pkg_json);
             elm_json_free(app_json);
             arena_free(elm_json_path);
@@ -289,7 +290,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         }
         
         if (!install_env_init(install_env)) {
-            fprintf(stderr, "Error: Failed to initialize install environment\n");
+            log_error("Failed to initialize install environment\n");
             install_env_free(install_env);
             elm_json_free(pkg_json);
             elm_json_free(app_json);
@@ -297,7 +298,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
             return 1;
         }
         
-        printf("=== Dependency Resolution Analysis ===\n\n");
+        user_message("=== Dependency Resolution Analysis ===\n\n");
         
         // Check if main package is in registry
         bool main_in_registry = false;
@@ -307,18 +308,18 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
             main_in_registry = registry_find(install_env->registry, author, name) != NULL;
         }
         
-        printf("Main package %s/%s:\n", author, name);
+        user_message("Main package %s/%s:\n", author, name);
         if (main_in_registry) {
-            printf("  Status: EXISTS in registry (local version 999.0.0 would be used)\n");
+            user_message("  Status: EXISTS in registry (local version 999.0.0 would be used)\n");
         } else {
-            printf("  Status: NOT in registry (local version 0.0.0 would be used)\n");
+            user_message("  Status: NOT in registry (local version 0.0.0 would be used)\n");
         }
-        printf("\n");
+        user_message("\n");
         
         // Check each dependency
         int issues = 0;
         if (pkg_json->package_dependencies && pkg_json->package_dependencies->count > 0) {
-            printf("Dependency analysis:\n");
+            user_message("Dependency analysis:\n");
             
             for (int i = 0; i < pkg_json->package_dependencies->count; i++) {
                 Package *dep = &pkg_json->package_dependencies->packages[i];
@@ -330,15 +331,15 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
                     dep_in_registry = registry_find(install_env->registry, dep->author, dep->name) != NULL;
                 }
                 
-                printf("\n  %s/%s (constraint: %s):\n", dep->author, dep->name, 
+                user_message("\n  %s/%s (constraint: %s):\n", dep->author, dep->name, 
                        dep->version ? dep->version : "any");
                 
                 if (!dep_in_registry) {
-                    printf("    Status: NOT IN REGISTRY\n");
-                    printf("    Action: Must also install with --local-dev\n");
+                    user_message("    Status: NOT IN REGISTRY\n");
+                    user_message("    Action: Must also install with --local-dev\n");
                     issues++;
                 } else {
-                    printf("    Status: Available in registry\n");
+                    user_message("    Status: Available in registry\n");
                     
                     // Try to resolve this dependency
                     SolverState *solver = solver_init(install_env, install_env_solver_online(install_env));
@@ -348,36 +349,36 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
                                                                   NULL, is_test, false, false, &dep_plan);
                         
                         if (result == SOLVER_OK) {
-                            printf("    Resolution: OK\n");
+                            user_message("    Resolution: OK\n");
                             if (dep_plan && dep_plan->count > 0) {
-                                printf("    Would install:\n");
+                                user_message("    Would install:\n");
                                 for (int j = 0; j < dep_plan->count; j++) {
                                     PackageChange *change = &dep_plan->changes[j];
                                     if (change->old_version) {
-                                        printf("      %s/%s: %s -> %s\n", 
+                                        user_message("      %s/%s: %s -> %s\n", 
                                                change->author, change->name,
                                                change->old_version, change->new_version);
                                     } else {
-                                        printf("      %s/%s: %s (new)\n", 
+                                        user_message("      %s/%s: %s (new)\n", 
                                                change->author, change->name,
                                                change->new_version);
                                     }
                                 }
                             } else {
-                                printf("    Would install: (already satisfied)\n");
+                                user_message("    Would install: (already satisfied)\n");
                             }
                         } else {
-                            printf("    Resolution: FAILED\n");
-                            printf("    Reason: ");
+                            user_message("    Resolution: FAILED\n");
+                            user_message("    Reason: ");
                             switch (result) {
                                 case SOLVER_NO_SOLUTION:
-                                    printf("Conflicts with current dependencies\n");
+                                    user_message("Conflicts with current dependencies\n");
                                     break;
                                 case SOLVER_INVALID_PACKAGE:
-                                    printf("Invalid package or version constraint\n");
+                                    user_message("Invalid package or version constraint\n");
                                     break;
                                 default:
-                                    printf("Solver error\n");
+                                    user_message("Solver error\n");
                                     break;
                             }
                             issues++;
@@ -386,18 +387,18 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
                         if (dep_plan) install_plan_free(dep_plan);
                         solver_free(solver);
                     } else {
-                        printf("    Resolution: Could not initialize solver\n");
+                        user_message("    Resolution: Could not initialize solver\n");
                         issues++;
                     }
                 }
             }
         }
         
-        printf("\n=== Summary ===\n");
+        user_message("\n=== Summary ===\n");
         if (issues == 0) {
-            printf("All dependencies can be resolved. Local-dev installation should succeed.\n");
+            user_message("All dependencies can be resolved. Local-dev installation should succeed.\n");
         } else {
-            printf("Found %d issue(s) that would prevent installation.\n", issues);
+            user_message("Found %d issue(s) that would prevent installation.\n", issues);
         }
         
         elm_json_free(pkg_json);
@@ -408,7 +409,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
     } else {
         // Regular mode - require at least one package name
         if (package_count == 0) {
-            fprintf(stderr, "Error: At least one package name required\n");
+            log_error("At least one package name required\n");
             print_install_plan_usage();
             return 1;
         }
@@ -417,14 +418,14 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
     // Find elm.json
     char *elm_json_path = find_elm_json_upwards(NULL);
     if (!elm_json_path) {
-        fprintf(stderr, "Error: Could not find elm.json in current directory or parent directories\n");
+        log_error("Could not find elm.json in current directory or parent directories\n");
         return 1;
     }
 
     // Load elm.json
     ElmJson *elm_json = elm_json_read(elm_json_path);
     if (!elm_json) {
-        fprintf(stderr, "Error: Failed to load elm.json from %s\n", elm_json_path);
+        log_error("Failed to load elm.json from %s\n", elm_json_path);
         arena_free(elm_json_path);
         return 1;
     }
@@ -432,14 +433,14 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
     // Create install environment
     InstallEnv *install_env = install_env_create();
     if (!install_env) {
-        fprintf(stderr, "Error: Failed to create install environment\n");
+        log_error("Failed to create install environment\n");
         elm_json_free(elm_json);
         arena_free(elm_json_path);
         return 1;
     }
 
     if (!install_env_init(install_env)) {
-        fprintf(stderr, "Error: Failed to initialize install environment\n");
+        log_error("Failed to initialize install environment\n");
         install_env_free(install_env);
         elm_json_free(elm_json);
         arena_free(elm_json_path);
@@ -449,7 +450,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
     // Initialize solver
     SolverState *solver = solver_init(install_env, install_env_solver_online(install_env));
     if (!solver) {
-        fprintf(stderr, "Error: Failed to initialize solver\n");
+        log_error("Failed to initialize solver\n");
         install_env_free(install_env);
         elm_json_free(elm_json);
         arena_free(elm_json_path);
@@ -464,7 +465,7 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
         // Single package mode - use original logic for better error messages
         const char *package = packages[0];
         if (!parse_package_name(package, &author, &name)) {
-            fprintf(stderr, "Error: Package name must be in author/name format (e.g., elm/html)\n");
+            log_error("Package name must be in author/name format (e.g., elm/html)\n");
             solver_free(solver);
             install_env_free(install_env);
             elm_json_free(elm_json);
@@ -479,48 +480,48 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
             report_conflicts_v2(install_env, elm_json, author, name);
             report_missing_registry_versions_for_elm_json(install_env, elm_json);
 
-            printf("\n");
-            printf("Failed to create install plan for package %s/%s%s%s\n", author, name,
+            user_message("\n");
+            user_message("Failed to create install plan for package %s/%s%s%s\n", author, name,
                    is_test ? " (test dependency)" : "",
                    major_upgrade ? " (major upgrades allowed)" : "");
-            printf("\n");
-            printf("Reason: ");
+            user_message("\n");
+            user_message("Reason: ");
             switch (result) {
                 case SOLVER_NO_SOLUTION:
-                    printf("No solution found - the package has conflicts with current dependencies\n");
+                    user_message("No solution found - the package has conflicts with current dependencies\n");
                     break;
                 case SOLVER_NO_OFFLINE_SOLUTION:
-                    printf("No offline solution found - network connection may be required\n");
+                    user_message("No offline solution found - network connection may be required\n");
                     break;
                 case SOLVER_NETWORK_ERROR:
-                    printf("Network error occurred\n");
+                    user_message("Network error occurred\n");
                     break;
                 case SOLVER_INVALID_PACKAGE:
-                    printf("Invalid package name or package does not exist\n");
+                    user_message("Invalid package name or package does not exist\n");
                     break;
                 default:
-                    printf("Unknown error\n");
+                    user_message("Unknown error\n");
                     break;
             }
-            printf("\n");
-            printf("See error messages above for details about conflicts.\n");
+            user_message("\n");
+            user_message("See error messages above for details about conflicts.\n");
         } else {
-            printf("Install plan for package %s/%s%s%s:\n", author, name,
+            user_message("Install plan for package %s/%s%s%s:\n", author, name,
                    is_test ? " (test dependency)" : "",
                    major_upgrade ? " (major upgrades allowed)" : "");
-            printf("\n");
+            user_message("\n");
 
             if (!plan || plan->count == 0) {
-                printf("No packages need to be installed\n");
+                user_message("No packages need to be installed\n");
             } else {
-                printf("Packages to be installed:\n");
+                user_message("Packages to be installed:\n");
                 for (int i = 0; i < plan->count; i++) {
                     PackageChange *change = &plan->changes[i];
                     if (change->old_version) {
-                        printf("  %s/%s: %s -> %s\n", change->author, change->name,
+                        user_message("  %s/%s: %s -> %s\n", change->author, change->name,
                                change->old_version, change->new_version);
                     } else {
-                        printf("  %s/%s: %s (new)\n", change->author, change->name,
+                        user_message("  %s/%s: %s (new)\n", change->author, change->name,
                                change->new_version);
                     }
                 }
@@ -549,59 +550,59 @@ int cmd_debug_install_plan(int argc, char *argv[]) {
 
         // Print validation errors if any
         if (validation && validation->invalid_count > 0) {
-            printf("\n");
-            printf("Package validation errors:\n");
+            user_message("\n");
+            user_message("Package validation errors:\n");
             for (int i = 0; i < validation->count; i++) {
                 PackageValidationResult *r = &validation->results[i];
                 if (!r->valid_name || !r->exists) {
-                    printf("  %s✗%s %s/%s: %s\n", ANSI_RED, ANSI_RESET,
+                    user_message("  %s✗%s %s/%s: %s\n", ANSI_RED, ANSI_RESET,
                            r->author ? r->author : "?",
                            r->name ? r->name : "?",
                            r->error_msg ? r->error_msg : "Unknown error");
                 }
             }
-            printf("\n");
+            user_message("\n");
         }
 
         if (result != SOLVER_OK) {
-            printf("Failed to create install plan for packages%s\n",
+            user_message("Failed to create install plan for packages%s\n",
                    is_test ? " (test dependencies)" : "");
-            printf("\n");
-            printf("Reason: ");
+            user_message("\n");
+            user_message("Reason: ");
             switch (result) {
                 case SOLVER_NO_SOLUTION:
-                    printf("No solution found - the packages have conflicts with current dependencies\n");
+                    user_message("No solution found - the packages have conflicts with current dependencies\n");
                     break;
                 case SOLVER_NO_OFFLINE_SOLUTION:
-                    printf("No offline solution found - network connection may be required\n");
+                    user_message("No offline solution found - network connection may be required\n");
                     break;
                 case SOLVER_NETWORK_ERROR:
-                    printf("Network error occurred\n");
+                    user_message("Network error occurred\n");
                     break;
                 case SOLVER_INVALID_PACKAGE:
-                    printf("One or more packages are invalid or do not exist\n");
+                    user_message("One or more packages are invalid or do not exist\n");
                     break;
                 default:
-                    printf("Unknown error\n");
+                    user_message("Unknown error\n");
                     break;
             }
-            printf("\n");
+            user_message("\n");
         } else {
-            printf("Install plan for %d packages%s:\n", package_count,
+            user_message("Install plan for %d packages%s:\n", package_count,
                    is_test ? " (test dependencies)" : "");
-            printf("\n");
+            user_message("\n");
 
             if (!plan || plan->count == 0) {
-                printf("No packages need to be installed\n");
+                user_message("No packages need to be installed\n");
             } else {
-                printf("Packages to be installed:\n");
+                user_message("Packages to be installed:\n");
                 for (int i = 0; i < plan->count; i++) {
                     PackageChange *change = &plan->changes[i];
                     if (change->old_version) {
-                        printf("  %s/%s: %s -> %s\n", change->author, change->name,
+                        user_message("  %s/%s: %s -> %s\n", change->author, change->name,
                                change->old_version, change->new_version);
                     } else {
-                        printf("  %s/%s: %s (new)\n", change->author, change->name,
+                        user_message("  %s/%s: %s (new)\n", change->author, change->name,
                                change->new_version);
                     }
                 }

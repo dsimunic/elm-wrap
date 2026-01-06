@@ -1,6 +1,7 @@
 #include "extract_cmd.h"
 #include "package_common.h"
 #include "install_local_dev.h"
+#include "../wrappers/elm_cmd_common.h"
 #include "../../install.h"
 #include "../../install_env.h"
 #include "../../global_context.h"
@@ -86,6 +87,7 @@ static void print_extract_usage(void) {
     printf("Options:\n");
     printf("  -y, --yes           Skip confirmation prompt\n");
     printf("  --no-local-dev      Do not register as a local-dev dependency\n");
+    printf("  --no-compile-check  Do not run a silent build after extraction\n");
     printf("  -h, --help          Show this help message\n");
 }
 
@@ -1584,6 +1586,7 @@ int cmd_extract(int argc, char *argv[]) {
     /* Phase A: Parse arguments */
     bool auto_yes = false;
     bool no_local_dev = false;
+    bool no_compile_check = false;
     const char *package_spec = NULL;
     const char *target_path = NULL;
 
@@ -1605,6 +1608,8 @@ int cmd_extract(int argc, char *argv[]) {
             auto_yes = true;
         } else if (strcmp(arg, "--no-local-dev") == 0) {
             no_local_dev = true;
+        } else if (strcmp(arg, "--no-compile-check") == 0) {
+            no_compile_check = true;
         } else if (arg[0] == '-' && strcmp(arg, "-") != 0) {
             log_error("Unknown option %s", arg);
             print_extract_usage();
@@ -2225,12 +2230,12 @@ int cmd_extract(int argc, char *argv[]) {
     int install_result = install_local_dev(target_abs, package_name, app_elm_json_to_use,
                                           env, false, true, true);
     install_env_free(env);
-    arena_free(target_abs);
 
     if (install_result != 0) {
         log_error("Package was created and files moved, but failed to add as dependency.");
         log_error("You can manually add it with: %s package install %s",
                  global_context_program_name(), package_name);
+        arena_free(target_abs);
         arena_free(package_name);
         if (version_str) arena_free(version_str);
         if (license_str) arena_free(license_str);
@@ -2239,6 +2244,70 @@ int cmd_extract(int argc, char *argv[]) {
         elm_json_free(app_json);
         if (app_elm_json_path) arena_free(app_elm_json_path);
         return 1;
+    }
+
+    /* Read package version for user-facing success message */
+    char *pkg_author = NULL;
+    char *pkg_name_tmp = NULL;
+    char *pkg_version = NULL;
+    if (!read_package_info_from_elm_json(pkg_elm_json_path, &pkg_author, &pkg_name_tmp, &pkg_version)) {
+        log_error("Failed to read package info from %s", pkg_elm_json_path);
+        arena_free(package_name);
+        if (version_str) arena_free(version_str);
+        if (license_str) arena_free(license_str);
+        if (app_root_dir) arena_free(app_root_dir);
+        if (app_root_abs) arena_free(app_root_abs);
+        elm_json_free(app_json);
+        if (app_elm_json_path) arena_free(app_elm_json_path);
+        if (pkg_author) arena_free(pkg_author);
+        if (pkg_name_tmp) arena_free(pkg_name_tmp);
+        if (pkg_version) arena_free(pkg_version);
+        if (target_abs) arena_free(target_abs);
+        return 1;
+    }
+
+    printf("Successfully extracted %d %s to %s and added as local-dev dependency.\n\n",
+           selected.count,
+           en_plural_s((long)selected.count, "file", "files"),
+           target_path);
+
+    printf("Successfully installed %s %s as a direct dependency in %s.\n\n",
+           package_name, pkg_version ? pkg_version : "(unknown)", app_elm_json_to_use);
+
+    /* Phase K2: Silent build extracted package, unless disabled */
+    if (!no_compile_check) {
+        printf("Checking module by compiling it...\n");
+
+        char pkg_elm_json_abs[MAX_PATH_LENGTH];
+        snprintf(pkg_elm_json_abs, sizeof(pkg_elm_json_abs), "%s/elm.json", target_abs);
+
+        char *compiler_stdout = NULL;
+        bool compile_ok = elm_cmd_run_silent_package_build(
+            target_abs,
+            pkg_elm_json_abs,
+            exposed_modules,
+            exposed_count,
+            &compiler_stdout
+        );
+
+        if (compile_ok) {
+            printf("The extracted package compiles successfully.\n\n");
+        } else {
+            char **error_paths = NULL;
+            int file_count = elm_cmd_get_compiler_error_paths(compiler_stdout, &error_paths);
+            if (file_count > 0) {
+                printf("The extracted package failed to compile. There's a problem with %d %s:\n\n",
+                       file_count,
+                       en_plural_s((long)file_count, "file", "files"));
+                for (int i = 0; i < file_count; i++) {
+                    char *rel = elm_cmd_path_relative_to_base(error_paths[i], target_abs);
+                    printf("  %s\n", rel ? rel : "(unknown)");
+                }
+                printf("\n");
+            } else {
+                printf("The extracted package failed to compile.\n\n");
+            }
+        }
     }
 
     /* Phase L: Demote app direct dependencies that are no longer directly imported */
@@ -2252,31 +2321,9 @@ int cmd_extract(int argc, char *argv[]) {
         if (keep_name) arena_free(keep_name);
     }
 
-    char *pkg_author = NULL;
-    char *pkg_name_tmp = NULL;
-    char *pkg_version = NULL;
-    if (!read_package_info_from_elm_json(pkg_elm_json_path, &pkg_author, &pkg_name_tmp, &pkg_version)) {
-        log_error("Failed to read package info from %s", pkg_elm_json_path);
-        arena_free(package_name);
-        if (version_str) arena_free(version_str);
-        if (license_str) arena_free(license_str);
-        if (app_root_dir) arena_free(app_root_dir);
-        if (app_root_abs) arena_free(app_root_abs);
-        elm_json_free(app_json);
-        if (app_elm_json_path) arena_free(app_elm_json_path);
-        return 1;
-    }
-
-        printf("Successfully extracted %d %s to %s and added as local-dev dependency.\n\n",
-            selected.count,
-            en_plural_s((long)selected.count, "file", "files"),
-            target_path);
-
-    printf("Successfully installed %s %s as a direct dependency in %s.\n\n",
-           package_name, pkg_version ? pkg_version : "(unknown)", app_elm_json_to_use);
-
     printf("Please compile the application to confirm it still works.\n");
 
+    if (target_abs) arena_free(target_abs);
     if (pkg_author) arena_free(pkg_author);
     if (pkg_name_tmp) arena_free(pkg_name_tmp);
     if (pkg_version) arena_free(pkg_version);

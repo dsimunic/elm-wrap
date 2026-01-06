@@ -7,6 +7,7 @@
 #include "reporter.h"
 #include "../../alloc.h"
 #include "../../dyn_array.h"
+#include "../../messages.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -20,6 +21,7 @@ ReporterConfig reporter_default_config(void) {
     cfg.base_path = NULL;
     cfg.use_tree = 1;
     cfg.use_color = 0;
+    cfg.show_base = 1;
     cfg.max_depth = -1;
     return cfg;
 }
@@ -194,7 +196,7 @@ static void tree_print_node(TreeNode *node, const char *prefix, int is_last, int
     if (max_depth >= 0 && depth > max_depth) return;
     
     if (node->name) {
-        printf("%s%s%s\n", prefix, is_last ? "└── " : "├── ", node->name);
+        user_message("%s%s%s\n", prefix, is_last ? "└── " : "├── ", node->name);
     }
     
     /* Build prefix for children - need space for prefix + 4 chars for the branch + null terminator */
@@ -215,7 +217,7 @@ static void tree_print_node(TreeNode *node, const char *prefix, int is_last, int
 
 void reporter_print_file_tree(const ReporterConfig *cfg, const char **paths, int count) {
     if (count == 0) {
-        printf("  (none)\n");
+        user_message("  (none)\n");
         return;
     }
     
@@ -229,8 +231,8 @@ void reporter_print_file_tree(const ReporterConfig *cfg, const char **paths, int
     }
     
     /* Print the base path as header */
-    if (base) {
-        printf("  %s/\n", base);
+    if (base && (!cfg || cfg->show_base)) {
+        user_message("  %s/\n", base);
     }
     
     /* Build tree from stripped paths */
@@ -253,7 +255,7 @@ void reporter_print_file_tree(const ReporterConfig *cfg, const char **paths, int
 
 void reporter_print_file_list(const ReporterConfig *cfg, const char **paths, int count) {
     if (count == 0) {
-        printf("  (none)\n");
+        user_message("  (none)\n");
         return;
     }
     
@@ -266,12 +268,12 @@ void reporter_print_file_list(const ReporterConfig *cfg, const char **paths, int
     }
     
     if (base) {
-        printf("  (relative to %s)\n", base);
+        user_message("  (relative to %s)\n", base);
     }
     
     for (int i = 0; i < count; i++) {
         char *rel_path = reporter_strip_prefix(paths[i], base);
-        printf("  - %s\n", rel_path);
+        user_message("  - %s\n", rel_path);
     }
 }
 
@@ -357,7 +359,7 @@ void reporter_print_errors(
         const Tuple *tuples = (const Tuple *)view.tuples;
         for (int i = 0; i < view.num_tuples; i++) {
             const Tuple *t = &tuples[i];
-            printf("  error(");
+            user_message("  error(");
             for (int a = 0; a < t->arity; a++) {
                 const Value *v = &t->fields[a];
                 switch (v->kind) {
@@ -368,27 +370,27 @@ void reporter_print_errors(
                         if (base_path && strncmp(name, base_path, strlen(base_path)) == 0) {
                             const char *rest = name + strlen(base_path);
                             while (*rest == '/') rest++;
-                            printf("%s", rest);
+                            user_message("%s", rest);
                         } else {
-                            printf("%s", name);
+                            user_message("%s", name);
                         }
                     } else {
-                        printf("#%d", v->u.sym);
+                        user_message("#%d", v->u.sym);
                     }
                     break;
                 }
                 case VAL_INT:
-                    printf("%ld", v->u.i);
+                    user_message("%ld", v->u.i);
                     break;
                 default:
-                    printf("?");
+                    user_message("?");
                     break;
                 }
                 if (a + 1 < t->arity) {
-                    printf(", ");
+                    user_message(", ");
                 }
             }
-            printf(")\n");
+            user_message(")\n");
         }
     }
 }
