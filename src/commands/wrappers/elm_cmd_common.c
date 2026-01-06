@@ -438,7 +438,9 @@ static int run_compiler_make_capture_stdout_in_dir(
         close(pipefd[0]);
         close(pipefd[1]);
 
-        (void)chdir(cwd);
+        if (chdir(cwd) != 0) {
+            _exit(127);
+        }
         execve(compiler_path, argv, compiler_env);
         _exit(127);
     }
