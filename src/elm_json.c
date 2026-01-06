@@ -638,7 +638,7 @@ static bool write_elm_json_formatted_to_file(cJSON *json, FILE *file) {
     return true;
 }
 
-static bool write_elm_json_formatted_atomic(cJSON *json, const char *filepath) {
+bool elm_json_write_formatted_atomic(struct cJSON *json, const char *filepath) {
     if (!json || !filepath) {
         return false;
     }
@@ -808,7 +808,7 @@ bool elm_json_write(ElmJson *elm_json, const char *filepath) {
     }
     
     /* Use custom formatter instead of cJSON_Print; write atomically */
-    bool result = write_elm_json_formatted_atomic(json, filepath);
+    bool result = elm_json_write_formatted_atomic(json, filepath);
     cJSON_Delete(json);
     
     return result;

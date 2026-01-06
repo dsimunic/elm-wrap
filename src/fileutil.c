@@ -45,6 +45,52 @@ static bool ensure_directory(const char *path) {
     return true;
 }
 
+bool mkdir_p(const char *path) {
+    if (!path || path[0] == '\0') {
+        errno = EINVAL;
+        return false;
+    }
+
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        if (S_ISDIR(st.st_mode)) {
+            return true;
+        }
+        errno = EEXIST;
+        return false;
+    }
+
+    /* Create parent directory first */
+    char *path_copy = arena_strdup(path);
+    if (!path_copy) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    char *parent = dirname(path_copy);
+    char *parent_copy = arena_strdup(parent);
+    arena_free(path_copy);
+
+    if (!parent_copy) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    if (strcmp(parent_copy, ".") != 0 && strcmp(parent_copy, "/") != 0 && strcmp(parent_copy, path) != 0) {
+        if (!mkdir_p(parent_copy)) {
+            arena_free(parent_copy);
+            return false;
+        }
+    }
+    arena_free(parent_copy);
+
+    if (mkdir(path, DIR_PERMISSIONS) != 0 && errno != EEXIST) {
+        return false;
+    }
+
+    return true;
+}
+
 bool extract_zip(const char *zip_path, const char *dest_dir) {
     mz_zip_archive zip;
     memset(&zip, 0, sizeof(zip));

@@ -996,7 +996,7 @@ int register_local_dev_package(const char *source_path, const char *package_name
 
 int install_local_dev(const char *source_path, const char *package_name,
                       const char *target_elm_json, InstallEnv *env,
-                      bool is_test, bool auto_yes) {
+                      bool is_test, bool auto_yes, bool quiet) {
     struct stat st;
     char resolved_source[PATH_MAX];
 
@@ -1128,7 +1128,9 @@ int install_local_dev(const char *source_path, const char *package_name,
     /* Process each dependency of the local package to build the install plan */
     bool resolution_failed = false;
     if (pkg_json->package_dependencies && pkg_json->package_dependencies->count > 0) {
-        log_progress("Resolving dependencies from local package...");
+        if (!quiet) {
+            log_progress("Resolving dependencies from local package...");
+        }
         
         for (int i = 0; i < pkg_json->package_dependencies->count; i++) {
             Package *dep = &pkg_json->package_dependencies->packages[i];
@@ -1247,37 +1249,39 @@ int install_local_dev(const char *source_path, const char *package_name,
     /* 
      * PHASE 2: Show complete plan and ask for confirmation
      */
-    printf("Here is my plan:\n");
-    printf("  \n");
-    if (is_update) {
-        printf("  Change (local):\n");
-        printf("    %s/%s    %s => %s (local)\n", actual_author, actual_name, existing->version, version);
-    } else {
-        printf("  Add (local):\n");
-        printf("    %s/%s    %s (local)\n", actual_author, actual_name, version);
-    }
-    
-    if (plan_count > 0) {
+    if (!quiet) {
+        printf("Here is my plan:\n");
         printf("  \n");
-        printf("  Add (indirect dependencies):\n");
-        for (int i = 0; i < plan_count; i++) {
-            if (plan_changes[i].old_version) {
-                printf("    %s/%s    %s => %s\n", 
-                       plan_changes[i].author, plan_changes[i].name,
-                       plan_changes[i].old_version, plan_changes[i].new_version);
-            } else {
-                printf("    %s/%s    %s\n", 
-                       plan_changes[i].author, plan_changes[i].name,
-                       plan_changes[i].new_version);
+        if (is_update) {
+            printf("  Change (local):\n");
+            printf("    %s/%s    %s => %s (local)\n", actual_author, actual_name, existing->version, version);
+        } else {
+            printf("  Add (local):\n");
+            printf("    %s/%s    %s (local)\n", actual_author, actual_name, version);
+        }
+
+        if (plan_count > 0) {
+            printf("  \n");
+            printf("  Add (indirect dependencies):\n");
+            for (int i = 0; i < plan_count; i++) {
+                if (plan_changes[i].old_version) {
+                    printf("    %s/%s    %s => %s\n",
+                           plan_changes[i].author, plan_changes[i].name,
+                           plan_changes[i].old_version, plan_changes[i].new_version);
+                } else {
+                    printf("    %s/%s    %s\n",
+                           plan_changes[i].author, plan_changes[i].name,
+                           plan_changes[i].new_version);
+                }
             }
         }
-    }
-    
-    printf("  \n");
-    printf("  Source: %s\n", resolved_source);
-    printf("  \n");
 
-    if (!auto_yes) {
+        printf("  \n");
+        printf("  Source: %s\n", resolved_source);
+        printf("  \n");
+    }
+
+    if (!quiet && !auto_yes) {
         printf("\nWould you like me to proceed? [Y/n] ");
         fflush(stdout);
 
@@ -1330,7 +1334,9 @@ int install_local_dev(const char *source_path, const char *package_name,
     }
 
     /* Write updated elm.json */
-    printf("Saving elm.json...\n");
+    if (!quiet) {
+        printf("Saving elm.json...\n");
+    }
     if (!elm_json_write(app_json, target_elm_json)) {
         log_error("Failed to write elm.json");
         elm_json_free(app_json);
@@ -1347,7 +1353,9 @@ int install_local_dev(const char *source_path, const char *package_name,
         /* Continue anyway - the install succeeded */
     }
 
-    printf("Successfully installed %s/%s %s (local)!\n", actual_author, actual_name, version);
+    if (!quiet) {
+        printf("Successfully installed %s/%s %s (local)!\n", actual_author, actual_name, version);
+    }
 
     elm_json_free(app_json);
     arena_free(actual_author);

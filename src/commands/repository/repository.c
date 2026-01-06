@@ -19,6 +19,7 @@
 #include "../../protocol_v2/solver/v2_registry.h"
 #include "../../registry.h"
 #include "../../cache.h"
+#include "../../fileutil.h"
 #include "rulr.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"
@@ -169,55 +170,6 @@ static char *get_compiler_name(void) {
     return arena_strdup("elm");
 }
 
-/**
- * Create a directory and all parent directories (like mkdir -p).
- * Returns 0 on success, -1 on failure.
- */
-static int mkdir_p(const char *path) {
-    if (!path || path[0] == '\0') {
-        return -1;
-    }
-
-    struct stat st;
-    if (stat(path, &st) == 0) {
-        if (S_ISDIR(st.st_mode)) {
-            return 0; /* Directory already exists */
-        }
-        errno = EEXIST;
-        return -1; /* Exists but is not a directory */
-    }
-
-    /* Create parent directory first */
-    char *path_copy = arena_strdup(path);
-    if (!path_copy) {
-        return -1;
-    }
-
-    char *parent = dirname(path_copy);
-    /* Make a copy of parent since dirname modifies the string in place */
-    char *parent_copy = arena_strdup(parent);
-    arena_free(path_copy);
-    
-    if (!parent_copy) {
-        return -1;
-    }
-
-    if (strcmp(parent_copy, ".") != 0 && strcmp(parent_copy, "/") != 0 && strcmp(parent_copy, path) != 0) {
-        if (mkdir_p(parent_copy) != 0) {
-            arena_free(parent_copy);
-            return -1;
-        }
-    }
-    arena_free(parent_copy);
-
-    /* Create this directory */
-    if (mkdir(path, DIR_PERMISSIONS) != 0 && errno != EEXIST) {
-        return -1;
-    }
-
-    return 0;
-}
-
 /* ============================================================================
  * Subcommands
  * ========================================================================== */
@@ -343,7 +295,7 @@ int cmd_repository_new(int argc, char *argv[]) {
     /* Create the directory */
     log_debug("Creating repository at: %s", repo_path);
 
-    if (mkdir_p(repo_path) != 0) {
+    if (!mkdir_p(repo_path)) {
         fprintf(stderr, "Error: Failed to create directory '%s': %s\n", repo_path, strerror(errno));
         return 1;
     }

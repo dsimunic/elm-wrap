@@ -86,4 +86,9 @@ char *file_read_contents_bounded(const char *filepath, size_t max_bytes, size_t 
  */
 char *strip_trailing_slash(const char *path);
 
+/* Create a directory and all parent directories (like mkdir -p).
+ * Returns true on success, false on failure (check errno).
+ */
+bool mkdir_p(const char *path);
+
 #endif /* FILEUTIL_H */

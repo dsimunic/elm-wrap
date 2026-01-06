@@ -3,6 +3,9 @@
 
 #include <stdbool.h>
 
+/* Forward declaration (vendored cJSON) */
+struct cJSON;
+
 /* Forward declarations */
 typedef struct ElmJson ElmJson;
 typedef struct Package Package;
@@ -58,6 +61,9 @@ void package_map_print(PackageMap *map);
 ElmJson* elm_json_read(const char *filepath);
 bool elm_json_write(ElmJson *elm_json, const char *filepath);
 void elm_json_free(ElmJson *elm_json);
+
+/* Write an already-parsed elm.json (cJSON) using the canonical formatter, atomically. */
+bool elm_json_write_formatted_atomic(struct cJSON *json, const char *filepath);
 
 /* Dependency promotion */
 typedef enum {

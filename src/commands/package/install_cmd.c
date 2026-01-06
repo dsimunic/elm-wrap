@@ -1376,7 +1376,7 @@ int cmd_install(int argc, char *argv[]) {
             return result;
         }
         
-        result = install_local_dev(source_path, package_name, project_elm_json_path, env, is_test, auto_yes);
+        result = install_local_dev(source_path, package_name, project_elm_json_path, env, is_test, auto_yes, false);
         
         elm_json_free(elm_json);
         arena_free(project_elm_json_path);

@@ -1,5 +1,7 @@
 #include "debug.h"
 #include "../../alloc.h"
+#include "../../cache.h"
+#include "../package/package_common.h"
 #include "../../global_context.h"
 #include "../../shared/log.h"
 #include "../../fileutil.h"
@@ -21,22 +23,301 @@
 #endif
 
 /* Forward declarations */
+typedef struct ExternalModuleOwnerMap ExternalModuleOwnerMap;
+
 static int print_file_include_tree(const char *file_path);
 static int print_package_include_tree(const char *dir_path);
 static void collect_imports_recursive(const char *file_path, const char *src_dir,
+                                       const ExternalModuleOwnerMap *external_map,
                                        char ***visited, int *visited_count, int *visited_capacity,
                                        const char *prefix);
 static char *module_name_to_path(const char *module_name, const char *src_dir);
 static void collect_all_elm_files(const char *dir_path, char ***files, int *count, int *capacity);
 static int is_file_in_list(const char *file, char **list, int count);
 static char *find_src_dir_for_file(const char *file_path);
+static char *find_elm_json_for_file(const char *file_path);
 static char *read_file_content(const char *filepath);
+static char **parse_exposed_modules(const char *elm_json_path, int *count);
 
 /* Tree drawing characters (UTF-8) */
 #define TREE_BRANCH "├── "
 #define TREE_LAST   "└── "
 #define TREE_VERT   "│   "
 #define TREE_SPACE  "    "
+
+typedef struct {
+    char *module_name;
+    char *package_name; /* author/name */
+} ExternalModuleOwner;
+
+struct ExternalModuleOwnerMap {
+    ExternalModuleOwner *items;
+    int count;
+    int capacity;
+};
+
+static int compare_packages_by_name(const void *a, const void *b) {
+    const Package *pa = (const Package *)a;
+    const Package *pb = (const Package *)b;
+
+    int author_cmp = strcmp(pa->author, pb->author);
+    if (author_cmp != 0) return author_cmp;
+    return strcmp(pa->name, pb->name);
+}
+
+static int compare_module_owner_by_module(const void *a, const void *b) {
+    const ExternalModuleOwner *ma = (const ExternalModuleOwner *)a;
+    const ExternalModuleOwner *mb = (const ExternalModuleOwner *)b;
+    return strcmp(ma->module_name, mb->module_name);
+}
+
+static void external_module_owner_map_init(ExternalModuleOwnerMap *map) {
+    if (!map) return;
+    map->count = 0;
+    map->capacity = INITIAL_MEDIUM_CAPACITY;
+    map->items = arena_malloc(map->capacity * sizeof(ExternalModuleOwner));
+}
+
+static bool external_module_owner_map_contains_module(const ExternalModuleOwnerMap *map, const char *module_name) {
+    if (!map || !map->items || !module_name) return false;
+    for (int i = 0; i < map->count; i++) {
+        if (map->items[i].module_name && strcmp(map->items[i].module_name, module_name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void external_module_owner_map_add(ExternalModuleOwnerMap *map, const char *module_name, char *package_name) {
+    if (!map || !module_name || !package_name) return;
+    if (external_module_owner_map_contains_module(map, module_name)) return;
+
+    DYNARRAY_ENSURE_CAPACITY(map->items, map->count, map->capacity, ExternalModuleOwner);
+    map->items[map->count].module_name = arena_strdup(module_name);
+    map->items[map->count].package_name = package_name;
+    map->count++;
+}
+
+static void external_module_owner_map_sort(ExternalModuleOwnerMap *map) {
+    if (!map || !map->items || map->count <= 1) return;
+    qsort(map->items, map->count, sizeof(ExternalModuleOwner), compare_module_owner_by_module);
+}
+
+static const char *external_module_owner_map_find(const ExternalModuleOwnerMap *map, const char *module_name) {
+    if (!map || !map->items || map->count == 0 || !module_name) return NULL;
+
+    ExternalModuleOwner key;
+    key.module_name = (char *)module_name;
+    key.package_name = NULL;
+
+    ExternalModuleOwner *found = bsearch(&key, map->items, map->count,
+                                         sizeof(ExternalModuleOwner), compare_module_owner_by_module);
+    return found ? found->package_name : NULL;
+}
+
+static bool package_list_contains(Package *pkgs, int count, const char *author, const char *name) {
+    if (!pkgs || !author || !name) return false;
+    for (int i = 0; i < count; i++) {
+        if (pkgs[i].author && pkgs[i].name &&
+            strcmp(pkgs[i].author, author) == 0 && strcmp(pkgs[i].name, name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void collect_packages_from_map(PackageMap *map, Package **out_pkgs, int *out_count, int *out_capacity) {
+    if (!map || !out_pkgs || !out_count || !out_capacity) return;
+
+    for (int i = 0; i < map->count; i++) {
+        Package *pkg = &map->packages[i];
+        if (!pkg->author || !pkg->name || !pkg->version) continue;
+        if (package_list_contains(*out_pkgs, *out_count, pkg->author, pkg->name)) continue;
+
+        DYNARRAY_ENSURE_CAPACITY(*out_pkgs, *out_count, *out_capacity, Package);
+        (*out_pkgs)[*out_count].author = arena_strdup(pkg->author);
+        (*out_pkgs)[*out_count].name = arena_strdup(pkg->name);
+        (*out_pkgs)[*out_count].version = arena_strdup(pkg->version);
+        (*out_count)++;
+    }
+}
+
+static char *format_author_name(const char *author, const char *name) {
+    if (!author || !name) return NULL;
+    size_t len = strlen(author) + 1 + strlen(name) + 1;
+    char *out = arena_malloc(len);
+    if (!out) return NULL;
+    snprintf(out, len, "%s/%s", author, name);
+    return out;
+}
+
+static char *resolve_cached_package_version(CacheConfig *cache, const char *author, const char *name, const char *version_or_constraint) {
+    if (!cache || !author || !name || !version_or_constraint) return NULL;
+
+    if (!version_is_constraint(version_or_constraint)) {
+        return arena_strdup(version_or_constraint);
+    }
+
+    VersionRange range = {0};
+    if (!version_parse_constraint(version_or_constraint, &range)) {
+        return NULL;
+    }
+
+    char base_dir[PATH_MAX];
+    int n = snprintf(base_dir, sizeof(base_dir), "%s/%s/%s", cache->packages_dir, author, name);
+    if (n < 0 || n >= (int)sizeof(base_dir)) {
+        return NULL;
+    }
+
+    DIR *dir = opendir(base_dir);
+    if (!dir) {
+        return NULL;
+    }
+
+    bool found_any = false;
+    Version best = {0};
+    char *best_name = NULL;
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        char ver_dir[PATH_MAX];
+        int vn = snprintf(ver_dir, sizeof(ver_dir), "%s/%s", base_dir, entry->d_name);
+        if (vn < 0 || vn >= (int)sizeof(ver_dir)) {
+            continue;
+        }
+
+        struct stat st;
+        if (stat(ver_dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
+            continue;
+        }
+
+        Version cand = {0};
+        if (!version_parse_safe(entry->d_name, &cand)) {
+            continue;
+        }
+
+        if (!version_in_range(&cand, &range)) {
+            continue;
+        }
+
+        if (!found_any || version_compare(&cand, &best) > 0) {
+            best = cand;
+            best_name = entry->d_name;
+            found_any = true;
+        }
+    }
+
+    closedir(dir);
+
+    return found_any && best_name ? arena_strdup(best_name) : NULL;
+}
+
+static bool build_external_module_owner_map_from_elm_json(const char *elm_json_path, ExternalModuleOwnerMap *out_map) {
+    if (!elm_json_path || !out_map) return false;
+
+    ElmJson *project = elm_json_read(elm_json_path);
+    if (!project) {
+        return false;
+    }
+
+    CacheConfig *cache = cache_config_init();
+    if (!cache) {
+        elm_json_free(project);
+        return false;
+    }
+
+    int pkgs_capacity = INITIAL_MEDIUM_CAPACITY;
+    int pkgs_count = 0;
+    Package *pkgs = arena_malloc(pkgs_capacity * sizeof(Package));
+    if (!pkgs) {
+        cache_config_free(cache);
+        elm_json_free(project);
+        return false;
+    }
+
+    if (project->type == ELM_PROJECT_APPLICATION) {
+        collect_packages_from_map(project->dependencies_direct, &pkgs, &pkgs_count, &pkgs_capacity);
+        collect_packages_from_map(project->dependencies_indirect, &pkgs, &pkgs_count, &pkgs_capacity);
+        collect_packages_from_map(project->dependencies_test_direct, &pkgs, &pkgs_count, &pkgs_capacity);
+        collect_packages_from_map(project->dependencies_test_indirect, &pkgs, &pkgs_count, &pkgs_capacity);
+    } else {
+        collect_packages_from_map(project->package_dependencies, &pkgs, &pkgs_count, &pkgs_capacity);
+        collect_packages_from_map(project->package_test_dependencies, &pkgs, &pkgs_count, &pkgs_capacity);
+    }
+
+    if (pkgs_count > 1) {
+        qsort(pkgs, pkgs_count, sizeof(Package), compare_packages_by_name);
+    }
+
+    external_module_owner_map_init(out_map);
+    if (!out_map->items) {
+        cache_config_free(cache);
+        elm_json_free(project);
+        return false;
+    }
+
+    for (int i = 0; i < pkgs_count; i++) {
+        const char *author = pkgs[i].author;
+        const char *name = pkgs[i].name;
+        const char *ver_or_constraint = pkgs[i].version;
+        if (!author || !name || !ver_or_constraint) continue;
+
+        char *resolved_version = resolve_cached_package_version(cache, author, name, ver_or_constraint);
+        if (!resolved_version) {
+            continue;
+        }
+
+        char *pkg_path = cache_get_package_path(cache, author, name, resolved_version);
+        arena_free(resolved_version);
+        if (!pkg_path) {
+            continue;
+        }
+
+        char dep_elm_json_path[PATH_MAX];
+        int pn = snprintf(dep_elm_json_path, sizeof(dep_elm_json_path), "%s/elm.json", pkg_path);
+        arena_free(pkg_path);
+        if (pn < 0 || pn >= (int)sizeof(dep_elm_json_path)) {
+            continue;
+        }
+
+        if (!file_exists(dep_elm_json_path)) {
+            continue;
+        }
+
+        int exposed_count = 0;
+        char **exposed = parse_exposed_modules(dep_elm_json_path, &exposed_count);
+        if (!exposed || exposed_count <= 0) {
+            if (exposed) arena_free(exposed);
+            continue;
+        }
+
+        char *pkg_display = format_author_name(author, name);
+        if (!pkg_display) {
+            for (int j = 0; j < exposed_count; j++) {
+                arena_free(exposed[j]);
+            }
+            arena_free(exposed);
+            continue;
+        }
+
+        for (int j = 0; j < exposed_count; j++) {
+            if (exposed[j]) {
+                external_module_owner_map_add(out_map, exposed[j], pkg_display);
+                arena_free(exposed[j]);
+            }
+        }
+        arena_free(exposed);
+    }
+
+    external_module_owner_map_sort(out_map);
+    cache_config_free(cache);
+    elm_json_free(project);
+    return true;
+}
 
 static void print_include_tree_usage(void) {
     printf("Usage: %s debug include-tree PATH\n", global_context_program_name());
@@ -132,6 +413,30 @@ static char *find_src_dir_for_file(const char *file_path) {
     return NULL;
 }
 
+static char *find_elm_json_for_file(const char *file_path) {
+    char abs_path[MAX_PATH_LENGTH];
+    if (!realpath(file_path, abs_path)) return NULL;
+
+    char *dir = arena_strdup(abs_path);
+    if (!dir) return NULL;
+
+    while (1) {
+        char *last_slash = strrchr(dir, '/');
+        if (!last_slash || last_slash == dir) {
+            break;
+        }
+        *last_slash = '\0';
+
+        char elm_json_path[PATH_MAX];
+        int n = snprintf(elm_json_path, sizeof(elm_json_path), "%s/elm.json", dir);
+        if (n > 0 && n < (int)sizeof(elm_json_path) && file_exists(elm_json_path)) {
+            return arena_strdup(elm_json_path);
+        }
+    }
+
+    return NULL;
+}
+
 /**
  * Print include tree for a single file
  */
@@ -157,6 +462,13 @@ static int print_file_include_tree(const char *file_path) {
 
     /* Find src directory */
     char *src_dir = find_src_dir_for_file(abs_path);
+    char *elm_json_path = find_elm_json_for_file(abs_path);
+
+    ExternalModuleOwnerMap external_map = {0};
+    bool have_external_map = false;
+    if (elm_json_path) {
+        have_external_map = build_external_module_owner_map_from_elm_json(elm_json_path, &external_map);
+    }
     if (!src_dir) {
         printf("\n⚠️  Could not find elm.json in parent directories\n");
         printf("   Imports from external packages will not be resolved.\n");
@@ -178,7 +490,9 @@ static int print_file_include_tree(const char *file_path) {
     printf("%s\n", abs_path);
 
     /* Recursively print imports */
-    collect_imports_recursive(abs_path, src_dir, &visited, &visited_count, &visited_capacity, "");
+    collect_imports_recursive(abs_path, src_dir,
+                              have_external_map ? &external_map : NULL,
+                              &visited, &visited_count, &visited_capacity, "");
 
     printf("\n");
     return 0;
@@ -313,6 +627,9 @@ static int print_package_include_tree(const char *dir_path) {
     printf("\n📦 Import tree for package: %s\n", clean_dir_path);
     printf("   Source directory: %s\n\n", src_dir);
 
+    ExternalModuleOwnerMap external_map = {0};
+    bool have_external_map = build_external_module_owner_map_from_elm_json(elm_json_path, &external_map);
+
     /* Track all included files for redundancy detection */
     int included_capacity = 256;
     int included_count = 0;
@@ -342,8 +659,10 @@ static int print_package_include_tree(const char *dir_path) {
                                  arena_strdup(abs_path), char*);
 
                     /* Print tree and collect all imports */
-                    collect_imports_recursive(abs_path, src_dir, &visited, &visited_count, 
-                                            &visited_capacity, "");
+                    collect_imports_recursive(abs_path, src_dir,
+                                              have_external_map ? &external_map : NULL,
+                                              &visited, &visited_count,
+                                              &visited_capacity, "");
 
                     /* Add all visited files to included list */
                     for (int j = 0; j < visited_count; j++) {
@@ -401,6 +720,7 @@ static int print_package_include_tree(const char *dir_path) {
  * prefix: the string to print before the branch character (accumulates "│   " or "    ")
  */
 static void collect_imports_recursive(const char *file_path, const char *src_dir,
+                                       const ExternalModuleOwnerMap *external_map,
                                        char ***visited, int *visited_count, int *visited_capacity,
                                        const char *prefix) {
     /* Get absolute path for consistent comparison */
@@ -504,8 +824,8 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
             memcpy(child_prefix + prefix_len, suffix, suffix_len + 1);
             
             /* Recurse */
-            collect_imports_recursive(mod_abs_path, src_dir, visited, 
-                                    visited_count, visited_capacity, child_prefix);
+            collect_imports_recursive(mod_abs_path, src_dir, external_map, visited,
+                                      visited_count, visited_capacity, child_prefix);
         }
     }
     
@@ -518,7 +838,12 @@ static void collect_imports_recursive(const char *file_path, const char *src_dir
         
         /* Print current prefix + branch character */
         printf("%s%s", prefix, is_last ? TREE_LAST : TREE_BRANCH);
-        printf("%s (📦 external)\n", module_name);
+        const char *owner = external_map ? external_module_owner_map_find(external_map, module_name) : NULL;
+        if (owner) {
+            printf("%s (📦 %s)\n", module_name, owner);
+        } else {
+            printf("%s (📦 external)\n", module_name);
+        }
     }
 }
 

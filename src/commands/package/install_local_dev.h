@@ -22,7 +22,7 @@
  */
 int install_local_dev(const char *source_path, const char *package_name,
                       const char *target_elm_json, InstallEnv *env,
-                      bool is_test, bool auto_yes);
+                      bool is_test, bool auto_yes, bool quiet);
 
 /**
  * Register a package for local development (cache + registry only, no app modification).
