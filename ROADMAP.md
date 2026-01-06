@@ -43,9 +43,9 @@
 - Search by type
 - Accept contributions in Elm
 
-## 1.3.0 Private repository hosting `private.elm-dev.cloud`
+## 1.3.0 Private repository hosting `private.elm-wrap.cloud`
 
-## 1.4.0 Public repository `elm-dev.cloud`
+## 1.4.0 Public repository `elm-wrap.cloud`
 
 ## 1.5.0 Web components and applications
 
