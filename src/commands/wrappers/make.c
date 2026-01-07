@@ -41,30 +41,43 @@ int cmd_make(int argc, char *argv[]) {
         }
     }
 
+    // Read elm.json first, before any environment initialization that may download/cache files.
+    log_debug("Reading elm.json");
+    ElmJson *elm_json = elm_json_read(ELM_JSON_PATH);
+    if (!elm_json) {
+        log_error("Could not read elm.json");
+        log_error("Have you run 'elm init' or 'wrap init'?");
+        return 1;
+    }
+
+    // Ensure the compiler exists before doing any registry/package downloads.
+    const char *compiler_name = global_context_compiler_name();
+    char *elm_path = elm_compiler_get_path();
+    if (!elm_path) {
+        log_error("Could not find %s binary", compiler_name);
+        log_error("Please install %s or set the WRAP_ELM_COMPILER_PATH environment variable", compiler_name);
+        elm_json_free(elm_json);
+        return 1;
+    }
+
+    log_debug("Using %s compiler at: %s", compiler_name, elm_path);
+
     // Initialize environment
     InstallEnv *env = install_env_create();
     if (!env) {
         log_error("Failed to create install environment");
+        elm_json_free(elm_json);
         return 1;
     }
 
     if (!install_env_init(env)) {
         log_error("Failed to initialize install environment");
         install_env_free(env);
+        elm_json_free(elm_json);
         return 1;
     }
 
     log_debug("ELM_HOME: %s", env->cache->elm_home);
-
-    // Read elm.json
-    log_debug("Reading elm.json");
-    ElmJson *elm_json = elm_json_read(ELM_JSON_PATH);
-    if (!elm_json) {
-        log_error("Could not read elm.json");
-        log_error("Have you run 'elm init' or 'wrap init'?");
-        install_env_free(env);
-        return 1;
-    }
 
     // Download all packages
     int result = download_all_packages(elm_json, env);
@@ -102,18 +115,7 @@ int cmd_make(int argc, char *argv[]) {
     install_env_free(env);
 
     // Now call elm make with all the arguments
-    const char *compiler_name = global_context_compiler_name();
     printf("\nAll dependencies cached. Running %s make...\n\n", compiler_name);
-
-    // Get elm compiler path
-    char *elm_path = elm_compiler_get_path();
-    if (!elm_path) {
-        log_error("Could not find %s binary", compiler_name);
-        log_error("Please install %s or set the WRAP_ELM_COMPILER_PATH environment variable", compiler_name);
-        return 1;
-    }
-
-    log_debug("Using %s compiler at: %s", compiler_name, elm_path);
 
     // Build environment with https_proxy for offline mode
     char **elm_env = build_elm_environment();
