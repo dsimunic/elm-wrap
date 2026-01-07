@@ -848,7 +848,7 @@ int cmd_package_prepublish(int argc, char *argv[]) {
     }
 
     user_message("\n");
-    user_message("The package has following %s:\n\n",
+    user_message("The package has the following %s:\n\n",
            en_plural_s((long)(elm_json->package_dependencies ? elm_json->package_dependencies->count : 0),
                        "dependency", "dependencies"));
 
