@@ -197,11 +197,243 @@ static bool track_if_local_dev(
     return true;
 }
 
+/**
+ * Track of packages we've already processed to avoid infinite recursion
+ * during transitive dependency resolution.
+ */
+typedef struct {
+    char *author;
+    char *name;
+    char *version;
+} ProcessedPackage;
+
+/**
+ * Check if a package has already been processed.
+ */
+static bool is_package_processed(
+    ProcessedPackage *processed,
+    int processed_count,
+    const char *author,
+    const char *name,
+    const char *version
+) {
+    for (int i = 0; i < processed_count; i++) {
+        if (strcmp(processed[i].author, author) == 0 &&
+            strcmp(processed[i].name, name) == 0 &&
+            strcmp(processed[i].version, version) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Add a package to the processed list.
+ */
+static void mark_package_processed(
+    ProcessedPackage **processed,
+    int *processed_count,
+    int *processed_capacity,
+    const char *author,
+    const char *name,
+    const char *version
+) {
+    if (*processed_count >= *processed_capacity) {
+        *processed_capacity *= 2;
+        *processed = arena_realloc(*processed, (*processed_capacity) * sizeof(ProcessedPackage));
+    }
+
+    (*processed)[*processed_count].author = arena_strdup(author);
+    (*processed)[*processed_count].name = arena_strdup(name);
+    (*processed)[*processed_count].version = arena_strdup(version);
+    (*processed_count)++;
+}
+
+/**
+ * Download a single package and recursively download its transitive dependencies.
+ */
+static int download_package_recursive(
+    InstallEnv *env,
+    const char *author,
+    const char *name,
+    const char *version,
+    ProcessedPackage **processed,
+    int *processed_count,
+    int *processed_capacity,
+    LocalDevPackageInfo **local_dev_packages,
+    int *local_dev_count,
+    int *local_dev_capacity
+) {
+    /* Check if we've already processed this package */
+    if (is_package_processed(*processed, *processed_count, author, name, version)) {
+        log_debug("Package %s/%s %s already processed", author, name, version);
+        return 0;
+    }
+
+    /* Mark this package as processed before downloading to avoid cycles */
+    mark_package_processed(processed, processed_count, processed_capacity, author, name, version);
+
+    /* Download the package if not already cached */
+    if (!cache_package_exists(env->cache, author, name, version)) {
+        user_message("Downloading %s/%s %s\n", author, name, version);
+        if (!cache_download_package_with_env(env, author, name, version)) {
+            log_error("Failed to download %s/%s %s", author, name, version);
+            return 1;
+        }
+    } else {
+        log_debug("Package %s/%s %s already cached", author, name, version);
+    }
+
+    /* Track if this is a local-dev package */
+    Package pkg = { .author = (char*)author, .name = (char*)name, .version = (char*)version };
+    track_if_local_dev(&pkg, local_dev_packages, local_dev_count, local_dev_capacity);
+
+    /* Now read the package's elm.json to discover its transitive dependencies */
+    char pkg_elm_json_path[MAX_PATH_LENGTH];
+    int n = snprintf(pkg_elm_json_path, sizeof(pkg_elm_json_path),
+                     "%s/%s/%s/%s/elm.json",
+                     env->cache->packages_dir, author, name, version);
+    if (n < 0 || (size_t)n >= sizeof(pkg_elm_json_path)) {
+        log_error("Path too long for %s/%s %s", author, name, version);
+        return 1;
+    }
+
+    ElmJson *pkg_elm_json = elm_json_read(pkg_elm_json_path);
+    if (!pkg_elm_json) {
+        /* If we can't read the elm.json, log a warning but continue.
+         * This shouldn't happen for properly formed packages. */
+        log_warn("Could not read elm.json for %s/%s %s", author, name, version);
+        return 0;
+    }
+
+    /* Recursively download dependencies based on project type */
+    int result = 0;
+
+    if (pkg_elm_json->type == ELM_PROJECT_APPLICATION) {
+        /* Application project - has exact versions */
+        for (int i = 0; i < pkg_elm_json->dependencies_direct->count; i++) {
+            Package *dep = &pkg_elm_json->dependencies_direct->packages[i];
+            if (download_package_recursive(env, dep->author, dep->name, dep->version,
+                                          processed, processed_count, processed_capacity,
+                                          local_dev_packages, local_dev_count, local_dev_capacity) != 0) {
+                result = 1;
+                break;
+            }
+        }
+
+        if (result == 0) {
+            for (int i = 0; i < pkg_elm_json->dependencies_indirect->count; i++) {
+                Package *dep = &pkg_elm_json->dependencies_indirect->packages[i];
+                if (download_package_recursive(env, dep->author, dep->name, dep->version,
+                                              processed, processed_count, processed_capacity,
+                                              local_dev_packages, local_dev_count, local_dev_capacity) != 0) {
+                    result = 1;
+                    break;
+                }
+            }
+        }
+
+        if (result == 0) {
+            for (int i = 0; i < pkg_elm_json->dependencies_test_direct->count; i++) {
+                Package *dep = &pkg_elm_json->dependencies_test_direct->packages[i];
+                if (download_package_recursive(env, dep->author, dep->name, dep->version,
+                                              processed, processed_count, processed_capacity,
+                                              local_dev_packages, local_dev_count, local_dev_capacity) != 0) {
+                    result = 1;
+                    break;
+                }
+            }
+        }
+
+        if (result == 0) {
+            for (int i = 0; i < pkg_elm_json->dependencies_test_indirect->count; i++) {
+                Package *dep = &pkg_elm_json->dependencies_test_indirect->packages[i];
+                if (download_package_recursive(env, dep->author, dep->name, dep->version,
+                                              processed, processed_count, processed_capacity,
+                                              local_dev_packages, local_dev_count, local_dev_capacity) != 0) {
+                    result = 1;
+                    break;
+                }
+            }
+        }
+    } else {
+        /* Package project - has version constraints */
+        for (int i = 0; i < pkg_elm_json->package_dependencies->count; i++) {
+            Package *dep = &pkg_elm_json->package_dependencies->packages[i];
+
+            /* Resolve version constraint to actual version */
+            Version resolved_version;
+            char *version_str;
+            if (registry_is_version_constraint(dep->version)) {
+                if (!registry_resolve_constraint(env->registry, dep->author, dep->name,
+                                                  dep->version, &resolved_version)) {
+                    log_error("Failed to resolve version constraint for %s/%s: %s",
+                              dep->author, dep->name, dep->version);
+                    result = 1;
+                    break;
+                }
+                version_str = version_to_string(&resolved_version);
+            } else {
+                version_str = dep->version;
+            }
+
+            int dep_result = download_package_recursive(env, dep->author, dep->name, version_str,
+                                                       processed, processed_count, processed_capacity,
+                                                       local_dev_packages, local_dev_count, local_dev_capacity);
+            if (version_str != dep->version) {
+                arena_free(version_str);
+            }
+
+            if (dep_result != 0) {
+                result = 1;
+                break;
+            }
+        }
+
+        if (result == 0) {
+            for (int i = 0; i < pkg_elm_json->package_test_dependencies->count; i++) {
+                Package *dep = &pkg_elm_json->package_test_dependencies->packages[i];
+
+                /* Resolve version constraint to actual version */
+                Version resolved_version;
+                char *version_str;
+                if (registry_is_version_constraint(dep->version)) {
+                    if (!registry_resolve_constraint(env->registry, dep->author, dep->name,
+                                                      dep->version, &resolved_version)) {
+                        log_error("Failed to resolve version constraint for %s/%s: %s",
+                                  dep->author, dep->name, dep->version);
+                        result = 1;
+                        break;
+                    }
+                    version_str = version_to_string(&resolved_version);
+                } else {
+                    version_str = dep->version;
+                }
+
+                int dep_result = download_package_recursive(env, dep->author, dep->name, version_str,
+                                                           processed, processed_count, processed_capacity,
+                                                           local_dev_packages, local_dev_count, local_dev_capacity);
+                if (version_str != dep->version) {
+                    arena_free(version_str);
+                }
+
+                if (dep_result != 0) {
+                    result = 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    elm_json_free(pkg_elm_json);
+    return result;
+}
+
 int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
     log_debug("Downloading all packages from elm.json");
 
     int total = 0;
-    
+
     /* Track local-dev packages to re-insert into registry.dat if needed */
     int local_dev_count = 0;
     int local_dev_capacity = INITIAL_SMALL_CAPACITY;
@@ -211,6 +443,17 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
         return 1;
     }
 
+    /* Track processed packages to avoid infinite recursion */
+    int processed_count = 0;
+    int processed_capacity = INITIAL_MODULE_CAPACITY;
+    ProcessedPackage *processed = arena_malloc(processed_capacity * sizeof(ProcessedPackage));
+    if (!processed) {
+        log_error("Failed to allocate memory for processed package tracking");
+        return 1;
+    }
+
+    int result = 0;
+
     if (elm_json->type == ELM_PROJECT_APPLICATION) {
         total = elm_json->dependencies_direct->count +
                 elm_json->dependencies_indirect->count +
@@ -219,75 +462,53 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
 
         log_debug("Checking %d packages", total);
 
-        // Download direct dependencies
+        // Download direct dependencies and their transitive dependencies
         for (int i = 0; i < elm_json->dependencies_direct->count; i++) {
             Package *pkg = &elm_json->dependencies_direct->packages[i];
-            
-            /* Track if this is a local-dev package */
-            track_if_local_dev(pkg, &local_dev_packages, &local_dev_count, &local_dev_capacity);
-            
-            if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
-                user_message("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
-                if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
-                    log_error("Failed to download %s/%s %s", pkg->author, pkg->name, pkg->version);
-                    return 1;
-                }
-            } else {
-                log_debug("Package %s/%s %s already cached", pkg->author, pkg->name, pkg->version);
+            if (download_package_recursive(env, pkg->author, pkg->name, pkg->version,
+                                          &processed, &processed_count, &processed_capacity,
+                                          &local_dev_packages, &local_dev_count, &local_dev_capacity) != 0) {
+                result = 1;
+                break;
             }
         }
 
-        // Download indirect dependencies
-        for (int i = 0; i < elm_json->dependencies_indirect->count; i++) {
-            Package *pkg = &elm_json->dependencies_indirect->packages[i];
-            
-            /* Track if this is a local-dev package */
-            track_if_local_dev(pkg, &local_dev_packages, &local_dev_count, &local_dev_capacity);
-            
-            if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
-                user_message("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
-                if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
-                    log_error("Failed to download %s/%s %s", pkg->author, pkg->name, pkg->version);
-                    return 1;
+        // Download indirect dependencies and their transitive dependencies
+        if (result == 0) {
+            for (int i = 0; i < elm_json->dependencies_indirect->count; i++) {
+                Package *pkg = &elm_json->dependencies_indirect->packages[i];
+                if (download_package_recursive(env, pkg->author, pkg->name, pkg->version,
+                                              &processed, &processed_count, &processed_capacity,
+                                              &local_dev_packages, &local_dev_count, &local_dev_capacity) != 0) {
+                    result = 1;
+                    break;
                 }
-            } else {
-                log_debug("Package %s/%s %s already cached", pkg->author, pkg->name, pkg->version);
             }
         }
 
-        // Download test direct dependencies
-        for (int i = 0; i < elm_json->dependencies_test_direct->count; i++) {
-            Package *pkg = &elm_json->dependencies_test_direct->packages[i];
-            
-            /* Track if this is a local-dev package */
-            track_if_local_dev(pkg, &local_dev_packages, &local_dev_count, &local_dev_capacity);
-            
-            if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
-                user_message("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
-                if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
-                    log_error("Failed to download %s/%s %s", pkg->author, pkg->name, pkg->version);
-                    return 1;
+        // Download test direct dependencies and their transitive dependencies
+        if (result == 0) {
+            for (int i = 0; i < elm_json->dependencies_test_direct->count; i++) {
+                Package *pkg = &elm_json->dependencies_test_direct->packages[i];
+                if (download_package_recursive(env, pkg->author, pkg->name, pkg->version,
+                                              &processed, &processed_count, &processed_capacity,
+                                              &local_dev_packages, &local_dev_count, &local_dev_capacity) != 0) {
+                    result = 1;
+                    break;
                 }
-            } else {
-                log_debug("Package %s/%s %s already cached", pkg->author, pkg->name, pkg->version);
             }
         }
 
-        // Download test indirect dependencies
-        for (int i = 0; i < elm_json->dependencies_test_indirect->count; i++) {
-            Package *pkg = &elm_json->dependencies_test_indirect->packages[i];
-            
-            /* Track if this is a local-dev package */
-            track_if_local_dev(pkg, &local_dev_packages, &local_dev_count, &local_dev_capacity);
-            
-            if (!cache_package_exists(env->cache, pkg->author, pkg->name, pkg->version)) {
-                user_message("Downloading %s/%s %s\n", pkg->author, pkg->name, pkg->version);
-                if (!cache_download_package_with_env(env, pkg->author, pkg->name, pkg->version)) {
-                    log_error("Failed to download %s/%s %s", pkg->author, pkg->name, pkg->version);
-                    return 1;
+        // Download test indirect dependencies and their transitive dependencies
+        if (result == 0) {
+            for (int i = 0; i < elm_json->dependencies_test_indirect->count; i++) {
+                Package *pkg = &elm_json->dependencies_test_indirect->packages[i];
+                if (download_package_recursive(env, pkg->author, pkg->name, pkg->version,
+                                              &processed, &processed_count, &processed_capacity,
+                                              &local_dev_packages, &local_dev_count, &local_dev_capacity) != 0) {
+                    result = 1;
+                    break;
                 }
-            } else {
-                log_debug("Package %s/%s %s already cached", pkg->author, pkg->name, pkg->version);
             }
         }
     } else {
@@ -297,69 +518,77 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
 
         log_debug("Checking %d packages", total);
 
-        // Download package dependencies
+        // Download package dependencies and their transitive dependencies
         for (int i = 0; i < elm_json->package_dependencies->count; i++) {
             Package *pkg = &elm_json->package_dependencies->packages[i];
-            
+
             // Resolve version constraint to actual version
             Version resolved_version;
             char *version_str;
             if (registry_is_version_constraint(pkg->version)) {
-                if (!registry_resolve_constraint(env->registry, pkg->author, pkg->name, 
+                if (!registry_resolve_constraint(env->registry, pkg->author, pkg->name,
                                                   pkg->version, &resolved_version)) {
-                    log_error("Failed to resolve version constraint for %s/%s: %s", 
+                    log_error("Failed to resolve version constraint for %s/%s: %s",
                               pkg->author, pkg->name, pkg->version);
-                    return 1;
+                    result = 1;
+                    break;
                 }
                 version_str = version_to_string(&resolved_version);
             } else {
                 version_str = pkg->version;
             }
-            
-            if (!cache_package_exists(env->cache, pkg->author, pkg->name, version_str)) {
-                user_message("Downloading %s/%s %s\n", pkg->author, pkg->name, version_str);
-                if (!cache_download_package_with_env(env, pkg->author, pkg->name, version_str)) {
-                    log_error("Failed to download %s/%s %s", pkg->author, pkg->name, version_str);
-                    if (version_str != pkg->version) arena_free(version_str);
-                    return 1;
-                }
-            } else {
-                log_debug("Package %s/%s %s already cached", pkg->author, pkg->name, version_str);
+
+            int dep_result = download_package_recursive(env, pkg->author, pkg->name, version_str,
+                                                       &processed, &processed_count, &processed_capacity,
+                                                       &local_dev_packages, &local_dev_count, &local_dev_capacity);
+            if (version_str != pkg->version) {
+                arena_free(version_str);
             }
-            if (version_str != pkg->version) arena_free(version_str);
+
+            if (dep_result != 0) {
+                result = 1;
+                break;
+            }
         }
 
-        // Download test dependencies
-        for (int i = 0; i < elm_json->package_test_dependencies->count; i++) {
-            Package *pkg = &elm_json->package_test_dependencies->packages[i];
-            
-            // Resolve version constraint to actual version
-            Version resolved_version;
-            char *version_str;
-            if (registry_is_version_constraint(pkg->version)) {
-                if (!registry_resolve_constraint(env->registry, pkg->author, pkg->name, 
-                                                  pkg->version, &resolved_version)) {
-                    log_error("Failed to resolve version constraint for %s/%s: %s", 
+        // Download test dependencies and their transitive dependencies
+        if (result == 0) {
+            for (int i = 0; i < elm_json->package_test_dependencies->count; i++) {
+                Package *pkg = &elm_json->package_test_dependencies->packages[i];
+
+                // Resolve version constraint to actual version
+                Version resolved_version;
+                char *version_str;
+                if (registry_is_version_constraint(pkg->version)) {
+                    if (!registry_resolve_constraint(env->registry, pkg->author, pkg->name,
+                                                      pkg->version, &resolved_version)) {
+                        log_error("Failed to resolve version constraint for %s/%s: %s",
                               pkg->author, pkg->name, pkg->version);
-                    return 1;
+                        result = 1;
+                        break;
+                    }
+                    version_str = version_to_string(&resolved_version);
+                } else {
+                    version_str = pkg->version;
                 }
-                version_str = version_to_string(&resolved_version);
-            } else {
-                version_str = pkg->version;
-            }
-            
-            if (!cache_package_exists(env->cache, pkg->author, pkg->name, version_str)) {
-                user_message("Downloading %s/%s %s\n", pkg->author, pkg->name, version_str);
-                if (!cache_download_package_with_env(env, pkg->author, pkg->name, version_str)) {
-                    log_error("Failed to download %s/%s %s", pkg->author, pkg->name, version_str);
-                    if (version_str != pkg->version) arena_free(version_str);
-                    return 1;
+
+                int dep_result = download_package_recursive(env, pkg->author, pkg->name, version_str,
+                                                           &processed, &processed_count, &processed_capacity,
+                                                           &local_dev_packages, &local_dev_count, &local_dev_capacity);
+                if (version_str != pkg->version) {
+                    arena_free(version_str);
                 }
-            } else {
-                log_debug("Package %s/%s %s already cached", pkg->author, pkg->name, version_str);
+
+                if (dep_result != 0) {
+                    result = 1;
+                    break;
+                }
             }
-            if (version_str != pkg->version) arena_free(version_str);
         }
+    }
+
+    if (result != 0) {
+        return result;
     }
 
     /* Re-insert local-dev packages into registry.dat if they were found */

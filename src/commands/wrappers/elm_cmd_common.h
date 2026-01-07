@@ -24,13 +24,17 @@
 char **build_elm_environment(void);
 
 /**
- * Download all packages listed in elm.json.
+ * Download all packages listed in elm.json and their transitive dependencies.
  *
  * For application projects, downloads direct, indirect, test-direct,
- * and test-indirect dependencies.
+ * and test-indirect dependencies, plus all their transitive dependencies.
  *
  * For package projects, resolves version constraints and downloads
- * package dependencies and test dependencies.
+ * package dependencies and test dependencies, plus all their transitive
+ * dependencies.
+ *
+ * Uses recursive dependency resolution to ensure all packages needed
+ * for compilation are available in the cache.
  *
  * Returns 0 on success, non-zero on failure.
  */
