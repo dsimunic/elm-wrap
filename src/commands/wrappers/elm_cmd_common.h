@@ -41,6 +41,28 @@ char **build_elm_environment(void);
 int download_all_packages(ElmJson *elm_json, InstallEnv *env);
 
 /**
+ * Run the Elm compiler in a specific directory and capture its stdout/stderr.
+ *
+ * This is a low-level utility that forks, redirects output to a pipe, runs the
+ * compiler with the given arguments in the specified working directory, and
+ * captures the output.
+ *
+ * @param compiler_path Absolute path to the elm compiler binary
+ * @param compiler_env Environment variables for the compiler
+ * @param argv Arguments to pass to the compiler (NULL-terminated array)
+ * @param cwd Working directory to run the compiler in
+ * @param out_stdout Output parameter for captured stdout/stderr (arena-allocated)
+ * @return Exit code from the compiler
+ */
+int run_compiler_make_capture_stdout_in_dir(
+    const char *compiler_path,
+    char **compiler_env,
+    char **argv,
+    const char *cwd,
+    char **out_stdout
+);
+
+/**
  * Run a "silent" package build using `elm make --json`, capturing compiler stdout,
  * verifying success via exit code.
  *

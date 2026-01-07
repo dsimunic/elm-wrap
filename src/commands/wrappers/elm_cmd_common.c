@@ -645,7 +645,7 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
     return 0;
 }
 
-static int run_compiler_make_capture_stdout_in_dir(
+int run_compiler_make_capture_stdout_in_dir(
     const char *compiler_path,
     char **compiler_env,
     char **argv,

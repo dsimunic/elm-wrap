@@ -343,6 +343,206 @@ test_err_03_from_path_without_local_dev() {
     echo
 }
 
+# MAKE-01: Local-dev package compiles successfully with make
+test_make_01_compile_success() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
+    echo "=== BEGIN MAKE-01: Local-dev package compiles successfully with make ==="
+
+    # Create package with valid Elm code
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/make-pkg1" "testauthor/make-pkg1")
+
+    # Add a valid module
+    mkdir -p "$pkg_dir/src"
+    cat > "$pkg_dir/src/ValidModule.elm" << 'EOF'
+module ValidModule exposing (greet)
+
+greet : String -> String
+greet name =
+    "Hello, " ++ name
+EOF
+
+    # Update elm.json to expose the module
+    cd "$pkg_dir"
+    cat > elm.json << 'EOF'
+{
+    "type": "package",
+    "name": "testauthor/make-pkg1",
+    "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "Test package",
+    "exposed-modules": ["ValidModule"],
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {}
+}
+EOF
+
+    # Register for local-dev
+    run_wrap install --local-dev
+
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/make-app01" "make-app01")
+
+    # Install local package
+    cd "$app_dir"
+    run_wrap install --local-dev --from-path "$pkg_dir" testauthor/make-pkg1
+
+    # Create Main.elm that uses the package
+    cat > src/Main.elm << 'EOF'
+module Main exposing (main)
+
+import Html exposing (Html, text)
+import ValidModule
+
+main : Html msg
+main =
+    text (ValidModule.greet "World")
+EOF
+
+    # Run make - should succeed
+    if ! run_wrap make src/Main.elm --output=/dev/null; then
+        echo "ERROR: Expected make to succeed"
+        exit 1
+    fi
+
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    echo "=== END MAKE-01 ==="
+    echo
+}
+
+# MAKE-02: Local-dev package with compilation error
+test_make_02_compile_error() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
+    echo "=== BEGIN MAKE-02: Local-dev package with compilation error ==="
+
+    # Create package with type error
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/make-pkg2" "testauthor/make-pkg2")
+
+    # Add a module with type error
+    mkdir -p "$pkg_dir/src"
+    cat > "$pkg_dir/src/BrokenModule.elm" << 'EOF'
+module BrokenModule exposing (broken)
+
+broken : String
+broken =
+    42
+EOF
+
+    # Update elm.json to expose the module
+    cd "$pkg_dir"
+    cat > elm.json << 'EOF'
+{
+    "type": "package",
+    "name": "testauthor/make-pkg2",
+    "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "Test package",
+    "exposed-modules": ["BrokenModule"],
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {}
+}
+EOF
+
+    # Register for local-dev
+    run_wrap install --local-dev
+
+    # Create app
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/make-app02" "make-app02")
+
+    # Install local package
+    cd "$app_dir"
+    run_wrap install --local-dev --from-path "$pkg_dir" testauthor/make-pkg2
+
+    # Create Main.elm
+    cat > src/Main.elm << 'EOF'
+module Main exposing (main)
+
+import Html exposing (Html, text)
+
+main : Html msg
+main =
+    text "Test"
+EOF
+
+    # Run make - should fail with human-friendly error
+    local output
+    output=$(run_wrap make src/Main.elm --output=/dev/null 2>&1 || true)
+
+    if echo "$output" | grep -q "Local-dev package compilation failed"; then
+        echo "SUCCESS: Detected compilation failure"
+    else
+        echo "ERROR: Expected 'Local-dev package compilation failed' in output"
+        echo "$output"
+        exit 1
+    fi
+
+    if echo "$output" | grep -q "TYPE MISMATCH"; then
+        echo "SUCCESS: Got human-friendly error output (not JSON)"
+    else
+        echo "ERROR: Expected human-friendly error output"
+        echo "$output"
+        exit 1
+    fi
+
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    echo "=== END MAKE-02 ==="
+    echo
+}
+
+# MAKE-03: Application without local-dev packages
+test_make_03_no_local_dev() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
+    echo "=== BEGIN MAKE-03: Application without local-dev packages ==="
+
+    # Create app without local-dev dependencies
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/make-app03" "make-app03")
+
+    cd "$app_dir"
+
+    # Create simple Main.elm
+    cat > src/Main.elm << 'EOF'
+module Main exposing (main)
+
+import Html exposing (Html, text)
+
+main : Html msg
+main =
+    text "Hello"
+EOF
+
+    # Run make - should succeed without any local-dev compilation
+    if ! run_wrap make src/Main.elm --output=/dev/null; then
+        echo "ERROR: Expected make to succeed"
+        exit 1
+    fi
+
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    echo "=== END MAKE-03 ==="
+    echo
+}
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -351,7 +551,7 @@ main() {
     echo "Running local-dev tests..."
     echo
     echo
-    
+
     # Run all test cases
     test_local_01_init_and_install
     test_local_02_install_from_path
@@ -362,7 +562,10 @@ main() {
     test_err_02_local_dev_multiple_packages
     test_err_03_from_path_without_local_dev
     test_local_06_registry_since_count
-    
+    test_make_01_compile_success
+    test_make_02_compile_error
+    test_make_03_no_local_dev
+
     local since_after delta
     since_after=$(get_v1_since_count)
     delta=0

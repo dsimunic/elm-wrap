@@ -76,7 +76,25 @@ int cmd_make(int argc, char *argv[]) {
         return result;
     }
 
-    // Clean local-dev artifacts before compilation
+    // Compile local-dev packages BEFORE cleaning artifacts
+    char *compile_error = NULL;
+    bool compile_success = builder_compile_local_dev_packages(
+        ELM_JSON_PATH,
+        env->cache,
+        &compile_error
+    );
+
+    if (!compile_success) {
+        log_error("Local-dev package compilation failed");
+        if (compile_error) {
+            fprintf(stderr, "\n%s\n", compile_error);
+        }
+        elm_json_free(elm_json);
+        install_env_free(env);
+        return 1;
+    }
+
+    // Clean local-dev artifacts before compilation (only after successful compilation check)
     builder_clean_local_dev_artifacts(ELM_JSON_PATH, env->cache);
 
     // Cleanup
