@@ -482,10 +482,18 @@ bool elm_cmd_run_silent_package_build(
     const char *elm_json_path_abs,
     char **exposed_modules,
     int exposed_count,
+    bool clean_artifacts,
     char **out_compiler_stdout
 ) {
     if (out_compiler_stdout) *out_compiler_stdout = NULL;
     if (!project_dir_abs || !elm_json_path_abs) return false;
+
+    if (clean_artifacts) {
+        /* Always delete elm-stuff before compilation to ensure a clean build. */
+        char elm_stuff_path[MAX_PATH_LENGTH];
+        snprintf(elm_stuff_path, sizeof(elm_stuff_path), "%s/elm-stuff", project_dir_abs);
+        (void)remove_directory_recursive(elm_stuff_path);
+    }
 
     /* Silence stdout during dependency download + artifact cleanup */
     int saved_stdout = dup(STDOUT_FILENO);
@@ -517,7 +525,9 @@ bool elm_cmd_run_silent_package_build(
     }
 
     int dl_result = download_all_packages(elm_json, env);
-    builder_clean_local_dev_artifacts(elm_json_path_abs, env->cache);
+    if (clean_artifacts) {
+        builder_clean_local_dev_artifacts(elm_json_path_abs, env->cache);
+    }
     elm_json_free(elm_json);
 
     /* Restore stdout */
@@ -594,10 +604,10 @@ bool elm_cmd_run_silent_package_build(
         *out_compiler_stdout = last_stdout;
     }
 
-    /* Always remove elm-stuff afterwards */
-    char elm_stuff_path[MAX_PATH_LENGTH];
-    snprintf(elm_stuff_path, sizeof(elm_stuff_path), "%s/elm-stuff", project_dir_abs);
-    if (file_exists(elm_stuff_path)) {
+    if (clean_artifacts) {
+        /* Always delete elm-stuff after compilation. */
+        char elm_stuff_path[MAX_PATH_LENGTH];
+        snprintf(elm_stuff_path, sizeof(elm_stuff_path), "%s/elm-stuff", project_dir_abs);
         (void)remove_directory_recursive(elm_stuff_path);
     }
 

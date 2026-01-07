@@ -2287,6 +2287,7 @@ int cmd_extract(int argc, char *argv[]) {
             pkg_elm_json_abs,
             exposed_modules,
             exposed_count,
+            true,
             &compiler_stdout
         );
 

@@ -38,7 +38,7 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env);
 
 /**
  * Run a "silent" package build using `elm make --json`, capturing compiler stdout,
- * verifying success via exit code, and always deleting `elm-stuff` afterwards.
+ * verifying success via exit code.
  *
  * This is used by commands like `wrap package prepublish` and `wrap package extract`
  * to quickly confirm a package compiles.
@@ -46,6 +46,9 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env);
  * - `project_dir_abs` must be an absolute path to the package directory.
  * - `elm_json_path_abs` must be an absolute path to that package's elm.json.
  * - `exposed_modules` is typically the exposed-modules list.
+ *
+ * If `clean_artifacts` is true, it may delete build artifacts (like `elm-stuff`) before
+ * and after compilation.
  *
  * Returns true if the compiler exits successfully for all modules compiled.
  * On failure, `*out_compiler_stdout` (if provided) contains the last compiler
@@ -56,6 +59,7 @@ bool elm_cmd_run_silent_package_build(
 	const char *elm_json_path_abs,
 	char **exposed_modules,
 	int exposed_count,
+	bool clean_artifacts,
 	char **out_compiler_stdout
 );
 

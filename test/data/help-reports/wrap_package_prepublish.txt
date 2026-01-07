@@ -7,7 +7,6 @@ Arguments:
 
 Options:
   -h, --help            Show this help message
-  --delete-extra        Offer to delete files that would NOT be published
   --git-exclude-extras  Generate .gitattributes to exclude extras from git archive
   --generate-docs-json  Generate docs.json file in package root
   -f, --overwrite       Overwrite existing docs.json (use with --generate-docs-json)
