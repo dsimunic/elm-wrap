@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 /* Cache directory structure */
-typedef struct {
+typedef struct CacheConfig {
     char *elm_home;          // Resolved ELM_HOME directory (version-specific root)
     char *elm_version;       // Elm compiler version used for cache paths
     char *packages_dir;      // $ELM_HOME/packages

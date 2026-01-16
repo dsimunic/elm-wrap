@@ -247,6 +247,22 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
     const char *name = spec->name;
     const Version *target_version = spec->has_version ? &spec->version : NULL;
 
+    /* Check for self-installation in package projects */
+    if (elm_json->type == ELM_PROJECT_PACKAGE && elm_json->package_name) {
+        char *current_author = NULL;
+        char *current_name = NULL;
+        if (parse_package_name_silent(elm_json->package_name, &current_author, &current_name)) {
+            if (strcmp(author, current_author) == 0 && strcmp(name, current_name) == 0) {
+                log_error("A package cannot depend on itself");
+                arena_free(current_author);
+                arena_free(current_name);
+                return 1;
+            }
+            arena_free(current_author);
+            arena_free(current_name);
+        }
+    }
+
     log_debug("Installing %s/%s%s%s", author, name,
               is_test ? " (test dependency)" : "",
               major_upgrade ? " (major upgrade allowed)" : "");
@@ -715,6 +731,25 @@ static int install_multiple_packages(
     InstallEnv *env,
     const char *elm_json_path
 ) {
+    /* Check for self-installation in package projects */
+    if (elm_json->type == ELM_PROJECT_PACKAGE && elm_json->package_name) {
+        char *current_author = NULL;
+        char *current_name = NULL;
+        if (parse_package_name_silent(elm_json->package_name, &current_author, &current_name)) {
+            for (int i = 0; i < specs_count; i++) {
+                if (strcmp(specs[i].author, current_author) == 0 &&
+                    strcmp(specs[i].name, current_name) == 0) {
+                    log_error("A package cannot depend on itself");
+                    arena_free(current_author);
+                    arena_free(current_name);
+                    return 1;
+                }
+            }
+            arena_free(current_author);
+            arena_free(current_name);
+        }
+    }
+
     for (int i = 0; i < specs_count; i++) {
         const PackageInstallSpec *spec = &specs[i];
         if (spec->has_version &&

@@ -1551,7 +1551,7 @@ static void insert_package_dependencies_recursive(
     package_map_add(visited, author, name, version);
 
     /* Get the package path in cache */
-    char *pkg_path = cache_get_package_path((CacheConfig *)cache, author, name, version);
+    char *pkg_path = cache_get_package_path(cache, author, name, version);
     if (!pkg_path) {
         log_debug("Could not get cache path for %s/%s %s", author, name, version);
         return;
