@@ -194,6 +194,11 @@ void curl_session_free(CurlSession *session) {
     arena_free(session);
 }
 
+void curl_session_set_timeout(CurlSession *session, long timeout_ms) {
+    if (!session) return;
+    session->timeout_ms = timeout_ms;
+}
+
 /* Test connection */
 bool curl_session_can_connect(CurlSession *session, const char *test_url) {
     if (!session || !test_url) return false;

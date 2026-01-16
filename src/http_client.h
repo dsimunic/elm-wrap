@@ -28,6 +28,7 @@ typedef struct CurlSession CurlSession;
 /* Session lifecycle */
 CurlSession* curl_session_create(void);
 void curl_session_free(CurlSession *session);
+void curl_session_set_timeout(CurlSession *session, long timeout_ms);
 
 /* Connection test */
 bool curl_session_can_connect(CurlSession *session, const char *test_url);

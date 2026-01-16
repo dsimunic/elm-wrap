@@ -14,6 +14,7 @@
 #include "../../commands/cache/check/cache_check.h"
 #include "../../commands/cache/full_scan/cache_full_scan.h"
 #include "../../commands/cache/download_missing/cache_download_missing.h"
+#include "../../commands/cache/download_all/cache_download_all.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -172,6 +173,7 @@ static void print_cache_usage(void) {
     log_progress("  %s package cache check PACKAGE [OPTIONS]", prog);
     log_progress("  %s package cache full-scan [OPTIONS]", prog);
     log_progress("  %s package cache missing [OPTIONS]", prog);
+    log_progress("  %s package cache download-all [OPTIONS]", prog);
     log_progress("");
     log_progress("Download packages into the cache so installs can run offline.");
     log_progress("");
@@ -184,6 +186,8 @@ static void print_cache_usage(void) {
     log_progress("  %s package cache check elm/html --fix-broken # Re-download broken versions", prog);
     log_progress("  %s package cache full-scan                   # Scan all packages in cache", prog);
     log_progress("  %s package cache missing                     # Download all missing deps from elm.json", prog);
+    log_progress("  %s package cache download-all                # Download entire registry to cache", prog);
+    log_progress("  %s package cache download-all --latest-only  # Only latest version of each package", prog);
     log_progress("  %s package cache --from-file ./pkg elm/html  # Download from local directory", prog);
     log_progress("  %s package cache --from-url URL elm/html     # Download from URL to cache", prog);
     log_progress("  %s package cache --major elm/html            # Download highest major version", prog);
@@ -206,6 +210,11 @@ static void print_cache_usage(void) {
     log_progress("Full-scan Options:");
     log_progress("  -q, --quiet                               # Only show summary counts");
     log_progress("  -v, --verbose                             # Show all issues including missing latest");
+    log_progress("");
+    log_progress("Download-all Options:");
+    log_progress("  -y, --yes                                 # Skip confirmation prompt");
+    log_progress("  --dry-run                                 # Show what would be downloaded");
+    log_progress("  --latest-only                             # Only latest version of each package");
     log_set_level(old_level);
 }
 
@@ -218,6 +227,9 @@ int cmd_cache(int argc, char *argv[]) {
     }
     if (argc >= 2 && strcmp(argv[1], "missing") == 0) {
         return cmd_cache_download_missing(argc - 1, argv + 1);
+    }
+    if (argc >= 2 && strcmp(argv[1], "download-all") == 0) {
+        return cmd_cache_download_all(argc - 1, argv + 1);
     }
 
     const char *from_file_path = NULL;
