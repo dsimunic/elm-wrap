@@ -1547,6 +1547,12 @@ static void insert_package_dependencies_recursive(
         return;
     }
 
+    /* Skip if the version is a constraint (package elm.json style) - no point
+     * trying to look up a path like "1.0.0 <= v < 2.0.0" */
+    if (version && (strchr(version, '<') != NULL || strchr(version, '>') != NULL)) {
+        return;
+    }
+
     /* Mark as visited */
     package_map_add(visited, author, name, version);
 
@@ -1568,19 +1574,8 @@ static void insert_package_dependencies_recursive(
 
     /* Read the package's elm.json */
     ElmJson *pkg_elm_json = elm_json_read(elm_json_path);
-    /*
-     * NOTE: We intentionally do NOT free elm_json_path and pkg_path here.
-     *
-     * The rulr engine shares the same arena allocator. If we free these paths,
-     * the arena may immediately reuse that memory for rulr's internal data
-     * structures. Since the old path strings (like "...elm.json") are still
-     * in the memory, when rulr later reads this memory expecting pointers,
-     * it crashes.
-     *
-     * The memory will be reclaimed when the arena is reset. For the short-lived
-     * orphan detection operation, this minor leak is acceptable.
-     */
-
+    arena_free(elm_json_path);
+    arena_free(pkg_path);
     if (!pkg_elm_json) {
         log_debug("Could not read elm.json for %s/%s %s", author, name, version);
         return;
@@ -1642,8 +1637,8 @@ bool find_orphaned_packages(
         exclude_author ? exclude_author : "",
         exclude_author ? ")" : "");
 
-    /* Initialize rulr */
-    Rulr rulr;
+    /* Initialize rulr (zero-init to prevent undefined behavior from uninitialized fields) */
+    Rulr rulr = {0};
     RulrError err = rulr_init(&rulr);
     if (err.is_error) {
         log_error("Failed to initialize rulr: %s", err.message);
@@ -1733,6 +1728,14 @@ bool find_orphaned_packages(
     }
 
     package_map_free(visited);
+
+    /* Workaround for uninitialized extern_buf in librulr's IterState.
+     * rulr's execute_plan_rule allocates PlanExecCtx on the stack without
+     * initializing IterState.extern_buf fields to NULL. This function call
+     * zeros the stack area that will be reused by execute_plan_rule.
+     * The depth (3 nested calls) and size (16KB) are tuned to cover the area
+     * where PlanExecCtx.iters[].extern_buf fields will land. */
+    rulr_stack_sanitize(3);
 
     /* Evaluate the rule */
     err = rulr_evaluate(&rulr);

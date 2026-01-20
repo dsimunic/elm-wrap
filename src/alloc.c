@@ -113,3 +113,23 @@ void arena_free(void *ptr) {
     (void)ptr;
 }
 
+/*
+ * Workaround for uninitialized IterState.extern_buf in librulr.
+ * This function recursively zeros stack memory at a configurable depth.
+ * Call this before rulr_evaluate() to zero the stack area that will be
+ * reused by execute_plan_rule's PlanExecCtx structure.
+ *
+ * The depth parameter controls how deep to recurse (to match rulr's internal
+ * call depth). The 16KB buffer size is chosen to cover PlanExecCtx.iters[].
+ */
+__attribute__((noinline))
+void rulr_stack_sanitize(int depth) {
+    volatile char buf[16384];
+    for (size_t i = 0; i < sizeof(buf); i++) {
+        buf[i] = 0;
+    }
+    if (depth > 0) {
+        rulr_stack_sanitize(depth - 1);
+    }
+}
+

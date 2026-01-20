@@ -13,5 +13,8 @@ void *arena_realloc(void *ptr, size_t size);
 char *arena_strdup(const char *s);
 void arena_free(void *ptr);
 
+/* Workaround for librulr uninitialized stack memory. See alloc.c */
+void rulr_stack_sanitize(int depth);
+
 #endif /* ALLOC_H */
 

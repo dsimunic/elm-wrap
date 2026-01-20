@@ -1,6 +1,5 @@
-Version: 0.6.1@main-HEAD
+Version: 0.6.1@main-f4e26856-2026-01-20T21:37:04Z
   Base version: 0.6.1
-  Commit: 64749cbdc4103a60a7845b7f91126c5d99e2a7f8
-  Built: 2026-01-20T19:56:40Z
+  Commit: f4e26856f652d4aa3cc0226f16115e2f60e8c6bd
   Compiler: Apple clang version 17.0.0 (clang-1700.4.4.1)
   Platform: Darwin/arm64
