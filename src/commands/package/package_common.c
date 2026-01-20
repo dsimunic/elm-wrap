@@ -1568,8 +1568,18 @@ static void insert_package_dependencies_recursive(
 
     /* Read the package's elm.json */
     ElmJson *pkg_elm_json = elm_json_read(elm_json_path);
-    arena_free(elm_json_path);
-    arena_free(pkg_path);
+    /*
+     * NOTE: We intentionally do NOT free elm_json_path and pkg_path here.
+     *
+     * The rulr engine shares the same arena allocator. If we free these paths,
+     * the arena may immediately reuse that memory for rulr's internal data
+     * structures. Since the old path strings (like "...elm.json") are still
+     * in the memory, when rulr later reads this memory expecting pointers,
+     * it crashes.
+     *
+     * The memory will be reclaimed when the arena is reset. For the short-lived
+     * orphan detection operation, this minor leak is acceptable.
+     */
 
     if (!pkg_elm_json) {
         log_debug("Could not read elm.json for %s/%s %s", author, name, version);
