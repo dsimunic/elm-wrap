@@ -191,6 +191,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/cache/full_scan/cache_full_scan.c \
           $(SRCDIR)/commands/cache/download_missing/cache_download_missing.c \
           $(SRCDIR)/commands/cache/download_all/cache_download_all.c \
+          $(SRCDIR)/commands/cache/cache_common.c \
           $(SRCDIR)/vendor/tree-sitter/lib.c \
           $(SRCDIR)/vendor/tree-sitter-elm/parser.c \
           $(SRCDIR)/vendor/tree-sitter-elm/scanner.c \
@@ -288,6 +289,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/cache_full_scan.o \
           $(BUILDDIR)/cache_download_missing.o \
           $(BUILDDIR)/cache_download_all.o \
+          $(BUILDDIR)/cache_common.o \
           $(BUILDDIR)/ts_lib.o \
           $(BUILDDIR)/ts_elm_parser.o \
           $(BUILDDIR)/ts_elm_scanner.o \
@@ -653,12 +655,17 @@ $(BUILDDIR)/cache_full_scan.o: $(SRCDIR)/commands/cache/full_scan/cache_full_sca
 	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build cache_download_missing object
-$(BUILDDIR)/cache_download_missing.o: $(SRCDIR)/commands/cache/download_missing/cache_download_missing.c $(SRCDIR)/commands/cache/download_missing/cache_download_missing.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/commands/package/package_common.h | $(BUILDDIR)
+$(BUILDDIR)/cache_download_missing.o: $(SRCDIR)/commands/cache/download_missing/cache_download_missing.c $(SRCDIR)/commands/cache/download_missing/cache_download_missing.h $(SRCDIR)/commands/cache/cache_common.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/commands/package/package_common.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 # Build cache_download_all object
-$(BUILDDIR)/cache_download_all.o: $(SRCDIR)/commands/cache/download_all/cache_download_all.c $(SRCDIR)/commands/cache/download_all/cache_download_all.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/install_env.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/constants.h | $(BUILDDIR)
+$(BUILDDIR)/cache_download_all.o: $(SRCDIR)/commands/cache/download_all/cache_download_all.c $(SRCDIR)/commands/cache/download_all/cache_download_all.h $(SRCDIR)/commands/cache/cache_common.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/install_env.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/constants.h | $(BUILDDIR)
+	$(COMPILE_MSG) $@
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+
+# Build cache_common object
+$(BUILDDIR)/cache_common.o: $(SRCDIR)/commands/cache/cache_common.c $(SRCDIR)/commands/cache/cache_common.h $(SRCDIR)/install_env.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/http_client.h $(SRCDIR)/fileutil.h $(SRCDIR)/commands/package/package_common.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 

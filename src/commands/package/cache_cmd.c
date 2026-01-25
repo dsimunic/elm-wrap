@@ -185,7 +185,9 @@ static void print_cache_usage(void) {
     log_progress("  %s package cache check elm/html              # Check cache status for elm/html", prog);
     log_progress("  %s package cache check elm/html --fix-broken # Re-download broken versions", prog);
     log_progress("  %s package cache full-scan                   # Scan all packages in cache", prog);
-    log_progress("  %s package cache missing                     # Download all missing deps from elm.json", prog);
+    log_progress("  %s package cache missing                     # Download missing deps from GitHub", prog);
+    log_progress("  %s package cache missing ./my-app            # Specify project path", prog);
+    log_progress("  %s package cache missing --from-registry     # Use registry (for packages)", prog);
     log_progress("  %s package cache download-all                # Download entire registry to cache", prog);
     log_progress("  %s package cache download-all --latest-only  # Only latest version of each package", prog);
     log_progress("  %s package cache --from-file ./pkg elm/html  # Download from local directory", prog);
