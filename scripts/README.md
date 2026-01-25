@@ -51,8 +51,8 @@ Builds `.deb` packages for multiple distributions and architectures using Docker
 
 Packages are written to `dist/`:
 ```
-dist/elm-wrap_0.5.0_bookworm_amd64.deb
-dist/elm-wrap_0.5.0_bookworm_arm64.deb
+dist/elm-wrap_0.6.1_bookworm_amd64.deb
+dist/elm-wrap_0.6.1_bookworm_arm64.deb
 ...
 ```
 
@@ -70,7 +70,7 @@ Tests `.deb` packages by installing them in clean containers and verifying the b
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VERSION` | `0.5.0` | Package version to test |
+| `VERSION` | `0.6.1` | Package version to test |
 | `DOCKER_CMD` | `docker` | Docker command |
 | `SUITE` | (all) | Test only this suite (e.g., `bookworm`, `trixie`) |
 | `ARCH` | (all) | Test only this arch (e.g., `amd64`, `arm64`) |
@@ -88,9 +88,9 @@ Tests `.deb` packages by installing them in clean containers and verifying the b
 ### Example Output
 
 ```
-[test-debs] Testing elm-wrap_0.5.0_bookworm_amd64.deb on debian:bookworm-slim (linux/amd64)...
-[test-debs] PASS: elm-wrap_0.5.0_bookworm_amd64.deb -> 0.5.0@main-abc12345-2024-01-15T10:30:00Z
-[test-debs] SKIP: elm-wrap_0.5.0_trixie_amd64.deb (not found)
+[test-debs] Testing elm-wrap_0.6.1_bookworm_amd64.deb on debian:bookworm-slim (linux/amd64)...
+[test-debs] PASS: elm-wrap_0.6.1_bookworm_amd64.deb -> 0.6.1@main-abc12345-2024-01-15T10:30:00Z
+[test-debs] SKIP: elm-wrap_0.6.1_trixie_amd64.deb (not found)
 [test-debs] =========================================
 [test-debs] Results: 1 passed, 0 failed, 1 skipped
 ```
@@ -104,7 +104,7 @@ Typical workflow for building and testing packages:
 ./scripts/build-debs.sh
 
 # Rebuild specific packages by removing them first
-rm dist/elm-wrap_0.5.0_bookworm_*.deb
+rm dist/elm-wrap_0.6.1_bookworm_*.deb
 ./scripts/build-debs.sh
 
 # Test all built packages
