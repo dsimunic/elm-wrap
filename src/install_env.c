@@ -426,7 +426,7 @@ static void install_env_v1_probe_offline(InstallEnv *env) {
     env->offline = !curl_session_can_connect(env->curl_session, health_check_url);
 }
 
-bool install_env_prepare_v1(InstallEnv *env) {
+bool install_env_prepare_v1(InstallEnv *env, bool skip_connectivity_probe) {
     if (!env) return false;
 
     env->protocol_mode = PROTOCOL_V1;
@@ -442,7 +442,9 @@ bool install_env_prepare_v1(InstallEnv *env) {
         return false;
     }
 
-    install_env_v1_probe_offline(env);
+    if (!skip_connectivity_probe) {
+        install_env_v1_probe_offline(env);
+    }
     return true;
 }
 

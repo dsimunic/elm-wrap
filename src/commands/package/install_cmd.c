@@ -270,6 +270,13 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
     Package *existing_pkg = find_existing_package(elm_json, author, name);
     PromotionType promotion = elm_json_find_package(elm_json, author, name);
 
+    /* If package already exists, ensure local-dev symlink is correct (if applicable) */
+    if (existing_pkg && existing_pkg->version) {
+        if (!ensure_local_dev_symlink(author, name, existing_pkg->version, env)) {
+            return 1;
+        }
+    }
+
     if (existing_pkg) {
         if (target_version) {
             Version existing_ver = {0};
@@ -664,11 +671,14 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
         return 1;
     }
 
-    /* Register local-dev tracking for all installed packages (if they are local-dev) */
+    /* Register local-dev tracking and ensure symlinks for all installed packages (if they are local-dev) */
     if (elm_json->type == ELM_PROJECT_APPLICATION) {
         for (int i = 0; i < out_plan->count; i++) {
             PackageChange *change = &out_plan->changes[i];
             if (change->new_version) {
+                /* Ensure local-dev symlink is correct (restores corrupted symlinks) */
+                ensure_local_dev_symlink(change->author, change->name, change->new_version, env);
+                /* Register tracking for local-dev packages */
                 register_local_dev_tracking_if_needed(change->author, change->name,
                                                       change->new_version, elm_json_path);
             }
@@ -791,10 +801,19 @@ static int install_multiple_packages(
         const char *name = specs[i].name;
 
         PromotionType promo = elm_json_find_package(elm_json, author, name);
+        Package *existing = find_existing_package(elm_json, author, name);
+
+        /* If package already exists, ensure local-dev symlink is correct (if applicable) */
+        if (existing && existing->version) {
+            if (!ensure_local_dev_symlink(author, name, existing->version, env)) {
+                arena_free(promotions);
+                arena_free(to_solve);
+                return 1;
+            }
+        }
 
         if (promo == PROMOTION_INDIRECT_TO_DIRECT) {
             /* Package is in indirect dependencies - need to promote */
-            Package *existing = find_existing_package(elm_json, author, name);
             DYNARRAY_PUSH(promotions, promotions_count, promotions_capacity,
                 ((PromotionInfo){ .author = arena_strdup(author),
                                   .name = arena_strdup(name),
@@ -1109,11 +1128,14 @@ static int install_multiple_packages(
         return 1;
     }
 
-    /* Register local-dev tracking for all installed packages */
+    /* Register local-dev tracking and ensure symlinks for all installed packages */
     if (elm_json->type == ELM_PROJECT_APPLICATION && out_plan) {
         for (int i = 0; i < out_plan->count; i++) {
             PackageChange *change = &out_plan->changes[i];
             if (change->new_version) {
+                /* Ensure local-dev symlink is correct (restores corrupted symlinks) */
+                ensure_local_dev_symlink(change->author, change->name, change->new_version, env);
+                /* Register tracking for local-dev packages */
                 register_local_dev_tracking_if_needed(change->author, change->name,
                                                       change->new_version, elm_json_path);
             }

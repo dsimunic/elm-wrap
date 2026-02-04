@@ -1,6 +1,7 @@
 #include "package_common.h"
 #include "../../install.h"
 #include "../../global_context.h"
+#include "../../feature_flags.h"
 #include "../../elm_json.h"
 #include "../../cache.h"
 #include "../../install_env.h"
@@ -173,7 +174,9 @@ static void print_cache_usage(void) {
     log_progress("  %s package cache check PACKAGE [OPTIONS]", prog);
     log_progress("  %s package cache full-scan [OPTIONS]", prog);
     log_progress("  %s package cache missing [OPTIONS]", prog);
-    log_progress("  %s package cache download-all [OPTIONS]", prog);
+    if (feature_cache_download_all_enabled()) {
+        log_progress("  %s package cache download-all [OPTIONS]", prog);
+    }
     log_progress("");
     log_progress("Download packages into the cache so installs can run offline.");
     log_progress("");
@@ -188,8 +191,10 @@ static void print_cache_usage(void) {
     log_progress("  %s package cache missing                     # Download missing deps from GitHub", prog);
     log_progress("  %s package cache missing ./my-app            # Specify project path", prog);
     log_progress("  %s package cache missing --from-registry     # Use registry (for packages)", prog);
-    log_progress("  %s package cache download-all                # Download entire registry to cache", prog);
-    log_progress("  %s package cache download-all --latest-only  # Only latest version of each package", prog);
+    if (feature_cache_download_all_enabled()) {
+        log_progress("  %s package cache download-all                # Download entire registry to cache", prog);
+        log_progress("  %s package cache download-all --latest-only  # Only latest version of each package", prog);
+    }
     log_progress("  %s package cache --from-file ./pkg elm/html  # Download from local directory", prog);
     log_progress("  %s package cache --from-url URL elm/html     # Download from URL to cache", prog);
     log_progress("  %s package cache --major elm/html            # Download highest major version", prog);
@@ -212,11 +217,13 @@ static void print_cache_usage(void) {
     log_progress("Full-scan Options:");
     log_progress("  -q, --quiet                               # Only show summary counts");
     log_progress("  -v, --verbose                             # Show all issues including missing latest");
-    log_progress("");
-    log_progress("Download-all Options:");
-    log_progress("  -y, --yes                                 # Skip confirmation prompt");
-    log_progress("  --dry-run                                 # Show what would be downloaded");
-    log_progress("  --latest-only                             # Only latest version of each package");
+    if (feature_cache_download_all_enabled()) {
+        log_progress("");
+        log_progress("Download-all Options:");
+        log_progress("  -y, --yes                                 # Skip confirmation prompt");
+        log_progress("  --dry-run                                 # Show what would be downloaded");
+        log_progress("  --latest-only                             # Only latest version of each package");
+    }
     log_set_level(old_level);
 }
 
@@ -231,9 +238,12 @@ int cmd_cache(int argc, char *argv[]) {
         return cmd_cache_download_missing(argc - 1, argv + 1);
     }
     if (argc >= 2 && strcmp(argv[1], "download-all") == 0) {
+        if (!feature_cache_download_all_enabled()) {
+            fprintf(stderr, "Error: Command 'cache download-all' is not available in this build.\n");
+            return 1;
+        }
         return cmd_cache_download_all(argc - 1, argv + 1);
     }
-
     const char *from_file_path = NULL;
     const char *from_url = NULL;
     const char *major_package_name = NULL;

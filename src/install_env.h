@@ -41,7 +41,7 @@ void install_env_free(InstallEnv *env);
 bool install_env_solver_online(const InstallEnv *env);
 
 /* V1 registry helpers (used by debug tools and shared init paths) */
-bool install_env_prepare_v1(InstallEnv *env);
+bool install_env_prepare_v1(InstallEnv *env, bool skip_connectivity_probe);
 bool install_env_ensure_v1_registry(InstallEnv *env);
 char *install_env_registry_etag_file_path(const char *registry_dat_path);
 char *install_env_registry_since_count_file_path(const char *registry_dat_path);

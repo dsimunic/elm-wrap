@@ -197,7 +197,7 @@ static int cmd_registry_v1_reset(int argc, char *argv[]) {
         return 1;
     }
 
-    if (!install_env_prepare_v1(env)) {
+    if (!install_env_prepare_v1(env, false)) {
         log_error("Failed to initialize V1 registry environment");
         install_env_free(env);
         return 1;

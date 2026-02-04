@@ -92,12 +92,32 @@ int unregister_local_dev_package(InstallEnv *env);
  * application gets registered for tracking updates.
  *
  * @param author            Package author
- * @param name              Package name  
+ * @param name              Package name
  * @param version           Package version
  * @param app_elm_json_path Path to the application's elm.json
  * @return true on success (or if package is not local-dev), false on error
  */
 bool register_local_dev_tracking_if_needed(const char *author, const char *name,
                                            const char *version, const char *app_elm_json_path);
+
+/**
+ * Ensure the local-dev symlink is correct for a package.
+ *
+ * If the package is registered as local-dev but the symlink in ELM_HOME
+ * is missing or corrupted (e.g., replaced with a regular directory),
+ * this function will restore it using the saved PATH file.
+ *
+ * This should be called early in the install process for packages that
+ * may be local-dev packages, to ensure the symlink is correct before
+ * any operations that depend on the package contents.
+ *
+ * @param author    Package author
+ * @param name      Package name
+ * @param version   Package version
+ * @param env       Install environment (for cache paths and registry updates)
+ * @return true on success (or if not a local-dev package), false on error
+ */
+bool ensure_local_dev_symlink(const char *author, const char *name, const char *version,
+                               InstallEnv *env);
 
 #endif /* INSTALL_LOCAL_DEV_H */

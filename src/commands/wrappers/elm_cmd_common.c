@@ -10,6 +10,7 @@
 #include "../../shared/log.h"
 #include "../../constants.h"
 #include "../../commands/package/package_common.h"
+#include "../../commands/package/install_local_dev.h"
 #include "../../local_dev/local_dev_tracking.h"
 #include "../../elm_compiler.h"
 #include "../../elm_project.h"
@@ -272,6 +273,12 @@ static int download_package_recursive(
 
     /* Mark this package as processed before downloading to avoid cycles */
     mark_package_processed(processed, processed_count, processed_capacity, author, name, version);
+
+    /* Ensure local-dev symlink is valid (if this is a local-dev package) */
+    if (!ensure_local_dev_symlink(author, name, version, env)) {
+        log_warn("Failed to ensure local-dev symlink for %s/%s %s", author, name, version);
+        /* Continue anyway - if it's not a local-dev package, this is fine */
+    }
 
     /* Download the package if not already cached */
     if (!cache_package_exists(env->cache, author, name, version)) {

@@ -339,8 +339,8 @@ int cmd_cache_download_missing(int argc, char *argv[]) {
             return 1;
         }
     } else {
-        /* Lightweight initialization for GitHub-only download */
-        if (!install_env_prepare_v1(env)) {
+        /* Lightweight initialization for GitHub-only download (skip registry probe) */
+        if (!install_env_prepare_v1(env, true)) {
             log_error("Failed to initialize install environment");
             install_env_free(env);
             elm_json_free(elm_json);

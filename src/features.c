@@ -22,6 +22,14 @@
 #define FEATURE_DEBUG_DEFAULT 0
 #endif
 
+#ifndef FEATURE_CACHE_DOWNLOAD_ALL_DEFAULT
+#define FEATURE_CACHE_DOWNLOAD_ALL_DEFAULT 0
+#endif
+
+#ifndef FEATURE_MIRROR_DEFAULT
+#define FEATURE_MIRROR_DEFAULT 0
+#endif
+
 /*
  * Check environment variable for feature flag override.
  * Returns: 1 if enabled, 0 if disabled, -1 if not set (use default).
@@ -70,4 +78,20 @@ bool feature_debug_enabled(void) {
         return env_value == 1;
     }
     return FEATURE_DEBUG_DEFAULT != 0;
+}
+
+bool feature_cache_download_all_enabled(void) {
+    int env_value = check_env_flag("WRAP_FEATURE_CACHE_DOWNLOAD_ALL");
+    if (env_value >= 0) {
+        return env_value == 1;
+    }
+    return FEATURE_CACHE_DOWNLOAD_ALL_DEFAULT != 0;
+}
+
+bool feature_mirror_enabled(void) {
+    int env_value = check_env_flag("WRAP_FEATURE_MIRROR");
+    if (env_value >= 0) {
+        return env_value == 1;
+    }
+    return FEATURE_MIRROR_DEFAULT != 0;
 }

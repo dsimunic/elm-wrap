@@ -26,4 +26,10 @@ bool feature_cache_enabled(void);
 /* Check if the 'debug' command group is enabled */
 bool feature_debug_enabled(void);
 
+/* Check if the 'package cache download-all' subcommand is enabled */
+bool feature_cache_download_all_enabled(void);
+
+/* Check if the 'package cache mirror' subcommand is enabled */
+bool feature_mirror_enabled(void);
+
 #endif /* FEATURE_FLAGS_H */

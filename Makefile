@@ -13,12 +13,16 @@ FEATURE_REVIEW ?= 0
 FEATURE_POLICY ?= 0
 FEATURE_CACHE ?= 1
 FEATURE_DEBUG ?= 0
+FEATURE_CACHE_DOWNLOAD_ALL ?= 0
+FEATURE_MIRROR ?= 0
 
 CFLAGS = -Wall -Wextra -Werror -Wunused-result -std=gnu99 -D_GNU_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -O2 -flto
 CFLAGS += -DFEATURE_PUBLISH_DEFAULT=$(FEATURE_PUBLISH)
 CFLAGS += -DFEATURE_REVIEW_DEFAULT=$(FEATURE_REVIEW) -DFEATURE_POLICY_DEFAULT=$(FEATURE_POLICY)
 CFLAGS += -DFEATURE_CACHE_DEFAULT=$(FEATURE_CACHE)
 CFLAGS += -DFEATURE_DEBUG_DEFAULT=$(FEATURE_DEBUG)
+CFLAGS += -DFEATURE_CACHE_DOWNLOAD_ALL_DEFAULT=$(FEATURE_CACHE_DOWNLOAD_ALL)
+CFLAGS += -DFEATURE_MIRROR_DEFAULT=$(FEATURE_MIRROR)
 
 # Detect operating system and architecture
 UNAME_S := $(shell uname -s)
@@ -177,6 +181,8 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/package/upgrade_cmd.c \
           $(SRCDIR)/commands/package/upgrade_v1.c \
           $(SRCDIR)/commands/package/upgrade_v2.c \
+          $(SRCDIR)/commands/repository/mirror_cmd.c \
+          $(SRCDIR)/mirror_manifest.c \
           $(SRCDIR)/commands/info/info.c \
           $(SRCDIR)/commands/application/application.c \
           $(SRCDIR)/commands/application/init.c \
@@ -276,6 +282,8 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/upgrade_cmd.o \
           $(BUILDDIR)/upgrade_v1.o \
           $(BUILDDIR)/upgrade_v2.o \
+          $(BUILDDIR)/mirror_cmd.o \
+          $(BUILDDIR)/mirror_manifest.o \
           $(BUILDDIR)/application.o \
           $(BUILDDIR)/app_init.o \
           $(BUILDDIR)/app_info.o \
@@ -741,6 +749,16 @@ $(BUILDDIR)/upgrade_v2.o: $(SRCDIR)/commands/package/upgrade_v2.c $(SRCDIR)/comm
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
+# Build mirror_cmd object
+$(BUILDDIR)/mirror_cmd.o: $(SRCDIR)/commands/repository/mirror_cmd.c $(SRCDIR)/commands/repository/mirror_cmd.h $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/mirror_manifest.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/fileutil.h $(SRCDIR)/http_client.h $(SRCDIR)/env_defaults.h $(SRCDIR)/global_context.h $(SRCDIR)/shared/log.h $(SRCDIR)/protocol_v1/package_fetch.h | $(BUILDDIR)
+	$(COMPILE_MSG) $@
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+
+# Build mirror_manifest object
+$(BUILDDIR)/mirror_manifest.o: $(SRCDIR)/mirror_manifest.c $(SRCDIR)/mirror_manifest.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/fileutil.h $(SRCDIR)/vendor/cJSON.h | $(BUILDDIR)
+	$(COMPILE_MSG) $@
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+
 # Build install_check object
 $(BUILDDIR)/install_check.o: $(SRCDIR)/install_check.c $(SRCDIR)/install_check.h $(SRCDIR)/elm_json.h $(SRCDIR)/vendor/cJSON.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
@@ -907,7 +925,7 @@ $(BUILDDIR)/global_context.o: $(SRCDIR)/global_context.c $(SRCDIR)/global_contex
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 # Build repository object
-$(BUILDDIR)/repository.o: $(SRCDIR)/commands/repository/repository.c $(SRCDIR)/commands/repository/repository.h $(SRCDIR)/env_defaults.h $(SRCDIR)/elm_compiler.h $(SRCDIR)/alloc.h | $(BUILDDIR)
+$(BUILDDIR)/repository.o: $(SRCDIR)/commands/repository/repository.c $(SRCDIR)/commands/repository/repository.h $(SRCDIR)/commands/repository/mirror_cmd.h $(SRCDIR)/feature_flags.h $(SRCDIR)/env_defaults.h $(SRCDIR)/elm_compiler.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr $(RULR_INCLUDE) -c $< -o $@
 

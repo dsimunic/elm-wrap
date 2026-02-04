@@ -171,6 +171,104 @@ static bool create_package_symlink(InstallEnv *env, const char *source_path,
 }
 
 /**
+ * Save the source path of a local-dev package to a PATH file.
+ * This allows recovery of the symlink if it gets corrupted.
+ * Creates: tracking_dir/author/name/version/PATH
+ */
+static bool save_local_dev_source_path(const char *author, const char *name, const char *version,
+                                       const char *source_path) {
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        return false;
+    }
+
+    /* Build path: tracking_dir/author/name/version */
+    size_t dir_len = strlen(tracking_dir) + strlen(author) + strlen(name) + strlen(version) + 4;
+    char *version_dir = arena_malloc(dir_len);
+    if (!version_dir) {
+        arena_free(tracking_dir);
+        return false;
+    }
+    snprintf(version_dir, dir_len, "%s/%s/%s/%s", tracking_dir, author, name, version);
+    arena_free(tracking_dir);
+
+    if (!ensure_path_exists(version_dir)) {
+        log_error("Failed to create tracking directory: %s", version_dir);
+        arena_free(version_dir);
+        return false;
+    }
+
+    /* Build full PATH file path */
+    size_t file_len = strlen(version_dir) + strlen("/PATH") + 1;
+    char *path_file = arena_malloc(file_len);
+    if (!path_file) {
+        arena_free(version_dir);
+        return false;
+    }
+    snprintf(path_file, file_len, "%s/PATH", version_dir);
+    arena_free(version_dir);
+
+    /* Write the source path to the PATH file */
+    FILE *f = fopen(path_file, "w");
+    if (!f) {
+        log_error("Failed to create PATH file: %s", path_file);
+        arena_free(path_file);
+        return false;
+    }
+
+    fprintf(f, "%s\n", source_path);
+    fclose(f);
+
+    log_debug("Saved local-dev source path: %s", path_file);
+    arena_free(path_file);
+    return true;
+}
+
+/**
+ * Read the source path of a local-dev package from the PATH file.
+ * Returns: Arena-allocated path string, or NULL if not found.
+ */
+static char *read_local_dev_source_path(const char *author, const char *name, const char *version) {
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        return NULL;
+    }
+
+    /* Build path: tracking_dir/author/name/version/PATH */
+    size_t file_len = strlen(tracking_dir) + strlen(author) + strlen(name) + strlen(version) + strlen("/PATH") + 4;
+    char *path_file = arena_malloc(file_len);
+    if (!path_file) {
+        arena_free(tracking_dir);
+        return NULL;
+    }
+    snprintf(path_file, file_len, "%s/%s/%s/%s/PATH", tracking_dir, author, name, version);
+    arena_free(tracking_dir);
+
+    FILE *f = fopen(path_file, "r");
+    if (!f) {
+        arena_free(path_file);
+        return NULL;
+    }
+
+    char path_buf[PATH_MAX];
+    if (!fgets(path_buf, sizeof(path_buf), f)) {
+        fclose(f);
+        arena_free(path_file);
+        return NULL;
+    }
+    fclose(f);
+    arena_free(path_file);
+
+    /* Strip trailing newline */
+    size_t len = strlen(path_buf);
+    while (len > 0 && (path_buf[len - 1] == '\n' || path_buf[len - 1] == '\r')) {
+        path_buf[--len] = '\0';
+    }
+
+    return arena_strdup(path_buf);
+}
+
+/**
  * Register the application's elm.json in the dependency tracking directory.
  * Creates: tracking_dir/author/name/version/<hash_of_path>
  */
@@ -977,6 +1075,12 @@ int register_local_dev_package(const char *source_path, const char *package_name
         return 1;
     }
 
+    /* Save the source path so we can restore the symlink if it gets corrupted */
+    if (!save_local_dev_source_path(actual_author, actual_name, version, resolved_source)) {
+        log_error("Warning: Failed to save local-dev source path");
+        /* Continue anyway - the symlink was created successfully */
+    }
+
     /* Register in registry-local-dev.dat so the solver can find this package */
     if (!register_in_local_dev_registry(env, actual_author, actual_name, version, source_elm_json)) {
         log_error("Warning: Failed to register in local-dev registry");
@@ -1301,7 +1405,7 @@ int install_local_dev(const char *source_path, const char *package_name,
     /*
      * PHASE 3: Apply the changes
      */
-    
+
     /* Create symlink in ELM_HOME */
     if (!create_package_symlink(env, resolved_source, actual_author, actual_name, version)) {
         log_error("Failed to register the package in the package cache.");
@@ -1311,6 +1415,12 @@ int install_local_dev(const char *source_path, const char *package_name,
         arena_free(actual_version);
         arena_free(plan_changes);
         return 1;
+    }
+
+    /* Save the source path so we can restore the symlink if it gets corrupted */
+    if (!save_local_dev_source_path(actual_author, actual_name, version, resolved_source)) {
+        log_error("Warning: Failed to save local-dev source path");
+        /* Continue anyway - the symlink was created successfully */
     }
 
     /* Register in registry-local-dev.dat so the solver can find this package */
@@ -1448,6 +1558,112 @@ int unregister_local_dev_package(InstallEnv *env) {
         elm_json_free(pkg_json);
         return 1;
     }
+}
+
+/**
+ * Ensure the local-dev symlink is correct for a package.
+ *
+ * If the package is registered as local-dev but the symlink in ELM_HOME
+ * is missing or corrupted (e.g., replaced with a regular directory),
+ * this function will restore it using the saved PATH file.
+ *
+ * @param author    Package author
+ * @param name      Package name
+ * @param version   Package version
+ * @param env       Install environment (for cache paths and registry updates)
+ * @return true on success (or if not a local-dev package), false on error
+ */
+bool ensure_local_dev_symlink(const char *author, const char *name, const char *version,
+                               InstallEnv *env) {
+    if (!author || !name || !version || !env) {
+        return true; /* Not an error - just nothing to do */
+    }
+
+    /* Try to read the saved source path */
+    char *source_path = read_local_dev_source_path(author, name, version);
+    if (!source_path) {
+        return true; /* No PATH file means not a local-dev package */
+    }
+
+    /* Verify the source path still exists */
+    struct stat src_st;
+    if (stat(source_path, &src_st) != 0 || !S_ISDIR(src_st.st_mode)) {
+        log_error("Local-dev source path no longer exists: %s", source_path);
+        log_error("Re-register the package with: %s install --local-dev --from-path %s",
+                  global_context_program_name(), source_path);
+        arena_free(source_path);
+        return false;
+    }
+
+    /* Build symlink path: packages_dir/author/name/version */
+    size_t link_len = strlen(env->cache->packages_dir) + strlen(author) + strlen(name) + strlen(version) + 4;
+    char *link_path = arena_malloc(link_len);
+    if (!link_path) {
+        arena_free(source_path);
+        return false;
+    }
+    snprintf(link_path, link_len, "%s/%s/%s/%s", env->cache->packages_dir, author, name, version);
+
+    /* Check current state of the link path */
+    struct stat link_st;
+    bool need_restore = false;
+
+    if (lstat(link_path, &link_st) == 0) {
+        if (S_ISLNK(link_st.st_mode)) {
+            /* It's a symlink - check if it points to the right place */
+            char target[PATH_MAX];
+            ssize_t len = readlink(link_path, target, sizeof(target) - 1);
+            if (len > 0) {
+                target[len] = '\0';
+                if (strcmp(target, source_path) == 0) {
+                    /* Symlink is correct - nothing to do */
+                    log_debug("Local-dev symlink is correct: %s -> %s", link_path, source_path);
+                    arena_free(link_path);
+                    arena_free(source_path);
+                    return true;
+                }
+            }
+            /* Symlink points to wrong place - need to restore */
+            need_restore = true;
+            log_debug("Local-dev symlink points to wrong target, restoring");
+        } else if (S_ISDIR(link_st.st_mode)) {
+            /* It's a regular directory (corrupted) - need to restore */
+            need_restore = true;
+            log_debug("Local-dev path is a directory instead of symlink, restoring");
+        } else {
+            /* Some other file type - need to restore */
+            need_restore = true;
+            log_debug("Local-dev path is not a symlink, restoring");
+        }
+    } else {
+        /* Path doesn't exist - need to create */
+        need_restore = true;
+        log_debug("Local-dev symlink doesn't exist, creating");
+    }
+
+    if (need_restore) {
+        printf("Restoring local-dev symlink for %s/%s %s...\n", author, name, version);
+
+        /* Re-create the symlink using the existing create_package_symlink function */
+        if (!create_package_symlink(env, source_path, author, name, version)) {
+            log_error("Failed to restore local-dev symlink: %s -> %s", link_path, source_path);
+            arena_free(link_path);
+            arena_free(source_path);
+            return false;
+        }
+
+        /* Re-register in registry.dat */
+        if (!ensure_local_dev_in_registry_dat(env, author, name, version)) {
+            log_error("Warning: Failed to update registry.dat for restored local-dev package");
+            /* Continue anyway - the symlink was restored */
+        }
+
+        printf("Restored local-dev symlink: %s/%s %s -> %s\n", author, name, version, source_path);
+    }
+
+    arena_free(link_path);
+    arena_free(source_path);
+    return true;
 }
 
 /**

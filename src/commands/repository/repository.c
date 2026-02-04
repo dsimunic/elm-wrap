@@ -6,11 +6,13 @@
  */
 
 #include "repository.h"
+#include "mirror_cmd.h"
 #include "../package/install_local_dev.h"
 #include "../package/package_common.h"
 #include "../../alloc.h"
 #include "../../constants.h"
 #include "../../global_context.h"
+#include "../../feature_flags.h"
 #include "../../env_defaults.h"
 #include "../../elm_compiler.h"
 #include "../../elm_json.h"
@@ -53,6 +55,9 @@ static void print_repository_usage(void) {
     // printf("  init [ROOT_PATH]      Create a new repository directory\n");
     // printf("  list [ROOT_PATH]      List repositories at path\n");
     printf("  local-dev             Manage local development tracking\n");
+    if (feature_mirror_enabled()) {
+        printf("  mirror                Create a content-addressable mirror of Elm packages\n");
+    }
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help            Show this help message\n");
@@ -147,6 +152,117 @@ static void remove_local_dev_from_v1_registry_dat(const char *author, const char
 
     registry_free(registry);
     cache_config_free(cache);
+}
+
+/* Forward declaration */
+static char *get_local_dev_registry_path(void);
+
+/**
+ * Remove a package version from registry-local-dev.dat.
+ * This is a text file, so we load the V2 registry, modify it, and write back.
+ */
+static void remove_local_dev_from_text_registry(const char *author, const char *name, const char *version) {
+    if (!author || !name || !version) {
+        return;
+    }
+
+    char *registry_path = get_local_dev_registry_path();
+    if (!registry_path) {
+        return;
+    }
+
+    struct stat st;
+    if (stat(registry_path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        arena_free(registry_path);
+        return;
+    }
+
+    /* Load the registry */
+    V2Registry *registry = v2_registry_load_from_text(registry_path);
+    if (!registry) {
+        arena_free(registry_path);
+        return;
+    }
+
+    /* Find the package entry */
+    V2PackageEntry *entry = v2_registry_find(registry, author, name);
+    if (!entry) {
+        v2_registry_free(registry);
+        arena_free(registry_path);
+        return;
+    }
+
+    /* Parse the version to remove */
+    Version parsed;
+    if (!version_parse_safe(version, &parsed)) {
+        v2_registry_free(registry);
+        arena_free(registry_path);
+        return;
+    }
+
+    /* Find and remove the version */
+    bool found = false;
+    for (size_t i = 0; i < entry->version_count; i++) {
+        if (entry->versions[i].major == parsed.major &&
+            entry->versions[i].minor == parsed.minor &&
+            entry->versions[i].patch == parsed.patch) {
+            /* Shift remaining versions down */
+            for (size_t j = i; j < entry->version_count - 1; j++) {
+                entry->versions[j] = entry->versions[j + 1];
+            }
+            entry->version_count--;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        v2_registry_free(registry);
+        arena_free(registry_path);
+        return;
+    }
+
+    /* Rewrite the registry file */
+    FILE *f = fopen(registry_path, "w");
+    if (!f) {
+        v2_registry_free(registry);
+        arena_free(registry_path);
+        return;
+    }
+
+    /* Write header */
+    fprintf(f, "format 2\n");
+    fprintf(f, "elm 0.19.1\n\n");
+
+    /* Write all packages that still have versions */
+    for (size_t i = 0; i < registry->entry_count; i++) {
+        V2PackageEntry *pkg = &registry->entries[i];
+        if (pkg->version_count == 0) continue;
+
+        fprintf(f, "package: %s/%s\n", pkg->author, pkg->name);
+
+        for (size_t v = 0; v < pkg->version_count; v++) {
+            V2PackageVersion *ver = &pkg->versions[v];
+            fprintf(f, "    version: %d.%d.%d\n", ver->major, ver->minor, ver->patch);
+            fprintf(f, "    status: valid\n");
+            fprintf(f, "    license: %s\n", ver->license ? ver->license : "BSD-3-Clause");
+            fprintf(f, "    dependencies:\n");
+
+            if (ver->dependencies && ver->dependency_count > 0) {
+                for (size_t d = 0; d < ver->dependency_count; d++) {
+                    V2Dependency *dep = &ver->dependencies[d];
+                    fprintf(f, "        %s  %s\n",
+                            dep->package_name ? dep->package_name : "",
+                            dep->constraint ? dep->constraint : "1.0.0 <= v < 2.0.0");
+                }
+            }
+        }
+        fprintf(f, "\n");
+    }
+
+    fclose(f);
+    v2_registry_free(registry);
+    arena_free(registry_path);
 }
 
 /**
@@ -614,6 +730,8 @@ static int list_tracking_for_package(const char *tracking_dir, const char *autho
     struct dirent *track_entry;
     while ((track_entry = readdir(track_files_handle)) != NULL) {
         if (track_entry->d_name[0] == '.') continue;
+        /* Skip the PATH file - it stores the package source path, not an app tracking */
+        if (strcmp(track_entry->d_name, "PATH") == 0) continue;
 
         size_t track_file_len = strlen(version_path) + strlen(track_entry->d_name) + 2;
         char *track_file = arena_malloc(track_file_len);
@@ -987,8 +1105,9 @@ static int clear_package_tracking(const char *package_name, const char *version)
 
     struct stat st;
     if (stat(pkg_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
-        printf("No tracking found for %s/%s %s\n", author, name, version);
+        printf("Cleared %s/%s %s from local-dev registry\n", author, name, version);
         remove_local_dev_from_v1_registry_dat(author, name, version);
+        remove_local_dev_from_text_registry(author, name, version);
         arena_free(pkg_path);
         arena_free(tracking_dir);
         arena_free(author);
@@ -999,6 +1118,7 @@ static int clear_package_tracking(const char *package_name, const char *version)
     if (remove_directory_recursive_local(pkg_path)) {
         printf("Cleared tracking for %s/%s %s\n", author, name, version);
         remove_local_dev_from_v1_registry_dat(author, name, version);
+        remove_local_dev_from_text_registry(author, name, version);
         arena_free(pkg_path);
         arena_free(tracking_dir);
         arena_free(author);
@@ -1262,6 +1382,14 @@ int cmd_repository(int argc, char *argv[]) {
 
     if (strcmp(subcmd, "local-dev") == 0) {
         return cmd_repository_local_dev(argc - 1, argv + 1);
+    }
+
+    if (strcmp(subcmd, "mirror") == 0) {
+        if (!feature_mirror_enabled()) {
+            fprintf(stderr, "Error: Command 'repository mirror' is not available in this build.\n");
+            return 1;
+        }
+        return cmd_mirror(argc - 1, argv + 1);
     }
 
     fprintf(stderr, "Error: Unknown repository subcommand '%s'\n", subcmd);

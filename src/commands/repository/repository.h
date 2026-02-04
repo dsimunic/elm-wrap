@@ -3,11 +3,12 @@
 
 /**
  * Repository command group - manage local package repositories
- * 
+ *
  * Commands:
  *   repository new PATH [--compiler COMPILER [--version VERSION]]
  *   repository list [PATH]
  *   repository local-dev [clear ...]
+ *   repository mirror [OPTIONS] [OUTPUT_DIR]
  */
 
 /* Main entry point for the 'repository' command group */
