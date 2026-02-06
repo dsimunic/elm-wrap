@@ -1520,10 +1520,120 @@ bool package_exists_in_registry(InstallEnv *env, const char *author, const char 
     }
 }
 
+/* ========================================================================
+ * Dependency completeness validation
+ * ======================================================================== */
+
 /**
- * Recursively insert package_dependency facts for a package and all its transitive dependencies.
- * This builds the complete dependency graph needed for orphan detection.
+ * Check if a package (author/name) exists in any dependency map of an
+ * application elm.json.
  */
+static bool is_in_any_dep_map(ElmJson *elm_json, const char *author, const char *name) {
+    if (elm_json->dependencies_direct &&
+        package_map_find(elm_json->dependencies_direct, author, name)) return true;
+    if (elm_json->dependencies_indirect &&
+        package_map_find(elm_json->dependencies_indirect, author, name)) return true;
+    if (elm_json->dependencies_test_direct &&
+        package_map_find(elm_json->dependencies_test_direct, author, name)) return true;
+    if (elm_json->dependencies_test_indirect &&
+        package_map_find(elm_json->dependencies_test_indirect, author, name)) return true;
+    return false;
+}
+
+/**
+ * Check the dependencies of one cached package against the application's
+ * elm.json.  Any dependency that is not listed in any of the four maps is
+ * recorded in `missing` (with the "version" field set to "needed by author/name"
+ * for display purposes).
+ */
+static void check_package_deps_completeness(
+    ElmJson *app_json,
+    CacheConfig *cache,
+    const Package *pkg,
+    PackageMap *missing
+) {
+    /* Skip constraint versions — can't look up in cache */
+    if (!pkg->version || strchr(pkg->version, '<') || strchr(pkg->version, '>')) {
+        return;
+    }
+
+    char *pkg_path = cache_get_package_path(cache, pkg->author, pkg->name, pkg->version);
+    if (!pkg_path) return;
+
+    size_t elm_json_len = strlen(pkg_path) + 12; /* /elm.json\0 */
+    char *ejp = arena_malloc(elm_json_len);
+    if (!ejp) {
+        arena_free(pkg_path);
+        return;
+    }
+    snprintf(ejp, elm_json_len, "%s/elm.json", pkg_path);
+
+    ElmJson *pkg_json = elm_json_read(ejp);
+    arena_free(ejp);
+    arena_free(pkg_path);
+    if (!pkg_json) return;
+
+    PackageMap *deps = NULL;
+    if (pkg_json->type == ELM_PROJECT_PACKAGE) {
+        deps = pkg_json->package_dependencies;
+    } else {
+        deps = pkg_json->dependencies_direct;
+    }
+
+    if (deps) {
+        for (int i = 0; i < deps->count; i++) {
+            Package *dep = &deps->packages[i];
+            if (!is_in_any_dep_map(app_json, dep->author, dep->name) &&
+                !package_map_find(missing, dep->author, dep->name)) {
+                char needed_by[MAX_PACKAGE_NAME_LENGTH];
+                snprintf(needed_by, sizeof(needed_by), "%s/%s", pkg->author, pkg->name);
+                package_map_add(missing, dep->author, dep->name, needed_by);
+            }
+        }
+    }
+
+    elm_json_free(pkg_json);
+}
+
+/**
+ * Check one PackageMap's worth of packages for completeness.
+ */
+static void check_deps_from_map(
+    ElmJson *app_json,
+    CacheConfig *cache,
+    PackageMap *map,
+    PackageMap *missing
+) {
+    if (!map) return;
+    for (int i = 0; i < map->count; i++) {
+        check_package_deps_completeness(app_json, cache, &map->packages[i], missing);
+    }
+}
+
+int find_missing_dependencies(ElmJson *elm_json, CacheConfig *cache, PackageMap **out_missing) {
+    if (!elm_json || !cache || elm_json->type != ELM_PROJECT_APPLICATION) {
+        return 0;
+    }
+
+    PackageMap *missing = package_map_create();
+    if (!missing) return 0;
+
+    check_deps_from_map(elm_json, cache, elm_json->dependencies_direct, missing);
+    check_deps_from_map(elm_json, cache, elm_json->dependencies_indirect, missing);
+    check_deps_from_map(elm_json, cache, elm_json->dependencies_test_direct, missing);
+    check_deps_from_map(elm_json, cache, elm_json->dependencies_test_indirect, missing);
+
+    int count = missing->count;
+
+    if (count > 0 && out_missing) {
+        *out_missing = missing;
+    } else {
+        package_map_free(missing);
+    }
+
+    return count;
+}
+
 /**
  * Recursively insert package_dependency facts for a package and all its transitive dependencies.
  * This builds the complete dependency graph needed for orphan detection.
@@ -1619,11 +1729,30 @@ static void insert_package_dependencies_recursive(
     elm_json_free(pkg_elm_json);
 }
 
+/**
+ * Check if a package is in the exclusion list (packages being removed).
+ */
+static bool is_in_exclude_list(const char *author, const char *name,
+                               const char **exclude_authors, const char **exclude_names,
+                               int exclude_count) {
+    if (exclude_count <= 0 || !exclude_authors || !exclude_names) {
+        return false;
+    }
+    for (int i = 0; i < exclude_count; i++) {
+        if (strcmp(author, exclude_authors[i]) == 0 &&
+            strcmp(name, exclude_names[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool find_orphaned_packages(
     const ElmJson *elm_json,
     struct CacheConfig *cache,
-    const char *exclude_author,
-    const char *exclude_name,
+    const char **exclude_authors,
+    const char **exclude_names,
+    int exclude_count,
     PackageMap **out_orphaned
 ) {
     *out_orphaned = NULL;
@@ -1633,10 +1762,8 @@ bool find_orphaned_packages(
         return true;
     }
 
-    log_debug("Finding orphaned dependencies%s%s%s",
-        exclude_author ? " (excluding " : "",
-        exclude_author ? exclude_author : "",
-        exclude_author ? ")" : "");
+    log_debug("Finding orphaned dependencies (excluding %d package%s)",
+        exclude_count, exclude_count == 1 ? "" : "s");
 
     /* Initialize rulr (zero-init to prevent undefined behavior from uninitialized fields) */
     Rulr rulr = {0};
@@ -1654,14 +1781,13 @@ bool find_orphaned_packages(
         return false;
     }
 
-    /* Insert direct_dependency facts (optionally excluding a target package) */
+    /* Insert direct_dependency facts (excluding packages being removed) */
     if (elm_json->dependencies_direct) {
         for (int i = 0; i < elm_json->dependencies_direct->count; i++) {
             Package *pkg = &elm_json->dependencies_direct->packages[i];
-            if (exclude_author && exclude_name &&
-                strcmp(pkg->author, exclude_author) == 0 &&
-                strcmp(pkg->name, exclude_name) == 0) {
-                continue; /* Skip the excluded package */
+            if (is_in_exclude_list(pkg->author, pkg->name,
+                    exclude_authors, exclude_names, exclude_count)) {
+                continue; /* Skip excluded packages */
             }
             rulr_insert_fact_2s(&rulr, "direct_dependency", pkg->author, pkg->name);
         }
@@ -1670,10 +1796,9 @@ bool find_orphaned_packages(
     if (elm_json->dependencies_test_direct) {
         for (int i = 0; i < elm_json->dependencies_test_direct->count; i++) {
             Package *pkg = &elm_json->dependencies_test_direct->packages[i];
-            if (exclude_author && exclude_name &&
-                strcmp(pkg->author, exclude_author) == 0 &&
-                strcmp(pkg->name, exclude_name) == 0) {
-                continue; /* Skip the excluded package */
+            if (is_in_exclude_list(pkg->author, pkg->name,
+                    exclude_authors, exclude_names, exclude_count)) {
+                continue; /* Skip excluded packages */
             }
             rulr_insert_fact_2s(&rulr, "direct_dependency", pkg->author, pkg->name);
         }
@@ -1705,10 +1830,9 @@ bool find_orphaned_packages(
     if (elm_json->dependencies_direct) {
         for (int i = 0; i < elm_json->dependencies_direct->count; i++) {
             Package *pkg = &elm_json->dependencies_direct->packages[i];
-            if (exclude_author && exclude_name &&
-                strcmp(pkg->author, exclude_author) == 0 &&
-                strcmp(pkg->name, exclude_name) == 0) {
-                continue; /* Skip the excluded package */
+            if (is_in_exclude_list(pkg->author, pkg->name,
+                    exclude_authors, exclude_names, exclude_count)) {
+                continue; /* Skip excluded packages */
             }
             insert_package_dependencies_recursive(&rulr, cache,
                 pkg->author, pkg->name, pkg->version, visited);
@@ -1718,11 +1842,32 @@ bool find_orphaned_packages(
     if (elm_json->dependencies_test_direct) {
         for (int i = 0; i < elm_json->dependencies_test_direct->count; i++) {
             Package *pkg = &elm_json->dependencies_test_direct->packages[i];
-            if (exclude_author && exclude_name &&
-                strcmp(pkg->author, exclude_author) == 0 &&
-                strcmp(pkg->name, exclude_name) == 0) {
-                continue; /* Skip the excluded package */
+            if (is_in_exclude_list(pkg->author, pkg->name,
+                    exclude_authors, exclude_names, exclude_count)) {
+                continue; /* Skip excluded packages */
             }
+            insert_package_dependencies_recursive(&rulr, cache,
+                pkg->author, pkg->name, pkg->version, visited);
+        }
+    }
+
+    /* Also process indirect dependencies to complete the dependency graph.
+     * Direct dep processing only goes 1 level deep because cached package
+     * elm.json files use constraint versions (e.g. "1.0.0 <= v < 2.0.0")
+     * which can't be used as cache paths. Indirect deps in the application
+     * elm.json have exact versions, so processing them fills in the deeper
+     * package_dependency links that would otherwise be missing. */
+    if (elm_json->dependencies_indirect) {
+        for (int i = 0; i < elm_json->dependencies_indirect->count; i++) {
+            Package *pkg = &elm_json->dependencies_indirect->packages[i];
+            insert_package_dependencies_recursive(&rulr, cache,
+                pkg->author, pkg->name, pkg->version, visited);
+        }
+    }
+
+    if (elm_json->dependencies_test_indirect) {
+        for (int i = 0; i < elm_json->dependencies_test_indirect->count; i++) {
+            Package *pkg = &elm_json->dependencies_test_indirect->packages[i];
             insert_package_dependencies_recursive(&rulr, cache,
                 pkg->author, pkg->name, pkg->version, visited);
         }

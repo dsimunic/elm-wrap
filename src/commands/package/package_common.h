@@ -240,20 +240,35 @@ bool package_exists_in_registry(struct InstallEnv *env, const char *author, cons
  * Uses the no_orphaned_packages rulr rule to detect indirect dependencies
  * that are not reachable from any direct dependency.
  *
- * @param elm_json       The application's parsed elm.json
- * @param cache          Cache config for looking up package elm.json files
- * @param exclude_author If non-NULL, exclude this package from direct deps (for simulating removal)
- * @param exclude_name   If non-NULL, exclude this package from direct deps (for simulating removal)
- * @param out_orphaned   Output: PackageMap of orphaned packages (caller must free), or NULL if none
+ * @param elm_json         The application's parsed elm.json
+ * @param cache            Cache config for looking up package elm.json files
+ * @param exclude_authors  Array of package authors to exclude from direct deps (for simulating removal), or NULL
+ * @param exclude_names    Array of package names to exclude from direct deps (for simulating removal), or NULL
+ * @param exclude_count    Number of packages to exclude (0 for none)
+ * @param out_orphaned     Output: PackageMap of orphaned packages (caller must free), or NULL if none
  * @return true on success, false on error
  */
 bool find_orphaned_packages(
     const ElmJson *elm_json,
     struct CacheConfig *cache,
-    const char *exclude_author,
-    const char *exclude_name,
+    const char **exclude_authors,
+    const char **exclude_names,
+    int exclude_count,
     PackageMap **out_orphaned
 );
+
+/**
+ * Find dependencies that are required by packages in an application's elm.json
+ * but are not listed in any of the four dependency maps.
+ *
+ * @param elm_json    The application's parsed elm.json
+ * @param cache       Cache config for looking up package elm.json files
+ * @param out_missing If non-NULL and missing deps are found, filled with a
+ *                    PackageMap where each entry's version is "needed by author/name".
+ *                    Caller must free with package_map_free().
+ * @return Number of missing dependencies (0 = healthy). Returns 0 for non-application projects.
+ */
+int find_missing_dependencies(ElmJson *elm_json, struct CacheConfig *cache, PackageMap **out_missing);
 
 /**
  * Check if an exact version exists in the currently loaded registry.

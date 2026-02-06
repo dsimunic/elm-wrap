@@ -86,56 +86,17 @@ static void print_remove_usage(const char *invocation) {
 }
 
 /**
- * Find orphaned indirect dependencies after removing packages.
- * Uses the shared find_orphaned_packages function to detect orphans.
- * For multiple packages, we need to simulate removing all at once.
+ * Tracking info for each package being removed.
+ * Remembers the original map and where to demote (if applicable).
  */
-static bool find_orphaned_dependencies_multi(
-    const ElmJson *elm_json,
-    const char **authors,
-    const char **names,
-    int count,
-    CacheConfig *cache,
-    InstallPlan *plan
-) {
-    if (elm_json->type != ELM_PROJECT_APPLICATION) {
-        /* For packages, we don't have the direct/indirect distinction */
-        return true;
-    }
-
-    /* For multiple packages, we need to find orphans considering all removals */
-    /* Currently find_orphaned_packages only handles single package removal */
-    /* We'll call it for each package - orphans may be duplicated but plan merging handles that */
-    for (int i = 0; i < count; i++) {
-        log_debug("Finding orphaned dependencies after removing %s/%s", authors[i], names[i]);
-
-        PackageMap *orphaned = NULL;
-        if (!find_orphaned_packages(elm_json, cache, authors[i], names[i], &orphaned)) {
-            return false;
-        }
-
-        if (orphaned) {
-            for (int j = 0; j < orphaned->count; j++) {
-                Package *pkg = &orphaned->packages[j];
-                /* Check if already in plan to avoid duplicates */
-                bool already_in_plan = false;
-                for (int k = 0; k < plan->count; k++) {
-                    if (strcmp(plan->changes[k].author, pkg->author) == 0 &&
-                        strcmp(plan->changes[k].name, pkg->name) == 0) {
-                        already_in_plan = true;
-                        break;
-                    }
-                }
-                if (!already_in_plan) {
-                    install_plan_add_change(plan, pkg->author, pkg->name, pkg->version, NULL);
-                }
-            }
-            package_map_free(orphaned);
-        }
-    }
-
-    return true;
-}
+typedef struct {
+    const char *author;
+    const char *name;
+    char *version;          /* arena_strdup'd — safe across map operations */
+    PackageMap *source_map; /* original map (direct or test-direct) */
+    PackageMap *demote_map; /* indirect counterpart, or NULL if already indirect */
+    bool demote;            /* after analysis: true = demote, false = remove */
+} RemovalTarget;
 
 /**
  * Validation result for package removal
@@ -318,7 +279,7 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
 
     log_debug("ELM_HOME: %s", env->cache->elm_home);
 
-    /* Phase 3: Build removal plan for all packages */
+    /* Phase 3: Build removal plan with demotion support for applications */
     InstallPlan *out_plan = install_plan_create();
     if (!out_plan) {
         log_error("Failed to create install plan");
@@ -327,81 +288,260 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
         return 1;
     }
 
-    /* Add all target packages to removal plan */
-    for (int i = 0; i < package_count; i++) {
-        Package *pkg = find_existing_package(elm_json, authors[i], names[i]);
-        if (pkg) {
-            install_plan_add_change(out_plan, authors[i], names[i], pkg->version, NULL);
+    /* For package-type projects: no direct/indirect distinction, just remove */
+    if (elm_json->type != ELM_PROJECT_APPLICATION) {
+        for (int i = 0; i < package_count; i++) {
+            Package *pkg = find_existing_package(elm_json, authors[i], names[i]);
+            if (pkg) {
+                install_plan_add_change(out_plan, authors[i], names[i], pkg->version, NULL);
+            }
         }
+        goto display_plan;
     }
 
-    /* Find and add orphaned indirect dependencies to the removal plan */
-    if (!find_orphaned_dependencies_multi(elm_json, (const char **)authors, (const char **)names, 
-                                          package_count, env->cache, out_plan)) {
-        log_error("Failed to find orphaned dependencies");
-        install_plan_free(out_plan);
-        elm_json_free(elm_json);
-        install_env_free(env);
-        return 1;
-    }
+    /* --- Application project: detect demotions via temporary move + orphan detection --- */
+    {
+        RemovalTarget *targets = arena_calloc(package_count, sizeof(RemovalTarget));
 
-    qsort(out_plan->changes, out_plan->count, sizeof(PackageChange), compare_package_changes);
+        /* Step 1: Record target info and determine source/demote maps */
+        for (int i = 0; i < package_count; i++) {
+            targets[i].author = authors[i];
+            targets[i].name = names[i];
+            targets[i].demote = false;
 
-    int max_width = 0;
-    for (int i = 0; i < out_plan->count; i++) {
-        PackageChange *change = &out_plan->changes[i];
-        int pkg_len = strlen(change->author) + 1 + strlen(change->name);
-        if (pkg_len > max_width) max_width = pkg_len;
-    }
+            PackageMap *src = find_package_map(elm_json, authors[i], names[i]);
+            targets[i].source_map = src;
 
-    printf("Here is my plan:\n");
-    printf("  \n");
-    printf("  Remove:\n");
-    
-    for (int i = 0; i < out_plan->count; i++) {
-        PackageChange *change = &out_plan->changes[i];
-        char pkg_name[MAX_PACKAGE_NAME_LENGTH];
-        snprintf(pkg_name, sizeof(pkg_name), "%s/%s", change->author, change->name);
-        printf("    %-*s    %s\n", max_width, pkg_name, change->old_version);
-    }
-    printf("  \n");
+            if (src == elm_json->dependencies_direct) {
+                targets[i].demote_map = elm_json->dependencies_indirect;
+            } else if (src == elm_json->dependencies_test_direct) {
+                targets[i].demote_map = elm_json->dependencies_test_indirect;
+            } else {
+                /* Already indirect (or not found) — no demotion possible */
+                targets[i].demote_map = NULL;
+            }
 
-    if (!auto_yes) {
-        printf("\nWould you like me to update your elm.json accordingly? [Y/n] ");
-        fflush(stdout);
-        
-        char response[10];
-        if (!fgets(response, sizeof(response), stdin)) {
-            fprintf(stderr, "Error reading input\n");
+            /* Save version (arena_strdup'd) before any map operations */
+            Package *pkg = find_existing_package(elm_json, authors[i], names[i]);
+            targets[i].version = pkg ? arena_strdup(pkg->version) : NULL;
+        }
+
+        /* Step 2: Temporarily move direct targets to their indirect counterpart */
+        for (int i = 0; i < package_count; i++) {
+            if (targets[i].demote_map && targets[i].version) {
+                /* add-before-remove: package_map_add copies strings */
+                package_map_add(targets[i].demote_map, targets[i].author, targets[i].name, targets[i].version);
+                package_map_remove(targets[i].source_map, targets[i].author, targets[i].name);
+            }
+        }
+
+        /* Step 3: Run orphan detection with NO excludes —
+         * targets are now "indirect" so the engine checks their reachability */
+        PackageMap *orphaned = NULL;
+        bool orphan_ok = find_orphaned_packages(elm_json, env->cache, NULL, NULL, 0, &orphaned);
+
+        /* Step 4: Restore elm_json to original state (move targets back) */
+        for (int i = 0; i < package_count; i++) {
+            if (targets[i].demote_map && targets[i].version) {
+                package_map_add(targets[i].source_map, targets[i].author, targets[i].name, targets[i].version);
+                package_map_remove(targets[i].demote_map, targets[i].author, targets[i].name);
+            }
+        }
+
+        if (!orphan_ok) {
+            log_error("Failed to find orphaned dependencies");
             install_plan_free(out_plan);
             elm_json_free(elm_json);
             install_env_free(env);
             return 1;
         }
-        
-        if (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n') {
-            printf("Aborted.\n");
-            install_plan_free(out_plan);
-            elm_json_free(elm_json);
-            install_env_free(env);
-            return 0;
+
+        /* Step 5: Classify each target as demote or remove */
+        for (int i = 0; i < package_count; i++) {
+            if (!targets[i].demote_map) {
+                /* Already indirect — always remove */
+                targets[i].demote = false;
+                continue;
+            }
+
+            /* Check if this target appeared in the orphaned set */
+            bool is_orphaned = orphaned &&
+                package_map_find(orphaned, targets[i].author, targets[i].name);
+            targets[i].demote = !is_orphaned;
         }
+
+        /* Step 6: Build the plan — removals for orphaned targets */
+        for (int i = 0; i < package_count; i++) {
+            if (!targets[i].demote && targets[i].version) {
+                install_plan_add_change(out_plan, targets[i].author, targets[i].name,
+                                        targets[i].version, NULL);
+            }
+        }
+
+        /* Also add orphaned non-target indirect deps (cascade removals) */
+        if (orphaned) {
+            for (int j = 0; j < orphaned->count; j++) {
+                Package *pkg = &orphaned->packages[j];
+                /* Skip if this orphan is one of our targets (already handled above) */
+                bool is_target = false;
+                for (int i = 0; i < package_count; i++) {
+                    if (strcmp(pkg->author, targets[i].author) == 0 &&
+                        strcmp(pkg->name, targets[i].name) == 0) {
+                        is_target = true;
+                        break;
+                    }
+                }
+                if (!is_target) {
+                    install_plan_add_change(out_plan, pkg->author, pkg->name, pkg->version, NULL);
+                }
+            }
+            package_map_free(orphaned);
+        }
+
+        /* Sort the removal plan */
+        if (out_plan->count > 0) {
+            qsort(out_plan->changes, out_plan->count, sizeof(PackageChange), compare_package_changes);
+        }
+
+        /* --- Display plan --- */
+        int demote_count = 0;
+        for (int i = 0; i < package_count; i++) {
+            if (targets[i].demote) demote_count++;
+        }
+
+        /* Compute max width across all entries for alignment */
+        int max_width = 0;
+        for (int i = 0; i < package_count; i++) {
+            if (targets[i].demote) {
+                int pkg_len = (int)(strlen(targets[i].author) + 1 + strlen(targets[i].name));
+                if (pkg_len > max_width) max_width = pkg_len;
+            }
+        }
+        for (int i = 0; i < out_plan->count; i++) {
+            PackageChange *change = &out_plan->changes[i];
+            int pkg_len = (int)(strlen(change->author) + 1 + strlen(change->name));
+            if (pkg_len > max_width) max_width = pkg_len;
+        }
+
+        printf("Here is my plan:\n");
+        printf("  \n");
+
+        if (demote_count > 0) {
+            printf("  Demote to indirect:\n");
+            for (int i = 0; i < package_count; i++) {
+                if (!targets[i].demote) continue;
+                char pkg_name[MAX_PACKAGE_NAME_LENGTH];
+                snprintf(pkg_name, sizeof(pkg_name), "%s/%s", targets[i].author, targets[i].name);
+                printf("    %-*s    %s\n", max_width, pkg_name, targets[i].version);
+            }
+            if (out_plan->count > 0) printf("  \n");
+        }
+
+        if (out_plan->count > 0) {
+            printf("  Remove:\n");
+            for (int i = 0; i < out_plan->count; i++) {
+                PackageChange *change = &out_plan->changes[i];
+                char pkg_name[MAX_PACKAGE_NAME_LENGTH];
+                snprintf(pkg_name, sizeof(pkg_name), "%s/%s", change->author, change->name);
+                printf("    %-*s    %s\n", max_width, pkg_name, change->old_version);
+            }
+        }
+        printf("  \n");
+
+        if (!auto_yes) {
+            printf("\nWould you like me to update your elm.json accordingly? [Y/n] ");
+            fflush(stdout);
+
+            char response[10];
+            if (!fgets(response, sizeof(response), stdin)) {
+                fprintf(stderr, "Error reading input\n");
+                install_plan_free(out_plan);
+                elm_json_free(elm_json);
+                install_env_free(env);
+                return 1;
+            }
+
+            if (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n') {
+                printf("Aborted.\n");
+                install_plan_free(out_plan);
+                elm_json_free(elm_json);
+                install_env_free(env);
+                return 0;
+            }
+        }
+
+        /* Apply demotions: move from direct to indirect */
+        for (int i = 0; i < package_count; i++) {
+            if (targets[i].demote && targets[i].version) {
+                /* add-before-remove pattern */
+                package_map_add(targets[i].demote_map, targets[i].author, targets[i].name, targets[i].version);
+                package_map_remove(targets[i].source_map, targets[i].author, targets[i].name);
+            }
+        }
+
+        /* Apply removals */
+        for (int i = 0; i < out_plan->count; i++) {
+            PackageChange *change = &out_plan->changes[i];
+            remove_from_all_app_maps(elm_json, change->author, change->name);
+        }
+
+        goto save_and_finish;
     }
-    
-    for (int i = 0; i < out_plan->count; i++) {
-        PackageChange *change = &out_plan->changes[i];
-        
-        if (elm_json->type == ELM_PROJECT_APPLICATION) {
-            package_map_remove(elm_json->dependencies_direct, change->author, change->name);
-            package_map_remove(elm_json->dependencies_indirect, change->author, change->name);
-            package_map_remove(elm_json->dependencies_test_direct, change->author, change->name);
-            package_map_remove(elm_json->dependencies_test_indirect, change->author, change->name);
-        } else {
+
+display_plan:
+    /* Display plan for package-type projects (removals only) */
+    qsort(out_plan->changes, out_plan->count, sizeof(PackageChange), compare_package_changes);
+
+    {
+        int max_width = 0;
+        for (int i = 0; i < out_plan->count; i++) {
+            PackageChange *change = &out_plan->changes[i];
+            int pkg_len = (int)(strlen(change->author) + 1 + strlen(change->name));
+            if (pkg_len > max_width) max_width = pkg_len;
+        }
+
+        printf("Here is my plan:\n");
+        printf("  \n");
+        printf("  Remove:\n");
+
+        for (int i = 0; i < out_plan->count; i++) {
+            PackageChange *change = &out_plan->changes[i];
+            char pkg_name[MAX_PACKAGE_NAME_LENGTH];
+            snprintf(pkg_name, sizeof(pkg_name), "%s/%s", change->author, change->name);
+            printf("    %-*s    %s\n", max_width, pkg_name, change->old_version);
+        }
+        printf("  \n");
+
+        if (!auto_yes) {
+            printf("\nWould you like me to update your elm.json accordingly? [Y/n] ");
+            fflush(stdout);
+
+            char response[10];
+            if (!fgets(response, sizeof(response), stdin)) {
+                fprintf(stderr, "Error reading input\n");
+                install_plan_free(out_plan);
+                elm_json_free(elm_json);
+                install_env_free(env);
+                return 1;
+            }
+
+            if (response[0] != 'Y' && response[0] != 'y' && response[0] != '\n') {
+                printf("Aborted.\n");
+                install_plan_free(out_plan);
+                elm_json_free(elm_json);
+                install_env_free(env);
+                return 0;
+            }
+        }
+
+        for (int i = 0; i < out_plan->count; i++) {
+            PackageChange *change = &out_plan->changes[i];
             package_map_remove(elm_json->package_dependencies, change->author, change->name);
             package_map_remove(elm_json->package_test_dependencies, change->author, change->name);
         }
     }
-    
+
+save_and_finish:
     printf("Saving elm.json...\n");
     if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
         fprintf(stderr, "Error: Failed to write elm.json\n");

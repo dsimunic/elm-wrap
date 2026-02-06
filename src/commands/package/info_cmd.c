@@ -6,6 +6,7 @@
 #include "../../elm_json.h"
 #include "../../elm_project.h"
 #include "../../install_env.h"
+#include "../../cache.h"
 #include "../../registry.h"
 #include "../../protocol_v1/install.h"
 #include "../../protocol_v2/install.h"
@@ -625,6 +626,36 @@ static int show_package_info_from_registry(const char *package_name, const char 
     return result;
 }
 
+/**
+ * Validate that every dependency required by packages in the application's
+ * elm.json is also listed in elm.json.  Prints a diagnostic block to stderr
+ * and returns the count of missing dependencies (0 = healthy).
+ */
+static int validate_dependency_completeness(ElmJson *elm_json, CacheConfig *cache) {
+    PackageMap *missing = NULL;
+    int count = find_missing_dependencies(elm_json, cache, &missing);
+
+    if (count > 0 && missing) {
+        fprintf(stderr, "\n%s-- MISSING DEPENDENCIES --------------------------------------------------------%s\n\n",
+                ANSI_DULL_CYAN, ANSI_RESET);
+        fprintf(stderr, "The following packages are required by your dependencies but are not\n");
+        fprintf(stderr, "listed in your elm.json:\n\n");
+
+        for (int i = 0; i < missing->count; i++) {
+            Package *pkg = &missing->packages[i];
+            fprintf(stderr, "    %s✗%s %s/%s  (needed by %s)\n",
+                    ANSI_RED, ANSI_RESET, pkg->author, pkg->name, pkg->version);
+        }
+
+        fprintf(stderr, "\nYour project will not compile. Run '%s make' or '%s install' to\n",
+                global_context_program_name(), global_context_program_name());
+        fprintf(stderr, "resolve the missing dependencies.\n\n");
+        package_map_free(missing);
+    }
+
+    return count;
+}
+
 int cmd_info(int argc, char *argv[], const char *invocation) {
     const char *arg = NULL;
     const char *raw_arg = NULL;
@@ -865,6 +896,8 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
         }
 
         print_dependencies_section(elm_json, max_name_len);
+
+        validate_dependency_completeness(elm_json, env->cache);
 
         if (global_context_is_v2() && v2_registry) {
             check_all_upgrades_v2(elm_json_path, v2_registry, max_name_len);

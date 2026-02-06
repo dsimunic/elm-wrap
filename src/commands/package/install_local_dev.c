@@ -825,7 +825,7 @@ static bool prune_app_orphaned_deps(const char *app_elm_json_path, CacheConfig *
 
     /* Use the shared orphan detection function (no exclusions) */
     PackageMap *orphaned = NULL;
-    if (!find_orphaned_packages(app_json, cache, NULL, NULL, &orphaned)) {
+    if (!find_orphaned_packages(app_json, cache, NULL, NULL, 0, &orphaned)) {
         elm_json_free(app_json);
         return false;
     }

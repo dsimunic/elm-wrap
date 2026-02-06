@@ -286,11 +286,17 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
             }
 
             if (parsed_existing && version_equals(&existing_ver, target_version)) {
-                LogLevel old_level = g_log_level;
-                log_set_level(LOG_LEVEL_PROGRESS);
-                log_progress("%s/%s is already installed at version %s", author, name, existing_pkg->version);
-                log_set_level(old_level);
-                return 0;
+                /* Check if dependencies are complete before declaring success */
+                if (find_missing_dependencies(elm_json, env->cache, NULL) > 0) {
+                    log_progress("%s/%s is installed but has missing dependencies. Re-resolving...", author, name);
+                    /* Fall through to the solver */
+                } else {
+                    LogLevel old_level = g_log_level;
+                    log_set_level(LOG_LEVEL_PROGRESS);
+                    log_progress("%s/%s is already installed at version %s", author, name, existing_pkg->version);
+                    log_set_level(old_level);
+                    return 0;
+                }
             }
 
             char *ver_str = version_to_string(target_version);
@@ -387,11 +393,17 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
                     }
                     log_debug("Done");
                 }
-            } else {
-                printf("It is already installed!\n");
+                return 0;
             }
 
-            return 0;
+            /* Check if dependencies are complete before declaring success */
+            if (find_missing_dependencies(elm_json, env->cache, NULL) > 0) {
+                log_progress("%s/%s is installed but has missing dependencies. Re-resolving...", author, name);
+                /* Fall through to the solver */
+            } else {
+                printf("It is already installed!\n");
+                return 0;
+            }
         } else if (major_upgrade) {
             log_debug("Package %s/%s exists at %s, checking for major upgrade", 
                       author, name, existing_pkg->version);
@@ -796,6 +808,9 @@ static int install_multiple_packages(
     int to_solve_count = 0;
     PackageVersionSpec *to_solve = arena_malloc(to_solve_capacity * sizeof(PackageVersionSpec));
 
+    /* Check dependency completeness once for the whole project */
+    bool has_missing_deps = (find_missing_dependencies(elm_json, env->cache, NULL) > 0);
+
     for (int i = 0; i < specs_count; i++) {
         const char *author = specs[i].author;
         const char *name = specs[i].name;
@@ -823,6 +838,14 @@ static int install_multiple_packages(
         } else if (promo == PROMOTION_NONE) {
             /* Package not installed at all - needs solving */
             /* Pass version spec to solver */
+            PackageVersionSpec spec;
+            spec.author = author;
+            spec.name = name;
+            spec.version = specs[i].has_version ? &specs[i].version : NULL;
+            DYNARRAY_PUSH(to_solve, to_solve_count, to_solve_capacity, spec, PackageVersionSpec);
+        } else if (has_missing_deps) {
+            /* Already a direct dependency but project has broken deps - re-solve */
+            log_debug("Package %s/%s is already a direct dependency but deps are incomplete, re-solving", author, name);
             PackageVersionSpec spec;
             spec.author = author;
             spec.name = name;
