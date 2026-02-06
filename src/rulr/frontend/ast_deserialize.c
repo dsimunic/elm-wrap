@@ -19,6 +19,7 @@
 #include "alloc.h"
 #include "constants.h"
 #include "fileutil.h"
+#include "../rulr_compat.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -34,6 +35,39 @@ static AstSerializeError ast_err(const char *msg) {
     return err;
 }
 
+static AstSerializeError ensure_rulr_allocator_initialized(void) {
+    /*
+     * ast_deserialize_raw() (from librulr.a) allocates via rulr_malloc/rulr_calloc,
+     * which require rulr_alloc_init() to have been called (normally done by rulr_init()).
+     *
+     * Some **elm-wrap** commands (e.g. policy view) deserialize compiled ASTs without
+     * having initialized a Rulr instance yet, so bootstrap one here to set up the
+     * allocator with our arena_* callbacks.
+     *
+     * Keep this bootstrap instance alive for the lifetime of the process so the
+     * global allocator host pointer never dangles.
+     */
+    static int initialized = 0;
+    static Rulr bootstrap_rulr;
+
+    if (initialized) {
+        AstSerializeError ok = {0};
+        return ok;
+    }
+
+    memset(&bootstrap_rulr, 0, sizeof(bootstrap_rulr));
+    RulrError err = wrap_rulr_init(&bootstrap_rulr);
+    if (err.is_error) {
+        char msg[MAX_TEMP_BUFFER_LENGTH];
+        snprintf(msg, sizeof(msg), "Failed to initialize Rulr allocator: %s", err.message);
+        return ast_err(msg);
+    }
+
+    initialized = 1;
+    AstSerializeError ok = {0};
+    return ok;
+}
+
 /* ============================================================================
  * Deserialization - decompression wrapper around librulr.a
  * ============================================================================ */
@@ -41,6 +75,11 @@ static AstSerializeError ast_err(const char *msg) {
 AstSerializeError ast_deserialize(const unsigned char *data, size_t size, AstProgram *prog) {
     if (!data || !prog) {
         return ast_err("Invalid arguments");
+    }
+
+    AstSerializeError init_err = ensure_rulr_allocator_initialized();
+    if (init_err.is_error) {
+        return init_err;
     }
 
     /* Check magic header */

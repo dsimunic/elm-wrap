@@ -29,6 +29,7 @@
 #include "rulr.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"
+#include "../../rulr/rulr_compat.h"
 #include "engine/engine.h"
 #include "runtime/runtime.h"
 #include "common/types.h"
@@ -677,7 +678,7 @@ int cmd_review_file(int argc, char *argv[]) {
 
         /* Initialize rulr engine */
         Rulr rulr;
-        RulrError err = rulr_init(&rulr);
+        RulrError err = wrap_rulr_init(&rulr);
         if (err.is_error) {
             if (!quiet_mode) {
                 log_error("Failed to initialize rulr engine: %s\n", err.message);
@@ -1212,7 +1213,7 @@ int cmd_review_package(int argc, char *argv[]) {
 
     /* Initialize rulr engine ONCE */
     Rulr rulr;
-    RulrError err = rulr_init(&rulr);
+    RulrError err = wrap_rulr_init(&rulr);
     if (err.is_error) {
         if (!quiet_mode) {
             log_error("Failed to initialize rulr engine: %s\n", err.message);

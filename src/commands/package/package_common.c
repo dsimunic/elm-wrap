@@ -11,6 +11,7 @@
 #include "rulr.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"
+#include "../../rulr/rulr_compat.h"
 #include "runtime/runtime.h"
 #include "../../dyn_array.h"
 #include <ctype.h>
@@ -1639,7 +1640,7 @@ bool find_orphaned_packages(
 
     /* Initialize rulr (zero-init to prevent undefined behavior from uninitialized fields) */
     Rulr rulr = {0};
-    RulrError err = rulr_init(&rulr);
+    RulrError err = wrap_rulr_init(&rulr);
     if (err.is_error) {
         log_error("Failed to initialize rulr: %s", err.message);
         return false;

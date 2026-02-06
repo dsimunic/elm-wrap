@@ -3,6 +3,7 @@ set -euo pipefail
 
 # update-librulr.sh
 # Rebuilds librulr.a for all target platforms and copies to external/lib/
+# Also syncs exported headers to external/include/rulr/ (from Rulr's check export).
 #
 # Prerequisites:
 #   - Rulr project checked out at ../Rulr (relative to elm-wrap)
@@ -40,6 +41,66 @@ info "Using Rulr project at: $RULR_ROOT"
 # Target directories
 EXTERNAL_LIB="$ELM_WRAP_ROOT/external/lib"
 mkdir -p "$EXTERNAL_LIB"/{darwin-arm64,darwin-x86_64,linux-x86_64,linux-arm64}
+
+sync_headers() {
+    local rulr_export="$RULR_ROOT/check/external/include"
+    local external_include="$ELM_WRAP_ROOT/external/include/rulr"
+
+    if [[ ! -d "$rulr_export" ]]; then
+        warn "Rulr exported headers not found at: $rulr_export"
+        warn "Headers not updated."
+        return 0
+    fi
+
+    info "Syncing Rulr exported headers to elm-wrap..."
+    mkdir -p "$external_include"
+
+    # Copy without deleting: elm-wrap may carry additional integration headers
+    # (e.g. compiled .dlc helpers) that aren't part of Rulr's exported include set.
+    cp -R "$rulr_export"/* "$external_include/"
+}
+
+recompile_builtin_rules() {
+    local rulrc="$RULR_ROOT/bin/rulrc"
+    local src_dir="$ELM_WRAP_ROOT/rulr/rules/src"
+    local out_dir="$ELM_WRAP_ROOT/rulr/rules/compiled"
+
+    if [[ ! -d "$src_dir" ]]; then
+        warn "Built-in rules source directory not found at: $src_dir"
+        warn "Skipping built-in rule compilation."
+        return 0
+    fi
+
+    if [[ ! -x "$rulrc" ]]; then
+        info "Building rulrc compiler..."
+        (cd "$RULR_ROOT" && make bin/rulrc)
+    fi
+
+    if [[ ! -x "$rulrc" ]]; then
+        warn "rulrc not found or not executable at: $rulrc"
+        warn "Skipping built-in rule compilation. Built-in .dlc files may be incompatible with the updated library."
+        return 0
+    fi
+
+    mkdir -p "$out_dir"
+
+    shopt -s nullglob
+    local dl_files=("$src_dir"/*.dl)
+    shopt -u nullglob
+
+    if [[ ${#dl_files[@]} -eq 0 ]]; then
+        warn "No .dl files found in: $src_dir"
+        warn "Skipping built-in rule compilation."
+        return 0
+    fi
+
+    info "Recompiling built-in rules with rulrc..."
+    for dl in "${dl_files[@]}"; do
+        local base
+        base="$(basename "$dl" .dl)"
+        "$rulrc" compile "$dl" -o "$out_dir/$base.dlc"
+    done
+}
 
 build_darwin() {
     info "Building macOS libraries..."
@@ -110,6 +171,12 @@ case "$TARGET" in
 esac
 
 echo ""
+sync_headers
+
+echo ""
+recompile_builtin_rules
+
+echo ""
 info "All requested libraries updated successfully!"
 echo ""
 info "Library summary:"
@@ -118,4 +185,4 @@ find "$EXTERNAL_LIB" -name "librulr.a" -exec sh -c 'echo "  $(dirname "$1" | xar
 echo ""
 info "Next steps:"
 echo "  1. Test build:  make clean all"
-echo "  2. Commit:      git add external/lib && git commit -m 'Update librulr.a for all platforms'"
+echo "  2. (Optional) Commit: git add external/lib external/include/rulr"

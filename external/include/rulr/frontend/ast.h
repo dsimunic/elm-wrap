@@ -16,6 +16,17 @@ typedef struct {
     char **arg_types;
 } AstDecl;
 
+/* External predicate declaration: @extern relation name(arg: type, ...) { @key(n) ... }. */
+typedef struct {
+    char *name;
+    int   arity;
+    char **arg_names;
+    char **arg_types;
+    /* Key declarations: which argument positions are indexed */
+    int   key_args[MAX_ARITY];  /* Argument indices declared as keys */
+    int   num_keys;
+} AstExternDecl;
+
 typedef enum {
     AST_ARG_STRING,
     AST_ARG_INT
@@ -40,17 +51,26 @@ typedef enum {
     TERM_VAR,
     TERM_STRING,
     TERM_INT,
-    TERM_WILDCARD
+    TERM_WILDCARD,
+    TERM_NESTED     /* Nested fact: pred(args...) */
 } AstTermKind;
 
-typedef struct {
+/* Forward declaration for recursive nesting */
+typedef struct AstTerm AstTerm;
+
+struct AstTerm {
     AstTermKind kind;
     union {
-        AstVar var;
-        char  *s;
-        long   i;
+        AstVar   var;
+        char    *s;
+        long     i;
+        struct {
+            char    *pred;      /* Predicate name */
+            int      arity;     /* Number of arguments */
+            AstTerm *args;      /* Heap-allocated array of arguments */
+        } nested;
     } u;
-} AstTerm;
+};
 
 typedef enum {
     LIT_POS,
@@ -70,7 +90,10 @@ typedef enum {
 } AstCmpOp;
 
 typedef enum {
-    BUILTIN_MATCH /* match(pattern, string) - regex match */
+    BUILTIN_MATCH,       /* match(pattern, string) - regex match */
+    BUILTIN_STARTS_WITH, /* starts_with(prefix, string) */
+    BUILTIN_ENDS_WITH,   /* ends_with(suffix, string) */
+    BUILTIN_CONTAINS     /* contains(needle, string) */
 } AstBuiltinKind;
 
 typedef struct {
@@ -102,6 +125,10 @@ typedef struct {
     AstDecl  *decls;
     int       num_decls;
     int       decls_capacity;
+
+    AstExternDecl *extern_decls;
+    int       num_extern_decls;
+    int       extern_decls_capacity;
 
     AstFact  *facts;
     int       num_facts;

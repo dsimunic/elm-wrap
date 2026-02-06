@@ -31,6 +31,7 @@
 #include "rulr.h"
 #include "../../../rulr/rulr_dl.h"
 #include "../../../rulr/host_helpers.h"
+#include "../../../rulr/rulr_compat.h"
 #include "engine/engine.h"
 #include "runtime/runtime.h"
 #include "common/types.h"
@@ -425,7 +426,7 @@ static char **load_dont_descend_into_names(int *out_count) {
     if (out_count) *out_count = 0;
 
     Rulr policy = {0};
-    RulrError err = rulr_init(&policy);
+    RulrError err = wrap_rulr_init(&policy);
     if (err.is_error) {
         return NULL;
     }
@@ -876,7 +877,7 @@ int cmd_package_prepublish(int argc, char *argv[]) {
 
     /* Initialize rulr engine */
     Rulr rulr;
-    RulrError err = rulr_init(&rulr);
+    RulrError err = wrap_rulr_init(&rulr);
     if (err.is_error) {
         log_error("Failed to initialize rulr engine: %s", err.message);
         if (abs_license) arena_free(abs_license);

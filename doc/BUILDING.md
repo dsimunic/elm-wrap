@@ -76,7 +76,9 @@ When the Rulr project changes, rebuild and update the libraries:
 The script:
 1. Builds libraries in the Rulr project (../Rulr by default, or set `RULR_ROOT`)
 2. Copies them to `external/lib/<platform>/`
-3. Reports sizes and next steps
+3. Syncs exported Rulr headers to `external/include/rulr/` (from `../Rulr/check/external/include`)
+4. Recompiles built-in rules to `rulr/rules/compiled/*.dlc` using `../Rulr/bin/rulrc`
+5. Reports sizes and next steps
 
 ### Manual Library Build
 
