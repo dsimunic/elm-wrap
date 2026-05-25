@@ -409,6 +409,10 @@ compile-rules: $(RULE_COMPILED)
 # Create zip file from pre-compiled rules and append to binary
 append-builtin-rules: $(TARGET)
 	@echo "Creating built-in rules archive..."
+	@command -v zip >/dev/null 2>&1 || { \
+		echo "ERROR: 'zip' command not found. Install it (e.g. 'apt-get install zip')." >&2; \
+		exit 1; \
+	}
 	@rm -f $(BUILTIN_RULES_ZIP)
 	@rm -rf $(EMBEDDED_ARCHIVE_DIR)
 	@mkdir -p $(EMBEDDED_ARCHIVE_DIR)
@@ -416,11 +420,13 @@ append-builtin-rules: $(TARGET)
 	@if [ -d $(TEMPLATES_DIR) ]; then \
 		rsync -a $(TEMPLATES_DIR) $(EMBEDDED_ARCHIVE_DIR)/; \
 	fi
-	@cd $(EMBEDDED_ARCHIVE_DIR) && { find . -mindepth 1 -print | sed 's|^./||'; } | zip -q ../builtin_rules.zip -@ 2>/dev/null || true
-	@if [ -f $(BUILTIN_RULES_ZIP) ]; then \
-		echo "Appending rules to binary..."; \
-		cat $(BUILTIN_RULES_ZIP) >> $(TARGET); \
+	@cd $(EMBEDDED_ARCHIVE_DIR) && { find . -mindepth 1 -print | sed 's|^./||'; } | zip -q ../builtin_rules.zip -@
+	@if [ ! -f $(BUILTIN_RULES_ZIP) ]; then \
+		echo "ERROR: $(BUILTIN_RULES_ZIP) was not produced; cannot embed built-in rules." >&2; \
+		exit 1; \
 	fi
+	@echo "Appending rules to binary..."
+	@cat $(BUILTIN_RULES_ZIP) >> $(TARGET)
 
 # Generate buildinfo.c before compiling
 $(BUILDINFO_SRC): buildinfo.mk $(VERSION_FILE) $(wildcard $(ENV_DEFAULTS_FILE))

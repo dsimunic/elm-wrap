@@ -954,7 +954,10 @@ int prune_local_dev_dependents(CacheConfig *cache) {
     return failed > 0 ? 1 : 0;
 }
 
-int register_local_dev_package(const char *source_path, const char *package_name,
+int register_local_dev_package(const char *source_path,
+                               const char *override_author,
+                               const char *override_name,
+                               const char *override_version,
                                InstallEnv *env, bool auto_yes, bool quiet) {
     struct stat st;
     char resolved_source[PATH_MAX];
@@ -1008,46 +1011,23 @@ int register_local_dev_package(const char *source_path, const char *package_name
     }
     elm_json_free(pkg_json);
 
-    /* If package_name specified, verify it matches */
-    if (package_name) {
-        char *spec_author = NULL;
-        char *spec_name = NULL;
-        if (!parse_package_name(package_name, &spec_author, &spec_name)) {
-            arena_free(actual_author);
-            arena_free(actual_name);
-            arena_free(actual_version);
-            return 1;
-        }
-
-        if (strcmp(spec_author, actual_author) != 0 || strcmp(spec_name, actual_name) != 0) {
-            log_error("Package name mismatch: specified %s/%s but elm.json has %s/%s",
-                      spec_author, spec_name, actual_author, actual_name);
-            arena_free(spec_author);
-            arena_free(spec_name);
-            arena_free(actual_author);
-            arena_free(actual_name);
-            arena_free(actual_version);
-            return 1;
-        }
-        arena_free(spec_author);
-        arena_free(spec_name);
-    }
-
-    /* Use version from elm.json */
-    const char *version = actual_version;
-    log_debug("Using local-dev version from elm.json: %s", version);
+    /* Apply overrides — fall back to elm.json values when caller passed NULL */
+    const char *author = override_author ? override_author : actual_author;
+    const char *name = override_name ? override_name : actual_name;
+    const char *version = override_version ? override_version : actual_version;
+    log_debug("Using local-dev version: %s", version);
 
     /* Show plan */
     if (!quiet) {
         printf("Here is my plan:\n");
         printf("  \n");
         printf("  Register (local-dev):\n");
-        printf("    %s/%s    %s (local)\n", actual_author, actual_name, version);
+        printf("    %s/%s    %s (local)\n", author, name, version);
         printf("  \n");
         printf("  Source: %s\n", resolved_source);
         printf("  \n");
         printf("To use this package in an application, run from the application directory:\n");
-        printf("    %s package install %s/%s\n", global_context_program_name(), actual_author, actual_name);
+        printf("    %s package install %s/%s\n", global_context_program_name(), author, name);
         printf("  \n");
     }
 
@@ -1067,7 +1047,7 @@ int register_local_dev_package(const char *source_path, const char *package_name
     }
 
     /* Create symlink in ELM_HOME */
-    if (!create_package_symlink(env, resolved_source, actual_author, actual_name, version)) {
+    if (!create_package_symlink(env, resolved_source, author, name, version)) {
         log_error("Failed to register the package in the package cache");
         arena_free(actual_author);
         arena_free(actual_name);
@@ -1076,19 +1056,19 @@ int register_local_dev_package(const char *source_path, const char *package_name
     }
 
     /* Save the source path so we can restore the symlink if it gets corrupted */
-    if (!save_local_dev_source_path(actual_author, actual_name, version, resolved_source)) {
+    if (!save_local_dev_source_path(author, name, version, resolved_source)) {
         log_error("Warning: Failed to save local-dev source path");
         /* Continue anyway - the symlink was created successfully */
     }
 
     /* Register in registry-local-dev.dat so the solver can find this package */
-    if (!register_in_local_dev_registry(env, actual_author, actual_name, version, source_elm_json)) {
+    if (!register_in_local_dev_registry(env, author, name, version, source_elm_json)) {
         log_error("Warning: Failed to register in local-dev registry");
         /* Continue anyway - the symlink was created successfully */
     }
 
     if (!quiet) {
-        printf("Successfully registered %s/%s %s (local)!\n", actual_author, actual_name, version);
+        printf("Successfully registered %s/%s %s (local)!\n", author, name, version);
     }
 
     arena_free(actual_author);

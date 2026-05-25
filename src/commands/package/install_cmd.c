@@ -211,8 +211,13 @@ static void print_install_usage(void) {
     log_progress("  --upgrade-all                      # Allow upgrading production deps (with --test)");
     log_progress("  --from-file PATH PACKAGE           # Install from local file/directory (single package only)");
     log_progress("  --from-url URL PACKAGE             # Install from URL (single package only)");
-    log_progress("  --local-dev [--from-path PATH] [PACKAGE]");
-    log_progress("                                     # Install package for local development");
+    log_progress("  --local-dev [PATH] [PACKAGE[@VERSION]]");
+    log_progress("                                     # Register a package for local development.");
+    log_progress("                                     # Name/version are read from elm.json at PATH");
+    log_progress("                                     # (or cwd). PACKAGE[@VERSION] overrides them.");
+    log_progress("  --local-dev --from-path PATH [PACKAGE]");
+    log_progress("                                     # Install local-dev PATH into the surrounding");
+    log_progress("                                     # application. Requires an application elm.json.");
     // log_progress("  --pin                              # Create PIN file with package version\n");
     log_progress("  -v, --verbose                      # Show progress reports (registry, connectivity)");
     log_progress("  -q, --quiet                        # Suppress progress reports");
@@ -1195,6 +1200,21 @@ int cmd_install(int argc, char *argv[]) {
     int specs_count = 0;
     int specs_capacity = 0;
 
+    /* Pre-scan for --local-dev so we can defer parsing of positionals — under
+     * --local-dev the first positional may be a path like `releases/foo/bar`,
+     * which would fail the usual `author/name` parser. */
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--local-dev") == 0) {
+            local_dev = true;
+            break;
+        }
+    }
+
+    /* Raw positionals collected under --local-dev (parsed in the local-dev block). */
+    const char **ld_positionals = NULL;
+    int ld_positionals_count = 0;
+    int ld_positionals_capacity = 0;
+
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_install_usage();
@@ -1288,7 +1308,7 @@ int cmd_install(int argc, char *argv[]) {
                 return 1;
             }
         } else if (strcmp(argv[i], "--local-dev") == 0) {
-            local_dev = true;
+            /* Flag already set by pre-scan above. */
         } else if (strcmp(argv[i], "--from-path") == 0) {
             if (i + 1 < argc) {
                 i++;
@@ -1299,6 +1319,12 @@ int cmd_install(int argc, char *argv[]) {
                 return 1;
             }
         } else if (argv[i][0] != '-') {
+            if (local_dev) {
+                /* Under --local-dev, positionals may be paths — defer parsing. */
+                DYNARRAY_PUSH(ld_positionals, ld_positionals_count, ld_positionals_capacity,
+                    argv[i], const char *);
+                continue;
+            }
             /* Parse positional argument as package spec or version */
             Version v;
             /* Check if this is a version string for the previous package (backwards compat) */
@@ -1404,62 +1430,163 @@ int cmd_install(int argc, char *argv[]) {
 
     log_debug("ELM_HOME: %s", env->cache->elm_home);
 
-    char *project_elm_json_path = find_elm_json_upwards(NULL);
-    if (!project_elm_json_path) {
-        log_error("Could not find elm.json in current or parent directories");
-        log_error("Have you run 'elm init' or '%s init'?", global_context_program_name());
-        install_env_free(env);
-        log_set_level(original_level);
-        return 1;
-    }
+    /* The register-only --local-dev flow (no --from-path) operates standalone and
+     * does not need an application elm.json — its source elm.json comes from PATH
+     * (or cwd). Every other flow requires one. */
+    bool need_app_elm_json = !(local_dev && !from_path);
 
-    log_debug("Reading elm.json (%s)", project_elm_json_path);
-    ElmJson *elm_json = elm_json_read(project_elm_json_path);
-    if (!elm_json) {
-        log_error("Could not read elm.json");
-        log_error("Have you run 'elm init' or '%s init'?", global_context_program_name());
-        arena_free(project_elm_json_path);
-        install_env_free(env);
-        return 1;
+    char *project_elm_json_path = NULL;
+    ElmJson *elm_json = NULL;
+    if (need_app_elm_json) {
+        project_elm_json_path = find_elm_json_upwards(NULL);
+        if (!project_elm_json_path) {
+            log_error("Could not find elm.json in current or parent directories");
+            log_error("Have you run 'elm init' or '%s init'?", global_context_program_name());
+            install_env_free(env);
+            log_set_level(original_level);
+            return 1;
+        }
+
+        log_debug("Reading elm.json (%s)", project_elm_json_path);
+        elm_json = elm_json_read(project_elm_json_path);
+        if (!elm_json) {
+            log_error("Could not read elm.json");
+            log_error("Have you run 'elm init' or '%s init'?", global_context_program_name());
+            arena_free(project_elm_json_path);
+            install_env_free(env);
+            return 1;
+        }
     }
 
     int result = 0;
 
     if (local_dev) {
-        /* Handle --local-dev installation */
-        const char *source_path = from_path ? from_path : ".";
-        /* Reconstruct package name for local-dev (doesn't support versioned specs) */
-        const char *package_name = NULL;
-        char package_name_buf[MAX_PACKAGE_NAME_LENGTH];
-        if (specs_count > 0) {
-            snprintf(package_name_buf, sizeof(package_name_buf), "%s/%s",
-                     specs[0].author, specs[0].name);
-            package_name = package_name_buf;
-        }
-        
-        /*
-         * Check if we're running from within a package directory itself.
-         * In that case, we just register the package in the cache/registry
-         * without trying to add it as a dependency to anything.
-         *
-         * This is detected when:
-         * 1. No explicit --from-path was specified (source defaults to ".")
-         * 2. The current elm.json is a package (not an application)
-         */
-        if (!from_path && elm_json->type == ELM_PROJECT_PACKAGE) {
-            /* Register-only mode: just put in cache and registry */
-            result = register_local_dev_package(source_path, package_name, env, auto_yes, false);
+        if (from_path) {
+            /* Existing --from-path behavior: install PATH as a dependency into the
+             * application elm.json found above. A positional PACKAGE[@VERSION] (if
+             * present) is forwarded to install_local_dev for validation. */
+            const char *source_path = from_path;
+            const char *package_name = NULL;
+            char package_name_buf[MAX_PACKAGE_NAME_LENGTH];
+            if (ld_positionals_count > 0) {
+                char *pn_author = NULL;
+                char *pn_name = NULL;
+                Version pn_ver;
+                bool parsed_ok;
+                if (strchr(ld_positionals[0], '@')) {
+                    parsed_ok = parse_package_with_version(ld_positionals[0],
+                        &pn_author, &pn_name, &pn_ver);
+                } else {
+                    parsed_ok = parse_package_name(ld_positionals[0], &pn_author, &pn_name);
+                }
+                if (!parsed_ok) {
+                    print_install_usage();
+                    elm_json_free(elm_json);
+                    arena_free(project_elm_json_path);
+                    install_env_free(env);
+                    log_set_level(original_level);
+                    return 1;
+                }
+                snprintf(package_name_buf, sizeof(package_name_buf), "%s/%s",
+                         pn_author, pn_name);
+                package_name = package_name_buf;
+            }
+            result = install_local_dev(source_path, package_name, project_elm_json_path,
+                                       env, is_test, auto_yes, false);
             elm_json_free(elm_json);
             arena_free(project_elm_json_path);
             install_env_free(env);
             log_set_level(original_level);
             return result;
         }
-        
-        result = install_local_dev(source_path, package_name, project_elm_json_path, env, is_test, auto_yes, false);
-        
-        elm_json_free(elm_json);
-        arena_free(project_elm_json_path);
+
+        /* Register-only flow (no --from-path). No application elm.json needed.
+         * Disambiguation of positionals:
+         *   0 args  → source = "." (cwd must be a package)
+         *   1 arg   → PACKAGE override if it parses as author/name AND cwd is a package;
+         *             otherwise treated as PATH
+         *   2 args  → PATH then PACKAGE[@VERSION] override
+         */
+        if (ld_positionals_count > 2) {
+            log_error("--local-dev accepts at most PATH and PACKAGE arguments");
+            print_install_usage();
+            install_env_free(env);
+            log_set_level(original_level);
+            return 1;
+        }
+
+        const char *source_path = ".";
+        char *override_author = NULL;
+        char *override_name = NULL;
+        char *override_version = NULL;
+
+        if (ld_positionals_count == 2) {
+            source_path = ld_positionals[0];
+            const char *pkg_arg = ld_positionals[1];
+            if (strchr(pkg_arg, '@')) {
+                Version v;
+                if (!parse_package_with_version(pkg_arg, &override_author, &override_name, &v)) {
+                    print_install_usage();
+                    install_env_free(env);
+                    log_set_level(original_level);
+                    return 1;
+                }
+                override_version = version_to_string(&v);
+            } else {
+                if (!parse_package_name(pkg_arg, &override_author, &override_name)) {
+                    print_install_usage();
+                    install_env_free(env);
+                    log_set_level(original_level);
+                    return 1;
+                }
+            }
+        } else if (ld_positionals_count == 1) {
+            const char *arg = ld_positionals[0];
+            char *a = NULL;
+            char *n = NULL;
+            Version v = {0};
+            bool parsed_pkg = false;
+            bool has_ver = false;
+            if (strchr(arg, '@')) {
+                /* parse_package_with_version logs errors on its own — but we want
+                 * to silently fall back to PATH on failure. Check the slash shape
+                 * first to avoid logging a spurious error. */
+                const char *slash = strchr(arg, '/');
+                const char *at = strchr(arg, '@');
+                if (slash && slash < at) {
+                    parsed_pkg = parse_package_with_version(arg, &a, &n, &v);
+                    has_ver = parsed_pkg;
+                }
+            } else {
+                parsed_pkg = parse_package_name_silent(arg, &a, &n);
+            }
+
+            bool cwd_is_package = false;
+            if (parsed_pkg) {
+                struct stat st;
+                if (stat("elm.json", &st) == 0) {
+                    ElmJson *cwd_json = elm_json_read("elm.json");
+                    if (cwd_json) {
+                        cwd_is_package = (cwd_json->type == ELM_PROJECT_PACKAGE);
+                        elm_json_free(cwd_json);
+                    }
+                }
+            }
+
+            if (parsed_pkg && cwd_is_package) {
+                source_path = ".";
+                override_author = a;
+                override_name = n;
+                if (has_ver) {
+                    override_version = version_to_string(&v);
+                }
+            } else {
+                source_path = arg;
+            }
+        }
+
+        result = register_local_dev_package(source_path, override_author, override_name,
+                                            override_version, env, auto_yes, false);
         install_env_free(env);
         log_set_level(original_level);
         return result;

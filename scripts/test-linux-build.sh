@@ -46,7 +46,7 @@ echo ""
 BUILD_CMD='
 set -e
 apt-get update -qq
-apt-get install -y -qq build-essential libcurl4-openssl-dev rsync libcurl4 >/dev/null 2>&1
+apt-get install -y -qq build-essential libcurl4-openssl-dev rsync zip libcurl4 >/dev/null 2>&1
 echo "=== Cleaning ==="
 rm -rf build bin lib
 mkdir -p build

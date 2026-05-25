@@ -83,8 +83,8 @@ select_image() {
 # Note: libssh-dev AND libssh2-1-dev needed because curl uses different SSH backends on different distros
 FULL_DEPS=(build-essential git curl ca-certificates pkg-config \
   libcurl4-openssl-dev libnghttp2-dev libidn2-dev libunistring-dev libgpg-error-dev libgcrypt20-dev \
-  libssl-dev libldap2-dev libbrotli-dev librtmp-dev libssh-dev libssh2-1-dev libpsl-dev libkrb5-dev libzstd-dev zlib1g-dev rsync dpkg-dev fakeroot)
-MINIMAL_DEPS=(build-essential curl ca-certificates rsync dpkg-dev fakeroot)
+  libssl-dev libldap2-dev libbrotli-dev librtmp-dev libssh-dev libssh2-1-dev libpsl-dev libkrb5-dev libzstd-dev zlib1g-dev rsync zip dpkg-dev fakeroot)
+MINIMAL_DEPS=(build-essential curl ca-certificates rsync zip dpkg-dev fakeroot)
 
 # Join arrays into strings for in-container use
 PACKAGES_FULL_STR="${FULL_DEPS[*]}"

@@ -27,18 +27,24 @@ int install_local_dev(const char *source_path, const char *package_name,
 /**
  * Register a package for local development (cache + registry only, no app modification).
  *
- * This is used when running --local-dev from within the package directory itself.
+ * This is used when running --local-dev from within the package directory itself
+ * or with a PATH argument that points at a package source tree.
  * It creates a symlink in ELM_HOME and registers the package in the local-dev registry,
  * but does NOT try to add the package as a dependency to any application.
  *
- * @param source_path   Absolute path to the package source directory
- * @param package_name  Package name in "author/name" format (optional, read from elm.json if NULL)
- * @param env           Install environment
- * @param auto_yes      Skip confirmation prompts
- * @param quiet         Suppress plan output and success message (caller handles UI)
+ * @param source_path        Path to the package source directory (relative or absolute)
+ * @param override_author    If non-NULL, use this author instead of the value in elm.json
+ * @param override_name      If non-NULL, use this name instead of the value in elm.json
+ * @param override_version   If non-NULL, use this version instead of the value in elm.json
+ * @param env                Install environment
+ * @param auto_yes           Skip confirmation prompts
+ * @param quiet              Suppress plan output and success message (caller handles UI)
  * @return 0 on success, non-zero on failure
  */
-int register_local_dev_package(const char *source_path, const char *package_name,
+int register_local_dev_package(const char *source_path,
+                               const char *override_author,
+                               const char *override_name,
+                               const char *override_version,
                                InstallEnv *env, bool auto_yes, bool quiet);
 
 /**

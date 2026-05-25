@@ -571,7 +571,7 @@ int cmd_package_init(int argc, char *argv[]) {
         return 1;
     }
 
-    int result = register_local_dev_package(".", package_name_buf, env, true, true);
+    int result = register_local_dev_package(".", NULL, NULL, NULL, env, true, true);
     install_env_free(env);
 
     if (result == 0) {
@@ -719,7 +719,7 @@ int package_init_at_path(const char *target_dir, const char *package_spec,
             return 1;
         }
 
-        result = register_local_dev_package(".", package_name_buf, env, auto_yes, true);
+        result = register_local_dev_package(".", NULL, NULL, NULL, env, auto_yes, true);
         install_env_free(env);
     }
 
