@@ -1136,6 +1136,42 @@ static int clear_package_tracking(const char *package_name, const char *version)
 }
 
 /**
+ * Remove a local-dev package's registry entries and tracking directory by
+ * (author, name, version). Mirrors `repository local-dev clear PKG VERSION`
+ * but takes the triple directly and emits no output. Does NOT remove the
+ * ELM_HOME cache symlink; callers that manage the cache remove that separately.
+ *
+ * Used by `kit update` when tearing down the previously-installed kit version.
+ */
+void repository_clear_local_dev_registration(const char *author, const char *name,
+                                             const char *version) {
+    if (!author || !name || !version) {
+        return;
+    }
+
+    remove_local_dev_from_v1_registry_dat(author, name, version);
+    remove_local_dev_from_text_registry(author, name, version);
+
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        return;
+    }
+    size_t path_len = strlen(tracking_dir) + strlen(author) + strlen(name) +
+                      strlen(version) + 4;
+    char *pkg_path = arena_malloc(path_len);
+    if (pkg_path) {
+        snprintf(pkg_path, path_len, "%s/%s/%s/%s",
+                 tracking_dir, author, name, version);
+        struct stat st;
+        if (lstat(pkg_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+            remove_directory_recursive_local(pkg_path);
+        }
+        arena_free(pkg_path);
+    }
+    arena_free(tracking_dir);
+}
+
+/**
  * Simple hash function for path -> filename.
  */
 static unsigned long hash_path_local(const char *str) {

@@ -1,6 +1,7 @@
 #include "env_defaults.h"
 #include "buildinfo.h"
 #include "alloc.h"
+#include "constants.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -93,6 +94,14 @@ char *env_get_elm_compiler_path(void) {
         return expand_tilde(env_val);
     }
     return NULL;
+}
+
+char *env_get_tool_bin_path(void) {
+    const char *env_val = getenv("WRAP_TOOL_BIN_PATH");
+    if (env_val && env_val[0] != '\0') {
+        return expand_tilde(env_val);
+    }
+    return expand_tilde(TOOL_BIN_PATH);
 }
 
 bool env_get_offline_mode(void) {

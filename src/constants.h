@@ -158,4 +158,12 @@
 #define LAMDERA_TRACKING_DIR "_lamdera"  /* Directory under WRAP_HOME for Lamdera-specific data */
 #define LAMDERA_REGISTRY_DAT "registry.dat"  /* Lamdera registry file name under LAMDERA_TRACKING_DIR */
 
+/*
+ * Kit installation constants
+ */
+#define TOOL_BIN_PATH "~/.local/bin"  /* Preferred executable install path (overridden by WRAP_TOOL_BIN_PATH) */
+#define KIT_TOOLS_DIR "tools"         /* Subdirectory under WRAP_HOME for kit-installed tools */
+#define MAX_KIT_FILE_BYTES (1 * BYTES_PER_MB)  /* Maximum size of a kitfile manifest we will parse */
+#define MAX_TOOL_FILE_BYTES (64 * BYTES_PER_MB)  /* Maximum size of a downloaded tool binary */
+
 #endif /* CONSTANTS_H */

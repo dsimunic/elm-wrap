@@ -3,6 +3,7 @@
 #include "http_constants.h"
 #include "shared/log.h"
 #include <curl/curl.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -237,58 +238,113 @@ static size_t file_write_cb(void *contents, size_t size, size_t nmemb, void *use
     return written;
 }
 
-/* HTTP file download */
-HttpResult http_download_file(CurlSession *session, const char *url, const char *dest_path) {
+/* Bridge from libcurl's xferinfo signature to our HttpProgressFn. */
+typedef struct {
+    HttpProgressFn fn;
+    void *userdata;
+} ProgressBridge;
+
+static int curl_xferinfo_cb(void *clientp,
+                            curl_off_t dltotal, curl_off_t dlnow,
+                            curl_off_t ultotal, curl_off_t ulnow) {
+    (void)ultotal;
+    (void)ulnow;
+    ProgressBridge *b = (ProgressBridge *)clientp;
+    if (!b || !b->fn) return 0;
+    return b->fn(b->userdata, (double)dltotal, (double)dlnow);
+}
+
+HttpResult http_download_file_ex(
+    CurlSession *session,
+    const char *url,
+    const char *dest_path,
+    HttpProgressFn progress_fn,
+    void *progress_userdata,
+    long *out_response_code,
+    char *err_buf,
+    size_t err_buf_size
+) {
+    if (out_response_code) *out_response_code = 0;
+    if (err_buf && err_buf_size > 0) err_buf[0] = '\0';
+
     if (!session || !url || !dest_path) return HTTP_ERROR_INIT;
 
     CURL *handle = session->handle;
 
     curl_session_prepare_request(session);
 
-    /* Open file for writing */
     FILE *file = fopen(dest_path, "wb");
     if (!file) {
-        fprintf(stderr, "Error: Failed to open file for writing: %s\n", dest_path);
+        if (err_buf && err_buf_size > 0) {
+            snprintf(err_buf, err_buf_size, "fopen('%s'): %s",
+                     dest_path, strerror(errno));
+        } else {
+            fprintf(stderr, "Error: Failed to open file for writing: %s\n", dest_path);
+        }
         return HTTP_ERROR_INIT;
     }
 
-    /* Configure request */
     curl_easy_setopt(handle, CURLOPT_URL, url);
     curl_easy_setopt(handle, CURLOPT_HTTPGET, 1L);
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, file_write_cb);
     curl_easy_setopt(handle, CURLOPT_WRITEDATA, file);
 
-    /* Perform request */
-    CURLcode res = curl_easy_perform(handle);
+    ProgressBridge bridge = { progress_fn, progress_userdata };
+    if (progress_fn) {
+        curl_easy_setopt(handle, CURLOPT_XFERINFOFUNCTION, curl_xferinfo_cb);
+        curl_easy_setopt(handle, CURLOPT_XFERINFODATA, &bridge);
+        curl_easy_setopt(handle, CURLOPT_NOPROGRESS, 0L);
+    }
 
-    /* Close file */
+    CURLcode res = curl_easy_perform(handle);
     fclose(file);
 
-    if (res != CURLE_OK) {
-        /* Remove partial file on error */
-        remove(dest_path);
+    long response_code = 0;
+    curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &response_code);
+    if (out_response_code) *out_response_code = response_code;
 
+    if (res != CURLE_OK) {
+        if (err_buf && err_buf_size > 0) {
+            const char *msg = session->error_buffer[0] != '\0'
+                ? session->error_buffer
+                : curl_easy_strerror(res);
+            snprintf(err_buf, err_buf_size, "%s", msg);
+        }
+        remove(dest_path);
         if (res == CURLE_OPERATION_TIMEDOUT) {
             return HTTP_ERROR_TIMEOUT;
         }
         return HTTP_ERROR_NETWORK;
     }
 
-    /* Check HTTP response code */
-    long response_code;
-    curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &response_code);
-
     if (http_is_success(response_code)) {
         return HTTP_OK;
-    } else if (http_is_client_error(response_code)) {
+    }
+    if (http_is_client_error(response_code)) {
+        if (err_buf && err_buf_size > 0) {
+            snprintf(err_buf, err_buf_size, "HTTP %ld", response_code);
+        }
         remove(dest_path);
         return HTTP_ERROR_4XX;
-    } else if (http_is_server_error(response_code)) {
+    }
+    if (http_is_server_error(response_code)) {
+        if (err_buf && err_buf_size > 0) {
+            snprintf(err_buf, err_buf_size, "HTTP %ld", response_code);
+        }
         remove(dest_path);
         return HTTP_ERROR_5XX;
     }
 
+    if (err_buf && err_buf_size > 0) {
+        snprintf(err_buf, err_buf_size, "HTTP %ld (unexpected)", response_code);
+    }
     return HTTP_ERROR_NETWORK;
+}
+
+/* HTTP file download (no progress, no error detail) */
+HttpResult http_download_file(CurlSession *session, const char *url, const char *dest_path) {
+    return http_download_file_ex(session, url, dest_path,
+                                  NULL, NULL, NULL, NULL, 0);
 }
 
 /* HTTP HEAD request */

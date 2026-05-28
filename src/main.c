@@ -29,6 +29,7 @@
 #include "commands/publish/package/package_publish.h"
 #include "commands/publish/docs/docs.h"
 #include "commands/repository/repository.h"
+#include "commands/kit/kit.h"
 #include "commands/info/info.h"
 #include "alloc.h"
 #include "shared/log.h"
@@ -99,6 +100,7 @@ void print_usage(const char *prog) {
     printf("  application SUBCOMMAND    Application management commands\n");
     printf("  package SUBCOMMAND        Package management commands\n");
     printf("  repository SUBCOMMAND     Repository management commands\n");
+    printf("  kit SUBCOMMAND            Install kits (bundles of tools and packages)\n");
     if (feature_policy_enabled()) {
         printf("  policy SUBCOMMAND         View and manage rulr policy rules\n");
     }
@@ -385,6 +387,10 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "repository") == 0) {
             return cmd_repository(argc - 1, argv + 1);
+        }
+
+        if (strcmp(argv[1], "kit") == 0) {
+            return cmd_kit(argc - 1, argv + 1);
         }
 
         if (strcmp(argv[1], "debug") == 0) {

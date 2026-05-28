@@ -24,6 +24,9 @@ char *env_get_repository_local_path(void);
 /* Get WRAP_ELM_COMPILER_PATH (no compiled default, returns NULL if not set) */
 char *env_get_elm_compiler_path(void);
 
+/* Get WRAP_TOOL_BIN_PATH with fallback to TOOL_BIN_PATH (~/.local/bin) */
+char *env_get_tool_bin_path(void);
+
 /* Check if offline mode is forced via WRAP_OFFLINE_MODE=1 */
 bool env_get_offline_mode(void);
 

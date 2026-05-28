@@ -38,6 +38,38 @@ HttpResult http_get_json(CurlSession *session, const char *url, MemoryBuffer *ou
 HttpResult http_download_file(CurlSession *session, const char *url, const char *dest_path);
 HttpResult http_head(CurlSession *session, const char *url);
 
+/*
+ * Progress callback invoked periodically during a download.
+ *
+ *   userdata        : opaque pointer passed to http_download_file_ex.
+ *   total_bytes     : expected size of the download in bytes, or 0 if unknown.
+ *   downloaded_bytes: bytes received so far.
+ *
+ * Return 0 to continue. Non-zero aborts the transfer.
+ */
+typedef int (*HttpProgressFn)(void *userdata, double total_bytes, double downloaded_bytes);
+
+/*
+ * Download `url` to `dest_path` with optional progress reporting and error
+ * detail capture.
+ *
+ *   progress_fn / progress_userdata: may be NULL to disable progress.
+ *   out_response_code              : may be NULL; receives the HTTP status
+ *                                    code when curl returned data.
+ *   err_buf / err_buf_size         : may be NULL/0; receives a copy of the
+ *                                    curl error string on failure.
+ */
+HttpResult http_download_file_ex(
+    CurlSession *session,
+    const char *url,
+    const char *dest_path,
+    HttpProgressFn progress_fn,
+    void *progress_userdata,
+    long *out_response_code,
+    char *err_buf,
+    size_t err_buf_size
+);
+
 /* Conditional requests / ETag helpers
  *
  * If if_none_match is non-NULL, sends an If-None-Match header.

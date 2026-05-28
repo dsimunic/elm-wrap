@@ -192,6 +192,8 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/debug/install_plan.c \
           $(SRCDIR)/commands/debug/registry_v1.c \
           $(SRCDIR)/commands/repository/repository.c \
+          $(SRCDIR)/commands/kit/kit.c \
+          $(SRCDIR)/commands/kit/install_cmd.c \
           $(SRCDIR)/import_tree.c \
           $(SRCDIR)/commands/cache/check/cache_check.c \
           $(SRCDIR)/commands/cache/full_scan/cache_full_scan.c \
@@ -292,6 +294,8 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/install_plan.o \
           $(BUILDDIR)/registry_v1.o \
           $(BUILDDIR)/repository.o \
+          $(BUILDDIR)/kit.o \
+          $(BUILDDIR)/kit_install_cmd.o \
           $(BUILDDIR)/import_tree.o \
           $(BUILDDIR)/cache_check.o \
           $(BUILDDIR)/cache_full_scan.o \
@@ -934,6 +938,15 @@ $(BUILDDIR)/global_context.o: $(SRCDIR)/global_context.c $(SRCDIR)/global_contex
 $(BUILDDIR)/repository.o: $(SRCDIR)/commands/repository/repository.c $(SRCDIR)/commands/repository/repository.h $(SRCDIR)/commands/repository/mirror_cmd.h $(SRCDIR)/feature_flags.h $(SRCDIR)/env_defaults.h $(SRCDIR)/elm_compiler.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr $(RULR_INCLUDE) -c $< -o $@
+
+# Build kit command group objects
+$(BUILDDIR)/kit.o: $(SRCDIR)/commands/kit/kit.c $(SRCDIR)/commands/kit/kit.h $(SRCDIR)/global_context.h | $(BUILDDIR)
+	$(COMPILE_MSG) $@
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/kit_install_cmd.o: $(SRCDIR)/commands/kit/install_cmd.c $(SRCDIR)/commands/kit/kit.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/repository/repository.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/dyn_array.h $(SRCDIR)/env_defaults.h $(SRCDIR)/fileutil.h $(SRCDIR)/global_context.h $(SRCDIR)/http_client.h $(SRCDIR)/install_env.h $(SRCDIR)/shared/log.h $(SRCDIR)/vendor/sha256.h | $(BUILDDIR)
+	$(COMPILE_MSG) $@
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 # Build sha1 object
 $(BUILDDIR)/sha1.o: $(SRCDIR)/vendor/sha1.c $(SRCDIR)/vendor/sha1.h | $(BUILDDIR)
