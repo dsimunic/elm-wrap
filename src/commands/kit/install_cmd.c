@@ -1263,7 +1263,7 @@ static char *download_tool_binary(CurlSession *session, const KitTool *tool,
         return NULL;
     }
 
-    if (rename(tmp_path, dest_path) != 0) {
+    if (os_rename_replace(tmp_path, dest_path) != 0) {
         set_err(err, err_size, "rename('%s'): %s", dest_path, strerror(errno));
         unlink(tmp_path);
         return NULL;

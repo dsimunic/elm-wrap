@@ -18,6 +18,27 @@
 #define PATH_MAX MAX_PATH_LENGTH
 #endif
 
+const char *os_temp_dir(void) {
+#ifdef _WIN32
+    const char *t = getenv("TEMP");
+    if (!t || t[0] == '\0') t = getenv("TMP");
+    if (!t || t[0] == '\0') t = "C:\\Windows\\Temp";
+    return t;
+#else
+    const char *t = getenv("TMPDIR");
+    if (t && t[0] != '\0') return t;
+    return "/tmp";
+#endif
+}
+
+int os_rename_replace(const char *src, const char *dst) {
+#ifdef _WIN32
+    return os_win_rename_replace(src, dst);
+#else
+    return rename(src, dst);
+#endif
+}
+
 static bool ensure_directory(const char *path) {
     struct stat st;
     if (stat(path, &st) == 0) {
@@ -396,7 +417,7 @@ char* find_first_subdirectory(const char *dir_path) {
 
 static bool move_item(const char *src, const char *dest) {
     /* Try rename first (fast, atomic) */
-    if (rename(src, dest) == 0) {
+    if (os_rename_replace(src, dest) == 0) {
         return true;
     }
 
@@ -722,7 +743,7 @@ bool file_write_bytes_atomic(const char *dest_path, const void *data, size_t len
         return false;
     }
 
-    if (rename(tmp_path, dest_path) != 0) {
+    if (os_rename_replace(tmp_path, dest_path) != 0) {
         log_debug("Failed to rename %s to %s: %s", tmp_path, dest_path, strerror(errno));
         unlink(tmp_path);
         arena_free(tmp_path);

@@ -81,7 +81,7 @@ static bool registry_etag_write_to_disk(const char *etag_path, const char *etag)
     fsync(fileno(f));
     fclose(f);
 
-    if (rename(tmp_path, etag_path) != 0) {
+    if (os_rename_replace(tmp_path, etag_path) != 0) {
         log_debug("Failed to rename %s to %s: %s", tmp_path, etag_path, strerror(errno));
         unlink(tmp_path);
         return false;
@@ -216,7 +216,7 @@ static bool registry_since_count_write_to_disk(const char *since_path, size_t si
     fsync(fileno(f));
     fclose(f);
 
-    if (rename(tmp_path, since_path) != 0) {
+    if (os_rename_replace(tmp_path, since_path) != 0) {
         log_debug("Failed to rename %s to %s: %s", tmp_path, since_path, strerror(errno));
         unlink(tmp_path);
         return false;

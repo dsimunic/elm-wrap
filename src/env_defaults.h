@@ -36,4 +36,8 @@ bool env_get_offline_mode(void);
  * registry. */
 bool env_get_skip_registry_update(void);
 
+/* User's home directory: USERPROFILE (then HOME) on Windows, HOME on POSIX.
+ * Returns a non-owned pointer (from getenv), or NULL if unset. */
+const char *home_directory(void);
+
 #endif /* ENV_DEFAULTS_H */

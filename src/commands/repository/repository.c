@@ -331,7 +331,7 @@ int cmd_repository_new(int argc, char *argv[]) {
     if (root_path) {
         /* Expand tilde if present */
         if (root_path[0] == '~') {
-            const char *home = getenv("HOME");
+            const char *home = home_directory();
             if (home) {
                 size_t len = strlen(home) + strlen(root_path);
                 effective_root = arena_malloc(len);
@@ -454,7 +454,7 @@ int cmd_repository_list(int argc, char *argv[]) {
     if (root_path) {
         /* Expand tilde if present */
         if (root_path[0] == '~') {
-            const char *home = getenv("HOME");
+            const char *home = home_directory();
             if (home) {
                 size_t len = strlen(home) + strlen(root_path);
                 effective_root = arena_malloc(len);

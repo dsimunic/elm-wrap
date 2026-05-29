@@ -9,6 +9,7 @@
 #include "../shared/log.h"
 #include "../constants.h"
 #include "../commands/package/package_common.h"
+#include "../alloc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -63,19 +64,19 @@ int v2_show_package_dependencies(const char *author, const char *name, const cha
     return 0;
 }
 
-bool v2_package_depends_on(const char *pkg_author, const char *pkg_name, const char *pkg_version,
-                           const char *target_author, const char *target_name,
-                           V2Registry *registry) {
+char *v2_package_dependency_constraint(const char *pkg_author, const char *pkg_name, const char *pkg_version,
+                                       const char *target_author, const char *target_name,
+                                       V2Registry *registry) {
     if (!registry || !pkg_author || !pkg_name || !pkg_version ||
         !target_author || !target_name) {
-        return false;
+        return NULL;
     }
 
     /* Parse the version string */
     Version parsed_v;
     if (!version_parse_safe(pkg_version, &parsed_v)) {
         log_debug("Invalid version format: %s", pkg_version);
-        return false;
+        return NULL;
     }
 
     /* Find the specific version in the registry */
@@ -83,22 +84,30 @@ bool v2_package_depends_on(const char *pkg_author, const char *pkg_name, const c
                                                           parsed_v.major, parsed_v.minor, parsed_v.patch);
     if (!version) {
         log_debug("Version %s not found for %s/%s in V2 registry", pkg_version, pkg_author, pkg_name);
-        return false;
+        return NULL;
     }
 
     /* Build the target package name for comparison */
     char target_full_name[MAX_PACKAGE_NAME_LENGTH];
     snprintf(target_full_name, sizeof(target_full_name), "%s/%s", target_author, target_name);
 
-    /* Check if any dependency matches the target */
+    /* Return the constraint of the dependency matching the target, if any */
     for (size_t i = 0; i < version->dependency_count; i++) {
         V2Dependency *dep = &version->dependencies[i];
-        if (dep && dep->package_name) {
-            if (strcmp(dep->package_name, target_full_name) == 0) {
-                return true;
-            }
+        if (dep && dep->package_name && strcmp(dep->package_name, target_full_name) == 0) {
+            return dep->constraint ? arena_strdup(dep->constraint) : NULL;
         }
     }
 
-    return false;
+    return NULL;
+}
+
+bool v2_package_depends_on(const char *pkg_author, const char *pkg_name, const char *pkg_version,
+                           const char *target_author, const char *target_name,
+                           V2Registry *registry) {
+    char *constraint = v2_package_dependency_constraint(pkg_author, pkg_name, pkg_version,
+                                                        target_author, target_name, registry);
+    bool depends = (constraint != NULL);
+    arena_free(constraint);
+    return depends;
 }

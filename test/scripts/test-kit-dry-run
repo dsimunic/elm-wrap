@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+#
+# test-kit-dry-run - Regression tests for `wrap kit` dry-run parity
+#
+# Verifies that:
+#   - `kit install --dry-run` and `kit update --dry-run` produce the same
+#     verification report for a local kit source.
+#   - `--check-urls` is supported on both commands and probes only URL-backed
+#     tools, not locally discovered tools.
+#   - local source scanning contributes sibling packages and tools to both dry
+#     runs, matching the real install/update source model.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+WRAP_BIN="$PROJECT_ROOT/bin/wrap"
+TEST_ROOT=""
+SERVER_PID=""
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+log() {
+    echo -e "${CYAN}[INFO]${NC} $*"
+}
+
+log_success() {
+    echo -e "${GREEN}[PASS]${NC} $*"
+}
+
+log_error() {
+    echo -e "${RED}[FAIL]${NC} $*"
+}
+
+fail() {
+    log_error "$*"
+    exit 1
+}
+
+cleanup() {
+    if [ -n "${SERVER_PID:-}" ]; then
+        kill "$SERVER_PID" >/dev/null 2>&1 || true
+    fi
+    if [ -n "${TEST_ROOT:-}" ]; then
+        rm -rf "$TEST_ROOT"
+    fi
+}
+
+require_tool() {
+    local tool="$1"
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        fail "Required tool not found: $tool"
+    fi
+}
+
+assert_contains() {
+    local haystack="$1"
+    local needle="$2"
+    local label="$3"
+    if ! grep -Fq -- "$needle" <<< "$haystack"; then
+        fail "$label missing expected text: $needle"
+    fi
+}
+
+assert_not_contains() {
+    local haystack="$1"
+    local needle="$2"
+    local label="$3"
+    if grep -Fq -- "$needle" <<< "$haystack"; then
+        fail "$label unexpectedly contained: $needle"
+    fi
+}
+
+main() {
+    [ -x "$WRAP_BIN" ] || fail "wrap binary not found at $WRAP_BIN"
+    require_tool python3
+    require_tool curl
+    require_tool diff
+
+    TEST_ROOT="$(mktemp -d /tmp/wrap-kit-dry-run-test.XXXXXX)"
+    local serve_dir="$TEST_ROOT/http"
+    local kit_dir="$TEST_ROOT/kit"
+    mkdir -p "$serve_dir" \
+             "$kit_dir/tools/localdemo/1.0.0/bin" \
+             "$kit_dir/tools/remotedemo" \
+             "$kit_dir/packages/0.19.1/example/pkg/1.2.3"
+
+    printf 'remote tool\n' > "$serve_dir/remotedemo"
+    printf 'MIT\n' > "$kit_dir/tools/localdemo/1.0.0/LICENSE"
+    printf 'MIT\n' > "$kit_dir/tools/remotedemo/LICENSE"
+    printf '#!/bin/sh\nexit 0\n' > "$kit_dir/tools/localdemo/1.0.0/bin/localdemo"
+    chmod +x "$kit_dir/tools/localdemo/1.0.0/bin/localdemo"
+    printf '{"type":"package","name":"example/pkg","version":"1.2.3","summary":"test","license":"BSD-3-Clause","exposed-modules":[],"elm-version":"0.19.1 <= v < 0.20.0","dependencies":{},"test-dependencies":{}}\n' > "$kit_dir/packages/0.19.1/example/pkg/1.2.3/elm.json"
+
+    local port
+    port="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+    python3 -m http.server "$port" --bind 127.0.0.1 --directory "$serve_dir" >/dev/null 2>&1 &
+    SERVER_PID=$!
+    trap cleanup EXIT
+
+    local remote_url="http://127.0.0.1:${port}/remotedemo"
+    local server_ready=false
+    for _ in $(seq 1 50); do
+        if curl -fsS "$remote_url" >/dev/null 2>&1; then
+            server_ready=true
+            break
+        fi
+        sleep 0.1
+    done
+    [ "$server_ready" = true ] || fail "Local HTTP server did not become ready"
+
+    printf 'format 2\nelm 0.19.1\nkit: sample\n    version: 1.0.0\nlocal-dev: sample/local-dev/2.0.0\ntool: remotedemo\n    url: %s\n' "$remote_url" > "$kit_dir/sample.kit"
+
+    log "Running install/update dry-run parity check"
+    local install_output
+    local update_output
+    install_output="$("$WRAP_BIN" kit install "$kit_dir" --dry-run 2>&1)"
+    update_output="$("$WRAP_BIN" kit update "$kit_dir" --dry-run 2>&1)"
+
+    if ! diff -u <(printf '%s\n' "$install_output") <(printf '%s\n' "$update_output") >/dev/null; then
+        echo "$install_output"
+        echo "---"
+        echo "$update_output"
+        fail "kit install/update dry-run outputs differ"
+    fi
+
+    assert_contains "$install_output" "Would register 1 local-dev package(s):" "dry-run report"
+    assert_contains "$install_output" "Would install 1 package(s):" "dry-run report"
+    assert_contains "$install_output" "Would install 2 tool(s):" "dry-run report"
+    assert_contains "$install_output" "remotedemo  (download: $remote_url)" "dry-run report"
+    assert_contains "$install_output" "localdemo  (local: " "dry-run report"
+    assert_contains "$install_output" "/tools/localdemo/1.0.0/bin/localdemo)" "dry-run report"
+
+    log "Running install/update --check-urls parity check"
+    local install_check_output
+    local update_check_output
+    install_check_output="$("$WRAP_BIN" kit install "$kit_dir" --dry-run --check-urls 2>&1)"
+    update_check_output="$("$WRAP_BIN" kit update "$kit_dir" --dry-run --check-urls 2>&1)"
+
+    if ! diff -u <(printf '%s\n' "$install_check_output") <(printf '%s\n' "$update_check_output") >/dev/null; then
+        echo "$install_check_output"
+        echo "---"
+        echo "$update_check_output"
+        fail "kit install/update --check-urls outputs differ"
+    fi
+
+    assert_contains "$install_check_output" "Checking tool URLs:" "check-urls report"
+    assert_contains "$install_check_output" "  - remotedemo ... OK" "check-urls report"
+    assert_not_contains "$install_check_output" "  - localdemo ..." "check-urls report"
+
+    log_success "kit dry-run parity checks passed"
+}
+
+main "$@"

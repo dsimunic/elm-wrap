@@ -24,7 +24,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#ifndef _WIN32
 #include <sys/wait.h>
+#endif
 
 static int compare_string_ptrs_for_sort(const void *a, const void *b) {
     const char *sa = *(const char * const *)a;
@@ -662,6 +664,13 @@ int run_compiler_make_capture_stdout_in_dir(
     if (out_stdout) *out_stdout = NULL;
     if (!compiler_path || !compiler_env || !argv || !cwd) return 1;
 
+#ifdef _WIN32
+    {
+        int rc = os_win_run_capture(compiler_path, argv, compiler_env, cwd,
+                                    out_stdout, (size_t)MAX_ELM_JSON_FILE_BYTES);
+        return (rc < 0) ? 1 : rc;
+    }
+#else
     int pipefd[2];
     if (pipe(pipefd) != 0) {
         return 1;
@@ -711,6 +720,7 @@ int run_compiler_make_capture_stdout_in_dir(
     if (pid < 0) return 1;
     if (WIFEXITED(status)) return WEXITSTATUS(status);
     return 1;
+#endif
 }
 
 bool elm_cmd_run_silent_package_build(
@@ -733,7 +743,7 @@ bool elm_cmd_run_silent_package_build(
 
     /* Silence stdout during dependency download + artifact cleanup */
     int saved_stdout = dup(STDOUT_FILENO);
-    int devnull = open("/dev/null", O_WRONLY);
+    int devnull = open(OS_DEVNULL, O_WRONLY);
     if (saved_stdout >= 0 && devnull >= 0) {
         (void)dup2(devnull, STDOUT_FILENO);
     }
@@ -808,7 +818,7 @@ bool elm_cmd_run_silent_package_build(
                 continue;
             }
 
-            char *out_path = arena_strdup("/dev/null");
+            char *out_path = arena_strdup(OS_DEVNULL);
 
             char **elm_args = arena_malloc(sizeof(char*) * 7);
             elm_args[0] = (char*)compiler_name;

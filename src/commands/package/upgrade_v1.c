@@ -205,9 +205,30 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
         return 0;
     }
 
-    if (strcmp(existing_pkg->version, latest_version) == 0) {
-        printf("Package %s/%s is already at the latest %s version (%s)\n",
-               author, name, major_upgrade ? "major" : "minor", latest_version);
+    /* Compare the resolved current version against the latest candidate.
+     * For package projects existing_pkg->version is a constraint string
+     * ("1.0.0 <= v < 2.0.0"), so a raw strcmp never matches; parse both and
+     * compare by version instead. */
+    Version cur_v, latest_v;
+    if (version_parse_safe(existing_pkg->version, &cur_v) &&
+        version_parse_safe(latest_version, &latest_v) &&
+        version_compare(&cur_v, &latest_v) == 0) {
+        if (!major_upgrade) {
+            const Version *newest = (registry_entry->version_count > 0)
+                ? &registry_entry->versions[0] : NULL;
+            if (newest && newest->major > cur_v.major) {
+                printf("There are no minor upgrade candidates for %s/%s; it is already on the latest %u.x version (%u.%u.%u).\n",
+                       author, name, cur_v.major, cur_v.major, cur_v.minor, cur_v.patch);
+                printf("Use '--major' to upgrade to the next major version (%u.%u.%u).\n",
+                       newest->major, newest->minor, newest->patch);
+            } else {
+                printf("Package %s/%s is already at the latest version (%u.%u.%u).\n",
+                       author, name, cur_v.major, cur_v.minor, cur_v.patch);
+            }
+        } else {
+            printf("Package %s/%s is already at the latest major version (%u.%u.%u).\n",
+                   author, name, latest_v.major, latest_v.minor, latest_v.patch);
+        }
         arena_free((char*)latest_version);
         arena_free(author);
         arena_free(name);
@@ -299,7 +320,43 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
                     continue;
                 }
 
-                if (v1_package_depends_on(pkg->author, pkg->name, pkg->version, author, name, env)) {
+                /* For package projects pkg->version is a constraint string
+                 * ("1.0.0 <= v < 2.0.0"), which cannot be used as a cache path or
+                 * download version. Normalize to the concrete lower-bound version
+                 * so the reverse-dep check reads local metadata instead of issuing
+                 * doomed downloads (which also created constraint-named junk dirs). */
+                const char *dep_version = pkg->version;
+                char *concrete_version = NULL;
+                Version parsed_dep;
+                if (version_parse_safe(pkg->version, &parsed_dep)) {
+                    concrete_version = version_format(parsed_dep.major, parsed_dep.minor, parsed_dep.patch);
+                    if (concrete_version) {
+                        dep_version = concrete_version;
+                    }
+                }
+
+                char *rev_constraint = v1_package_dependency_constraint(pkg->author, pkg->name, dep_version, author, name, env);
+                arena_free(concrete_version);
+
+                /* A reverse-dep only blocks the major upgrade if its declared
+                 * constraint on the target does NOT admit the new target version.
+                 * If the dep already allows the new major (e.g. it now requires
+                 * "2.0.0 <= v < 3.0.0"), it is compatible and must not block. */
+                bool blocks = false;
+                if (rev_constraint) {
+                    VersionRange rev_range;
+                    Version new_target_v;
+                    if (version_parse_constraint(rev_constraint, &rev_range) &&
+                        version_parse_safe(latest_version, &new_target_v)) {
+                        blocks = !version_in_range(&new_target_v, &rev_range);
+                    } else {
+                        /* Couldn't evaluate the constraint; be conservative. */
+                        blocks = true;
+                    }
+                    arena_free(rev_constraint);
+                }
+
+                if (blocks) {
                     bool is_test_dep = false;
                     if (elm_json->dependencies_test_direct && package_map_find(elm_json->dependencies_test_direct, pkg->author, pkg->name)) {
                         is_test_dep = true;

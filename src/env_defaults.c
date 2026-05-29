@@ -7,6 +7,16 @@
 #include <string.h>
 #include <stdbool.h>
 
+const char *home_directory(void) {
+#ifdef _WIN32
+    const char *profile = getenv("USERPROFILE");
+    if (profile && profile[0] != '\0') {
+        return profile;
+    }
+#endif
+    return getenv("HOME");
+}
+
 /* Expand ~ to the user's home directory in a path */
 static char *expand_tilde(const char *path) {
     if (!path || path[0] == '\0') {
@@ -19,7 +29,7 @@ static char *expand_tilde(const char *path) {
     
     /* Handle ~/... or just ~ */
     if (path[1] == '\0' || path[1] == '/') {
-        const char *home = getenv("HOME");
+        const char *home = home_directory();
         if (!home) {
             /* If HOME is not set, return path as-is */
             return arena_strdup(path);

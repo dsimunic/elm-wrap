@@ -39,4 +39,13 @@ bool v2_package_depends_on(const char *pkg_author, const char *pkg_name, const c
                            const char *target_author, const char *target_name,
                            V2Registry *registry);
 
+/**
+ * Return the version constraint that pkg declares on target (e.g.
+ * "2.0.0 <= v < 3.0.0"), or NULL if pkg does not depend on target.
+ * Caller does not own the result (arena-allocated).
+ */
+char *v2_package_dependency_constraint(const char *pkg_author, const char *pkg_name, const char *pkg_version,
+                                       const char *target_author, const char *target_name,
+                                       V2Registry *registry);
+
 #endif /* PROTOCOL_V2_INSTALL_H */

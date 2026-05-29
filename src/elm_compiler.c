@@ -24,21 +24,38 @@ static char* find_elm_binary_in_path(void) {
         return NULL;
     }
 
-    char *dir = strtok(path_copy, ":");
+#ifdef _WIN32
+    const char *sep = ";";
+    const char *const names[] = { "elm.exe", "elm", NULL };
+#else
+    const char *sep = ":";
+    const char *const names[] = { "elm", NULL };
+#endif
+
+    char *dir = strtok(path_copy, sep);
     while (dir != NULL) {
-        char *candidate = arena_malloc(PATH_MAX);
-        if (!candidate) {
-            return NULL;
+        for (int i = 0; names[i] != NULL; i++) {
+            char *candidate = arena_malloc(PATH_MAX);
+            if (!candidate) {
+                return NULL;
+            }
+
+            snprintf(candidate, PATH_MAX, "%s/%s", dir, names[i]);
+
+            struct stat st;
+            if (stat(candidate, &st) == 0
+#ifdef _WIN32
+                && S_ISREG(st.st_mode)   /* Windows has no execute bit */
+#else
+                && (st.st_mode & S_IXUSR)
+#endif
+               ) {
+                return candidate;
+            }
+            arena_free(candidate);
         }
 
-        snprintf(candidate, PATH_MAX, "%s/elm", dir);
-
-        struct stat st;
-        if (stat(candidate, &st) == 0 && (st.st_mode & S_IXUSR)) {
-            return candidate;
-        }
-
-        dir = strtok(NULL, ":");
+        dir = strtok(NULL, sep);
     }
 
     return NULL;

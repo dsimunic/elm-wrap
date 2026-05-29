@@ -475,19 +475,47 @@ SolverResult run_with_strategy_v1(
         bool include_prod = true;
         bool include_test = is_test_dependency;
 
-        if (include_prod) {
-            root_ok = solver_add_constraint_map_dependencies(
-                pg_ctx,
-                elm_json->package_dependencies,
-                "package_dependencies"
-            );
-        }
-        if (root_ok && include_test) {
-            root_ok = solver_add_constraint_map_dependencies(
-                pg_ctx,
-                elm_json->package_test_dependencies,
-                "package_test_dependencies"
-            );
+        if (strategy == STRATEGY_CROSS_MAJOR_FOR_TARGET) {
+            /* Cross-major: add the target with an unconstrained range so it can
+             * cross the major boundary, and DON'T add the package_dependencies
+             * constraints (which would re-pin the target below its next major).
+             * Let the solver resolve the target and its transitive deps freely. */
+            PgPackageId target_pkg_id = pg_elm_intern_package(pg_ctx, author, name);
+            if (target_pkg_id < 0) {
+                pg_solver_free(pg_solver);
+                pg_elm_context_free(pg_ctx);
+                return SOLVER_INVALID_PACKAGE;
+            }
+            if (!pg_elm_add_root_dependency(pg_ctx, target_pkg_id, pg_range_any())) {
+                log_error("Failed to add target package %s/%s as root with any range", author, name);
+                pg_solver_free(pg_solver);
+                pg_elm_context_free(pg_ctx);
+                return SOLVER_NO_SOLUTION;
+            }
+            log_debug("Cross-major (package): target %s/%s added with unconstrained range", author, name);
+
+            if (include_test) {
+                root_ok = solver_add_constraint_map_dependencies(
+                    pg_ctx,
+                    elm_json->package_test_dependencies,
+                    "package_test_dependencies"
+                );
+            }
+        } else {
+            if (include_prod) {
+                root_ok = solver_add_constraint_map_dependencies(
+                    pg_ctx,
+                    elm_json->package_dependencies,
+                    "package_dependencies"
+                );
+            }
+            if (root_ok && include_test) {
+                root_ok = solver_add_constraint_map_dependencies(
+                    pg_ctx,
+                    elm_json->package_test_dependencies,
+                    "package_test_dependencies"
+                );
+            }
         }
     }
 

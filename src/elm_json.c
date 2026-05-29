@@ -669,7 +669,7 @@ bool elm_json_write_formatted_atomic(struct cJSON *json, const char *filepath) {
     fsync(fileno(file));
     fclose(file);
 
-    if (rename(tmp_path, filepath) != 0) {
+    if (os_rename_replace(tmp_path, filepath) != 0) {
         log_error("Could not replace %s: %s", filepath, strerror(errno));
         unlink(tmp_path);
         arena_free(tmp_path);

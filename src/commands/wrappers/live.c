@@ -118,6 +118,12 @@ int cmd_live(int argc, char *argv[]) {
     elm_args[argc + 1] = NULL;
 
     // Execute lamdera live with custom environment
+#ifdef _WIN32
+    {
+        int rc = os_win_exec_replace(lamdera_path, elm_args, elm_env);
+        if (rc >= 0) return rc;
+    }
+#endif
     execve(lamdera_path, elm_args, elm_env);
 
     // If execve returns, it failed

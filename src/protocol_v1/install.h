@@ -27,6 +27,15 @@ bool v1_package_depends_on(const char *pkg_author, const char *pkg_name, const c
                            InstallEnv *env);
 
 /**
+ * Return the version constraint that pkg declares on target (e.g.
+ * "2.0.0 <= v < 3.0.0"), or NULL if pkg does not depend on target.
+ * Caller does not own the result (arena-allocated).
+ */
+char *v1_package_dependency_constraint(const char *pkg_author, const char *pkg_name, const char *pkg_version,
+                                       const char *target_author, const char *target_name,
+                                       InstallEnv *env);
+
+/**
  * Show package dependencies using V1 protocol.
  * Downloads and reads package elm.json from cache.
  *

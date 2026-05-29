@@ -1609,7 +1609,7 @@ int cmd_install(int argc, char *argv[]) {
         temp_dir_buf[0] = '\0';
 
         if (from_url) {
-            snprintf(temp_dir_buf, sizeof(temp_dir_buf), "/tmp/wrap_temp_%s_%s", author, name);
+            snprintf(temp_dir_buf, sizeof(temp_dir_buf), "%s/wrap_temp_%s_%s", os_temp_dir(), author, name);
             mkdir(temp_dir_buf, DIR_PERMISSIONS);
 
             char temp_file[1024];

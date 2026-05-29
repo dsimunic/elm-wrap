@@ -862,7 +862,7 @@ static bool move_file(const char *src, const char *dest) {
     arena_free(dest_copy);
 
     /* Try rename first */
-    if (rename(src, dest) == 0) {
+    if (os_rename_replace(src, dest) == 0) {
         return true;
     }
 

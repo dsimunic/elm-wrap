@@ -2,6 +2,15 @@
 #define CONSTANTS_H
 
 /*
+ * Platform-specific paths
+ */
+#ifdef _WIN32
+#define OS_DEVNULL "NUL"
+#else
+#define OS_DEVNULL "/dev/null"
+#endif
+
+/*
  * Buffer size constants
  */
 #define MAX_PATH_LENGTH 4096

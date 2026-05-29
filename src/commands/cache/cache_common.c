@@ -30,7 +30,7 @@ bool cache_download_from_github(InstallEnv *env, const char *author,
 
     /* Create temp directory */
     char temp_dir[MAX_TEMP_PATH_LENGTH];
-    snprintf(temp_dir, sizeof(temp_dir), "/tmp/wrap_gh_%s_%s_%s", author, name, version);
+    snprintf(temp_dir, sizeof(temp_dir), "%s/wrap_gh_%s_%s_%s", os_temp_dir(), author, name, version);
 
     /* Clean up any previous attempt */
     remove_directory_recursive(temp_dir);

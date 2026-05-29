@@ -1,6 +1,17 @@
 CC = gcc
 AR = ar
 
+# ---- Windows cross-compilation (llvm-mingw) -------------------------------
+# Build with: make windows
+# The toolchain is invoked by absolute path; no PATH changes, no Homebrew.
+TARGET_OS      ?= native
+LLVM_MINGW_DIR ?= $(HOME)/llvm-mingw
+WIN_TRIPLE     ?= x86_64-w64-mingw32
+WIN_CC         := $(LLVM_MINGW_DIR)/bin/$(WIN_TRIPLE)-clang
+WIN_AR         := $(LLVM_MINGW_DIR)/bin/$(WIN_TRIPLE)-llvm-ar
+RULR_REPO      ?= ../Rulr
+WIN_RULR_LIB   := external/lib/windows-x86_64/librulr.a
+
 # Quiet mode: prefix commands with @ to hide, show summary instead
 Q = @
 COMPILE_MSG = @printf "  CC      %s\n"
@@ -16,7 +27,11 @@ FEATURE_DEBUG ?= 0
 FEATURE_CACHE_DOWNLOAD_ALL ?= 0
 FEATURE_MIRROR ?= 0
 
+ifeq ($(TARGET_OS),windows)
+CFLAGS = -Wall -Wextra -Werror -Wunused-result -std=gnu99 -O2 -D_WIN32_WINNT=0x0A00 -include src/os_compat.h -Isrc/win_compat
+else
 CFLAGS = -Wall -Wextra -Werror -Wunused-result -std=gnu99 -D_GNU_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -O2 -flto
+endif
 CFLAGS += -DFEATURE_PUBLISH_DEFAULT=$(FEATURE_PUBLISH)
 CFLAGS += -DFEATURE_REVIEW_DEFAULT=$(FEATURE_REVIEW) -DFEATURE_POLICY_DEFAULT=$(FEATURE_POLICY)
 CFLAGS += -DFEATURE_CACHE_DEFAULT=$(FEATURE_CACHE)
@@ -134,6 +149,26 @@ RULE_COMPILED := $(patsubst $(BUILTIN_RULES_SRC)/%.dl,$(BUILTIN_RULES_COMPILED)/
 
 # Files
 TARGET_FILE = wrap
+
+# Networking backend: libcurl by default, WinHTTP on Windows. Both compile to
+# build/.../http_client.o, so OBJECTS and the link rule stay identical.
+HTTP_CLIENT_SRC = $(SRCDIR)/http_client.c
+
+# ---- Windows target overrides ---------------------------------------------
+# Separate build/bin/lib dirs so a Windows cross build never clobbers native
+# artifacts. http_client.o is built from the WinHTTP backend instead of curl.
+ifeq ($(TARGET_OS),windows)
+CC := $(WIN_CC)
+AR := $(WIN_AR)
+LIB_PLATFORM := windows-x86_64
+LDFLAGS := -lwinhttp -static
+BUILDDIR := build/windows
+BINDIR := bin/windows
+LIBDIR := lib/windows
+TARGET_FILE := wrap.exe
+HTTP_CLIENT_SRC := $(SRCDIR)/http_client_winhttp.c
+endif
+
 SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/alloc.c \
           $(SRCDIR)/shared/log.c \
@@ -236,6 +271,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/vendor/miniz.c
 BUILDINFO_SRC = $(BUILDDIR)/buildinfo.c
 OBJECTS = $(BUILDDIR)/main.o \
+          $(BUILDDIR)/os_compat.o \
           $(BUILDDIR)/alloc.o \
           $(BUILDDIR)/log.o \
           $(BUILDDIR)/package_list.o \
@@ -379,7 +415,7 @@ BINDIR_INSTALL = $(PREFIX)/bin
 USER_PREFIX = $(HOME)/.local
 USER_BINDIR = $(USER_PREFIX)/bin
 
-.PHONY: all rebuild rebuild-install clean pg_core_test pg_file_test indexmaker mkpkg help-report-html-gen test check dist distcheck install uninstall uninstall-user compile-builtin-rules
+.PHONY: all rebuild rebuild-install clean pg_core_test pg_file_test indexmaker mkpkg help-report-html-gen test check dist distcheck install uninstall uninstall-user compile-builtin-rules windows windows-build
 
 .DEFAULT_GOAL := all
 
@@ -392,6 +428,25 @@ rebuild:
 	@install -d $(USER_BINDIR)
 	@install -m 755 $(TARGET) $(USER_BINDIR)/$(TARGET_FILE)
 	@echo "Installation complete."
+
+# ---- Windows cross build (llvm-mingw) -------------------------------------
+# `make windows` cross-compiles bin/windows/wrap.exe. It first ensures the
+# Windows librulr.a exists (cross-building it from $(RULR_REPO) if needed),
+# then re-invokes make with TARGET_OS=windows to build + embed the rules.
+windows: $(WIN_RULR_LIB)
+	@$(MAKE) clean TARGET_OS=windows
+	@$(MAKE) TARGET_OS=windows windows-build
+
+windows-build: $(TARGET) append-builtin-rules
+	@echo "Built $(TARGET) (windows-x86_64)"
+
+# Cross-build librulr.a from the sibling Rulr repo when it is not present.
+$(WIN_RULR_LIB):
+	@echo "Cross-building librulr.a (windows-x86_64) from $(RULR_REPO)..."
+	$(MAKE) -C $(RULR_REPO) lib-windows-x86_64 CC=$(WIN_CC) AR=$(WIN_AR) \
+		LIB_CFLAGS="-Wall -Wextra -Werror -std=c99 -O2 -Isrc -Ireference"
+	@mkdir -p $(dir $@)
+	cp $(RULR_REPO)/lib/windows-x86_64/librulr.a $@
 
 rebuild-install:
 	@$(MAKE) clean
@@ -854,8 +909,13 @@ $(BUILDDIR)/cJSON.o: $(SRCDIR)/vendor/cJSON.c $(SRCDIR)/vendor/cJSON.h | $(BUILD
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
-# Build http_client object
-$(BUILDDIR)/http_client.o: $(SRCDIR)/http_client.c $(SRCDIR)/http_client.h | $(BUILDDIR)
+# Build http_client object (curl backend by default, WinHTTP on Windows)
+$(BUILDDIR)/http_client.o: $(HTTP_CLIENT_SRC) $(SRCDIR)/http_client.h | $(BUILDDIR)
+	$(COMPILE_MSG) $@
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+
+# Build os_compat object (Windows POSIX shims; an empty TU on other platforms)
+$(BUILDDIR)/os_compat.o: $(SRCDIR)/os_compat.c $(SRCDIR)/os_compat.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
@@ -1046,6 +1106,9 @@ test: pg_core_test pg_file_test package_suggestions_test
 	@echo ""
 	@echo "Running package_suggestions_test..."
 	@$(PACKAGE_SUGGESTIONS_TEST)
+	@echo ""
+	@echo "Running kit dry-run regression test..."
+	@test/scripts/test-kit-dry-run
 
 # Print current version
 .PHONY: version

@@ -27,7 +27,9 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <limits.h>
+#ifndef _WIN32
 #include <sys/wait.h>
+#endif
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
@@ -190,7 +192,7 @@ static char *run_compiler_for_human_errors(
         elm_args[1] = "make";
         elm_args[2] = rel_elm;
         elm_args[3] = "--output";
-        elm_args[4] = "/dev/null";
+        elm_args[4] = OS_DEVNULL;
         elm_args[5] = NULL;
 
         char *compiler_stdout = NULL;

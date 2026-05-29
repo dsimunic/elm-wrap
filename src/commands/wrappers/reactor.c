@@ -105,6 +105,12 @@ int cmd_reactor(int argc, char *argv[]) {
     elm_args[argc + 1] = NULL;
 
     // Execute elm reactor with custom environment
+#ifdef _WIN32
+    {
+        int rc = os_win_exec_replace(elm_path, elm_args, elm_env);
+        if (rc >= 0) return rc;
+    }
+#endif
     execve(elm_path, elm_args, elm_env);
 
     // If execve returns, it failed

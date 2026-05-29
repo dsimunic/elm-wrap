@@ -77,12 +77,12 @@ static char* v1_find_package_elm_json(const char *pkg_path) {
     return found_path;
 }
 
-bool v1_package_depends_on(const char *pkg_author, const char *pkg_name, const char *pkg_version,
-                           const char *target_author, const char *target_name,
-                           InstallEnv *env) {
+char *v1_package_dependency_constraint(const char *pkg_author, const char *pkg_name, const char *pkg_version,
+                                       const char *target_author, const char *target_name,
+                                       InstallEnv *env) {
     char *pkg_path = cache_get_package_path(env->cache, pkg_author, pkg_name, pkg_version);
     if (!pkg_path) {
-        return false;
+        return NULL;
     }
 
     char *elm_json_path = v1_find_package_elm_json(pkg_path);
@@ -106,26 +106,36 @@ bool v1_package_depends_on(const char *pkg_author, const char *pkg_name, const c
     arena_free(pkg_path);
 
     if (!pkg_elm_json) {
-        return false;
+        return NULL;
     }
 
-    bool depends = false;
+    char *constraint = NULL;
 
     if (pkg_elm_json->package_dependencies) {
         Package *dep = package_map_find(pkg_elm_json->package_dependencies, target_author, target_name);
-        if (dep) {
-            depends = true;
+        if (dep && dep->version) {
+            constraint = arena_strdup(dep->version);
         }
     }
 
-    if (!depends && pkg_elm_json->package_test_dependencies) {
+    if (!constraint && pkg_elm_json->package_test_dependencies) {
         Package *dep = package_map_find(pkg_elm_json->package_test_dependencies, target_author, target_name);
-        if (dep) {
-            depends = true;
+        if (dep && dep->version) {
+            constraint = arena_strdup(dep->version);
         }
     }
 
     elm_json_free(pkg_elm_json);
+    return constraint;
+}
+
+bool v1_package_depends_on(const char *pkg_author, const char *pkg_name, const char *pkg_version,
+                           const char *target_author, const char *target_name,
+                           InstallEnv *env) {
+    char *constraint = v1_package_dependency_constraint(pkg_author, pkg_name, pkg_version,
+                                                        target_author, target_name, env);
+    bool depends = (constraint != NULL);
+    arena_free(constraint);
     return depends;
 }
 

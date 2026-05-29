@@ -211,6 +211,10 @@ int cmd_package(int argc, char *argv[], const char *prog) {
 int main(int argc, char *argv[]) {
     alloc_init();
 
+#ifdef _WIN32
+    os_win_enable_vt();   /* enable ANSI color escapes on the Windows console */
+#endif
+
     /*
      * Initialize built-in rules subsystem.
      * Get the full path to the executable to find the embedded zip archive.
@@ -233,6 +237,10 @@ int main(int argc, char *argv[]) {
         ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
         if (len > 0) {
             exe_path[len] = '\0';
+            got_exe_path = true;
+        }
+#elif defined(_WIN32)
+        if (os_win_executable_path(exe_path, sizeof(exe_path))) {
             got_exe_path = true;
         }
 #endif

@@ -1,6 +1,7 @@
 #include "registry.h"
 #include "alloc.h"
 #include "constants.h"
+#include "fileutil.h"
 #include "shared/log.h"
 #include <stdlib.h>
 #include <string.h>
@@ -426,7 +427,7 @@ bool registry_dat_write(const Registry *registry, const char *path) {
     fclose(f);
 
     /* Atomic rename */
-    if (rename(tmp_path, path) != 0) {
+    if (os_rename_replace(tmp_path, path) != 0) {
         log_error("Failed to rename %s to %s: %s", tmp_path, path, strerror(errno));
         unlink(tmp_path);
         return false;

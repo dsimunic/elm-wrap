@@ -43,7 +43,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#ifndef _WIN32
 #include <sys/wait.h>
+#endif
 
 /* ============================================================================
  * Usage

@@ -91,4 +91,13 @@ char *strip_trailing_slash(const char *path);
  */
 bool mkdir_p(const char *path);
 
+/* OS temp directory: %TEMP%/%TMP% (or C:\Windows\Temp) on Windows,
+ * $TMPDIR or /tmp on POSIX. Returns a non-owned string (never NULL). */
+const char *os_temp_dir(void);
+
+/* Rename src -> dst, replacing dst if it already exists. POSIX rename does this
+ * implicitly; on Windows it needs MoveFileEx. Returns 0 on success, -1 on
+ * failure. Use for "write temp then rename over the real file" saves. */
+int os_rename_replace(const char *src, const char *dst);
+
 #endif /* FILEUTIL_H */
