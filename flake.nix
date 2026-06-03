@@ -41,9 +41,7 @@
               curl
             ];
 
-            installPhase = ''
-              PREFIX=$out make install
-            '';
+            installFlags = [ "PREFIX=$(out)" ];
           };
         }
       );
