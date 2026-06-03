@@ -45,6 +45,7 @@
               python3
             ];
 
+            buildFlags = [ "RELEASE_VERSION=1" ];
             installFlags = [ "PREFIX=$(out)" ];
           };
         }

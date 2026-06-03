@@ -27,23 +27,24 @@ ifdef RELEASE_VERSION
   REV := $(BASE_VERSION)
   REV_FULL := $(BASE_VERSION)
   DIRTY_FLAG := false
-  TIMESTAMP := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+  BUILD_DATE := $(COMMIT_TIMESTAMP)
 else ifeq ($(INSIDE_WT),true)
   # Inside git repository
   BRANCH_NAME := $(shell git symbolic-ref --short -q HEAD 2>/dev/null || echo detached)
   REV_FULL := $(shell git rev-parse HEAD)
   DIRTY_FLAG := $(shell test -n "$$(git status --porcelain 2>/dev/null)" && echo "true" || echo "false")
-  TIMESTAMP := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
   COMMIT_TIMESTAMP := $(shell TZ=UTC git log -1 --format="%cd" --date=format-local:"%Y-%m-%dT%H:%M:%SZ" HEAD)
 
   ifeq ($(DIRTY_FLAG),true)
     # Dirty tree: VERSION@branch-HEAD (no timestamp - it's in Built line)
     REV := HEAD
     GITVER := $(BASE_VERSION)@$(BRANCH_NAME)-HEAD
+    BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
   else
     # Clean tree: VERSION@branch-revision-commit_timestamp
     REV := $(shell git rev-parse --short=8 HEAD)
     GITVER := $(BASE_VERSION)@$(BRANCH_NAME)-$(REV)-$(COMMIT_TIMESTAMP)
+    BUILD_DATE := $(COMMIT_TIMESTAMP)
   endif
 else
   # Not in git repository: VERSION@TIMESTAMP
@@ -52,11 +53,11 @@ else
   REV_FULL := unknown
   DIRTY_FLAG := unknown
   TIMESTAMP := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+  BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
   GITVER := $(BASE_VERSION)@$(TIMESTAMP)
 endif
 
 # Capture build environment metadata
-BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 BUILD_HOST := $(shell hostname)
 BUILD_USER := $(shell whoami)
 BUILD_OS := $(shell uname -s)
