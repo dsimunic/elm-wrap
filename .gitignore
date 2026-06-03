@@ -36,3 +36,4 @@ test/pwa-build-order.json
 
 dist/
 foreign/Elm-Compiler/
+result
