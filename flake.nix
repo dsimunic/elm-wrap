@@ -31,6 +31,8 @@
             version = builtins.readFile ./VERSION;
             src = ./.;
 
+            doCheck = true;
+
             nativeBuildInputs = with pkgs; [
               hostname
               rsync
