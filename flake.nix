@@ -36,6 +36,7 @@
             nativeBuildInputs = with pkgs; [
               hostname
               rsync
+              zip
             ];
             buildInputs = with pkgs; [
               curl
