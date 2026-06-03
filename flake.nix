@@ -41,6 +41,9 @@
             buildInputs = with pkgs; [
               curl
             ];
+            nativeCheckInputs = with pkgs; [
+              python3
+            ];
 
             installFlags = [ "PREFIX=$(out)" ];
           };
