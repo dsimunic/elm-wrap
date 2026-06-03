@@ -41,10 +41,6 @@
               curl
             ];
 
-            buildPhase = ''
-              make
-            '';
-
             installPhase = ''
               PREFIX=$out make install
             '';
