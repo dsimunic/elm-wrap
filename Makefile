@@ -1108,7 +1108,7 @@ test: pg_core_test pg_file_test package_suggestions_test
 	@$(PACKAGE_SUGGESTIONS_TEST)
 	@echo ""
 	@echo "Running kit dry-run regression test..."
-	@test/scripts/test-kit-dry-run
+	@bash test/scripts/test-kit-dry-run
 
 # Print current version
 .PHONY: version

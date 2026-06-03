@@ -31,21 +31,21 @@
             version = builtins.readFile ./VERSION;
             src = ./.;
 
+            doCheck = true;
+
             nativeBuildInputs = with pkgs; [
               hostname
               rsync
+              zip
             ];
             buildInputs = with pkgs; [
               curl
             ];
+            nativeCheckInputs = with pkgs; [
+              python3
+            ];
 
-            buildPhase = ''
-              make
-            '';
-
-            installPhase = ''
-              PREFIX=$out make install
-            '';
+            installFlags = [ "PREFIX=$(out)" ];
           };
         }
       );
