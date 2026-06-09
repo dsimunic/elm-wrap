@@ -1,0 +1,7 @@
+Usage: wrap debug registry_v1 remove AUTHOR/NAME@VERSION
+
+Remove a package version from the registry.
+
+This command removes a package version from the V1 protocol
+registry.dat file. The package must be specified in the
+format AUTHOR/NAME@VERSION (e.g., elm/core@1.0.5).

@@ -1,0 +1,21 @@
+Usage: wrap package cache full-scan [OPTIONS]
+
+Scan the entire package cache and verify all packages.
+
+This command will:
+  - Scan all packages in the cache
+  - Report broken packages (missing or empty src/ directory)
+  - Count packages missing the latest version
+  - Provide a summary of cache health
+
+Examples:
+  wrap package cache full-scan           # Scan and report broken packages
+  wrap package cache full-scan -q        # Quiet mode - only show summary
+  wrap package cache full-scan -v        # Verbose - show all issues
+  wrap package cache full-scan --no-check-redundant  # Skip redundant file check
+
+Options:
+  -q, --quiet               Only show summary counts
+  -v, --verbose             Show all issues including missing latest
+  --no-check-redundant      Skip analyzing import trees for unused files
+  --help                Show this help

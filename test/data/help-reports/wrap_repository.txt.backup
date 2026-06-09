@@ -1,0 +1,9 @@
+Usage: wrap repository SUBCOMMAND [OPTIONS]
+
+Manage local package repositories.
+
+Subcommands:
+  local-dev             Manage local development tracking
+
+Options:
+  -h, --help            Show this help message

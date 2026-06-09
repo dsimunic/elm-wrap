@@ -1,0 +1,13 @@
+Usage: wrap make ELM_FILE [OPTIONS]
+
+Compile Elm code to JavaScript or HTML.
+
+This command ensures all package dependencies are downloaded and cached
+before calling 'elm make' to perform the actual compilation.
+
+Examples:
+  wrap make src/Main.elm                 # Compile Main.elm
+  wrap make src/Main.elm --output=main.js
+  wrap make src/Main.elm --optimize
+
+All options are passed through to 'elm make'.

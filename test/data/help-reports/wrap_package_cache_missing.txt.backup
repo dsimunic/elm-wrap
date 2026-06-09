@@ -1,0 +1,18 @@
+Usage: wrap package cache missing [OPTIONS]
+
+Download missing dependencies from elm.json to the cache.
+
+Reads elm.json from the current directory and identifies which
+dependencies are not yet downloaded. For applications, uses the
+exact versions specified. For packages, resolves version constraints
+to the latest matching version.
+
+Options:
+  -y, --yes       Skip confirmation prompt and download immediately
+  -v, --verbose   Show detailed progress during download
+  -q, --quiet     Suppress progress messages
+  --help          Show this help message
+
+Examples:
+  wrap package cache missing       # Show plan and prompt
+  wrap package cache missing -y    # Download without prompting

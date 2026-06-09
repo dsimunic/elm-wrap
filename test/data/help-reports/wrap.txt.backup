@@ -14,7 +14,6 @@ Commands:
   application SUBCOMMAND    Application management commands
   package SUBCOMMAND        Package management commands
   repository SUBCOMMAND     Repository management commands
-  kit SUBCOMMAND            Install kits (bundles of tools and packages)
 
 Options:
   -v, --verbose      Show detailed logging output

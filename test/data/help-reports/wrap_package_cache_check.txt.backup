@@ -1,0 +1,21 @@
+Usage: wrap package cache check PACKAGE [OPTIONS]
+
+Check cache status for a specific package.
+
+This command will:
+  - Search registry.dat and list known versions
+  - Search ELM_HOME for cached versions with valid src/ directory
+  - Report broken packages (missing or empty src/ directory)
+
+Examples:
+  wrap package cache check elm/json            # Check cache status for elm/json
+  wrap package cache check elm/html --purge-broken  # Remove broken cached versions
+  wrap package cache check elm/html --fix-broken    # Re-download broken versions
+  wrap package cache check elm/html --no-check-redundant  # Skip redundant file check
+
+Options:
+  --purge-broken            Remove broken directories without re-downloading
+  --fix-broken              Try to re-download broken versions from registry
+  --no-check-redundant      Skip analyzing import tree for unused files
+  -v, --verbose             Show detailed output
+  --help                    Show this help

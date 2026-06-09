@@ -1,0 +1,19 @@
+Usage: wrap package SUBCOMMAND [OPTIONS]
+
+Subcommands:
+  install PACKAGE                Add a dependency to current elm.json
+  init PACKAGE                   Initialize a package
+  upgrade PACKAGE                Upgrade packages to latest versions
+  uninstall PACKAGE              Remove a package from elm.json (alias: remove)
+  info    [ PATH                 Display package information and upgrades
+          | PACKAGE [VERSION]
+          ]
+  prepublish PATH                Show files that would be published from a package
+  docs    PATH                   Generate documentation JSON for a package
+  cache   PACKAGE                Download package to ELM_HOME without adding it to elm.json
+
+Options:
+  -y, --yes            Automatically confirm changes
+  -v, --verbose        Show detailed logging output
+  -vv                  Show extra verbose (trace) logging output
+  -h, --help           Show this help message

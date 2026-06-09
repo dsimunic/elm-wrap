@@ -1,0 +1,18 @@
+Usage: wrap debug install-plan PACKAGE [PACKAGE ...] [OPTIONS]
+
+Show what packages would be installed for one or more packages (dry-run).
+This exercises the dependency solver without actually installing anything.
+
+Arguments:
+  PACKAGE           Package name in author/name format (e.g., elm/html)
+                     Multiple packages can be specified.
+
+Options:
+  --test             Show plan for test dependencies
+  --major            Allow major version upgrades (single package only)
+  --local-dev        Debug local development package installation
+  --from-path PATH   Path to local package (requires --local-dev)
+  -v, --verbose      Show detailed logging output (default)
+  -vv                Show extra verbose (trace) logging output
+  -q, --quiet        Suppress statistics output
+  -h, --help         Show this help message

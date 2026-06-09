@@ -1,0 +1,6 @@
+Usage: wrap debug registry_v1 list
+
+Display all packages in the registry.
+
+This command lists all packages and their versions currently
+registered in the V1 protocol registry.dat file.

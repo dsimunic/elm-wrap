@@ -16,13 +16,8 @@ Options:
   --upgrade-all                      # Allow upgrading production deps (with --test)
   --from-file PATH PACKAGE           # Install from local file/directory (single package only)
   --from-url URL PACKAGE             # Install from URL (single package only)
-  --local-dev [PATH] [PACKAGE[@VERSION]]
-                                     # Register a package for local development.
-                                     # Name/version are read from elm.json at PATH
-                                     # (or cwd). PACKAGE[@VERSION] overrides them.
-  --local-dev --from-path PATH [PACKAGE]
-                                     # Install local-dev PATH into the surrounding
-                                     # application. Requires an application elm.json.
+  --local-dev [--from-path PATH] [PACKAGE]
+                                     # Install package for local development
   -v, --verbose                      # Show progress reports (registry, connectivity)
   -q, --quiet                        # Suppress progress reports
   -y, --yes                          # Automatically confirm changes

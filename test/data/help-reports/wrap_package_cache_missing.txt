@@ -1,18 +1,28 @@
-Usage: wrap package cache missing [OPTIONS]
+Usage: wrap package cache missing [OPTIONS] [PATH]
 
 Download missing dependencies from elm.json to the cache.
 
-Reads elm.json from the current directory and identifies which
-dependencies are not yet downloaded. For applications, uses the
-exact versions specified. For packages, resolves version constraints
-to the latest matching version.
+Reads elm.json and identifies which dependencies are not yet downloaded.
+By default, downloads directly from GitHub for faster operation.
+
+Download Sources:
+  (default)         Download directly from GitHub
+  --from-github     Same as default (explicit flag for clarity)
+  --from-registry   Use package registry for metadata and download
+                    (required for package projects with version constraints)
 
 Options:
-  -y, --yes       Skip confirmation prompt and download immediately
-  -v, --verbose   Show detailed progress during download
-  -q, --quiet     Suppress progress messages
-  --help          Show this help message
+  -y, --yes         Skip confirmation prompt and download immediately
+  -v, --verbose     Show detailed progress during download
+  -q, --quiet       Suppress progress messages
+  --help            Show this help message
+
+Arguments:
+  PATH              Optional path to directory containing elm.json
+                    (defaults to current directory)
 
 Examples:
-  wrap package cache missing       # Show plan and prompt
-  wrap package cache missing -y    # Download without prompting
+  wrap package cache missing              # Download from GitHub (default)
+  wrap package cache missing -y           # Download without prompting
+  wrap package cache missing ./my-app     # Specify project path
+  wrap package cache missing --from-registry  # Use registry (for packages)

@@ -1,0 +1,10 @@
+Usage: wrap kit SUBCOMMAND [OPTIONS]
+
+Install a set of tools and packages from a kitfile manifest.
+
+Subcommands:
+  install PATH          Install the kit at PATH (a .kit file or a directory)
+  update --dry-run SRC  Verify a kit (URL, .kit file, or directory) is consumable
+
+Options:
+  -h, --help            Show this help message

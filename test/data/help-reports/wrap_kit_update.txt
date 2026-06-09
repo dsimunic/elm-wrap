@@ -1,0 +1,13 @@
+Usage: wrap kit update <KIT-URL|PATH> [--dry-run] [--yes] [--check-urls]
+
+Install, reinstall, or update a kit, tracking versions under
+$WRAP_HOME/kits/<KIT>/<VERSION> with a 'current' symlink.
+
+Arguments:
+  KIT-URL|PATH          A kit URL, a .kit file, or a directory containing one
+
+Options:
+  --dry-run             Verify only: parse and report, write nothing
+  -y, --yes             Skip the confirmation prompt
+  --check-urls          With --dry-run, probe each tool URL (HTTP HEAD)
+  -h, --help            Show this help message

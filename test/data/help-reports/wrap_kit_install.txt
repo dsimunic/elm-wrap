@@ -1,0 +1,14 @@
+Usage: wrap kit install PATH [OPTIONS]
+
+Install a kit (a manifest of tools and packages) from PATH.
+
+Arguments:
+  PATH                  A .kit file or a directory containing a single .kit file
+
+Options:
+  -y, --yes             Automatically confirm prompts
+      --dry-run         Verify only: parse and report, write nothing
+      --check-urls      With --dry-run, probe each tool URL (HTTP HEAD)
+  -h, --help            Show this help message
+
+Tool binaries are symlinked into ~/.local/bin (override with WRAP_TOOL_BIN_PATH).

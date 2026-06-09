@@ -1,0 +1,31 @@
+Usage: wrap package cache download-all [OPTIONS]
+
+Download all packages from the Elm registry to the local cache.
+
+Packages are downloaded directly from GitHub archives.
+
+This command will:
+  - Update registry.dat with latest package information
+  - Check each package version listed in the registry
+  - Skip packages listed in WRAP_HOME/blacklist.txt
+  - Download missing/broken packages from GitHub
+  - Fix broken packages (missing/empty src/) by re-downloading
+
+Blacklist format (one entry per line):
+  author/name           # Skip all versions
+  author/name@1.0.0     # Skip specific version
+  # Lines starting with # are comments
+
+Options:
+  -y, --yes         Skip confirmation prompt
+  -q, --quiet       Only show summary
+  -v, --verbose     Show detailed progress for each package
+  --dry-run         Show what would be downloaded without downloading
+  --latest-only     Only download the latest version of each package
+  --fail-log FILE   Write failed packages to FILE in blacklist format
+  --help            Show this help
+
+Examples:
+  wrap package cache download-all              # Download all packages
+  wrap package cache download-all --dry-run    # Preview what would download
+  wrap package cache download-all --latest-only # Only latest versions

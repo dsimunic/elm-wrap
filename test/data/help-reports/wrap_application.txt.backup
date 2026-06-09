@@ -1,0 +1,11 @@
+Usage: wrap application SUBCOMMAND [OPTIONS]
+
+Application management commands.
+
+Subcommands:
+  init [TEMPLATE]    Initialize a new Elm application (default: application)
+  info [PATH]        Display application information and upgrades
+  list-templates     List available application templates
+
+Options:
+  -h, --help         Show this help message

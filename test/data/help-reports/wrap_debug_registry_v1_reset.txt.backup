@@ -1,0 +1,12 @@
+Usage: wrap debug registry_v1 reset [--yes|-y]
+
+Delete registry.dat and re-download it.
+
+This command removes the local V1 protocol registry.dat file
+and its associated metadata (ETag, since count), then downloads
+a fresh copy from the registry server. This is useful when the
+local registry cache becomes corrupted or out of sync.
+
+Options:
+  -y, --yes    Assume yes for prompts (skip confirmation)
+  -h, --help   Show this help message

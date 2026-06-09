@@ -1,0 +1,14 @@
+Usage: wrap debug include-tree PATH
+
+Show import dependency tree for an Elm file or package at PATH.
+
+Arguments:
+  PATH       Path to an Elm file (.elm)
+             or a path to a package directory with elm.json
+
+For packages:
+  - Shows import tree for each exposed module
+  - Lists redundant files not imported by any exposed module
+
+Options:
+  -h, --help        Show this help message
