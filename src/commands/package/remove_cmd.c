@@ -11,6 +11,7 @@
 #include "../../shared/log.h"
 #include "../../cache.h"
 #include "../../terminal_colors.h"
+#include "../../plural.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -288,6 +289,11 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
         return 1;
     }
 
+    /* Number of requested packages demoted to indirect (vs. actually removed).
+     * Stays 0 for package-type projects and for pure removals; used both for
+     * the plan display and for the final success message. */
+    int demote_count = 0;
+
     /* For package-type projects: no direct/indirect distinction, just remove */
     if (elm_json->type != ELM_PROJECT_APPLICATION) {
         for (int i = 0; i < package_count; i++) {
@@ -404,7 +410,6 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
         }
 
         /* --- Display plan --- */
-        int demote_count = 0;
         for (int i = 0; i < package_count; i++) {
             if (targets[i].demote) demote_count++;
         }
@@ -551,11 +556,25 @@ save_and_finish:
         return 1;
     }
 
-    /* Print success message */
+    /* Print success message — reflect demotions vs. removals so the wording
+     * matches the plan we just carried out. */
+    int removed_count = package_count - demote_count;
     if (package_count == 1) {
-        printf("Successfully removed %s/%s!\n", authors[0], names[0]);
+        if (demote_count == 1) {
+            printf("Successfully demoted %s/%s to indirect!\n", authors[0], names[0]);
+        } else {
+            printf("Successfully removed %s/%s!\n", authors[0], names[0]);
+        }
+    } else if (demote_count == 0) {
+        printf("Successfully removed %d package%s!\n",
+               package_count, en_plural_suffix(package_count));
+    } else if (removed_count == 0) {
+        printf("Successfully demoted %d package%s to indirect!\n",
+               package_count, en_plural_suffix(package_count));
     } else {
-        printf("Successfully removed %d packages!\n", package_count);
+        printf("Successfully demoted %d package%s to indirect and removed %d package%s!\n",
+               demote_count, en_plural_suffix(demote_count),
+               removed_count, en_plural_suffix(removed_count));
     }
 
     /* If we're in a package directory that's being tracked for local-dev,
