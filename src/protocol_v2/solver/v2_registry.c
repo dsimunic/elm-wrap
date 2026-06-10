@@ -221,8 +221,21 @@ static bool parse_dependency_line(const char *line, char **package_name, char **
 
 /**
  * Add a package entry to the registry (with dynamic expansion).
+ *
+ * The same package may legitimately appear in several "package:" blocks of
+ * one index: registry-local-dev.dat gains one block per registered version,
+ * while its removal rewrite merges them. Returning the existing entry merges
+ * versions across such blocks; otherwise later blocks would be shadowed by
+ * v2_registry_find(), which returns the first match. In indexes where every
+ * package appears once (the zipped main index), this lookup never matches
+ * and entries are appended as before.
  */
 static V2PackageEntry *v2_registry_add_entry(V2Registry *registry, const char *author, const char *name) {
+    V2PackageEntry *existing = v2_registry_find(registry, author, name);
+    if (existing) {
+        return existing;
+    }
+
     if (registry->entry_count >= registry->entry_capacity) {
         size_t new_capacity = registry->entry_capacity * 2;
         V2PackageEntry *new_entries = arena_realloc(registry->entries, 

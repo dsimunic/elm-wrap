@@ -419,6 +419,55 @@ static void remove_local_dev_from_registry_dat(InstallEnv *env, const char *auth
 }
 
 /**
+ * True when `c` terminates a matched registry line: end of line (LF or CRLF
+ * content; the file is read in binary mode) or end of file.
+ */
+static bool registry_line_end(char c) {
+    return c == '\n' || c == '\r' || c == '\0';
+}
+
+/**
+ * Check whether registry-local-dev.dat content already lists author/name at
+ * `version`. The same package may appear in several "package:" blocks (one
+ * appended per registered version), and the removal rewrite merges versions
+ * under a single block, so every block of the package must be searched, not
+ * just the first. Matches are anchored at line ends so "a/b" does not match
+ * "a/b-extra" and "1.0.0" does not match "1.0.01".
+ */
+static bool text_registry_has_version(const char *content, const char *author,
+                                      const char *name, const char *version) {
+    char pkg_pattern[MAX_PACKAGE_NAME_LENGTH];
+    int pkg_len = snprintf(pkg_pattern, sizeof(pkg_pattern), "package: %s/%s",
+                           author, name);
+    char ver_pattern[MAX_VERSION_STRING_MEDIUM_LENGTH];
+    int ver_len = snprintf(ver_pattern, sizeof(ver_pattern), "version: %s",
+                           version);
+    if (pkg_len <= 0 || (size_t)pkg_len >= sizeof(pkg_pattern) ||
+        ver_len <= 0 || (size_t)ver_len >= sizeof(ver_pattern)) {
+        /* A truncated pattern could prefix-match a different entry; report
+         * "not found" so the entry is appended rather than silently lost. */
+        return false;
+    }
+
+    for (const char *pkg_pos = strstr(content, pkg_pattern);
+         pkg_pos != NULL;
+         pkg_pos = strstr(pkg_pos + 1, pkg_pattern)) {
+        if (!registry_line_end(pkg_pos[pkg_len])) {
+            continue; /* a different package whose name starts with ours */
+        }
+        const char *block_end = strstr(pkg_pos + 1, "package: ");
+        for (const char *ver_pos = strstr(pkg_pos, ver_pattern);
+             ver_pos != NULL && (block_end == NULL || ver_pos < block_end);
+             ver_pos = strstr(ver_pos + 1, ver_pattern)) {
+            if (registry_line_end(ver_pos[ver_len])) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
  * Register the local-dev package in the text registry file.
  * This file is used to track all local-dev packages regardless of protocol mode.
  * The file is stored in the local-dev tracking directory, not the V2 repository.
@@ -464,26 +513,7 @@ static bool register_local_dev_v2_text_registry(InstallEnv *env, const char *aut
     bool entry_exists = false;
 
     if (existing_content) {
-        char search_pattern[MAX_PACKAGE_NAME_LENGTH];
-        snprintf(search_pattern, sizeof(search_pattern), "package: %s/%s", author, name);
-        char *pkg_pos = strstr(existing_content, search_pattern);
-        if (pkg_pos) {
-            char version_pattern[MAX_VERSION_STRING_MEDIUM_LENGTH];
-            snprintf(version_pattern, sizeof(version_pattern), "version: %s", version);
-            char *next_pkg = strstr(pkg_pos + 1, "package: ");
-            if (next_pkg) {
-                size_t search_len = (size_t)(next_pkg - pkg_pos);
-                char *section = arena_malloc(search_len + 1);
-                if (section) {
-                    memcpy(section, pkg_pos, search_len);
-                    section[search_len] = '\0';
-                    entry_exists = strstr(section, version_pattern) != NULL;
-                    arena_free(section);
-                }
-            } else {
-                entry_exists = strstr(pkg_pos, version_pattern) != NULL;
-            }
-        }
+        entry_exists = text_registry_has_version(existing_content, author, name, version);
         arena_free(existing_content);
     }
 

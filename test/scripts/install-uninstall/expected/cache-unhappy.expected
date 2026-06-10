@@ -37,7 +37,9 @@ Examples:
   wrap package cache check elm/html              # Check cache status for elm/html
   wrap package cache check elm/html --fix-broken # Re-download broken versions
   wrap package cache full-scan                   # Scan all packages in cache
-  wrap package cache missing                     # Download all missing deps from elm.json
+  wrap package cache missing                     # Download missing deps from GitHub
+  wrap package cache missing ./my-app            # Specify project path
+  wrap package cache missing --from-registry     # Use registry (for packages)
   wrap package cache --from-file ./pkg elm/html  # Download from local directory
   wrap package cache --from-url URL elm/html     # Download from URL to cache
   wrap package cache --major elm/html            # Download highest major version
