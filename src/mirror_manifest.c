@@ -283,7 +283,7 @@ MirrorManifest* mirror_manifest_load_json(const char *path) {
             if (!pkg_key) continue;
 
             /* Parse "author/name" */
-            char *slash = strchr(pkg_key, '/');
+            const char *slash = strchr(pkg_key, '/');
             if (!slash) continue;
 
             size_t author_len = (size_t)(slash - pkg_key);
