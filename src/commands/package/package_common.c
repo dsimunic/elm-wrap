@@ -1377,7 +1377,10 @@ bool install_from_file(const char *source_path, InstallEnv *env, const char *aut
         return false;
     }
 
-    if (stat(dest_path, &st) == 0) {
+    if (lstat(dest_path, &st) == 0) {
+        /* lstat, not stat: dest_path may be a local-dev symlink into a source
+         * checkout. remove_directory_recursive unlinks such a symlink rather
+         * than recursing into (and deleting) the target. */
         if (!remove_directory_recursive(dest_path)) {
             fprintf(stderr, "Warning: Failed to remove existing directory: %s\n", dest_path);
         }

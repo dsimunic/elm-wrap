@@ -496,13 +496,15 @@ bool move_directory_contents(const char *src_dir, const char *dest_dir) {
 
 bool remove_directory_recursive(const char *path) {
     struct stat st;
-    if (stat(path, &st) != 0) {
+    if (lstat(path, &st) != 0) {
         /* Path doesn't exist, consider it success */
         return true;
     }
 
     if (!S_ISDIR(st.st_mode)) {
-        /* It's a file, just delete it */
+        /* It's a file or a symlink: unlink the entry itself, never follow a
+         * symlink into its target (which could be outside the cache, e.g. a
+         * local-dev symlink into a source checkout). */
         return unlink(path) == 0;
     }
 

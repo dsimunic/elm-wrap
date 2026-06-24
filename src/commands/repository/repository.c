@@ -643,6 +643,12 @@ static void insert_app_dependencies_for_path(Rulr *rulr, const char *app_path) {
  * Recursively remove a directory and its contents.
  */
 static bool remove_directory_recursive_local(const char *path) {
+    /* Never follow a symlink: unlink the link itself, not its target. */
+    struct stat lst;
+    if (lstat(path, &lst) == 0 && S_ISLNK(lst.st_mode)) {
+        return unlink(path) == 0;
+    }
+
     DIR *dir = opendir(path);
     if (!dir) {
         return unlink(path) == 0;
@@ -664,7 +670,7 @@ static bool remove_directory_recursive_local(const char *path) {
         snprintf(sub_path, sub_len, "%s/%s", path, entry->d_name);
 
         struct stat st;
-        if (stat(sub_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+        if (lstat(sub_path, &st) == 0 && S_ISDIR(st.st_mode)) {
             ok = remove_directory_recursive_local(sub_path);
         } else {
             ok = unlink(sub_path) == 0;
