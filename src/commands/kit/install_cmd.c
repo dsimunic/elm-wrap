@@ -1376,8 +1376,20 @@ static bool install_one_local_dev(const KitManifest *m, InstallEnv *env,
         return false;
     }
     if (!path_is_directory(src)) {
-        set_err(err, err_size, "path not found: %s", src);
-        return false;
+        /* Fallback to a source-checkout layout that omits the compiler-version
+         * segment: packages/AUTHOR/NAME/VERSION. The elm-run monorepo lays out
+         * its in-tree packages this way, unlike a published kit which uses
+         * packages/ELM_VERSION/AUTHOR/NAME/VERSION. */
+        int n2 = snprintf(src, sizeof(src), "%s/packages/%s/%s/%s",
+                          m->kitfile_dir, ld->author, ld->name, ld->version);
+        if (n2 <= 0 || (size_t)n2 >= sizeof(src)) {
+            set_err(err, err_size, "path too long");
+            return false;
+        }
+        if (!path_is_directory(src)) {
+            set_err(err, err_size, "path not found: %s", src);
+            return false;
+        }
     }
     char elm_json[PATH_MAX];
     int en = snprintf(elm_json, sizeof(elm_json), "%s/elm.json", src);
