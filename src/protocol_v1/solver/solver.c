@@ -94,6 +94,34 @@ static bool solver_add_upgradable_root_dependency(
     return true;
 }
 
+static bool solver_add_any_root_dependency(
+    PgElmContext *ctx,
+    const char *author,
+    const char *name,
+    const char *context_label
+) {
+    if (!ctx || !author || !name) {
+        return false;
+    }
+
+    PgPackageId pkg_id = pg_elm_intern_package(ctx, author, name);
+    if (pkg_id < 0) {
+        log_error("Failed to intern package %s/%s for %s",
+                author,
+                name,
+                context_label ? context_label : "root");
+        return false;
+    }
+
+    if (!pg_elm_add_root_dependency(ctx, pkg_id, pg_range_any())) {
+        log_error("Failed to add unconstrained root dependency for %s/%s",
+                author,
+                name);
+        return false;
+    }
+    return true;
+}
+
 /* Add dependencies with exact version constraints */
 static bool solver_add_exact_map_dependencies(
     PgElmContext *ctx,
@@ -133,6 +161,27 @@ static bool solver_add_upgradable_map_dependencies(
                 pkg->author,
                 pkg->name,
                 pkg->version,
+                label)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool solver_add_any_map_dependencies(
+    PgElmContext *ctx,
+    PackageMap *map,
+    const char *label
+) {
+    if (!map) {
+        return true;
+    }
+    for (int i = 0; i < map->count; i++) {
+        Package *pkg = &map->packages[i];
+        if (!solver_add_any_root_dependency(
+                ctx,
+                pkg->author,
+                pkg->name,
                 label)) {
             return false;
         }
@@ -349,7 +398,8 @@ static bool build_roots_strategy_cross_major_for_target(
     const ElmJson *elm_json,
     const char *target_author,
     const char *target_name,
-    bool include_test
+    bool include_test,
+    bool include_prod_as_any
 ) {
     (void)target_author; /* Unused - target already added before this function */
     (void)target_name;
@@ -357,17 +407,36 @@ static bool build_roots_strategy_cross_major_for_target(
     /* For cross-major upgrades, use MINIMAL root constraints.
      * The target package was already added with `any` range before this function.
      * For other packages:
-     * - Direct dependencies: DON'T add as roots, let solver pick compatible versions
+     * - Direct dependencies: DON'T add as roots, let solver pick compatible versions,
+     *   except install --test --upgrade-all where production deps are kept as
+     *   unconstrained roots so the plan can validate and upgrade them.
      * - Test dependencies: Keep exact to avoid unnecessary test changes
      *
      * This gives the solver maximum flexibility to find versions that work
      * together with the new major version of the target package.
      */
 
-    log_debug("Cross-major strategy: skipping direct/indirect dependencies, only constraining tests");
+    if (include_prod_as_any) {
+        log_debug("Cross-major strategy: production dependencies unconstrained, tests exact");
+    } else {
+        log_debug("Cross-major strategy: skipping direct/indirect dependencies, only constraining tests");
+    }
+
+    bool ok = true;
+    if (include_prod_as_any) {
+        ok = ok && solver_add_any_map_dependencies(
+            pg_ctx,
+            elm_json->dependencies_direct,
+            "dependencies_direct"
+        );
+        ok = ok && solver_add_any_map_dependencies(
+            pg_ctx,
+            elm_json->dependencies_indirect,
+            "dependencies_indirect"
+        );
+    }
 
     /* Add test dependencies with exact constraints to avoid unnecessary changes */
-    bool ok = true;
     if (include_test) {
         ok = ok && solver_add_exact_map_dependencies(
             pg_ctx,
@@ -465,7 +534,14 @@ SolverResult run_with_strategy_v1(
                 break;
             case STRATEGY_CROSS_MAJOR_FOR_TARGET:
                 log_debug("Trying strategy: cross-major upgrade for %s/%s", author, name);
-                root_ok = build_roots_strategy_cross_major_for_target(pg_ctx, elm_json, author, name, include_test);
+                root_ok = build_roots_strategy_cross_major_for_target(
+                    pg_ctx,
+                    elm_json,
+                    author,
+                    name,
+                    include_test,
+                    is_test_dependency && upgrade_all
+                );
                 break;
         }
     } else {
@@ -732,15 +808,30 @@ SolverResult solver_upgrade_all_v1(
     bool root_ok = true;
     if (elm_json->type == ELM_PROJECT_APPLICATION) {
         if (major_upgrade) {
-            /* For major upgrades, allow any version */
+            /* For major upgrades, keep existing dependencies as roots but allow
+             * any compatible version. Without roots, PubGrub solves an empty
+             * project and reports no upgrades. */
             log_debug("Allowing major upgrades for all packages");
-            /* Don't add any root constraints - let solver pick latest versions.
-             * We rely on the registry/provider to expose only package versions that
-             * are compatible with the current Elm compiler version (via ELM_HOME
-             * being versioned per compiler), so the solver itself only ever sees
-             * compatible packages here.
-             */
-            root_ok = true;
+            root_ok = solver_add_any_map_dependencies(
+                pg_ctx,
+                elm_json->dependencies_direct,
+                "dependencies_direct"
+            );
+            root_ok = root_ok && solver_add_any_map_dependencies(
+                pg_ctx,
+                elm_json->dependencies_indirect,
+                "dependencies_indirect"
+            );
+            root_ok = root_ok && solver_add_any_map_dependencies(
+                pg_ctx,
+                elm_json->dependencies_test_direct,
+                "dependencies_test_direct"
+            );
+            root_ok = root_ok && solver_add_any_map_dependencies(
+                pg_ctx,
+                elm_json->dependencies_test_indirect,
+                "dependencies_test_indirect"
+            );
         } else {
             /* For minor upgrades, use upgradable within major strategy */
             log_debug("Using upgradable within major version strategy");

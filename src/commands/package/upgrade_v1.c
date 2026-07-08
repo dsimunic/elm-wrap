@@ -144,6 +144,42 @@ static bool apply_change_preserving_location(
                                              elm_json->type == ELM_PROJECT_APPLICATION);
 }
 
+static bool prune_orphaned_indirect_dependencies(ElmJson *elm_json, InstallEnv *env) {
+    if (!elm_json || !env || elm_json->type != ELM_PROJECT_APPLICATION) {
+        return true;
+    }
+
+    PackageMap *orphaned = NULL;
+    if (!find_orphaned_packages(elm_json, env->cache, NULL, NULL, 0, &orphaned)) {
+        return false;
+    }
+
+    if (!orphaned) {
+        return true;
+    }
+
+    for (int i = 0; i < orphaned->count; i++) {
+        Package *pkg = &orphaned->packages[i];
+
+        if (elm_json->dependencies_indirect &&
+            package_map_find(elm_json->dependencies_indirect, pkg->author, pkg->name)) {
+            log_debug("Removing orphaned indirect dependency after upgrade: %s/%s",
+                      pkg->author, pkg->name);
+            package_map_remove(elm_json->dependencies_indirect, pkg->author, pkg->name);
+        }
+
+        if (elm_json->dependencies_test_indirect &&
+            package_map_find(elm_json->dependencies_test_indirect, pkg->author, pkg->name)) {
+            log_debug("Removing orphaned test-indirect dependency after upgrade: %s/%s",
+                      pkg->author, pkg->name);
+            package_map_remove(elm_json->dependencies_test_indirect, pkg->author, pkg->name);
+        }
+    }
+
+    package_map_free(orphaned);
+    return true;
+}
+
 int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv *env,
                               bool major_upgrade, bool major_ignore_test, bool auto_yes) {
     char *author = NULL;
@@ -512,6 +548,15 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
 
     log_debug("Resolving dependencies for %s/%s upgrade to %s", author, name, latest_version);
 
+    Version resolved_upgrade_version;
+    if (!version_parse_safe(latest_version, &resolved_upgrade_version)) {
+        fprintf(stderr, "Error: Invalid version format: %s\n", latest_version);
+        arena_free((char*)latest_version);
+        arena_free(author);
+        arena_free(name);
+        return 1;
+    }
+
     SolverState *solver = solver_init(env, install_env_solver_online(env));
     if (!solver) {
         log_error("Failed to initialize solver");
@@ -526,7 +571,16 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
                     package_map_find(elm_json->dependencies_test_indirect, author, name) != NULL ||
                     package_map_find(elm_json->package_test_dependencies, author, name) != NULL);
 
-    SolverResult result = solver_add_package(solver, elm_json, author, name, NULL, is_test, major_upgrade, false, &out_plan);
+    const Version *solver_target_version = major_upgrade ? NULL : &resolved_upgrade_version;
+    SolverResult result = solver_add_package(solver,
+                                             elm_json,
+                                             author,
+                                             name,
+                                             solver_target_version,
+                                             is_test,
+                                             major_upgrade,
+                                             false,
+                                             &out_plan);
 
     solver_free(solver);
 
@@ -724,6 +778,15 @@ int upgrade_single_package_v1(const char *package, ElmJson *elm_json, InstallEnv
             arena_free(name);
             return 1;
         }
+    }
+
+    if (!prune_orphaned_indirect_dependencies(elm_json, env)) {
+        log_error("Failed to prune orphaned dependencies after upgrade");
+        install_plan_free(out_plan);
+        arena_free((char*)latest_version);
+        arena_free(author);
+        arena_free(name);
+        return 1;
     }
 
     printf("Saving elm.json...\n");

@@ -8,6 +8,7 @@
 #ifndef PROTOCOL_V1_INSTALL_H
 #define PROTOCOL_V1_INSTALL_H
 
+#include "../elm_json.h"
 #include "../install_env.h"
 
 /**
@@ -25,6 +26,14 @@
 bool v1_package_depends_on(const char *pkg_author, const char *pkg_name, const char *pkg_version,
                            const char *target_author, const char *target_name,
                            InstallEnv *env);
+
+/**
+ * Check if a package transitively depends on another package.
+ * Uses cache to read package elm.json files, downloading if necessary.
+ */
+bool v1_package_depends_on_transitively(const char *pkg_author, const char *pkg_name, const char *pkg_version,
+                                        const char *target_author, const char *target_name,
+                                        InstallEnv *env);
 
 /**
  * Return the version constraint that pkg declares on target (e.g.
@@ -47,5 +56,27 @@ char *v1_package_dependency_constraint(const char *pkg_author, const char *pkg_n
  */
 int v1_show_package_dependencies(const char *author, const char *name, const char *version,
                                  InstallEnv *env);
+
+/**
+ * Detect and report package dependency cycles reachable from a V1 package.
+ *
+ * @param author Package author
+ * @param name Package name
+ * @param version Exact package version
+ * @param env Install environment with cache and V1 registry access
+ * @return Number of cycles reported, 0 when none were found
+ */
+int v1_report_package_cycles(const char *author, const char *name, const char *version,
+                             InstallEnv *env);
+
+/**
+ * Detect and report V1 package dependency cycles reachable from an elm.json.
+ * Package dependency ranges are resolved against the V1 registry before scanning.
+ *
+ * @param elm_json Project elm.json to scan
+ * @param env Install environment with cache and V1 registry access
+ * @return Number of cycles reported, 0 when none were found
+ */
+int v1_report_project_package_cycles(ElmJson *elm_json, InstallEnv *env);
 
 #endif /* PROTOCOL_V1_INSTALL_H */

@@ -17,6 +17,54 @@ get_v1_since_count() {
     echo "$out" | awk -F': ' '/^Since count: /{print $2; exit}'
 }
 
+ensure_fake_elm_compiler() {
+    local fake_dir="$TEST_ROOT/fake-elm-bin"
+    local fake_elm="$fake_dir/elm"
+
+    if [[ ! -x "$fake_elm" ]]; then
+        mkdir -p "$fake_dir"
+        cat > "$fake_elm" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${1:-}" == "--version" ]]; then
+    echo "0.19.1"
+    exit 0
+fi
+
+report_json=false
+broken_module=false
+
+for arg in "$@"; do
+    if [[ "$arg" == "--report=json" ]]; then
+        report_json=true
+    fi
+    if [[ "$arg" == *"BrokenModule.elm"* ]]; then
+        broken_module=true
+    fi
+done
+
+if [[ "$broken_module" == true ]]; then
+    if [[ "$report_json" == true ]]; then
+        printf '{"type":"compile-errors","errors":[{"path":"src/BrokenModule.elm","name":"TYPE MISMATCH","problems":[]}]}\n'
+    else
+        cat <<'ERR'
+-- TYPE MISMATCH ------------------------------------------------ src/BrokenModule.elm
+
+The value does not match the annotation.
+ERR
+    fi
+    exit 1
+fi
+
+exit 0
+EOF
+        chmod +x "$fake_elm"
+    fi
+
+    export WRAP_ELM_COMPILER_PATH="$fake_elm"
+}
+
 # LOCAL-01: Initialize package with local-dev and install to app
 test_local_01_init_and_install() {
     local since_before since_after delta
@@ -253,6 +301,67 @@ EOF
     echo
 }
 
+# LOCAL-07: Package uninstall ignores local-dev PATH metadata
+test_local_07_package_uninstall_ignores_path_metadata() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
+    echo "=== BEGIN LOCAL-07: Package uninstall ignores local-dev PATH metadata ==="
+
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/local-prune-self" "testauthor/local-prune-self")
+
+    cd "$pkg_dir"
+    run_wrap install --local-dev
+
+    cat > elm.json << 'EOF'
+{
+    "type": "package",
+    "name": "testauthor/local-prune-self",
+    "version": "1.0.0",
+    "license": "BSD-3-Clause",
+    "summary": "Test package",
+    "exposed-modules": [],
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.0 <= v < 2.0.0",
+        "wrap/package-single-no-deps": "1.0.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {}
+}
+EOF
+
+    local output
+    output=$(run_wrap package uninstall wrap/package-single-no-deps)
+    echo "$output"
+
+    if [[ "$output" == *"dependent application"* || "$output" == *"dependent application(s)"* ]]; then
+        echo "ERROR: Package-local uninstall should not report dependent applications from PATH metadata"
+        exit 1
+    fi
+
+    if [[ "$output" == *"Failed to read application elm.json"* ]]; then
+        echo "ERROR: Package-local uninstall tried to prune the package source path as an application"
+        exit 1
+    fi
+
+    if [[ "$output" != *"Successfully removed wrap/package-single-no-deps!"* ]]; then
+        echo "ERROR: Expected dependency removal to succeed"
+        exit 1
+    fi
+
+    if grep -Fq '"wrap/package-single-no-deps"' "$pkg_dir/elm.json"; then
+        echo "ERROR: Dependency was not removed from package elm.json"
+        exit 1
+    fi
+
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    echo "=== END LOCAL-07 ==="
+    echo
+}
+
 # ERR-01: Install with --local-dev --from-path with non-existent path
 test_err_01_local_dev_nonexistent_path() {
     local since_before since_after delta
@@ -347,6 +456,7 @@ test_err_03_from_path_without_local_dev() {
 test_make_01_compile_success() {
     local since_before since_after delta
     since_before=$(get_v1_since_count)
+    ensure_fake_elm_compiler
 
     echo "=== BEGIN MAKE-01: Local-dev package compiles successfully with make ==="
 
@@ -422,6 +532,7 @@ EOF
 test_make_02_compile_error() {
     local since_before since_after delta
     since_before=$(get_v1_since_count)
+    ensure_fake_elm_compiler
 
     echo "=== BEGIN MAKE-02: Local-dev package with compilation error ==="
 
@@ -510,6 +621,7 @@ EOF
 test_make_03_no_local_dev() {
     local since_before since_after delta
     since_before=$(get_v1_since_count)
+    ensure_fake_elm_compiler
 
     echo "=== BEGIN MAKE-03: Application without local-dev packages ==="
 
@@ -562,6 +674,7 @@ main() {
     test_err_02_local_dev_multiple_packages
     test_err_03_from_path_without_local_dev
     test_local_06_registry_since_count
+    test_local_07_package_uninstall_ignores_path_metadata
     test_make_01_compile_success
     test_make_02_compile_error
     test_make_03_no_local_dev

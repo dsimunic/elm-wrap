@@ -11,15 +11,15 @@ I cannot remove these requested packages:
 Please fix the specification and try again.
 
 I didn't remove anything yet, as I can only remove all specified packages or none.
-[Registry since-count: 30 -> 30 (Δ0)]
+[Registry since-count: 34 -> 34 (Δ0)]
 === END ERR-01 ===
 
 === BEGIN ERR-02: Uninstall package not in dependencies ===
 Here is my plan:
-  
+
   Add:
     wrap/package-single-no-deps    1.0.0
-  
+
 Saving elm.json...
 Successfully installed wrap/package-single-no-deps!
 -- PACKAGE REMOVAL FAILED -----------------------------------------------------
@@ -31,3 +31,22 @@ I cannot remove these requested packages:
 Please fix the specification and try again.
 
 I didn't remove anything yet, as I can only remove all specified packages or none.
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END ERR-02 ===
+
+=== BEGIN ERR-03: Try to uninstall elm/core ===
+Here is my plan:
+
+  Demote to indirect:
+    elm/core    1.0.5
+
+Saving elm.json...
+Successfully demoted elm/core to indirect!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END ERR-03 ===
+
+
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END ===
+
+All uninstall-unhappy tests completed successfully

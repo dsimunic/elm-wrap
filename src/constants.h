@@ -135,6 +135,12 @@
 /* Maximum length of a dependency version/constraint string from elm.json. */
 #define MAX_ELM_JSON_VERSION_VALUE_LENGTH MAX_RANGE_STRING_LENGTH
 
+/* Maximum package graph recursion depth for cycle diagnostics. */
+#define MAX_PACKAGE_CYCLE_DEPTH 256
+
+/* Maximum package dependency cycles to print in one diagnostic pass. */
+#define MAX_PACKAGE_CYCLE_REPORTS 3
+
 /* PubGrub solve-loop budgets (DoS protection). */
 #define PG_MAX_DECISIONS 200000
 #define PG_MAX_PROPAGATIONS 1000000

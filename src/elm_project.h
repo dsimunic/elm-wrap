@@ -8,6 +8,8 @@
 #ifndef ELM_PROJECT_H
 #define ELM_PROJECT_H
 
+#include <stdbool.h>
+
 /**
  * Parse exposed-modules from elm.json.
  * 
@@ -69,5 +71,19 @@ void elm_collect_all_files(const char *dir_path, char ***files, int *count, int 
  * @return 1 if found, 0 otherwise
  */
 int elm_is_file_in_list(const char *file, char **list, int count);
+
+/**
+ * Validate that every exposed module in a package elm.json exists under src/.
+ *
+ * @param package_dir Package root directory
+ * @param elm_json_path Path to the package elm.json file
+ * @param package_label Human-readable package label for diagnostics
+ * @return true when all exposed modules have matching source files
+ */
+bool elm_validate_package_exposed_modules(
+    const char *package_dir,
+    const char *elm_json_path,
+    const char *package_label
+);
 
 #endif /* ELM_PROJECT_H */

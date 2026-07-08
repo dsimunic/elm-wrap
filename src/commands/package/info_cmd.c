@@ -242,6 +242,53 @@ static void print_dependencies_section(const ElmJson *elm_json, size_t max_name_
     user_message("\n");
 }
 
+static void report_local_package_cycles_with_env(ElmJson *elm_json, InstallEnv *env) {
+    if (!elm_json ||
+        !env ||
+        env->protocol_mode != PROTOCOL_V1) {
+        return;
+    }
+
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        (void)v1_report_project_package_cycles(elm_json, env);
+        return;
+    }
+
+    if (elm_json->type != ELM_PROJECT_PACKAGE ||
+        !elm_json->package_name ||
+        !elm_json->package_version ||
+        version_is_constraint(elm_json->package_version)) {
+        return;
+    }
+
+    char *author = NULL;
+    char *name = NULL;
+    if (!parse_package_name_silent(elm_json->package_name, &author, &name)) {
+        return;
+    }
+
+    (void)v1_report_package_cycles(author, name, elm_json->package_version, env);
+    arena_free(author);
+    arena_free(name);
+}
+
+static void report_local_package_cycles(ElmJson *elm_json) {
+    if (!elm_json || global_context_is_v2()) {
+        return;
+    }
+
+    InstallEnv *env = install_env_create();
+    if (!env) {
+        return;
+    }
+
+    if (install_env_init(env)) {
+        report_local_package_cycles_with_env(elm_json, env);
+    }
+
+    install_env_free(env);
+}
+
 static bool is_package_name_format(const char *str) {
     if (!str || str[0] == '\0') {
         return false;
@@ -807,6 +854,7 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
 
         size_t max_name_len = get_max_dependency_name_len(elm_json);
         print_dependencies_section(elm_json, max_name_len);
+        report_local_package_cycles(elm_json);
         elm_json_free(elm_json);
         return 0;
     }
@@ -896,6 +944,7 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
         }
 
         print_dependencies_section(elm_json, max_name_len);
+        report_local_package_cycles_with_env(elm_json, env);
 
         validate_dependency_completeness(elm_json, env->cache);
 

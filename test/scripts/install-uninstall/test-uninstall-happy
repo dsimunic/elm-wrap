@@ -140,7 +140,7 @@ test_app_04_uninstall_direct_still_needed_indirect() {
     run_wrap package uninstall wrap/dep-single-no-deps
     
     # Verify it's no longer direct but still indirect
-    assert_no_dep "wrap/dep-single-no-deps" "$app_dir"  # Not direct anymore
+    assert_no_direct_dep "wrap/dep-single-no-deps" "$app_dir"  # Not direct anymore
     assert_indirect_dep "wrap/dep-single-no-deps" "1.0.0" "$app_dir"  # Still indirect
     
     since_after=$(get_v1_since_count)
@@ -175,6 +175,58 @@ test_app_05_uninstall_test_dependency() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-05 ==="
+    echo
+}
+
+# APP-06: Uninstall package from application with dependency cycle
+test_app_06_uninstall_cycle_from_application() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
+    echo "=== BEGIN APP-06: Uninstall package cycle from application ==="
+
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/app06" "app06")
+
+    cat >"$app_dir/elm.json" <<'EOF'
+{
+    "type": "application",
+    "source-directories": [
+        "src"
+    ],
+    "elm-version": "0.19.1",
+    "dependencies": {
+        "direct": {
+            "elm/browser": "1.0.2",
+            "elm/core": "1.0.5",
+            "elm/html": "1.0.1",
+            "elm/url": "1.0.0",
+            "wrap/cycle-a": "1.0.0"
+        },
+        "indirect": {
+            "elm/json": "1.1.4",
+            "elm/time": "1.0.0",
+            "elm/virtual-dom": "1.0.5",
+            "wrap/cycle-b": "1.0.0"
+        }
+    },
+    "test-dependencies": {
+        "direct": {},
+        "indirect": {}
+    }
+}
+EOF
+
+    cd "$app_dir"
+    run_wrap package uninstall wrap/cycle-a
+
+    assert_no_dep "wrap/cycle-a" "$app_dir"
+    assert_no_dep "wrap/cycle-b" "$app_dir"
+
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    echo "=== END APP-06 ==="
     echo
 }
 
@@ -232,6 +284,48 @@ test_pkg_02_uninstall_with_deps_from_package() {
     echo
 }
 
+# PKG-03: Uninstall package from package elm.json with dependency cycle
+test_pkg_03_uninstall_cycle_from_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
+    echo "=== BEGIN PKG-03: Uninstall package cycle from package ==="
+
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/pkg03" "wrap/cycle-a")
+
+    cat >"$pkg_dir/elm.json" <<'EOF'
+{
+    "type": "package",
+    "name": "wrap/cycle-a",
+    "summary": "Cycle test package",
+    "license": "BSD-3-Clause",
+    "version": "1.0.0",
+    "exposed-modules": [],
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.0 <= v < 2.0.0",
+        "wrap/cycle-b": "1.0.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {}
+}
+EOF
+
+    cd "$pkg_dir"
+    run_wrap package uninstall wrap/cycle-b
+
+    if grep -Fq '"wrap/cycle-b"' "$pkg_dir/elm.json"; then
+        echo "ERROR: Uninstall did not remove wrap/cycle-b from package elm.json"
+        exit 1
+    fi
+
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    echo "=== END PKG-03 ==="
+    echo
+}
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -247,8 +341,10 @@ main() {
     test_app_03_uninstall_keeping_shared
     test_app_04_uninstall_direct_still_needed_indirect
     test_app_05_uninstall_test_dependency
+    test_app_06_uninstall_cycle_from_application
     test_pkg_01_uninstall_single_from_package
     test_pkg_02_uninstall_with_deps_from_package
+    test_pkg_03_uninstall_cycle_from_package
     
     local since_after delta
     since_after=$(get_v1_since_count)

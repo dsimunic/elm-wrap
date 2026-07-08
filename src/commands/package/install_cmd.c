@@ -8,6 +8,7 @@
 #include "../../solver.h"
 #include "../../install_env.h"
 #include "../../registry.h"
+#include "../../protocol_v1/install.h"
 #include "../../protocol_v2/solver/v2_registry.h"
 #include "../../http_client.h"
 #include "../../alloc.h"
@@ -158,7 +159,7 @@ static void print_target_version_conflict(const char *author, const char *name, 
         log_progress("");
         log_progress("  1. Try a different version");
         log_progress("  2. Upgrade conflicting packages first");
-        log_progress("  3. Use --major to allow major version upgrades of dependencies");
+        log_progress("  3. Use 'wrap package upgrade --major' to upgrade dependencies across majors");
         log_set_level(old_level);
     }
 }
@@ -245,6 +246,172 @@ static bool create_pin_file(const char *pkg_path, const char *version) {
     fclose(pin_file);
     arena_free(pin_path);
     return true;
+}
+
+static const char *find_plan_new_version(const InstallPlan *plan,
+                                         const char *author,
+                                         const char *name) {
+    if (!plan || !author || !name) {
+        return NULL;
+    }
+
+    for (int i = 0; i < plan->count; i++) {
+        const PackageChange *change = &plan->changes[i];
+        if (change->new_version &&
+            strcmp(change->author, author) == 0 &&
+            strcmp(change->name, name) == 0) {
+            return change->new_version;
+        }
+    }
+
+    return NULL;
+}
+
+static bool reject_v1_package_cycle_for_exact_version(InstallEnv *env,
+                                                      const char *author,
+                                                      const char *name,
+                                                      const char *version) {
+    if (!env ||
+        env->protocol_mode != PROTOCOL_V1 ||
+        !author ||
+        !name ||
+        !version ||
+        version_is_constraint(version)) {
+        return false;
+    }
+
+    int cycle_count = v1_report_package_cycles(author, name, version, env);
+    if (cycle_count > 0) {
+        log_error("Cannot install %s/%s because it has a package dependency cycle", author, name);
+        return true;
+    }
+
+    return false;
+}
+
+static bool reject_v1_package_cycle_with_project(InstallEnv *env,
+                                                 ElmJson *elm_json,
+                                                 const char *author,
+                                                 const char *name,
+                                                 const char *version) {
+    if (reject_v1_package_cycle_for_exact_version(env, author, name, version)) {
+        return true;
+    }
+
+    if (!env ||
+        env->protocol_mode != PROTOCOL_V1 ||
+        !elm_json ||
+        elm_json->type != ELM_PROJECT_PACKAGE ||
+        !elm_json->package_name ||
+        !author ||
+        !name ||
+        !version ||
+        version_is_constraint(version)) {
+        return false;
+    }
+
+    char *current_author = NULL;
+    char *current_name = NULL;
+    if (!parse_package_name_silent(elm_json->package_name, &current_author, &current_name)) {
+        return false;
+    }
+
+    bool closes_cycle = (strcmp(author, current_author) == 0 &&
+                         strcmp(name, current_name) == 0);
+    if (!closes_cycle) {
+        closes_cycle = v1_package_depends_on_transitively(author,
+                                                          name,
+                                                          version,
+                                                          current_author,
+                                                          current_name,
+                                                          env);
+    }
+
+    if (closes_cycle) {
+        log_error("Cannot install %s/%s because it would create a package dependency cycle with %s/%s",
+                  author,
+                  name,
+                  current_author,
+                  current_name);
+    }
+
+    arena_free(current_author);
+    arena_free(current_name);
+    return closes_cycle;
+}
+
+static char *single_v1_registry_version_for_package(InstallEnv *env,
+                                                    const char *author,
+                                                    const char *name) {
+    if (!env || env->protocol_mode != PROTOCOL_V1 || !env->registry || !author || !name) {
+        return NULL;
+    }
+
+    RegistryEntry *entry = registry_find(env->registry, author, name);
+    if (!entry || entry->version_count != 1) {
+        return NULL;
+    }
+
+    return version_to_string(&entry->versions[0]);
+}
+
+static bool reject_v1_package_cycle_before_solve(InstallEnv *env,
+                                                 ElmJson *elm_json,
+                                                 const PackageInstallSpec *spec) {
+    if (!env || !spec || env->protocol_mode != PROTOCOL_V1) {
+        return false;
+    }
+
+    char *version = NULL;
+    if (spec->has_version) {
+        version = version_to_string(&spec->version);
+    } else {
+        version = single_v1_registry_version_for_package(env, spec->author, spec->name);
+    }
+
+    if (!version) {
+        return false;
+    }
+
+    bool rejected = reject_v1_package_cycle_with_project(env, elm_json, spec->author, spec->name, version);
+    arena_free(version);
+    return rejected;
+}
+
+static bool reject_v1_package_cycle_for_install(InstallEnv *env,
+                                                const InstallPlan *plan,
+                                                ElmJson *elm_json,
+                                                const PackageInstallSpec *spec) {
+    if (!env || !spec) {
+        return false;
+    }
+
+    const char *version = NULL;
+    if (plan) {
+        version = find_plan_new_version(plan, spec->author, spec->name);
+    }
+    Package *existing = NULL;
+
+    if (!version && elm_json) {
+        existing = find_existing_package(elm_json, spec->author, spec->name);
+        if (existing && existing->version && !version_is_constraint(existing->version)) {
+            version = existing->version;
+        }
+    }
+
+    char *target_version = NULL;
+    if (!version && spec->has_version) {
+        target_version = version_to_string(&spec->version);
+        version = target_version;
+    }
+
+    bool rejected = reject_v1_package_cycle_with_project(env, elm_json, spec->author, spec->name, version);
+
+    if (target_version) {
+        arena_free(target_version);
+    }
+
+    return rejected;
 }
 
 static int install_package(const PackageInstallSpec *spec, bool is_test, bool major_upgrade, bool upgrade_all, bool auto_yes, ElmJson *elm_json, InstallEnv *env, const char *elm_json_path) {
@@ -447,6 +614,10 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
         return 1;
     }
 
+    if (reject_v1_package_cycle_before_solve(env, elm_json, spec)) {
+        return 1;
+    }
+
     SolverState *solver = solver_init(env, install_env_solver_online(env));
     if (!solver) {
         log_error("Failed to initialize solver");
@@ -497,6 +668,11 @@ static int install_package(const PackageInstallSpec *spec, bool is_test, bool ma
                 break;
         }
 
+        return 1;
+    }
+
+    if (reject_v1_package_cycle_for_install(env, out_plan, elm_json, spec)) {
+        install_plan_free(out_plan);
         return 1;
     }
 
@@ -797,6 +973,12 @@ static int install_multiple_packages(
         }
     }
 
+    for (int i = 0; i < specs_count; i++) {
+        if (reject_v1_package_cycle_before_solve(env, elm_json, &specs[i])) {
+            return 1;
+        }
+    }
+
     log_debug("Installing %d packages%s", specs_count, is_test ? " (test dependencies)" : "");
 
     /*
@@ -938,6 +1120,16 @@ static int install_multiple_packages(
 
     if (validation) multi_package_validation_free(validation);
     arena_free(to_solve);
+
+    for (int i = 0; i < specs_count; i++) {
+        if (reject_v1_package_cycle_for_install(env, out_plan, elm_json, &specs[i])) {
+            if (out_plan) {
+                install_plan_free(out_plan);
+            }
+            arena_free(promotions);
+            return 1;
+        }
+    }
 
     /* Prepare plan display */
     int add_count = 0;
@@ -1184,7 +1376,6 @@ static int install_multiple_packages(
 
 int cmd_install(int argc, char *argv[]) {
     bool is_test = false;
-    bool major_upgrade = false;
     bool upgrade_all = false;
     bool auto_yes = false;
     bool cmd_verbose = false;
@@ -1465,6 +1656,16 @@ int cmd_install(int argc, char *argv[]) {
             /* Existing --from-path behavior: install PATH as a dependency into the
              * application elm.json found above. A positional PACKAGE[@VERSION] (if
              * present) is forwarded to install_local_dev for validation. */
+            if (ld_positionals_count > 1) {
+                log_error("--local-dev --from-path accepts at most one PACKAGE argument");
+                print_install_usage();
+                elm_json_free(elm_json);
+                arena_free(project_elm_json_path);
+                install_env_free(env);
+                log_set_level(original_level);
+                return 1;
+            }
+
             const char *source_path = from_path;
             const char *package_name = NULL;
             char package_name_buf[MAX_PACKAGE_NAME_LENGTH];
@@ -1771,6 +1972,15 @@ int cmd_install(int argc, char *argv[]) {
             return 1;
         }
 
+        if (reject_v1_package_cycle_with_project(env, elm_json, author, name, version)) {
+            if (version) arena_free(version);
+            elm_json_free(elm_json);
+            arena_free(project_elm_json_path);
+            install_env_free(env);
+            log_set_level(original_level);
+            return 1;
+        }
+
         if (pin_flag) {
             size_t pkg_dir_len = strlen(env->cache->packages_dir) + strlen(author) + strlen(name) + 3;
             char *pkg_dir = arena_malloc(pkg_dir_len);
@@ -1816,10 +2026,7 @@ int cmd_install(int argc, char *argv[]) {
         result = 0;
     } else if (specs_count > 0) {
         /* Install one or more packages */
-        if (specs_count == 1 && major_upgrade) {
-            /* Single package with --major flag: use existing install_package */
-            result = install_package(&specs[0], is_test, major_upgrade, upgrade_all, auto_yes, elm_json, env, project_elm_json_path);
-        } else if (specs_count == 1) {
+        if (specs_count == 1) {
             /* Single package without special flags: use existing install_package */
             result = install_package(&specs[0], is_test, false, upgrade_all, auto_yes, elm_json, env, project_elm_json_path);
         } else {

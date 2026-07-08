@@ -77,4 +77,16 @@ void local_dev_packages_free(LocalDevPackage *pkgs, int count);
  */
 bool is_package_local_dev(const char *author, const char *name, const char *version);
 
+/**
+ * Get the registered source directory for a local-dev package.
+ *
+ * Reads the PATH file written during local-dev registration.
+ *
+ * @param author  Package author
+ * @param name    Package name
+ * @param version Package version
+ * @return Arena-allocated source path, or NULL if the package is not registered.
+ */
+char *local_dev_get_source_path(const char *author, const char *name, const char *version);
+
 #endif /* LOCAL_DEV_TRACKING_H */

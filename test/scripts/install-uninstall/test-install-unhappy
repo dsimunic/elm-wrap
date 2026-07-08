@@ -149,6 +149,147 @@ test_err_04_install_multiple_with_wrong_version() {
     echo
 }
 
+# ERR-05: Info reports dependency cycles
+test_err_05_package_info_reports_cycle() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
+    echo "=== BEGIN ERR-05: Info reports dependency cycle ==="
+
+    local output
+    output=$(run_wrap info wrap/cycle-a)
+    echo "$output"
+
+    if [[ "$output" != *"Warning: package dependency cycle detected"* ]]; then
+        echo "ERROR: Expected package info to report dependency cycle"
+        exit 1
+    fi
+
+    if [[ "$output" != *"wrap/cycle-a 1.0.0"* || "$output" != *"wrap/cycle-b 1.0.0"* ]]; then
+        echo "ERROR: Expected cycle report to include both cycle packages"
+        exit 1
+    fi
+
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err05-app" "err05-app")
+
+    cat >"$app_dir/elm.json" <<'EOF'
+{
+    "type": "application",
+    "source-directories": [
+        "src"
+    ],
+    "elm-version": "0.19.1",
+    "dependencies": {
+        "direct": {
+            "elm/browser": "1.0.2",
+            "elm/core": "1.0.5",
+            "elm/html": "1.0.1",
+            "elm/url": "1.0.0",
+            "wrap/cycle-a": "1.0.0"
+        },
+        "indirect": {
+            "elm/json": "1.1.4",
+            "elm/time": "1.0.0",
+            "elm/virtual-dom": "1.0.5",
+            "wrap/cycle-b": "1.0.0"
+        }
+    },
+    "test-dependencies": {
+        "direct": {},
+        "indirect": {}
+    }
+}
+EOF
+
+    output=$(run_wrap info "$app_dir")
+    echo "$output"
+
+    if [[ "$output" != *"Warning: package dependency cycle detected"* ]]; then
+        echo "ERROR: Expected application info to report dependency cycle"
+        exit 1
+    fi
+
+    if [[ "$output" != *"wrap/cycle-a 1.0.0"* || "$output" != *"wrap/cycle-b 1.0.0"* ]]; then
+        echo "ERROR: Expected application cycle report to include both cycle packages"
+        exit 1
+    fi
+
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    echo "=== END ERR-05 ==="
+    echo
+}
+
+# ERR-06: Install cyclic package into application (should fail)
+test_err_06_install_cyclic_package_into_application() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
+    echo "=== BEGIN ERR-06: Install cyclic package into application ==="
+
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err06" "err06")
+
+    cd "$app_dir"
+    local before
+    before=$(snapshot_deps "$app_dir")
+
+    if run_wrap package install wrap/cycle-a; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+
+    assert_no_dep "wrap/cycle-a" "$app_dir"
+    assert_no_dep "wrap/cycle-b" "$app_dir"
+
+    local after
+    after=$(snapshot_deps "$app_dir")
+    assert_deps_unchanged "$before" "$after"
+
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    echo "=== END ERR-06 ==="
+    echo
+}
+
+# ERR-07: Install reverse dependency cycle into package elm.json (should fail)
+test_err_07_install_dependency_cycle_into_package() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
+    echo "=== BEGIN ERR-07: Install reverse dependency cycle into package ==="
+
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/err07" "wrap/cycle-root")
+
+    cd "$pkg_dir"
+    local before
+    before=$(snapshot_deps "$pkg_dir")
+
+    if run_wrap package install wrap/depends-on-cycle-root; then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+
+    if grep -Fq '"wrap/depends-on-cycle-root"' "$pkg_dir/elm.json"; then
+        echo "ERROR: Failed install wrote wrap/depends-on-cycle-root to package elm.json"
+        exit 1
+    fi
+
+    local after
+    after=$(snapshot_deps "$pkg_dir")
+    assert_deps_unchanged "$before" "$after"
+
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    echo "=== END ERR-07 ==="
+    echo
+}
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -163,6 +304,9 @@ main() {
     test_err_02_install_nonexistent_version
     test_err_03_install_multiple_with_nonexistent
     test_err_04_install_multiple_with_wrong_version
+    test_err_05_package_info_reports_cycle
+    test_err_06_install_cyclic_package_into_application
+    test_err_07_install_dependency_cycle_into_package
     
     local since_after delta
     since_after=$(get_v1_since_count)

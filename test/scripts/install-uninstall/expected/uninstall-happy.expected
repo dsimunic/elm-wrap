@@ -3,9 +3,182 @@ Running uninstall-happy tests...
 
 === BEGIN APP-01: Uninstall single package ===
 Here is my plan:
-  
+
   Add:
     wrap/package-single-no-deps    1.0.0
-  
+
 Saving elm.json...
 Successfully installed wrap/package-single-no-deps!
+Here is my plan:
+
+  Remove:
+    wrap/package-single-no-deps    1.0.0
+
+Saving elm.json...
+Successfully removed wrap/package-single-no-deps!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-01 ===
+
+=== BEGIN APP-02: Uninstall package removing orphaned dependencies ===
+Here is my plan:
+
+  Add:
+    wrap/dep-single-no-deps    1.0.0
+    wrap/package-single-1d     1.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-single-1d!
+Here is my plan:
+
+  Remove:
+    wrap/dep-single-no-deps    1.0.0
+    wrap/package-single-1d     1.0.0
+
+Saving elm.json...
+Successfully removed wrap/package-single-1d!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-02 ===
+
+=== BEGIN APP-03: Uninstall package keeping shared dependencies ===
+Here is my plan:
+
+  Add:
+    wrap/dep-shared-single-no-deps     1.0.0
+    wrap/package-a-single-1d-shared    1.0.0
+    wrap/package-b-single-1d-shared    1.0.0
+
+Saving elm.json...
+Successfully installed 2 packages!
+Here is my plan:
+
+  Remove:
+    wrap/package-a-single-1d-shared    1.0.0
+
+Saving elm.json...
+Successfully removed wrap/package-a-single-1d-shared!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-03 ===
+
+=== BEGIN APP-04: Uninstall direct dependency that's still needed indirectly ===
+Here is my plan:
+
+  Add:
+    wrap/dep-single-no-deps    1.0.0
+    wrap/package-single-1d     1.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-single-1d!
+Here is my plan:
+
+  Demote to indirect:
+    wrap/dep-single-no-deps    1.0.0
+
+Saving elm.json...
+Successfully demoted wrap/dep-single-no-deps to indirect!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-04 ===
+
+=== BEGIN APP-05: Uninstall test dependency ===
+Here is my plan:
+
+  Add:
+    wrap/package-single-no-deps    1.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-single-no-deps!
+Here is my plan:
+
+  Remove:
+    wrap/package-single-no-deps    1.0.0
+
+Saving elm.json...
+Successfully removed wrap/package-single-no-deps!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-05 ===
+
+=== BEGIN APP-06: Uninstall package cycle from application ===
+
+Warning: package dependency cycle detected:
+
+    wrap/cycle-a 1.0.0
+      ->
+    wrap/cycle-b 1.0.0
+      ->
+    wrap/cycle-a 1.0.0
+
+This can make Elm dependency verification block while building package artifacts.
+
+Here is my plan:
+
+  Remove:
+    wrap/cycle-a    1.0.0
+    wrap/cycle-b    1.0.0
+
+Saving elm.json...
+Successfully removed wrap/cycle-a!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-06 ===
+
+=== BEGIN PKG-01: Uninstall single package from package type ===
+Here is my plan:
+
+  Add:
+    wrap/package-single-no-deps    1.0.0 <= v < 2.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-single-no-deps!
+Here is my plan:
+
+  Remove:
+    wrap/package-single-no-deps    1.0.0 <= v < 2.0.0
+
+Saving elm.json...
+Successfully removed wrap/package-single-no-deps!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END PKG-01 ===
+
+=== BEGIN PKG-02: Uninstall package from package type (with dependencies) ===
+Here is my plan:
+
+  Add:
+    wrap/package-single-1d    1.0.0 <= v < 2.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-single-1d!
+Here is my plan:
+
+  Remove:
+    wrap/package-single-1d    1.0.0 <= v < 2.0.0
+
+Saving elm.json...
+Successfully removed wrap/package-single-1d!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END PKG-02 ===
+
+=== BEGIN PKG-03: Uninstall package cycle from package ===
+
+Warning: package dependency cycle detected:
+
+    wrap/cycle-b 1.0.0
+      ->
+    wrap/cycle-a 1.0.0
+      ->
+    wrap/cycle-b 1.0.0
+
+This can make Elm dependency verification block while building package artifacts.
+
+Here is my plan:
+
+  Remove:
+    wrap/cycle-b    1.0.0 <= v < 2.0.0
+
+Saving elm.json...
+Successfully removed wrap/cycle-b!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END PKG-03 ===
+
+
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END ===
+
+All uninstall-happy tests completed successfully

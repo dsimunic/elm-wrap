@@ -73,14 +73,12 @@ Dependent tests:
         wrap install elm/html elm/json elm/url    # Add multiple packages at once
         wrap install elm/html@1.0.0 elm/json      # Mix versioned and latest
         wrap install --test elm/json              # Add elm/json as a test dependency
-        wrap install --major elm/html             # Upgrade elm/html to next major version
         wrap install --from-file ./pkg.zip elm/html  # Install from local file
         wrap install --from-url URL elm/html         # Install from URL
 
     Options:
         --test                             # Install as test dependency
         --upgrade-all                      # Allow upgrading production deps (with --test)
-        --major PACKAGE                    # Allow major version upgrade for package (single package only)
         --from-file PATH PACKAGE           # Install from local file/directory (single package only)
         --from-url URL PACKAGE             # Install from URL (single package only)
         --local-dev [--from-path PATH] [PACKAGE]
@@ -201,7 +199,7 @@ confirm:
    - wrap/dep-single-no-deps 1.0.0
  - no other dependency changes
 
-### APP-08: Re-install does not cross major without --major
+### APP-08: Re-install does not cross major
 
 create_app "$TEST_ROOT/app08" "app08"
 
@@ -213,16 +211,6 @@ command: wrap install wrap/package-3v-no-deps
 
 confirm:
  - direct dependency remains at 2.0.0 (no cross-major upgrade)
-
-### APP-09: Re-install crosses major with --major (single package)
-
-depends_on: APP-08: Re-install does not cross major without --major
-
-command: wrap install --major wrap/package-3v-no-deps
-
-confirm:
- - direct dependency becomes 3.0.0
- - no unrelated dependency changes
 
 ### APP-10: Install as test dependency (--test)
 

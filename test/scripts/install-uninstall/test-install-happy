@@ -136,7 +136,7 @@ test_app_05_move_indirect_to_direct() {
     
     # Verify it's indirect
     assert_indirect_dep "wrap/dep-single-no-deps" "1.0.0" "$app_dir"
-    assert_no_dep "wrap/dep-single-no-deps" "$app_dir"  # Not direct
+    assert_no_direct_dep "wrap/dep-single-no-deps" "$app_dir"  # Not direct
     
     # Now install it directly
     run_wrap install wrap/dep-single-no-deps
@@ -179,12 +179,12 @@ test_app_07_mixed_version_specs() {
     echo
 }
 
-# APP-08: Re-install does not cross major without --major
+# APP-08: Re-install does not cross major
 test_app_08_reinstall_no_cross_major() {
     local since_before since_after delta
     since_before=$(get_v1_since_count)
 
-    echo "=== BEGIN APP-08: Re-install does not cross major without --major ==="
+    echo "=== BEGIN APP-08: Re-install does not cross major ==="
     
     # Create app
     local app_dir
@@ -207,30 +207,6 @@ test_app_08_reinstall_no_cross_major() {
     delta=$((since_after - since_before))
     echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
     echo "=== END APP-08 ==="
-    echo
-}
-
-# APP-09: Re-install crosses major with --major (single package)
-test_app_09_reinstall_cross_major() {
-    local since_before since_after delta
-    since_before=$(get_v1_since_count)
-
-    echo "=== BEGIN APP-09: Re-install crosses major with --major ==="
-    
-    # Depends on APP-08
-    local app_dir="$TEST_ROOT/app08"
-    
-    # Install with --major (should upgrade to 3.0.0)
-    cd "$app_dir"
-    run_wrap install --major wrap/package-3v-no-deps
-    
-    # Verify upgraded to 3.0.0
-    assert_direct_dep "wrap/package-3v-no-deps" "3.0.0" "$app_dir"
-    
-    since_after=$(get_v1_since_count)
-    delta=$((since_after - since_before))
-    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
-    echo "=== END APP-09 ==="
     echo
 }
 
@@ -442,7 +418,6 @@ main() {
     test_app_05_move_indirect_to_direct
     test_app_07_mixed_version_specs
     test_app_08_reinstall_no_cross_major
-    test_app_09_reinstall_cross_major
     test_app_10_install_as_test_dep
     test_app_11_test_dep_requires_prod_upgrade
     test_app_12_install_from_file

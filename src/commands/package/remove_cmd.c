@@ -8,6 +8,7 @@
 #include "../../alloc.h"
 #include "../../dyn_array.h"
 #include "../../constants.h"
+#include "../../protocol_v1/install.h"
 #include "../../shared/log.h"
 #include "../../cache.h"
 #include "../../terminal_colors.h"
@@ -164,7 +165,7 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
     }
 
     if (remove_local_dev) {
-        if (package_count > 0 || auto_yes) {
+        if (package_count > 0) {
             fprintf(stderr, "Error: --local-dev cannot be combined with package removal options\n");
             print_remove_usage(invocation);
             return 1;
@@ -279,6 +280,10 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
     }
 
     log_debug("ELM_HOME: %s", env->cache->elm_home);
+
+    if (env->protocol_mode == PROTOCOL_V1) {
+        (void)v1_report_project_package_cycles(elm_json, env);
+    }
 
     /* Phase 3: Build removal plan with demotion support for applications */
     InstallPlan *out_plan = install_plan_create();

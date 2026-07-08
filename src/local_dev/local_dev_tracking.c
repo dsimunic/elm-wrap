@@ -10,6 +10,7 @@
 #include "../commands/package/install_local_dev.h"
 #include "../alloc.h"
 #include "../constants.h"
+#include "../elm_json.h"
 #include "../fileutil.h"
 
 #include <stdio.h>
@@ -259,9 +260,24 @@ char **local_dev_get_tracking_apps(const char *author, const char *name,
             content[content_len - 1] = '\0';
         }
 
-        /* Check if the elm.json still exists */
+        /* Check if the path still exists and is an application elm.json.
+         * The same directory also contains metadata files such as PATH, whose
+         * content is the local package source directory, not a dependent app.
+         */
         struct stat st;
-        if (stat(content, &st) != 0) {
+        if (stat(content, &st) != 0 || !S_ISREG(st.st_mode)) {
+            arena_free(content);
+            continue;
+        }
+
+        ElmJson *elm_json = elm_json_read(content);
+        if (!elm_json) {
+            arena_free(content);
+            continue;
+        }
+        bool is_application = (elm_json->type == ELM_PROJECT_APPLICATION);
+        elm_json_free(elm_json);
+        if (!is_application) {
             arena_free(content);
             continue;
         }
@@ -311,4 +327,44 @@ bool is_package_local_dev(const char *author, const char *name, const char *vers
     arena_free(version_dir);
 
     return exists;
+}
+
+char *local_dev_get_source_path(const char *author, const char *name, const char *version) {
+    if (!author || !name || !version) {
+        return NULL;
+    }
+
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        return NULL;
+    }
+
+    size_t file_len = strlen(tracking_dir) + strlen(author) + strlen(name) + strlen(version) + strlen("/PATH") + 4;
+    char *path_file = arena_malloc(file_len);
+    if (!path_file) {
+        arena_free(tracking_dir);
+        return NULL;
+    }
+
+    snprintf(path_file, file_len, "%s/%s/%s/%s/PATH", tracking_dir, author, name, version);
+    arena_free(tracking_dir);
+
+    char *content = file_read_contents_bounded(path_file, MAX_PATH_LENGTH, NULL);
+    arena_free(path_file);
+    if (!content) {
+        return NULL;
+    }
+
+    size_t content_len = strlen(content);
+    while (content_len > 0 && (content[content_len - 1] == '\n' || content[content_len - 1] == '\r')) {
+        content[content_len - 1] = '\0';
+        content_len--;
+    }
+
+    if (content[0] == '\0') {
+        arena_free(content);
+        return NULL;
+    }
+
+    return content;
 }

@@ -297,22 +297,44 @@ static int download_package_recursive(
     Package pkg = { .author = (char*)author, .name = (char*)name, .version = (char*)version };
     track_if_local_dev(&pkg, local_dev_packages, local_dev_count, local_dev_capacity);
 
-    /* Now read the package's elm.json to discover its transitive dependencies */
+    char *pkg_path = cache_get_package_path(env->cache, author, name, version);
+    if (!pkg_path) {
+        log_error("Failed to allocate package path for %s/%s %s", author, name, version);
+        return 1;
+    }
+
+    /* Now read the package's elm.json to validate metadata and discover transitive dependencies */
     char pkg_elm_json_path[MAX_PATH_LENGTH];
     int n = snprintf(pkg_elm_json_path, sizeof(pkg_elm_json_path),
-                     "%s/%s/%s/%s/elm.json",
-                     env->cache->packages_dir, author, name, version);
+                     "%s/elm.json",
+                     pkg_path);
     if (n < 0 || (size_t)n >= sizeof(pkg_elm_json_path)) {
         log_error("Path too long for %s/%s %s", author, name, version);
+        arena_free(pkg_path);
         return 1;
     }
 
     ElmJson *pkg_elm_json = elm_json_read(pkg_elm_json_path);
     if (!pkg_elm_json) {
-        /* If we can't read the elm.json, log a warning but continue.
-         * This shouldn't happen for properly formed packages. */
-        log_warn("Could not read elm.json for %s/%s %s", author, name, version);
-        return 0;
+        log_error("Could not read elm.json for %s/%s %s", author, name, version);
+        arena_free(pkg_path);
+        return 1;
+    }
+
+    char package_label[MAX_PACKAGE_NAME_LENGTH + MAX_VERSION_STRING_MEDIUM_LENGTH + 2];
+    n = snprintf(package_label, sizeof(package_label), "%s/%s %s", author, name, version);
+    if (n < 0 || (size_t)n >= sizeof(package_label)) {
+        log_error("Package label too long for %s/%s %s", author, name, version);
+        elm_json_free(pkg_elm_json);
+        arena_free(pkg_path);
+        return 1;
+    }
+
+    if (pkg_elm_json->type == ELM_PROJECT_PACKAGE &&
+        !elm_validate_package_exposed_modules(pkg_path, pkg_elm_json_path, package_label)) {
+        elm_json_free(pkg_elm_json);
+        arena_free(pkg_path);
+        return 1;
     }
 
     /* Recursively download dependencies based on project type */
@@ -435,6 +457,7 @@ static int download_package_recursive(
     }
 
     elm_json_free(pkg_elm_json);
+    arena_free(pkg_path);
     return result;
 }
 

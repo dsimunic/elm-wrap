@@ -12,6 +12,23 @@ set -euo pipefail
 # Allow online package downloads (registry update is skipped via WRAP_SKIP_REGISTRY_UPDATE=1)
 export WRAP_OFFLINE_MODE=0
 
+cache_happy_registry_url() {
+    local base_url="${ELM_PACKAGE_REGISTRY_URL:-https://package.elm-lang.org}"
+    base_url="${base_url%/}"
+    printf '%s/all-packages\n' "$base_url"
+}
+
+cache_happy_can_reach_upstream() {
+    local url
+    url=$(cache_happy_registry_url)
+
+    if ! command -v curl >/dev/null 2>&1; then
+        return 1
+    fi
+
+    curl -fsSIL --connect-timeout 5 --max-time 10 "$url" >/dev/null 2>&1
+}
+
 # =============================================================================
 # Test Cases
 # =============================================================================
@@ -136,6 +153,11 @@ main() {
     echo "Running cache-happy tests..."
     echo
     echo
+
+    if ! cache_happy_can_reach_upstream; then
+        echo "SKIP: cache-happy requires network access to $(cache_happy_registry_url)"
+        return 0
+    fi
     
     # Run all test cases
     test_cache_01_single_package

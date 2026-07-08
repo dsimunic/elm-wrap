@@ -15,7 +15,7 @@ these packages with similar names:
 
 Maybe you want one of these instead?
 
-[Registry since-count: 30 -> 30 (Δ0)]
+[Registry since-count: 34 -> 34 (Δ0)]
 === END ERR-01 ===
 
 === BEGIN ERR-02: Install package with non-existent version ===
@@ -24,7 +24,7 @@ Available versions:
   3.0.0
   2.0.0
   1.0.0
-[Registry since-count: 30 -> 30 (Δ0)]
+[Registry since-count: 34 -> 34 (Δ0)]
 === END ERR-02 ===
 
 === BEGIN ERR-03: Install multiple packages with one non-existent ===
@@ -37,7 +37,7 @@ I cannot install these requested packages:
 Please fix the specification and try again.
 
 I didn't install anything yet, as I can only install all specified packages or none.
-[Registry since-count: 30 -> 30 (Δ0)]
+[Registry since-count: 34 -> 34 (Δ0)]
 === END ERR-03 ===
 
 === BEGIN ERR-04: Install multiple packages with one having wrong version ===
@@ -46,11 +46,106 @@ Available versions:
   3.0.0
   2.0.0
   1.0.0
-[Registry since-count: 30 -> 30 (Δ0)]
+[Registry since-count: 34 -> 34 (Δ0)]
 === END ERR-04 ===
 
+=== BEGIN ERR-05: Info reports dependency cycle ===
 
-[Registry since-count: 30 -> 30 (Δ0)]
+Package: wrap/cycle-a
+Version: 1.0.0
+Total versions: 1
+
+
+Package: wrap/cycle-a 1.0.0
+========================================
+
+Dependencies (2):
+  elm/core        1.0.0 <= v < 2.0.0
+  wrap/cycle-b    1.0.0 <= v < 2.0.0
+
+Warning: package dependency cycle detected:
+
+    wrap/cycle-a 1.0.0
+      ->
+    wrap/cycle-b 1.0.0
+      ->
+    wrap/cycle-a 1.0.0
+
+This can make Elm dependency verification block while building package artifacts.
+
+err05-app
+-------------------
+
+Type: Application
+Path: /private<TEST_ROOT>/err05-app
+
+Dependencies:
+
+  elm/browser      1.0.2
+  elm/core         1.0.5
+  elm/html         1.0.1
+  elm/url          1.0.0
+  wrap/cycle-a     1.0.0
+
+  elm/json         1.1.4 (indirect)
+  elm/time         1.0.0 (indirect)
+  elm/virtual-dom  1.0.5 (indirect)
+  wrap/cycle-b     1.0.0 (indirect)
+
+  Total:           9
+
+
+Warning: package dependency cycle detected:
+
+    wrap/cycle-a 1.0.0
+      ->
+    wrap/cycle-b 1.0.0
+      ->
+    wrap/cycle-a 1.0.0
+
+This can make Elm dependency verification block while building package artifacts.
+
+
+
+
+ELM_HOME: <TEST_ROOT>/elm_home/0.19.1
+
+Registry Cache:
+  Location: <TEST_ROOT>/elm_home/0.19.1/packages/registry.dat
+  Packages: 28
+  Versions: 34
+  Since count: 34
+
+Registry URL: https://package.elm-lang.org
+  Status: Offline (forced via WRAP_OFFLINE_MODE=1)
+
+No upgrades available. All packages at their latest version
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END ERR-05 ===
+
+=== BEGIN ERR-06: Install cyclic package into application ===
+
+Warning: package dependency cycle detected:
+
+    wrap/cycle-a 1.0.0
+      ->
+    wrap/cycle-b 1.0.0
+      ->
+    wrap/cycle-a 1.0.0
+
+This can make Elm dependency verification block while building package artifacts.
+
+[ERROR] Cannot install wrap/cycle-a because it has a package dependency cycle
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END ERR-06 ===
+
+=== BEGIN ERR-07: Install reverse dependency cycle into package ===
+[ERROR] Cannot install wrap/depends-on-cycle-root because it would create a package dependency cycle with wrap/cycle-root
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END ERR-07 ===
+
+
+[Registry since-count: 34 -> 34 (Δ0)]
 === END ===
 
 All install-unhappy tests completed successfully

@@ -12,14 +12,29 @@ set -euo pipefail
 # Allow online operations (registry update is skipped via WRAP_SKIP_REGISTRY_UPDATE=1)
 export WRAP_OFFLINE_MODE=0
 
+CACHE_UNHAPPY_SINCE_BASE=0
+
+cache_unhappy_since_count() {
+    local count
+    count=$(get_v1_since_count)
+    echo $((count - CACHE_UNHAPPY_SINCE_BASE))
+}
+
+cache_unhappy_print_since_delta() {
+    local since_before="$1"
+    local since_after="$2"
+    local delta=$((since_after - since_before))
+    echo "[Registry since-count: <BASE>+$since_before -> <BASE>+$since_after (Δ$delta)]"
+}
+
 # =============================================================================
 # Test Cases
 # =============================================================================
 
 # ERR-01: Cache non-existent package (should fail)
 test_err_01_cache_nonexistent_package() {
-    local since_before since_after delta
-    since_before=$(get_v1_since_count)
+    local since_before since_after
+    since_before=$(cache_unhappy_since_count)
     
     echo "=== BEGIN ERR-01: Cache non-existent package ==="
     
@@ -33,17 +48,16 @@ test_err_01_cache_nonexistent_package() {
         exit 1
     fi
     
-    since_after=$(get_v1_since_count)
-    delta=$((since_after - since_before))
-    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    since_after=$(cache_unhappy_since_count)
+    cache_unhappy_print_since_delta "$since_before" "$since_after"
     echo "=== END ERR-01 ==="
     echo
 }
 
 # ERR-02: Cache package with non-existent version (should fail)
 test_err_02_cache_nonexistent_version() {
-    local since_before since_after delta
-    since_before=$(get_v1_since_count)
+    local since_before since_after
+    since_before=$(cache_unhappy_since_count)
     
     echo "=== BEGIN ERR-02: Cache package with non-existent version ==="
     
@@ -57,17 +71,16 @@ test_err_02_cache_nonexistent_version() {
         exit 1
     fi
     
-    since_after=$(get_v1_since_count)
-    delta=$((since_after - since_before))
-    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    since_after=$(cache_unhappy_since_count)
+    cache_unhappy_print_since_delta "$since_before" "$since_after"
     echo "=== END ERR-02 ==="
     echo
 }
 
 # ERR-03: Cache from non-existent file path (should fail)
 test_err_03_cache_from_nonexistent_path() {
-    local since_before since_after delta
-    since_before=$(get_v1_since_count)
+    local since_before since_after
+    since_before=$(cache_unhappy_since_count)
     
     echo "=== BEGIN ERR-03: Cache from non-existent file path ==="
     
@@ -81,17 +94,16 @@ test_err_03_cache_from_nonexistent_path() {
         exit 1
     fi
     
-    since_after=$(get_v1_since_count)
-    delta=$((since_after - since_before))
-    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    since_after=$(cache_unhappy_since_count)
+    cache_unhappy_print_since_delta "$since_before" "$since_after"
     echo "=== END ERR-03 ==="
     echo
 }
 
 # ERR-04: Cache with both --from-file and --from-url (should fail)
 test_err_04_cache_both_from_file_and_url() {
-    local since_before since_after delta
-    since_before=$(get_v1_since_count)
+    local since_before since_after
+    since_before=$(cache_unhappy_since_count)
     
     echo "=== BEGIN ERR-04: Cache with both --from-file and --from-url ==="
     
@@ -107,9 +119,8 @@ test_err_04_cache_both_from_file_and_url() {
         exit 1
     fi
     
-    since_after=$(get_v1_since_count)
-    delta=$((since_after - since_before))
-    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    since_after=$(cache_unhappy_since_count)
+    cache_unhappy_print_since_delta "$since_before" "$since_after"
     echo "=== END ERR-04 ==="
     echo
 }
@@ -122,6 +133,8 @@ main() {
     echo "Running cache-unhappy tests..."
     echo
     echo
+
+    CACHE_UNHAPPY_SINCE_BASE=$(get_v1_since_count)
     
     # Run all test cases
     test_err_01_cache_nonexistent_package
@@ -129,11 +142,10 @@ main() {
     test_err_03_cache_from_nonexistent_path
     test_err_04_cache_both_from_file_and_url
     
-    local since_after delta
-    since_after=$(get_v1_since_count)
-    delta=0
+    local since_after
+    since_after=$(cache_unhappy_since_count)
     echo
-    echo "[Registry since-count: $since_after -> $since_after (Δ$delta)]"
+    cache_unhappy_print_since_delta "$since_after" "$since_after"
     echo "=== END ==="
     echo
     echo "All cache-unhappy tests completed successfully"

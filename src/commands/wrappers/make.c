@@ -4,6 +4,7 @@
 #include "../../global_context.h"
 #include "elm_cmd_common.h"
 #include "../../install_env.h"
+#include "../../protocol_v1/install.h"
 #include "../../elm_compiler.h"
 #include "../../alloc.h"
 #include "../../shared/log.h"
@@ -87,6 +88,16 @@ int cmd_make(int argc, char *argv[]) {
         elm_json_free(elm_json);
         install_env_free(env);
         return result;
+    }
+
+    if (env->protocol_mode == PROTOCOL_V1) {
+        int cycle_count = v1_report_project_package_cycles(elm_json, env);
+        if (cycle_count > 0) {
+            log_error("Cannot build because package dependencies contain a cycle");
+            elm_json_free(elm_json);
+            install_env_free(env);
+            return 1;
+        }
     }
 
     // Compile local-dev packages BEFORE cleaning artifacts

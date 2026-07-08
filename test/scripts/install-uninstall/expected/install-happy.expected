@@ -3,9 +3,180 @@ Running install-happy tests...
 
 === BEGIN APP-01: single package install ===
 Here is my plan:
-  
+
   Add:
     wrap/package-single-no-deps    1.0.0
-  
+
 Saving elm.json...
 Successfully installed wrap/package-single-no-deps!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-01 ===
+
+=== BEGIN APP-02: install multiple packages at once ===
+Here is my plan:
+
+  Add:
+    wrap/package-3v-no-deps        3.0.0
+    wrap/package-single-no-deps    1.0.0
+
+Saving elm.json...
+Successfully installed 2 packages!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-02 ===
+
+=== BEGIN APP-03: Install package with targeted version ===
+Here is my plan:
+
+  Add:
+    wrap/package-3v-no-deps    2.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-3v-no-deps!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-03 ===
+
+=== BEGIN APP-04: Install package with dependencies ===
+Here is my plan:
+
+  Add:
+    wrap/dep-single-no-deps    1.0.0
+    wrap/package-single-1d     1.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-single-1d!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-04 ===
+
+=== BEGIN APP-05: Move package from indirect to direct ===
+Here is my plan:
+
+  Add:
+    wrap/dep-single-no-deps    1.0.0
+    wrap/package-single-1d     1.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-single-1d!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-05 ===
+
+=== BEGIN APP-07: Install multiple packages with mixed version specifications ===
+Here is my plan:
+
+  Add:
+    wrap/dep-single-no-deps        1.0.0
+    wrap/package-3v-no-deps        2.0.0
+    wrap/package-single-1d         1.0.0
+    wrap/package-single-no-deps    1.0.0
+
+Saving elm.json...
+Successfully installed 3 packages!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-07 ===
+
+=== BEGIN APP-08: Re-install does not cross major ===
+Here is my plan:
+
+  Add:
+    wrap/package-3v-no-deps    2.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-3v-no-deps!
+It is already installed!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-08 ===
+
+=== BEGIN APP-10: Install as test dependency (--test) ===
+Here is my plan:
+
+  Add:
+    wrap/package-single-no-deps    1.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-single-no-deps!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-10 ===
+
+=== BEGIN APP-11: Install test dep requiring prod upgrade ===
+Here is my plan:
+
+  Add:
+    wrap/package-3v-no-deps    1.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-3v-no-deps!
+[ERROR] All solver strategies failed for wrap/testdep-req-newer-prod-single
+[ERROR] Failed to resolve dependencies
+[ERROR] No solution found - the package conflicts with current dependencies
+Here is my plan:
+
+  Add:
+    wrap/testdep-req-newer-prod-single    1.0.0
+
+  Change:
+    wrap/package-3v-no-deps               1.0.0 => 3.0.0
+Saving elm.json...
+Successfully installed wrap/testdep-req-newer-prod-single!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-11 ===
+
+=== BEGIN APP-12: Install from local file/directory (--from-file) ===
+Here is my plan:
+
+  Add:
+    wrap/package-from-file-single-no-deps    1.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-from-file-single-no-deps 1.0.0!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-12 ===
+
+=== BEGIN PKG-01: Install single package to package type ===
+Here is my plan:
+
+  Add:
+    wrap/package-single-no-deps    1.0.0 <= v < 2.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-single-no-deps!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END PKG-01 ===
+
+=== BEGIN PKG-02: Install multiple packages to package type ===
+Here is my plan:
+
+  Add:
+    wrap/package-3v-no-deps        3.0.0 <= v < 4.0.0
+    wrap/package-single-no-deps    1.0.0 <= v < 2.0.0
+
+Saving elm.json...
+Successfully installed 2 packages!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END PKG-02 ===
+
+=== BEGIN PKG-03: Install package with targeted version to package type ===
+Here is my plan:
+
+  Add:
+    wrap/package-3v-no-deps    2.0.0 <= v < 3.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-3v-no-deps!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END PKG-03 ===
+
+=== BEGIN PKG-04: Install package with dependencies to package type ===
+Here is my plan:
+
+  Add:
+    wrap/package-single-1d    1.0.0 <= v < 2.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-single-1d!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END PKG-04 ===
+
+
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END ===
+
+All install-happy tests completed successfully

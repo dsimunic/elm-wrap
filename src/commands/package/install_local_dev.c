@@ -19,6 +19,7 @@
 #include "../../solver.h"
 #include "../../global_context.h"
 #include "../../protocol_v2/solver/v2_registry.h"
+#include "../../plural.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -920,7 +921,9 @@ int refresh_local_dev_dependents(InstallEnv *env) {
         return 0;
     }
 
-    printf("Refreshing %d dependent application(s)...\n", dep_count);
+    printf("Refreshing %d dependent %s...\n",
+           dep_count,
+           en_plural_s(dep_count, "application", "applications"));
 
     int failed = 0;
     for (int i = 0; i < dep_count; i++) {
@@ -965,7 +968,9 @@ int prune_local_dev_dependents(CacheConfig *cache) {
         return 0;
     }
 
-    printf("Pruning orphaned dependencies in %d dependent application(s)...\n", dep_count);
+    printf("Pruning orphaned dependencies in %d dependent %s...\n",
+           dep_count,
+           en_plural_s(dep_count, "application", "applications"));
 
     int failed = 0;
     for (int i = 0; i < dep_count; i++) {

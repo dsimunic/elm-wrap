@@ -106,6 +106,18 @@ SolverResult solver_add_package(
         /* For major upgrades, only try cross-major strategy */
         strategies[0] = STRATEGY_CROSS_MAJOR_FOR_TARGET;
         num_strategies = 1;
+    } else if (is_test_dependency && upgrade_all) {
+        /*
+         * Installing a test dependency with --upgrade-all may need to move
+         * existing production transitive dependencies across majors to satisfy
+         * the new test package. Try the normal ladders first, then allow the
+         * target's dependency graph to choose those versions.
+         */
+        strategies[0] = STRATEGY_EXACT_ALL;
+        strategies[1] = STRATEGY_EXACT_DIRECT_UPGRADABLE_INDIRECT;
+        strategies[2] = STRATEGY_UPGRADABLE_WITHIN_MAJOR;
+        strategies[3] = STRATEGY_CROSS_MAJOR_FOR_TARGET;
+        num_strategies = 4;
     } else {
         /* Default: try exact, then exact-direct, then within-major */
         strategies[0] = STRATEGY_EXACT_ALL;

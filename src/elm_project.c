@@ -24,7 +24,7 @@ char **elm_parse_exposed_modules(const char *elm_json_path, int *count) {
         return NULL;
     }
 
-    int modules_capacity = 16;
+    int modules_capacity = INITIAL_MODULE_CAPACITY;
     int modules_count = 0;
     char **modules = arena_malloc(modules_capacity * sizeof(char*));
     if (!modules) {
@@ -82,7 +82,7 @@ char **elm_parse_source_directories(const char *elm_json_path, int *count) {
         return NULL;
     }
 
-    int dirs_capacity = 4;
+    int dirs_capacity = INITIAL_SMALL_CAPACITY;
     int dirs_count = 0;
     char **dirs = arena_malloc(dirs_capacity * sizeof(char*));
     if (!dirs) {
@@ -207,4 +207,71 @@ int elm_is_file_in_list(const char *file, char **list, int count) {
         }
     }
     return 0;
+}
+
+bool elm_validate_package_exposed_modules(
+    const char *package_dir,
+    const char *elm_json_path,
+    const char *package_label
+) {
+    if (!package_dir || !elm_json_path || !package_label) {
+        return false;
+    }
+
+    int exposed_count = 0;
+    char **exposed_modules = elm_parse_exposed_modules(elm_json_path, &exposed_count);
+    if (!exposed_modules) {
+        fprintf(stderr, "Error: Could not parse exposed modules for %s at %s\n",
+                package_label, elm_json_path);
+        return false;
+    }
+
+    size_t src_dir_len = strlen(package_dir) + strlen("/src") + 1;
+    if (src_dir_len > MAX_PATH_LENGTH) {
+        fprintf(stderr, "Error: Package path too long for %s\n", package_label);
+        return false;
+    }
+
+    char *src_dir = arena_malloc(src_dir_len);
+    if (!src_dir) {
+        fprintf(stderr, "Error: Failed to allocate source directory path for %s\n",
+                package_label);
+        return false;
+    }
+    int n = snprintf(src_dir, src_dir_len, "%s/src", package_dir);
+    if (n < 0 || (size_t)n >= src_dir_len) {
+        fprintf(stderr, "Error: Package path too long for %s\n", package_label);
+        arena_free(src_dir);
+        return false;
+    }
+
+    bool ok = true;
+    for (int i = 0; i < exposed_count; i++) {
+        char *module_path = elm_module_name_to_path(exposed_modules[i], src_dir);
+        if (!module_path) {
+            fprintf(stderr, "Error: Module path too long for %s in %s\n",
+                    exposed_modules[i], package_label);
+            ok = false;
+            break;
+        }
+
+        if (!file_exists(module_path)) {
+            fprintf(stderr,
+                    "Error: Package %s exposes missing module %s\n"
+                    "  elm.json: %s\n"
+                    "  expected: %s\n",
+                    package_label,
+                    exposed_modules[i],
+                    elm_json_path,
+                    module_path);
+            ok = false;
+            arena_free(module_path);
+            break;
+        }
+
+        arena_free(module_path);
+    }
+
+    arena_free(src_dir);
+    return ok;
 }

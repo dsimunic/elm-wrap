@@ -550,7 +550,7 @@ $(BUILDDIR)/init_v2.o: $(SRCDIR)/commands/wrappers/init_v2.c $(SRCDIR)/commands/
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 # Build make object
-$(BUILDDIR)/make.o: $(SRCDIR)/commands/wrappers/make.c $(SRCDIR)/commands/wrappers/make.h $(SRCDIR)/commands/wrappers/builder.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
+$(BUILDDIR)/make.o: $(SRCDIR)/commands/wrappers/make.c $(SRCDIR)/commands/wrappers/make.h $(SRCDIR)/commands/wrappers/builder.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/install_env.h $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/elm_compiler.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
@@ -766,15 +766,15 @@ $(BUILDDIR)/package_suggestions.o: $(SRCDIR)/package_suggestions.c $(SRCDIR)/pac
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/install_cmd.o: $(SRCDIR)/commands/package/install_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/http_client.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+$(BUILDDIR)/install_cmd.o: $(SRCDIR)/commands/package/install_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/http_client.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/install_local_dev.o: $(SRCDIR)/commands/package/install_local_dev.c $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/local_dev/local_dev_tracking.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/env_defaults.h | $(BUILDDIR)
+$(BUILDDIR)/install_local_dev.o: $(SRCDIR)/commands/package/install_local_dev.c $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/local_dev/local_dev_tracking.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/cache.h $(SRCDIR)/solver.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/env_defaults.h $(SRCDIR)/plural.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/local_dev_tracking.o: $(SRCDIR)/local_dev/local_dev_tracking.c $(SRCDIR)/local_dev/local_dev_tracking.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+$(BUILDDIR)/local_dev_tracking.o: $(SRCDIR)/local_dev/local_dev_tracking.c $(SRCDIR)/local_dev/local_dev_tracking.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/elm_json.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
@@ -930,7 +930,7 @@ $(BUILDDIR)/package_fetch.o: $(SRCDIR)/protocol_v1/package_fetch.c $(SRCDIR)/pro
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 # Build v1_install object (protocol v1 install functions)
-$(BUILDDIR)/v1_install.o: $(SRCDIR)/protocol_v1/install.c $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/shared/log.h $(SRCDIR)/alloc.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
+$(BUILDDIR)/v1_install.o: $(SRCDIR)/protocol_v1/install.c $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/install_env.h $(SRCDIR)/elm_json.h $(SRCDIR)/cache.h $(SRCDIR)/registry.h $(SRCDIR)/shared/log.h $(SRCDIR)/alloc.h $(SRCDIR)/fileutil.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 

@@ -92,7 +92,7 @@ test_err_03_uninstall_elm_core() {
     run_wrap package uninstall elm/core
     
     # Verify elm/core is no longer in direct dependencies
-    assert_no_dep "elm/core" "$app_dir"
+    assert_no_direct_dep "elm/core" "$app_dir"
     
     since_after=$(get_v1_since_count)
     delta=$((since_after - since_before))
@@ -114,12 +114,14 @@ main() {
     test_err_01_uninstall_nonexistent_package
     test_err_02_uninstall_not_in_dependencies
     test_err_03_uninstall_elm_core
-        local since_after delta
+
+    local since_after delta
     since_after=$(get_v1_since_count)
     delta=0
     echo
     echo "[Registry since-count: $since_after -> $since_after (Δ$delta)]"
-    echo "=== END ==="    echo
+    echo "=== END ==="
+    echo
     echo "All uninstall-unhappy tests completed successfully"
 }
 

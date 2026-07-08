@@ -226,10 +226,41 @@ package: wrap/dep-shared-single-no-deps
     dependencies:
         elm/core  1.0.0 <= v < 2.0.0
 
+package: wrap/cycle-a
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        wrap/cycle-b  1.0.0 <= v < 2.0.0
+
+package: wrap/cycle-b
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        wrap/cycle-a  1.0.0 <= v < 2.0.0
+
+package: wrap/cycle-root
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+
+package: wrap/depends-on-cycle-root
+    version: 1.0.0
+    status: valid
+    license: BSD-3-Clause
+    dependencies:
+        elm/core  1.0.0 <= v < 2.0.0
+        wrap/cycle-root  1.0.0 <= v < 2.0.0
+
 package: wrap/testdep-req-newer-prod-single
     version: 1.0.0
     status: valid
     license: BSD-3-Clause
     dependencies:
         elm/core  1.0.0 <= v < 2.0.0
-        wrap/package-3v-no-deps 3.0.0 <= v < 4.0.0
+        wrap/package-3v-no-deps  3.0.0 <= v < 4.0.0

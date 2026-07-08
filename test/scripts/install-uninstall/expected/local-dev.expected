@@ -3,22 +3,254 @@ Running local-dev tests...
 
 === BEGIN LOCAL-01: Initialize package with local-dev and install to app ===
 Here is my plan:
-  
+
   Register (local-dev):
     testauthor/local-pkg1    1.0.0 (local)
-  
+
   Source: /private<TEST_ROOT>/local-pkg1
-  
+
 To use this package in an application, run from the application directory:
     wrap package install testauthor/local-pkg1
-  
+
 Successfully registered testauthor/local-pkg1 1.0.0 (local)!
 Here is my plan:
-  
+
   Add (local):
     testauthor/local-pkg1    1.0.0 (local)
-  
+
   Source: /private<TEST_ROOT>/local-pkg1
-  
+
 Saving elm.json...
 Successfully installed testauthor/local-pkg1 1.0.0 (local)!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END LOCAL-01 ===
+
+=== BEGIN LOCAL-02: Install package with --local-dev --from-path ===
+Here is my plan:
+
+  Add (local):
+    testauthor/local-src2    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/local-src2
+
+Saving elm.json...
+Successfully installed testauthor/local-src2 1.0.0 (local)!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END LOCAL-02 ===
+
+=== BEGIN LOCAL-03: Dependency synchronization when local package changes ===
+Here is my plan:
+
+  Register (local-dev):
+    testauthor/local-pkg3    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/local-pkg3
+
+To use this package in an application, run from the application directory:
+    wrap package install testauthor/local-pkg3
+
+Successfully registered testauthor/local-pkg3 1.0.0 (local)!
+Here is my plan:
+
+  Add (local):
+    testauthor/local-pkg3    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/local-pkg3
+
+Saving elm.json...
+Successfully installed testauthor/local-pkg3 1.0.0 (local)!
+It is already installed!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END LOCAL-03 ===
+
+=== BEGIN LOCAL-04: Multiple applications depending on same local package ===
+Here is my plan:
+
+  Register (local-dev):
+    testauthor/local-pkg4    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/local-pkg4
+
+To use this package in an application, run from the application directory:
+    wrap package install testauthor/local-pkg4
+
+Successfully registered testauthor/local-pkg4 1.0.0 (local)!
+Here is my plan:
+
+  Add (local):
+    testauthor/local-pkg4    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/local-pkg4
+
+Saving elm.json...
+Successfully installed testauthor/local-pkg4 1.0.0 (local)!
+Here is my plan:
+
+  Add (local):
+    testauthor/local-pkg4    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/local-pkg4
+
+Saving elm.json...
+Successfully installed testauthor/local-pkg4 1.0.0 (local)!
+It is already installed!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END LOCAL-04 ===
+
+=== BEGIN LOCAL-05: Remove local-dev tracking with uninstall --local-dev ===
+Here is my plan:
+
+  Register (local-dev):
+    testauthor/local-pkg5    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/local-pkg5
+
+To use this package in an application, run from the application directory:
+    wrap package install testauthor/local-pkg5
+
+Successfully registered testauthor/local-pkg5 1.0.0 (local)!
+Removed local-dev tracking for testauthor/local-pkg5 1.0.0
+No local-dev tracking found for testauthor/local-pkg5 1.0.0
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END LOCAL-05 ===
+
+=== BEGIN ERR-01: Install with --local-dev --from-path with non-existent path ===
+[ERROR] Failed to resolve source path: <TEST_ROOT>/does-not-exist
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END ERR-01 ===
+
+=== BEGIN ERR-02: Install multiple packages with --local-dev (should fail) ===
+[ERROR] --local-dev --from-path accepts at most one PACKAGE argument
+Usage: wrap install PACKAGE[@VERSION] [PACKAGE[@VERSION]...]
+
+Install packages for your Elm project.
+
+Examples:
+  wrap install elm/html                     # Add elm/html to your project
+  wrap install elm/html@1.0.0               # Add elm/html at specific version
+  wrap install elm/html elm/json elm/url    # Add multiple packages at once
+  wrap install elm/html@1.0.0 elm/json      # Mix versioned and latest
+  wrap install --test elm/json              # Add elm/json as a test dependency
+  wrap install --from-file ./pkg.zip elm/html  # Install from local file
+  wrap install --from-url URL elm/html         # Install from URL
+
+Options:
+  --test                             # Install as test dependency
+  --upgrade-all                      # Allow upgrading production deps (with --test)
+  --from-file PATH PACKAGE           # Install from local file/directory (single package only)
+  --from-url URL PACKAGE             # Install from URL (single package only)
+  --local-dev [PATH] [PACKAGE[@VERSION]]
+                                     # Register a package for local development.
+                                     # Name/version are read from elm.json at PATH
+                                     # (or cwd). PACKAGE[@VERSION] overrides them.
+  --local-dev --from-path PATH [PACKAGE]
+                                     # Install local-dev PATH into the surrounding
+                                     # application. Requires an application elm.json.
+  -v, --verbose                      # Show progress reports (registry, connectivity)
+  -q, --quiet                        # Suppress progress reports
+  -y, --yes                          # Automatically confirm changes
+  --help                             # Show this help
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END ERR-02 ===
+
+=== BEGIN ERR-03: Use --from-path without --local-dev (should fail) ===
+[ERROR] --from-path requires --local-dev flag
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END ERR-03 ===
+
+=== BEGIN LOCAL-06: Registry since_count stability + /since advancement rules ===
+Here is my plan:
+
+  Register (local-dev):
+    testauthor/local-since    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/local-since
+
+To use this package in an application, run from the application directory:
+    wrap package install testauthor/local-since
+
+Successfully registered testauthor/local-since 1.0.0 (local)!
+Applied /since response (2 items). since_count is now 36
+=== END LOCAL-06 ===
+
+=== BEGIN LOCAL-07: Package uninstall ignores local-dev PATH metadata ===
+Here is my plan:
+
+  Register (local-dev):
+    testauthor/local-prune-self    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/local-prune-self
+
+To use this package in an application, run from the application directory:
+    wrap package install testauthor/local-prune-self
+
+Successfully registered testauthor/local-prune-self 1.0.0 (local)!
+Here is my plan:
+
+  Remove:
+    wrap/package-single-no-deps    1.0.0 <= v < 2.0.0
+
+Saving elm.json...
+Successfully removed wrap/package-single-no-deps!
+[Registry since-count: 36 -> 36 (Δ0)]
+=== END LOCAL-07 ===
+
+=== BEGIN MAKE-01: Local-dev package compiles successfully with make ===
+Here is my plan:
+
+  Register (local-dev):
+    testauthor/make-pkg1    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/make-pkg1
+
+To use this package in an application, run from the application directory:
+    wrap package install testauthor/make-pkg1
+
+Successfully registered testauthor/make-pkg1 1.0.0 (local)!
+Here is my plan:
+
+  Add (local):
+    testauthor/make-pkg1    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/make-pkg1
+
+Saving elm.json...
+Successfully installed testauthor/make-pkg1 1.0.0 (local)!
+[Registry since-count: 36 -> 36 (Δ0)]
+=== END MAKE-01 ===
+
+=== BEGIN MAKE-02: Local-dev package with compilation error ===
+Here is my plan:
+
+  Register (local-dev):
+    testauthor/make-pkg2    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/make-pkg2
+
+To use this package in an application, run from the application directory:
+    wrap package install testauthor/make-pkg2
+
+Successfully registered testauthor/make-pkg2 1.0.0 (local)!
+Here is my plan:
+
+  Add (local):
+    testauthor/make-pkg2    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/make-pkg2
+
+Saving elm.json...
+Successfully installed testauthor/make-pkg2 1.0.0 (local)!
+SUCCESS: Detected compilation failure
+SUCCESS: Got human-friendly error output (not JSON)
+[Registry since-count: 36 -> 36 (Δ0)]
+=== END MAKE-02 ===
+
+=== BEGIN MAKE-03: Application without local-dev packages ===
+[Registry since-count: 36 -> 36 (Δ0)]
+=== END MAKE-03 ===
+
+
+[Registry since-count: 36 -> 36 (Δ0)]
+=== END ===
+
+All local-dev tests completed successfully

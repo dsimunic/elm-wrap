@@ -264,8 +264,11 @@ bool builder_compile_local_dev_packages(
         const char *name = packages[i].name;
         const char *version = packages[i].version;
 
-        /* Get package path */
-        char *pkg_path = cache_get_package_path(cache, author, name, version);
+        /* Compile local-dev packages from their registered source tree. */
+        char *pkg_path = local_dev_get_source_path(author, name, version);
+        if (!pkg_path) {
+            pkg_path = cache_get_package_path(cache, author, name, version);
+        }
         if (!pkg_path) {
             log_debug("builder: Could not get path for %s/%s %s", author, name, version);
             continue;
