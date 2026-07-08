@@ -758,7 +758,7 @@ $(BUILDDIR)/ts_elm_scanner.o: $(SRCDIR)/vendor/tree-sitter-elm/scanner.c | $(BUI
 	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
 
 # Build package command objects
-$(BUILDDIR)/package_common.o: $(SRCDIR)/commands/package/package_common.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/alloc.h $(SRCDIR)/cache.h $(SRCDIR)/fileutil.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/shared/log.h $(SRCDIR)/rulr/rulr_dl.h $(SRCDIR)/rulr/host_helpers.h | $(BUILDDIR)
+$(BUILDDIR)/package_common.o: $(SRCDIR)/commands/package/package_common.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/alloc.h $(SRCDIR)/cache.h $(SRCDIR)/fileutil.h $(SRCDIR)/global_context.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/shared/log.h $(SRCDIR)/terminal_colors.h $(SRCDIR)/rulr/rulr_dl.h $(SRCDIR)/rulr/host_helpers.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr $(RULR_INCLUDE) -c $< -o $@
 

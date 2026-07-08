@@ -35,6 +35,8 @@ char **build_elm_environment(void);
  *
  * Uses recursive dependency resolution to ensure all packages needed
  * for compilation are available in the cache.
+ * For application projects, also verifies that all package-required
+ * dependencies are listed in elm.json before running the compiler.
  *
  * Returns 0 on success, non-zero on failure.
  */

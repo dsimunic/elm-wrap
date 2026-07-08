@@ -271,6 +271,13 @@ bool find_orphaned_packages(
 int find_missing_dependencies(ElmJson *elm_json, struct CacheConfig *cache, PackageMap **out_missing);
 
 /**
+ * Report missing dependencies in an application's elm.json to stderr.
+ *
+ * @return Number of missing dependencies (0 = healthy). Returns 0 for non-application projects.
+ */
+int report_missing_dependencies_for_elm_json(ElmJson *elm_json, struct CacheConfig *cache);
+
+/**
  * Check if an exact version exists in the currently loaded registry.
  * Works for both V1 and V2 protocols.
  */

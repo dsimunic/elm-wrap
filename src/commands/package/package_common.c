@@ -3,11 +3,13 @@
 #include "../../cache.h"
 #include "../../constants.h"
 #include "../../fileutil.h"
+#include "../../global_context.h"
 #include "../../install_env.h"
 #include "../../registry.h"
 #include "../../solver.h"
 #include "../../protocol_v2/solver/v2_registry.h"
 #include "../../shared/log.h"
+#include "../../terminal_colors.h"
 #include "rulr.h"
 #include "../../rulr/rulr_dl.h"
 #include "../../rulr/host_helpers.h"
@@ -1631,6 +1633,32 @@ int find_missing_dependencies(ElmJson *elm_json, CacheConfig *cache, PackageMap 
     if (count > 0 && out_missing) {
         *out_missing = missing;
     } else {
+        package_map_free(missing);
+    }
+
+    return count;
+}
+
+int report_missing_dependencies_for_elm_json(ElmJson *elm_json, CacheConfig *cache) {
+    PackageMap *missing = NULL;
+    int count = find_missing_dependencies(elm_json, cache, &missing);
+
+    if (count > 0 && missing) {
+        fprintf(stderr, "\n%s-- MISSING DEPENDENCIES --------------------------------------------------------%s\n\n",
+                ANSI_DULL_CYAN, ANSI_RESET);
+        fprintf(stderr, "The following packages are required by your dependencies but are not\n");
+        fprintf(stderr, "listed in your elm.json:\n\n");
+
+        for (int i = 0; i < missing->count; i++) {
+            Package *pkg = &missing->packages[i];
+            fprintf(stderr, "    %s✗%s %s/%s  (needed by %s)\n",
+                    ANSI_RED, ANSI_RESET, pkg->author, pkg->name, pkg->version);
+        }
+
+        fprintf(stderr, "\nYour project will not compile until elm.json lists these packages.\n");
+        fprintf(stderr, "Run '%s install PACKAGE' with one of your direct dependencies to re-solve\n",
+                global_context_program_name());
+        fprintf(stderr, "elm.json, or add the listed packages as indirect dependencies.\n\n");
         package_map_free(missing);
     }
 

@@ -673,6 +673,10 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
     
     arena_free(local_dev_packages);
 
+    if (report_missing_dependencies_for_elm_json(elm_json, env->cache) > 0) {
+        return 1;
+    }
+
     log_debug("All dependencies downloaded successfully");
     return 0;
 }
