@@ -84,10 +84,10 @@ int cmd_make(int argc, char *argv[]) {
     int result = download_all_packages(elm_json, env);
 
     if (result != 0) {
-        log_error("Failed to download all dependencies");
+        report_download_all_packages_error(result);
         elm_json_free(elm_json);
         install_env_free(env);
-        return result;
+        return 1;
     }
 
     if (env->protocol_mode == PROTOCOL_V1) {

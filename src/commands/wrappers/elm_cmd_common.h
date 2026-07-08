@@ -11,6 +11,12 @@
 #include "../../elm_json.h"
 #include "../../install_env.h"
 
+typedef enum {
+    DOWNLOAD_ALL_PACKAGES_OK = 0,
+    DOWNLOAD_ALL_PACKAGES_ERROR = 1,
+    DOWNLOAD_ALL_PACKAGES_MISSING_DEPENDENCIES = 2
+} DownloadAllPackagesResult;
+
 /**
  * Build an environment array for running elm commands.
  * 
@@ -38,9 +44,16 @@ char **build_elm_environment(void);
  * For application projects, also verifies that all package-required
  * dependencies are listed in elm.json before running the compiler.
  *
- * Returns 0 on success, non-zero on failure.
+ * Returns DOWNLOAD_ALL_PACKAGES_OK on success, or a DownloadAllPackagesResult error.
  */
 int download_all_packages(ElmJson *elm_json, InstallEnv *env);
+
+/**
+ * Print the shared dependency-download failure message when the result actually
+ * represents a download failure. Missing dependency validation already prints a
+ * specific diagnostic and should not be followed by a misleading download error.
+ */
+void report_download_all_packages_error(int result);
 
 /**
  * Run the Elm compiler in a specific directory and capture its stdout/stderr.

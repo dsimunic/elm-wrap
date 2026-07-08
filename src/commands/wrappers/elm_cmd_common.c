@@ -674,11 +674,18 @@ int download_all_packages(ElmJson *elm_json, InstallEnv *env) {
     arena_free(local_dev_packages);
 
     if (report_missing_dependencies_for_elm_json(elm_json, env->cache) > 0) {
-        return 1;
+        return DOWNLOAD_ALL_PACKAGES_MISSING_DEPENDENCIES;
     }
 
     log_debug("All dependencies downloaded successfully");
-    return 0;
+    return DOWNLOAD_ALL_PACKAGES_OK;
+}
+
+void report_download_all_packages_error(int result) {
+    if (result != DOWNLOAD_ALL_PACKAGES_OK &&
+        result != DOWNLOAD_ALL_PACKAGES_MISSING_DEPENDENCIES) {
+        log_error("Failed to download all dependencies");
+    }
 }
 
 int run_compiler_make_capture_stdout_in_dir(

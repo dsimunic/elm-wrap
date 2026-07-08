@@ -68,8 +68,8 @@ int cmd_bump(int argc, char *argv[]) {
     install_env_free(env);
 
     if (result != 0) {
-        log_error("Failed to download all dependencies");
-        return result;
+        report_download_all_packages_error(result);
+        return 1;
     }
 
     // Now call elm bump with all the arguments
