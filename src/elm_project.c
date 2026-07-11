@@ -6,6 +6,7 @@
 #include "fileutil.h"
 #include "alloc.h"
 #include "constants.h"
+#include "shared/log.h"
 #include "vendor/cJSON.h"
 #include "dyn_array.h"
 #include <stdio.h>
@@ -13,6 +14,41 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <dirent.h>
+
+char *elm_resolve_elm_json_path(const char *path, bool report_errors) {
+    if (!path) return NULL;
+
+    struct stat st;
+    char resolved[MAX_PATH_LENGTH];
+    int path_len;
+
+    if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
+        path_len = snprintf(resolved, sizeof(resolved), "%s/elm.json", path);
+    } else if (stat(path, &st) == 0 && S_ISREG(st.st_mode)) {
+        path_len = snprintf(resolved, sizeof(resolved), "%s", path);
+    } else {
+        if (report_errors) {
+            log_error("Path does not exist: %s\n", path);
+        }
+        return NULL;
+    }
+
+    if (path_len < 0 || path_len >= (int)sizeof(resolved)) {
+        if (report_errors) {
+            log_error("Path is too long: %s\n", path);
+        }
+        return NULL;
+    }
+
+    if (stat(resolved, &st) != 0 || !S_ISREG(st.st_mode)) {
+        if (report_errors) {
+            log_error("elm.json not found at: %s\n", resolved);
+        }
+        return NULL;
+    }
+
+    return arena_strdup(resolved);
+}
 
 char **elm_parse_exposed_modules(const char *elm_json_path, int *count) {
     char *content = file_read_contents_bounded(elm_json_path, MAX_ELM_JSON_FILE_BYTES, NULL);

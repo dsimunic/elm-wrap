@@ -3,6 +3,7 @@
 #include "../../install.h"
 #include "../../global_context.h"
 #include "../../elm_json.h"
+#include "../../elm_project.h"
 #include "../../install_env.h"
 #include "../../solver.h"
 #include "../../alloc.h"
@@ -11,6 +12,7 @@
 #include "../../protocol_v1/install.h"
 #include "../../shared/log.h"
 #include "../../cache.h"
+#include "../../dependency_usage.h"
 #include "../../terminal_colors.h"
 #include "../../plural.h"
 #include <stdio.h>
@@ -25,6 +27,10 @@ static const char *remove_invocation_to_cmd_path(const char *invocation) {
 
     if (strcmp(invocation, "uninstall") == 0) {
         return "uninstall";
+    }
+
+    if (strcmp(invocation, "remove") == 0) {
+        return "remove";
     }
 
     if (strcmp(invocation, "package remove") == 0) {
@@ -44,7 +50,11 @@ static const char *remove_invocation_alias_line(const char *invocation) {
     }
 
     if (strcmp(invocation, "uninstall") == 0) {
-        return "Alias: 'package uninstall' can be used instead of 'uninstall'.";
+        return "Aliases: 'remove' and 'package uninstall' can be used instead of 'uninstall'.";
+    }
+
+    if (strcmp(invocation, "remove") == 0) {
+        return "Aliases: 'uninstall' and 'package remove' can be used instead of 'remove'.";
     }
 
     if (strcmp(invocation, "package remove") == 0) {
@@ -65,11 +75,16 @@ static void print_remove_usage(const char *invocation) {
     printf("Usage:\n");
     printf("  %s %s PACKAGE [PACKAGE...]\n", prog, cmd_path);
     printf("  %s %s --local-dev\n", prog, cmd_path);
+    printf("  %s %s --redundant [PATH] [--yes]\n", prog, cmd_path);
     printf("\n");
     printf("Remove packages from your Elm project.\n");
     printf("\n");
     printf("Use --local-dev (run from within an Elm package directory) to remove the\n");
     printf("current package from local-dev tracking.\n");
+    printf("\n");
+    printf("Use --redundant in an application to find and remove redundant dependency\n");
+    printf("references at PATH (defaults to the current directory). Direct dependencies\n");
+    printf("that are still required are demoted to indirect.\n");
     printf("\n");
     printf("This will also remove any indirect dependencies that are no longer\n");
     printf("needed by other packages.\n");
@@ -80,9 +95,12 @@ static void print_remove_usage(const char *invocation) {
     printf("  %s %s elm/html           # Remove elm/html from your project\n", prog, cmd_path);
     printf("  %s %s elm/html elm/json  # Remove multiple packages at once\n", prog, cmd_path);
     printf("  %s %s --local-dev        # Remove current package from local-dev tracking\n", prog, cmd_path);
+    printf("  %s %s --redundant --yes  # Remove all redundant dependency references\n", prog, cmd_path);
+    printf("  %s %s --redundant ./app  # Remove redundant references from another app\n", prog, cmd_path);
     printf("\n");
     printf("Options:\n");
     printf("  --local-dev                        # Remove current package from local-dev tracking\n");
+    printf("  --redundant                        # Remove redundant application dependencies\n");
     printf("  -y, --yes                          # Automatically confirm changes\n");
     printf("  --help                             # Show this help\n");
 }
@@ -138,6 +156,71 @@ static void print_remove_validation_errors(MultiRemoveValidation *validation) {
     fprintf(stderr, "I didn't remove anything yet, as I can only remove all specified packages or none.\n");
 }
 
+static void print_unsafe_removal_plan(const PackageMap *missing) {
+    fprintf(stderr, "%s-- PACKAGE REMOVAL FAILED -----------------------------------------------------%s\n\n",
+            ANSI_DULL_CYAN, ANSI_RESET);
+    fprintf(stderr, "I cannot apply this plan because it would remove dependencies that are\n");
+    fprintf(stderr, "still required by packages remaining in elm.json:\n\n");
+
+    for (int i = 0; missing && i < missing->count; i++) {
+        Package *pkg = &missing->packages[i];
+        fprintf(stderr, "    %s✗%s %s/%s  (needed by %s)\n",
+                ANSI_RED, ANSI_RESET, pkg->author, pkg->name, pkg->version);
+    }
+
+    fprintf(stderr, "\nI didn't modify elm.json.\n");
+}
+
+static bool package_name_is_selected(
+    const char **package_names,
+    int package_count,
+    const char *full_name
+) {
+    for (int i = 0; i < package_count; i++) {
+        if (package_names[i] && strcmp(package_names[i], full_name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool append_redundant_package_names(
+    const PackageMap *packages,
+    const char ***package_names,
+    int *package_count,
+    int *package_capacity
+) {
+    if (!packages) return true;
+
+    for (int i = 0; i < packages->count; i++) {
+        Package *pkg = &packages->packages[i];
+        if (!pkg->author || !pkg->name) return false;
+
+        char full_name[MAX_PACKAGE_NAME_LENGTH];
+        int name_len = snprintf(full_name, sizeof(full_name), "%s/%s", pkg->author, pkg->name);
+        if (name_len < 0 || name_len >= (int)sizeof(full_name)) return false;
+        if (package_name_is_selected(*package_names, *package_count, full_name)) continue;
+
+        char *stored_name = arena_strdup(full_name);
+        if (!stored_name) return false;
+
+        if (*package_count >= *package_capacity) {
+            int new_capacity = *package_capacity == 0
+                ? INITIAL_SMALL_CAPACITY
+                : *package_capacity * 2;
+            const char **resized = arena_realloc(
+                (void *)*package_names, (size_t)new_capacity * sizeof(const char *));
+            if (!resized) return false;
+            *package_names = resized;
+            *package_capacity = new_capacity;
+        }
+
+        (*package_names)[(*package_count)++] = stored_name;
+    }
+
+    return true;
+}
+
 int cmd_remove(int argc, char *argv[], const char *invocation) {
     /* Multi-package support: collect package names into a dynamic array */
     const char **package_names = NULL;
@@ -145,6 +228,7 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
     int package_capacity = 0;
     bool auto_yes = false;
     bool remove_local_dev = false;
+    bool remove_redundant = false;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -152,6 +236,8 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
             return 0;
         } else if (strcmp(argv[i], "--local-dev") == 0) {
             remove_local_dev = true;
+        } else if (strcmp(argv[i], "--redundant") == 0) {
+            remove_redundant = true;
         } else if (strcmp(argv[i], "-y") == 0 || strcmp(argv[i], "--yes") == 0) {
             auto_yes = true;
         } else if (argv[i][0] != '-') {
@@ -165,8 +251,8 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
     }
 
     if (remove_local_dev) {
-        if (package_count > 0) {
-            fprintf(stderr, "Error: --local-dev cannot be combined with package removal options\n");
+        if (package_count > 0 || remove_redundant) {
+            fprintf(stderr, "Error: --local-dev cannot be combined with other package removal options\n");
             print_remove_usage(invocation);
             return 1;
         }
@@ -188,31 +274,122 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
         return result;
     }
 
-    if (package_count == 0) {
+    const char *redundant_path_arg = NULL;
+    if (remove_redundant) {
+        if (package_count > 1) {
+            fprintf(stderr, "Error: --redundant accepts at most one PATH\n");
+            print_remove_usage(invocation);
+            return 1;
+        }
+        if (package_count == 1) {
+            redundant_path_arg = package_names[0];
+            package_count = 0;
+        }
+    } else if (package_count == 0) {
         fprintf(stderr, "Error: At least one package name is required\n");
         print_remove_usage(invocation);
         return 1;
     }
 
-    /* Phase 1: Validate all package names and check they exist in elm.json */
-    MultiRemoveValidation validation;
-    validation.results = arena_calloc(package_count, sizeof(RemoveValidationResult));
-    validation.count = package_count;
-    validation.valid_count = 0;
-    validation.invalid_count = 0;
+    const char *elm_json_path = ELM_JSON_PATH;
+    if (redundant_path_arg) {
+        char *resolved = elm_resolve_elm_json_path(redundant_path_arg, true);
+        if (!resolved) return 1;
+        elm_json_path = resolved;
+    }
 
     /* We need to read elm.json first to validate package existence */
     log_debug("Reading elm.json");
-    ElmJson *elm_json = elm_json_read(ELM_JSON_PATH);
+    ElmJson *elm_json = elm_json_read(elm_json_path);
     if (!elm_json) {
         log_error("Could not read elm.json");
         log_error("Have you run 'elm init' or 'wrap init'?");
         return 1;
     }
 
+    InstallEnv *env = NULL;
+    if (remove_redundant) {
+        if (elm_json->type != ELM_PROJECT_APPLICATION) {
+            fprintf(stderr, "Error: --redundant requires an application elm.json\n");
+            elm_json_free(elm_json);
+            return 1;
+        }
+
+        env = install_env_create();
+        if (!env) {
+            log_error("Failed to create install environment");
+            elm_json_free(elm_json);
+            return 1;
+        }
+        if (!install_env_init(env)) {
+            log_error("Failed to initialize install environment");
+            install_env_free(env);
+            elm_json_free(elm_json);
+            return 1;
+        }
+
+        PackageMap *unused_direct = NULL;
+        PackageMap *orphaned_indirect = NULL;
+        bool unused_ok = dependency_usage_find_unused_direct(
+            elm_json_path, elm_json, env->cache, &unused_direct);
+        bool orphaned_ok = find_orphaned_packages(
+            elm_json, env->cache, NULL, NULL, 0, &orphaned_indirect);
+
+        if (!unused_ok || !orphaned_ok) {
+            if (unused_direct) package_map_free(unused_direct);
+            if (orphaned_indirect) package_map_free(orphaned_indirect);
+            log_error("Could not determine redundant dependencies safely");
+            install_env_free(env);
+            elm_json_free(elm_json);
+            return 1;
+        }
+
+        dependency_usage_report_redundant(unused_direct, orphaned_indirect);
+
+        bool appended = append_redundant_package_names(
+            unused_direct, &package_names, &package_count, &package_capacity) &&
+            append_redundant_package_names(
+                orphaned_indirect, &package_names, &package_count, &package_capacity);
+        if (unused_direct) package_map_free(unused_direct);
+        if (orphaned_indirect) package_map_free(orphaned_indirect);
+
+        if (!appended) {
+            log_error("Failed to prepare redundant dependency removal");
+            install_env_free(env);
+            elm_json_free(elm_json);
+            return 1;
+        }
+
+        if (package_count == 0) {
+            printf("No redundant dependencies found.\n");
+            install_env_free(env);
+            elm_json_free(elm_json);
+            return 0;
+        }
+    }
+
+    /* Phase 1: Validate all package names and check they exist in elm.json */
+    MultiRemoveValidation validation;
+    validation.results = arena_calloc((size_t)package_count, sizeof(RemoveValidationResult));
+    validation.count = package_count;
+    validation.valid_count = 0;
+    validation.invalid_count = 0;
+    if (!validation.results) {
+        log_error("Failed to allocate package removal validation");
+        if (env) install_env_free(env);
+        elm_json_free(elm_json);
+        return 1;
+    }
+
     /* Arrays to hold parsed author/name for valid packages */
-    char **authors = arena_malloc(package_count * sizeof(char*));
-    char **names = arena_malloc(package_count * sizeof(char*));
+    char **authors = arena_malloc((size_t)package_count * sizeof(char*));
+    char **names = arena_malloc((size_t)package_count * sizeof(char*));
+    if (!authors || !names) {
+        log_error("Failed to allocate package removal targets");
+        if (env) install_env_free(env);
+        elm_json_free(elm_json);
+        return 1;
+    }
 
     for (int i = 0; i < package_count; i++) {
         RemoveValidationResult *r = &validation.results[i];
@@ -254,6 +431,7 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
     /* Phase 2: Report validation errors if any */
     if (validation.invalid_count > 0) {
         print_remove_validation_errors(&validation);
+        if (env) install_env_free(env);
         elm_json_free(elm_json);
         return 1;
     }
@@ -265,18 +443,20 @@ int cmd_remove(int argc, char *argv[], const char *invocation) {
         log_debug("Removing %d packages", package_count);
     }
 
-    InstallEnv *env = install_env_create();
     if (!env) {
-        log_error("Failed to create install environment");
-        elm_json_free(elm_json);
-        return 1;
-    }
+        env = install_env_create();
+        if (!env) {
+            log_error("Failed to create install environment");
+            elm_json_free(elm_json);
+            return 1;
+        }
 
-    if (!install_env_init(env)) {
-        log_error("Failed to initialize install environment");
-        install_env_free(env);
-        elm_json_free(elm_json);
-        return 1;
+        if (!install_env_init(env)) {
+            log_error("Failed to initialize install environment");
+            install_env_free(env);
+            elm_json_free(elm_json);
+            return 1;
+        }
     }
 
     log_debug("ELM_HOME: %s", env->cache->elm_home);
@@ -552,8 +732,22 @@ display_plan:
     }
 
 save_and_finish:
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        PackageMap *missing = NULL;
+        int missing_count = find_missing_dependencies(elm_json, env->cache, &missing);
+        if (missing_count > 0 && missing) {
+            fflush(stdout);
+            print_unsafe_removal_plan(missing);
+            package_map_free(missing);
+            install_plan_free(out_plan);
+            elm_json_free(elm_json);
+            install_env_free(env);
+            return 1;
+        }
+    }
+
     printf("Saving elm.json...\n");
-    if (!elm_json_write(elm_json, ELM_JSON_PATH)) {
+    if (!elm_json_write(elm_json, elm_json_path)) {
         fprintf(stderr, "Error: Failed to write elm.json\n");
         install_plan_free(out_plan);
         elm_json_free(elm_json);
@@ -561,21 +755,34 @@ save_and_finish:
         return 1;
     }
 
+    if (elm_json->type == ELM_PROJECT_APPLICATION) {
+        for (int i = 0; i < out_plan->count; i++) {
+            PackageChange *change = &out_plan->changes[i];
+            if (!unregister_local_dev_tracking_for_app(
+                    change->author, change->name, change->old_version, elm_json_path)) {
+                log_error("elm.json was updated, but local-dev tracking cleanup failed for %s/%s",
+                          change->author, change->name);
+                install_plan_free(out_plan);
+                elm_json_free(elm_json);
+                install_env_free(env);
+                return 1;
+            }
+        }
+    }
+
     /* Print success message — reflect demotions vs. removals so the wording
      * matches the plan we just carried out. */
-    int removed_count = package_count - demote_count;
-    if (package_count == 1) {
-        if (demote_count == 1) {
-            printf("Successfully demoted %s/%s to indirect!\n", authors[0], names[0]);
-        } else {
-            printf("Successfully removed %s/%s!\n", authors[0], names[0]);
-        }
+    int removed_count = out_plan->count;
+    if (package_count == 1 && demote_count == 1 && removed_count == 0) {
+        printf("Successfully demoted %s/%s to indirect!\n", authors[0], names[0]);
+    } else if (package_count == 1 && demote_count == 0 && removed_count == 1) {
+        printf("Successfully removed %s/%s!\n", authors[0], names[0]);
     } else if (demote_count == 0) {
         printf("Successfully removed %d package%s!\n",
-               package_count, en_plural_suffix(package_count));
+               removed_count, en_plural_suffix(removed_count));
     } else if (removed_count == 0) {
         printf("Successfully demoted %d package%s to indirect!\n",
-               package_count, en_plural_suffix(package_count));
+               demote_count, en_plural_suffix(demote_count));
     } else {
         printf("Successfully demoted %d package%s to indirect and removed %d package%s!\n",
                demote_count, en_plural_suffix(demote_count),

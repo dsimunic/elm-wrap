@@ -1835,6 +1835,12 @@ bool find_orphaned_packages(
         }
     }
 
+    /* Elm applications require elm/core for default imports and elm/json for
+     * flags and ports, even when application source files do not import their
+     * modules. Keep either package reachable if it is listed as indirect. */
+    rulr_insert_fact_2s(&rulr, "direct_dependency", "elm", "core");
+    rulr_insert_fact_2s(&rulr, "direct_dependency", "elm", "json");
+
     /* Insert indirect_dependency facts */
     if (elm_json->dependencies_indirect) {
         for (int i = 0; i < elm_json->dependencies_indirect->count; i++) {

@@ -362,6 +362,45 @@ EOF
     echo
 }
 
+# LOCAL-08: Application uninstall removes only its local-dev tracking record
+test_local_08_app_uninstall_removes_tracking() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
+    echo "=== BEGIN LOCAL-08: Application uninstall removes local-dev tracking ==="
+
+    local pkg_dir
+    pkg_dir=$(create_package "$TEST_ROOT/local-remove" "testauthor/local-remove")
+
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/local-remove-app" "local-remove-app")
+
+    cd "$app_dir"
+    run_wrap install --local-dev --from-path "$pkg_dir" testauthor/local-remove
+
+    local tracking_dir="$TEST_WRAP_HOME/_local-dev/testauthor/local-remove/1.0.0"
+    local app_elm_json
+    app_elm_json="$(cd "$app_dir" && pwd -P)/elm.json"
+    if ! grep -RqxF "$app_elm_json" "$tracking_dir"; then
+        echo "ERROR: Expected application local-dev tracking before uninstall"
+        exit 1
+    fi
+
+    run_wrap package uninstall testauthor/local-remove
+
+    if grep -RqxF "$app_elm_json" "$tracking_dir"; then
+        echo "ERROR: Application local-dev tracking remained after uninstall"
+        exit 1
+    fi
+    assert_no_dep "testauthor/local-remove" "$app_dir"
+
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    echo "=== END LOCAL-08 ==="
+    echo
+}
+
 # ERR-01: Install with --local-dev --from-path with non-existent path
 test_err_01_local_dev_nonexistent_path() {
     local since_before since_after delta
@@ -675,6 +714,7 @@ main() {
     test_err_03_from_path_without_local_dev
     test_local_06_registry_since_count
     test_local_07_package_uninstall_ignores_path_metadata
+    test_local_08_app_uninstall_removes_tracking
     test_make_01_compile_success
     test_make_02_compile_error
     test_make_03_no_local_dev

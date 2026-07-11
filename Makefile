@@ -205,6 +205,7 @@ SOURCES = $(SRCDIR)/main.c \
           $(SRCDIR)/commands/review/review.c \
           $(SRCDIR)/commands/review/reporter.c \
           $(SRCDIR)/commands/package/package_common.c \
+          $(SRCDIR)/dependency_usage.c \
           $(SRCDIR)/package_suggestions.c \
           $(SRCDIR)/commands/package/install_cmd.c \
           $(SRCDIR)/commands/package/install_local_dev.c \
@@ -307,6 +308,7 @@ OBJECTS = $(BUILDDIR)/main.o \
           $(BUILDDIR)/review.o \
           $(BUILDDIR)/reporter.o \
           $(BUILDDIR)/package_common.o \
+          $(BUILDDIR)/dependency_usage.o \
           $(BUILDDIR)/package_suggestions.o \
           $(BUILDDIR)/install_cmd.o \
           $(BUILDDIR)/install_local_dev.o \
@@ -762,6 +764,10 @@ $(BUILDDIR)/package_common.o: $(SRCDIR)/commands/package/package_common.c $(SRCD
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/rulr $(RULR_INCLUDE) -c $< -o $@
 
+$(BUILDDIR)/dependency_usage.o: $(SRCDIR)/dependency_usage.c $(SRCDIR)/dependency_usage.h $(SRCDIR)/alloc.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/cache.h $(SRCDIR)/constants.h $(SRCDIR)/elm_json.h $(SRCDIR)/elm_project.h $(SRCDIR)/shared/log.h $(SRCDIR)/terminal_colors.h | $(BUILDDIR)
+	$(COMPILE_MSG) $@
+	$(Q)$(CC) $(CFLAGS) -I$(SRCDIR)/vendor/tree-sitter -c $< -o $@
+
 $(BUILDDIR)/package_suggestions.o: $(SRCDIR)/package_suggestions.c $(SRCDIR)/package_suggestions.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/alloc.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
@@ -782,7 +788,7 @@ $(BUILDDIR)/init_cmd.o: $(SRCDIR)/commands/package/init_cmd.c $(SRCDIR)/commands
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/extract_cmd.o: $(SRCDIR)/commands/package/extract_cmd.c $(SRCDIR)/commands/package/extract_cmd.h $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install.h $(SRCDIR)/install_env.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/shared/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/elm_json.h $(SRCDIR)/elm_project.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/vendor/cJSON.h | $(BUILDDIR)
+$(BUILDDIR)/extract_cmd.o: $(SRCDIR)/commands/package/extract_cmd.c $(SRCDIR)/commands/package/extract_cmd.h $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install.h $(SRCDIR)/install_env.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/shared/log.h $(SRCDIR)/fileutil.h $(SRCDIR)/elm_json.h $(SRCDIR)/elm_project.h $(SRCDIR)/dependency_usage.h $(SRCDIR)/ast/skeleton.h $(SRCDIR)/vendor/cJSON.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -Isrc/vendor/tree-sitter -c $< -o $@
 
@@ -790,11 +796,11 @@ $(BUILDDIR)/cache_cmd.o: $(SRCDIR)/commands/package/cache_cmd.c $(SRCDIR)/comman
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/remove_cmd.o: $(SRCDIR)/commands/package/remove_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/solver.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h | $(BUILDDIR)
+$(BUILDDIR)/remove_cmd.o: $(SRCDIR)/commands/package/remove_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/install.h $(SRCDIR)/elm_json.h $(SRCDIR)/elm_project.h $(SRCDIR)/dependency_usage.h $(SRCDIR)/install_env.h $(SRCDIR)/solver.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/info_cmd.o: $(SRCDIR)/commands/package/info_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/local_dev/local_dev_tracking.h $(SRCDIR)/install.h $(SRCDIR)/install_check.h $(SRCDIR)/elm_json.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/protocol_v2/install.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/shared/log.h | $(BUILDDIR)
+$(BUILDDIR)/info_cmd.o: $(SRCDIR)/commands/package/info_cmd.c $(SRCDIR)/commands/package/package_common.h $(SRCDIR)/commands/package/install_local_dev.h $(SRCDIR)/local_dev/local_dev_tracking.h $(SRCDIR)/install.h $(SRCDIR)/install_check.h $(SRCDIR)/elm_json.h $(SRCDIR)/dependency_usage.h $(SRCDIR)/install_env.h $(SRCDIR)/registry.h $(SRCDIR)/protocol_v1/install.h $(SRCDIR)/protocol_v2/install.h $(SRCDIR)/protocol_v2/solver/v2_registry.h $(SRCDIR)/global_context.h $(SRCDIR)/alloc.h $(SRCDIR)/cache.h $(SRCDIR)/terminal_colors.h $(SRCDIR)/shared/log.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
@@ -980,7 +986,7 @@ $(BUILDDIR)/elm_cmd_common.o: $(SRCDIR)/commands/wrappers/elm_cmd_common.c $(SRC
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 # Build elm_project object
-$(BUILDDIR)/elm_project.o: $(SRCDIR)/elm_project.c $(SRCDIR)/elm_project.h $(SRCDIR)/fileutil.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/dyn_array.h | $(BUILDDIR)
+$(BUILDDIR)/elm_project.o: $(SRCDIR)/elm_project.c $(SRCDIR)/elm_project.h $(SRCDIR)/alloc.h $(SRCDIR)/constants.h $(SRCDIR)/fileutil.h $(SRCDIR)/shared/log.h $(SRCDIR)/vendor/cJSON.h $(SRCDIR)/dyn_array.h | $(BUILDDIR)
 	$(COMPILE_MSG) $@
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 

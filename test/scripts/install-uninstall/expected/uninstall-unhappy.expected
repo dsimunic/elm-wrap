@@ -45,6 +45,31 @@ Successfully demoted elm/core to indirect!
 [Registry since-count: 34 -> 34 (Δ0)]
 === END ERR-03 ===
 
+=== BEGIN ERR-04: Remove required indirect dependency ===
+Here is my plan:
+
+  Add:
+    wrap/dep-single-no-deps    1.0.0
+    wrap/package-single-1d     1.0.0
+
+Saving elm.json...
+Successfully installed wrap/package-single-1d!
+Here is my plan:
+
+  Remove:
+    wrap/dep-single-no-deps    1.0.0
+
+-- PACKAGE REMOVAL FAILED -----------------------------------------------------
+
+I cannot apply this plan because it would remove dependencies that are
+still required by packages remaining in elm.json:
+
+    ✗ wrap/dep-single-no-deps  (needed by wrap/package-single-1d)
+
+I didn't modify elm.json.
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END ERR-04 ===
+
 
 [Registry since-count: 34 -> 34 (Δ0)]
 === END ===

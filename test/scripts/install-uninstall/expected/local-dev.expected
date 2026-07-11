@@ -195,6 +195,26 @@ Successfully removed wrap/package-single-no-deps!
 [Registry since-count: 36 -> 36 (Δ0)]
 === END LOCAL-07 ===
 
+=== BEGIN LOCAL-08: Application uninstall removes local-dev tracking ===
+Here is my plan:
+
+  Add (local):
+    testauthor/local-remove    1.0.0 (local)
+
+  Source: /private<TEST_ROOT>/local-remove
+
+Saving elm.json...
+Successfully installed testauthor/local-remove 1.0.0 (local)!
+Here is my plan:
+
+  Remove:
+    testauthor/local-remove    1.0.0
+
+Saving elm.json...
+Successfully removed testauthor/local-remove!
+[Registry since-count: 36 -> 36 (Δ0)]
+=== END LOCAL-08 ===
+
 === BEGIN MAKE-01: Local-dev package compiles successfully with make ===
 Here is my plan:
 

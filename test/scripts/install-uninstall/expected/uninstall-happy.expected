@@ -35,7 +35,7 @@ Here is my plan:
     wrap/package-single-1d     1.0.0
 
 Saving elm.json...
-Successfully removed wrap/package-single-1d!
+Successfully removed 2 packages!
 [Registry since-count: 34 -> 34 (Δ0)]
 === END APP-02 ===
 
@@ -115,9 +115,50 @@ Here is my plan:
     wrap/cycle-b    1.0.0
 
 Saving elm.json...
-Successfully removed wrap/cycle-a!
+Successfully removed 2 packages!
 [Registry since-count: 34 -> 34 (Δ0)]
 === END APP-06 ===
+
+=== BEGIN APP-07: Remove redundant dependencies ===
+
+-- REDUNDANT DEPENDENCIES ------------------------------------------------------
+
+The following direct dependencies are not imported by application source files:
+
+    ✗ wrap/package-single-no-deps  1.0.0
+
+The following indirect dependencies are not required by any direct dependency:
+
+    ✗ wrap/dep-single-no-deps  1.0.0
+
+Here is my plan:
+
+  Remove:
+    wrap/dep-single-no-deps        1.0.0
+    wrap/package-single-no-deps    1.0.0
+
+Saving elm.json...
+Successfully removed 2 packages!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-07 ===
+
+=== BEGIN APP-08: Demote redundant direct dependency ===
+
+-- REDUNDANT DEPENDENCIES ------------------------------------------------------
+
+The following direct dependencies are not imported by application source files:
+
+    ✗ wrap/dep-single-no-deps  1.0.0
+
+Here is my plan:
+
+  Demote to indirect:
+    wrap/dep-single-no-deps    1.0.0
+
+Saving elm.json...
+Successfully demoted wrap/dep-single-no-deps to indirect!
+[Registry since-count: 34 -> 34 (Δ0)]
+=== END APP-08 ===
 
 === BEGIN PKG-01: Uninstall single package from package type ===
 Here is my plan:

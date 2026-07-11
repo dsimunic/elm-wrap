@@ -5,6 +5,7 @@
 #include "../../install_check.h"
 #include "../../elm_json.h"
 #include "../../elm_project.h"
+#include "../../dependency_usage.h"
 #include "../../install_env.h"
 #include "../../cache.h"
 #include "../../registry.h"
@@ -109,6 +110,7 @@ static void print_info_usage(const char *invocation) {
     user_message("  - Package registry connectivity\n");
     user_message("  - Installed packages (if run in a project directory)\n");
     user_message("  - Available updates (if run in a project directory)\n");
+    user_message("  - Redundant dependencies (for application projects)\n");
     user_message("\n");
     user_message("Version resolution (for package lookup):\n");
     user_message("  - If package is in elm.json: uses that version\n");
@@ -242,6 +244,28 @@ static void print_dependencies_section(const ElmJson *elm_json, size_t max_name_
     user_message("\n");
 }
 
+static void report_redundant_application_dependencies(
+    const char *elm_json_path,
+    ElmJson *elm_json,
+    CacheConfig *cache
+) {
+    if (!elm_json || elm_json->type != ELM_PROJECT_APPLICATION || !cache) return;
+
+    PackageMap *unused_direct = NULL;
+    PackageMap *orphaned_indirect = NULL;
+    bool unused_ok = dependency_usage_find_unused_direct(
+        elm_json_path, elm_json, cache, &unused_direct);
+    bool orphaned_ok = find_orphaned_packages(
+        elm_json, cache, NULL, NULL, 0, &orphaned_indirect);
+
+    dependency_usage_report_redundant(
+        unused_ok ? unused_direct : NULL,
+        orphaned_ok ? orphaned_indirect : NULL);
+
+    if (unused_direct) package_map_free(unused_direct);
+    if (orphaned_indirect) package_map_free(orphaned_indirect);
+}
+
 static void report_local_package_cycles_with_env(ElmJson *elm_json, InstallEnv *env) {
     if (!elm_json ||
         !env ||
@@ -307,38 +331,6 @@ static bool is_package_name_format(const char *str) {
 
     return slash_count == 1;
 }
-
-static bool try_resolve_elm_json_path_from_arg(const char *arg, char **out_elm_json_path, bool report_errors) {
-    if (!arg || !out_elm_json_path) {
-        return false;
-    }
-
-    struct stat st;
-    char path_buf[PATH_MAX];
-
-    if (stat(arg, &st) == 0 && S_ISDIR(st.st_mode)) {
-        snprintf(path_buf, sizeof(path_buf), "%s/elm.json", arg);
-    } else if (stat(arg, &st) == 0 && S_ISREG(st.st_mode)) {
-        snprintf(path_buf, sizeof(path_buf), "%s", arg);
-    } else {
-        if (report_errors) {
-            log_error("Path does not exist: %s\n", arg);
-        }
-        return false;
-    }
-
-    if (stat(path_buf, &st) != 0 || !S_ISREG(st.st_mode)) {
-        if (report_errors) {
-            log_error("elm.json not found at: %s\n", path_buf);
-        }
-        return false;
-    }
-
-    *out_elm_json_path = arena_strdup(path_buf);
-    return *out_elm_json_path != NULL;
-}
-
-
 
 static void print_package_suggestions_block(
     const char *author,
@@ -750,8 +742,8 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
                 print_info_usage(invocation);
                 return 1;
             }
-            char *resolved = NULL;
-            if (!try_resolve_elm_json_path_from_arg(arg, &resolved, true)) {
+            char *resolved = elm_resolve_elm_json_path(arg, true);
+            if (!resolved) {
                 return 1;
             }
             elm_json_path = resolved;
@@ -790,9 +782,9 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
              * This matches the behavior users get when they suffix the argument with '/'.
              * If that also fails, keep the original "package not found" error.
              */
-            char *resolved = NULL;
             const char *path_arg = raw_arg ? raw_arg : arg;
-            if (try_resolve_elm_json_path_from_arg(path_arg, &resolved, false)) {
+            char *resolved = elm_resolve_elm_json_path(path_arg, false);
+            if (resolved) {
                 elm_json_path = resolved;
                 is_package_lookup = false;
                 install_env_free(env);
@@ -917,6 +909,7 @@ int cmd_info(int argc, char *argv[], const char *invocation) {
         report_local_package_cycles_with_env(elm_json, env);
 
         report_missing_dependencies_for_elm_json(elm_json, env->cache);
+        report_redundant_application_dependencies(elm_json_path, elm_json, env->cache);
 
         if (global_context_is_v2() && v2_registry) {
             check_all_upgrades_v2(elm_json_path, v2_registry, max_name_len);

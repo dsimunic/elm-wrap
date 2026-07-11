@@ -144,6 +144,9 @@ This can make Elm dependency verification block while building package artifacts
 [Registry since-count: 34 -> 34 (Δ0)]
 === END ERR-07 ===
 
+=== BEGIN ERR-08: Info reports redundant dependencies ===
+=== END ERR-08 ===
+
 
 [Registry since-count: 34 -> 34 (Δ0)]
 === END ===

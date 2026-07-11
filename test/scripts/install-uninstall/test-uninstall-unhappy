@@ -101,6 +101,39 @@ test_err_03_uninstall_elm_core() {
     echo
 }
 
+# ERR-04: Removing an indirect dependency required by a retained package must fail
+test_err_04_remove_required_indirect_dependency() {
+    local since_before since_after delta
+    since_before=$(get_v1_since_count)
+
+    echo "=== BEGIN ERR-04: Remove required indirect dependency ==="
+
+    local app_dir
+    app_dir=$(create_app "$TEST_ROOT/err04" "err04")
+
+    cd "$app_dir"
+    run_wrap install wrap/package-single-1d
+
+    local before output after
+    before=$(snapshot_deps "$app_dir")
+    if output=$(run_wrap package uninstall wrap/dep-single-no-deps); then
+        echo "ERROR: Expected command to fail"
+        exit 1
+    fi
+    echo "$output"
+
+    after=$(snapshot_deps "$app_dir")
+    assert_deps_unchanged "$before" "$after"
+    assert_direct_dep "wrap/package-single-1d" "1.0.0" "$app_dir"
+    assert_indirect_dep "wrap/dep-single-no-deps" "1.0.0" "$app_dir"
+
+    since_after=$(get_v1_since_count)
+    delta=$((since_after - since_before))
+    echo "[Registry since-count: $since_before -> $since_after (Δ$delta)]"
+    echo "=== END ERR-04 ==="
+    echo
+}
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -114,6 +147,7 @@ main() {
     test_err_01_uninstall_nonexistent_package
     test_err_02_uninstall_not_in_dependencies
     test_err_03_uninstall_elm_core
+    test_err_04_remove_required_indirect_dependency
 
     local since_after delta
     since_after=$(get_v1_since_count)

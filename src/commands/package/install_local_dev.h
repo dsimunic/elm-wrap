@@ -107,6 +107,21 @@ bool register_local_dev_tracking_if_needed(const char *author, const char *name,
                                            const char *version, const char *app_elm_json_path);
 
 /**
+ * Stop tracking one local-dev package for one application.
+ *
+ * This removes only the application's tracking file. The package's PATH
+ * metadata and tracking records for other applications are preserved.
+ *
+ * @param author            Package author
+ * @param name              Package name
+ * @param version           Package version
+ * @param app_elm_json_path Path to the application's elm.json
+ * @return true when the record was removed or did not exist, false on error
+ */
+bool unregister_local_dev_tracking_for_app(const char *author, const char *name,
+                                           const char *version, const char *app_elm_json_path);
+
+/**
  * Ensure the local-dev symlink is correct for a package.
  *
  * If the package is registered as local-dev but the symlink in ELM_HOME

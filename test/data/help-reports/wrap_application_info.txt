@@ -8,6 +8,7 @@ Shows:
   - Package registry connectivity
   - Installed packages
   - Available updates
+  - Redundant dependencies
 
 Examples:
   wrap application info              # Show info for current directory

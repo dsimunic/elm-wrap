@@ -290,6 +290,89 @@ test_err_07_install_dependency_cycle_into_package() {
     echo
 }
 
+# ERR-08: Info reports unused direct and orphaned indirect dependencies
+test_err_08_info_reports_redundant_dependencies() {
+    echo "=== BEGIN ERR-08: Info reports redundant dependencies ==="
+
+    local cached_package_dir="$TEST_ELM_HOME/$ELM_VERSION/packages/wrap/package-single-no-deps/1.0.0"
+    mkdir -p "$cached_package_dir/src/Unused"
+    cat >"$cached_package_dir/elm.json" <<'EOF'
+{
+    "type": "package",
+    "name": "wrap/package-single-no-deps",
+    "summary": "generated test package",
+    "license": "BSD-3-Clause",
+    "version": "1.0.0",
+    "exposed-modules": ["Unused.Module"],
+    "elm-version": "0.19.1 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {}
+}
+EOF
+    cat >"$cached_package_dir/src/Unused/Module.elm" <<'EOF'
+module Unused.Module exposing (value)
+
+value : Int
+value =
+    1
+EOF
+
+    local app_dir="$TEST_ROOT/err08"
+    mkdir -p "$app_dir/src"
+    cat >"$app_dir/elm.json" <<'EOF'
+{
+    "type": "application",
+    "source-directories": ["src"],
+    "elm-version": "0.19.1",
+    "dependencies": {
+        "direct": {
+            "elm/core": "1.0.5",
+            "wrap/package-single-no-deps": "1.0.0"
+        },
+        "indirect": {
+            "wrap/dep-single-no-deps": "1.0.0"
+        }
+    },
+    "test-dependencies": {
+        "direct": {},
+        "indirect": {}
+    }
+}
+EOF
+    cat >"$app_dir/src/Main.elm" <<'EOF'
+module Main exposing (main)
+
+import Platform
+
+main : Program () () Never
+main =
+    Platform.worker
+        { init = \() -> ( (), Cmd.none )
+        , update = \_ model -> ( model, Cmd.none )
+        , subscriptions = \_ -> Sub.none
+        }
+EOF
+
+    local output
+    output=$(run_wrap info "$app_dir")
+
+    if [[ "$output" != *"REDUNDANT DEPENDENCIES"* ||
+          "$output" != *"wrap/package-single-no-deps  1.0.0"* ]]; then
+        echo "ERROR: Expected application info to report the unused direct dependency"
+        exit 1
+    fi
+
+    if [[ "$output" != *"wrap/dep-single-no-deps  1.0.0"* ]]; then
+        echo "ERROR: Expected application info to report the orphaned indirect dependency"
+        exit 1
+    fi
+
+    echo "=== END ERR-08 ==="
+    echo
+}
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -307,6 +390,7 @@ main() {
     test_err_05_package_info_reports_cycle
     test_err_06_install_cyclic_package_into_application
     test_err_07_install_dependency_cycle_into_package
+    test_err_08_info_reports_redundant_dependencies
     
     local since_after delta
     since_after=$(get_v1_since_count)

@@ -8,6 +8,7 @@ Shows:
   - Package registry connectivity
   - Installed packages (if run in a project directory)
   - Available updates (if run in a project directory)
+  - Redundant dependencies (for application projects)
 
 Version resolution (for package lookup):
   - If package is in elm.json: uses that version

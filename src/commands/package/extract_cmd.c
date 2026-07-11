@@ -11,6 +11,7 @@
 #include "../../fileutil.h"
 #include "../../elm_json.h"
 #include "../../elm_project.h"
+#include "../../dependency_usage.h"
 #include "../../embedded_archive.h"
 #include "../../ast/skeleton.h"
 #include "../../dyn_array.h"
@@ -382,34 +383,6 @@ static const char *find_app_package_version_any(const ElmJson *app_json, const c
     return NULL;
 }
 
-typedef struct {
-    int count;
-    int capacity;
-    char **items; /* "author/name" */
-} StringSet;
-
-static void string_set_init(StringSet *set) {
-    if (!set) return;
-    set->count = 0;
-    set->capacity = INITIAL_MEDIUM_CAPACITY;
-    set->items = arena_malloc(set->capacity * sizeof(char*));
-}
-
-static bool string_set_contains(const StringSet *set, const char *s) {
-    if (!set || !set->items || !s) return false;
-    for (int i = 0; i < set->count; i++) {
-        if (set->items[i] && strcmp(set->items[i], s) == 0) return true;
-    }
-    return false;
-}
-
-static void string_set_add(StringSet *set, const char *s) {
-    if (!set || !s) return;
-    if (string_set_contains(set, s)) return;
-    DYNARRAY_ENSURE_CAPACITY(set->items, set->count, set->capacity, char*);
-    set->items[set->count++] = arena_strdup(s);
-}
-
 static PackageMap *compute_extracted_package_dependencies(
     const char *target_src_abs,
     const SelectedFiles *selected,
@@ -483,7 +456,6 @@ static PackageMap *compute_extracted_package_dependencies(
 
 static bool demote_unused_app_direct_dependencies(
     const char *app_elm_json_path,
-    const char *app_root_dir,
     const char *keep_author,
     const char *keep_name
 ) {
@@ -495,100 +467,30 @@ static bool demote_unused_app_direct_dependencies(
         return false;
     }
 
-    int srcdir_count = 0;
-    char **srcdirs_abs = get_app_source_dirs_abs(app_elm_json_path, app_root_dir, &srcdir_count);
-    if (!srcdirs_abs || srcdir_count <= 0) {
+    CacheConfig *cache = cache_config_init();
+    if (!cache) {
         elm_json_free(app_json);
         return false;
     }
 
-    ExternalModuleOwnerMap external_map = {0};
-    bool have_external_map = build_external_module_owner_map_from_app(app_json, &external_map);
-    if (!have_external_map) {
+    PackageMap *unused = NULL;
+    if (!dependency_usage_find_unused_direct(app_elm_json_path, app_json, cache, &unused)) {
+        cache_config_free(cache);
         elm_json_free(app_json);
         return false;
-    }
-
-    StringSet used_direct_pkgs;
-    string_set_init(&used_direct_pkgs);
-    if (!used_direct_pkgs.items) {
-        elm_json_free(app_json);
-        return false;
-    }
-
-    int files_capacity = INITIAL_LARGE_CAPACITY;
-    int files_count = 0;
-    char **files = arena_malloc(files_capacity * sizeof(char*));
-    if (!files) {
-        elm_json_free(app_json);
-        return false;
-    }
-
-    for (int i = 0; i < srcdir_count; i++) {
-        if (!srcdirs_abs[i]) continue;
-        elm_collect_elm_files(srcdirs_abs[i], &files, &files_count, &files_capacity);
-    }
-
-    for (int i = 0; i < files_count; i++) {
-        if (!files[i]) continue;
-
-        SkeletonModule *module = skeleton_parse(files[i]);
-        if (!module) continue;
-
-        for (int j = 0; j < module->imports_count; j++) {
-            const char *import_name = module->imports[j].module_name;
-            if (!import_name) continue;
-
-            char *resolved_local = resolve_local_import_to_file(import_name, srcdirs_abs, srcdir_count);
-            if (resolved_local) {
-                arena_free(resolved_local);
-                continue;
-            }
-
-            const char *owner_pkg = external_module_owner_map_find(&external_map, import_name);
-            if (!owner_pkg) continue;
-            string_set_add(&used_direct_pkgs, owner_pkg);
-        }
-
-        skeleton_free(module);
     }
 
     int removed_count = 0;
-    if (app_json->dependencies_direct) {
-        int i = 0;
-        while (i < app_json->dependencies_direct->count) {
-            Package *pkg = &app_json->dependencies_direct->packages[i];
-            if (!pkg->author || !pkg->name) {
-                i++;
-                continue;
-            }
-
-            if (strcmp(pkg->author, "elm") == 0 && strcmp(pkg->name, "core") == 0) {
-                i++;
-                continue;
-            }
-
+    if (unused) {
+        for (int i = 0; i < unused->count; i++) {
+            Package *pkg = &unused->packages[i];
             if (keep_author && keep_name &&
                 strcmp(pkg->author, keep_author) == 0 && strcmp(pkg->name, keep_name) == 0) {
-                i++;
                 continue;
             }
-
-            char key[MAX_KEY_LENGTH];
-            int n = snprintf(key, sizeof(key), "%s/%s", pkg->author, pkg->name);
-            if (n < 0 || n >= (int)sizeof(key)) {
-                i++;
-                continue;
+            if (package_map_remove(app_json->dependencies_direct, pkg->author, pkg->name)) {
+                removed_count++;
             }
-
-            if (!string_set_contains(&used_direct_pkgs, key)) {
-                if (package_map_remove(app_json->dependencies_direct, pkg->author, pkg->name)) {
-                    removed_count++;
-                    continue; /* swapped */
-                }
-            }
-
-            i++;
         }
     }
 
@@ -597,6 +499,8 @@ static bool demote_unused_app_direct_dependencies(
         ok = elm_json_write(app_json, app_elm_json_path);
     }
 
+    if (unused) package_map_free(unused);
+    cache_config_free(cache);
     elm_json_free(app_json);
     return ok;
 }
@@ -2316,7 +2220,7 @@ int cmd_extract(int argc, char *argv[]) {
         char *keep_author = NULL;
         char *keep_name = NULL;
         if (parse_package_name_silent(package_name, &keep_author, &keep_name)) {
-            (void)demote_unused_app_direct_dependencies(app_elm_json_to_use, app_root_dir, keep_author, keep_name);
+            (void)demote_unused_app_direct_dependencies(app_elm_json_to_use, keep_author, keep_name);
         }
         if (keep_author) arena_free(keep_author);
         if (keep_name) arena_free(keep_name);

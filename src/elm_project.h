@@ -11,6 +11,15 @@
 #include <stdbool.h>
 
 /**
+ * Resolve a directory or file argument to an elm.json path.
+ *
+ * @param path Directory containing elm.json, or a direct file path.
+ * @param report_errors Whether to print path resolution errors.
+ * @return Arena-allocated path, or NULL when resolution fails.
+ */
+char *elm_resolve_elm_json_path(const char *path, bool report_errors);
+
+/**
  * Parse exposed-modules from elm.json.
  * 
  * Handles both flat array format: ["Module1", "Module2"]

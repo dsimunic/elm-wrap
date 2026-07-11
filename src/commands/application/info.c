@@ -21,6 +21,7 @@ static void print_application_info_usage(void) {
     printf("  - Package registry connectivity\n");
     printf("  - Installed packages\n");
     printf("  - Available updates\n");
+    printf("  - Redundant dependencies\n");
     printf("\n");
     printf("Examples:\n");
     printf("  %s application info              # Show info for current directory\n", global_context_program_name());

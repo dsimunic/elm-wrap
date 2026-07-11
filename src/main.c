@@ -87,6 +87,7 @@ void print_usage(const char *prog) {
             printf("  reactor            Start the Elm Reactor development server\n");
             printf("  make ELM_FILE      Compile Elm code to JavaScript or HTML\n");
             printf("  install PACKAGE    Install packages for your Elm project\n");
+            printf("  remove PACKAGE     Remove packages from your Elm project\n");
             printf("  uninstall PACKAGE  Remove packages from your Elm project\n");
 //            printf("  bump               Bump version based on API changes\n");
 //            printf("  diff [VERSION]     Show API differences between versions\n");
@@ -343,6 +344,10 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(argv[1], "uninstall") == 0) {
             return cmd_remove(argc - 1, argv + 1, "uninstall");
+        }
+
+        if (strcmp(argv[1], "remove") == 0) {
+            return cmd_remove(argc - 1, argv + 1, "remove");
         }
 
         if (strcmp(argv[1], "info") == 0) {

@@ -1,0 +1,31 @@
+Usage:
+  wrap remove PACKAGE [PACKAGE...]
+  wrap remove --local-dev
+  wrap remove --redundant [PATH] [--yes]
+
+Remove packages from your Elm project.
+
+Use --local-dev (run from within an Elm package directory) to remove the
+current package from local-dev tracking.
+
+Use --redundant in an application to find and remove redundant dependency
+references at PATH (defaults to the current directory). Direct dependencies
+that are still required are demoted to indirect.
+
+This will also remove any indirect dependencies that are no longer
+needed by other packages.
+
+Aliases: 'uninstall' and 'package remove' can be used instead of 'remove'.
+
+Examples:
+  wrap remove elm/html           # Remove elm/html from your project
+  wrap remove elm/html elm/json  # Remove multiple packages at once
+  wrap remove --local-dev        # Remove current package from local-dev tracking
+  wrap remove --redundant --yes  # Remove all redundant dependency references
+  wrap remove --redundant ./app  # Remove redundant references from another app
+
+Options:
+  --local-dev                        # Remove current package from local-dev tracking
+  --redundant                        # Remove redundant application dependencies
+  -y, --yes                          # Automatically confirm changes
+  --help                             # Show this help

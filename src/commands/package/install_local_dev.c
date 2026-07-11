@@ -335,6 +335,55 @@ static bool register_dependency_tracking(const char *author, const char *name, c
     return true;
 }
 
+bool unregister_local_dev_tracking_for_app(const char *author, const char *name,
+                                           const char *version, const char *app_elm_json_path) {
+    if (!author || !name || !version || !app_elm_json_path) {
+        return false;
+    }
+
+    char *tracking_dir = get_local_dev_tracking_dir();
+    if (!tracking_dir) {
+        return false;
+    }
+
+    char abs_path[PATH_MAX];
+    if (!realpath(app_elm_json_path, abs_path)) {
+        log_error("Failed to resolve absolute path for: %s", app_elm_json_path);
+        arena_free(tracking_dir);
+        return false;
+    }
+
+    unsigned long path_hash = hash_path(abs_path);
+    char hash_filename[MAX_VERSION_STRING_LENGTH];
+    int hash_len = snprintf(hash_filename, sizeof(hash_filename), "%lx", path_hash);
+    if (hash_len < 0 || hash_len >= (int)sizeof(hash_filename)) {
+        arena_free(tracking_dir);
+        return false;
+    }
+
+    size_t file_len = strlen(tracking_dir) + strlen(author) + strlen(name) +
+                      strlen(version) + strlen(hash_filename) + 5;
+    char *tracking_file = arena_malloc(file_len);
+    if (!tracking_file) {
+        arena_free(tracking_dir);
+        return false;
+    }
+
+    snprintf(tracking_file, file_len, "%s/%s/%s/%s/%s",
+             tracking_dir, author, name, version, hash_filename);
+    arena_free(tracking_dir);
+
+    if (unlink(tracking_file) != 0 && errno != ENOENT) {
+        log_error("Failed to remove local-dev application tracking: %s", tracking_file);
+        arena_free(tracking_file);
+        return false;
+    }
+
+    log_debug("Removed local-dev application tracking: %s", tracking_file);
+    arena_free(tracking_file);
+    return true;
+}
+
 static bool ensure_local_dev_in_registry_dat(InstallEnv *env, const char *author, const char *name,
                                              const char *version) {
     if (!env || !env->cache || !env->cache->registry_path) {
